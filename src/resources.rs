@@ -18,3 +18,12 @@ impl Default for ExtendedUiConfiguration {
         }
     }
 }
+
+#[derive(Resource, Debug, Clone)]
+pub struct CurrentElementSelected(pub usize);
+
+impl Default for CurrentElementSelected {
+    fn default() -> Self {
+        Self(0)
+    }
+}

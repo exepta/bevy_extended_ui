@@ -2,7 +2,7 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
 use bevy::prelude::*;
 
-static UI_ID_COUNTER: AtomicUsize = AtomicUsize::new(0);
+static UI_ID_COUNTER: AtomicUsize = AtomicUsize::new(1);
 
 #[derive(Component, Debug, Clone)]
 pub struct UiGenID(pub usize);

@@ -8,7 +8,7 @@ pub mod utils;
 use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use crate::global::UiElementState;
-use crate::resources::ExtendedUiConfiguration;
+use crate::resources::{CurrentElementSelected, ExtendedUiConfiguration};
 use crate::services::ServicesPlugin;
 use crate::styles::StylesPlugin;
 use crate::widgets::WidgetsPlugin;
@@ -21,6 +21,7 @@ pub struct ExtendedUiPlugin;
 impl Plugin for ExtendedUiPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ExtendedUiConfiguration>();
+        app.init_resource::<CurrentElementSelected>();
         app.register_type::<UiElementState>();
         app.add_plugins((ServicesPlugin, StylesPlugin, WidgetsPlugin));
         app.add_systems(Update, load_ui_camera_system

@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use crate::global::{UiGenID, UiElementState };
-use crate::resources::ExtendedUiConfiguration;
+use crate::resources::{CurrentElementSelected, ExtendedUiConfiguration};
 use crate::styles::{BaseStyle, HoverStyle, SelectedStyle};
 
 #[derive(Component, Reflect, Debug, Clone)]
@@ -42,26 +42,25 @@ fn internal_generate_component_system(
     }
 }
 
-fn on_internal_mouse_click(event: Trigger<Pointer<Click>>, mut query: Query<(Entity, &mut UiElementState), With<DivContainer>>) {
-    for (entity, mut state) in query.iter_mut() {
-        if event.target.eq(&entity) {
-            state.selected = !state.selected;
-        }
+fn on_internal_mouse_click(
+    event: Trigger<Pointer<Click>>,
+    mut query: Query<(&mut UiElementState, &UiGenID), With<DivContainer>>,
+    mut current_element_selected: ResMut<CurrentElementSelected>
+) {
+    if let Ok((mut state, gen_id)) = query.get_mut(event.target) {
+        state.selected = true;
+        current_element_selected.0 = gen_id.0;
     }
 }
 
-fn on_internal_mouse_entered(event: Trigger<Pointer<Over>>, mut query: Query<(Entity, &mut UiElementState), With<DivContainer>>) {
-    for (entity, mut state) in query.iter_mut() {
-        if event.target.eq(&entity) {
-            state.hovered = true;
-        }
+fn on_internal_mouse_entered(event: Trigger<Pointer<Over>>, mut query: Query<&mut UiElementState, With<DivContainer>>) {
+    if let Ok(mut state) = query.get_mut(event.target) {
+        state.hovered = true;
     }
 }
 
-fn on_internal_mouse_leave(event: Trigger<Pointer<Out>>, mut query: Query<(Entity, &mut UiElementState), With<DivRoot>>) {
-    for (entity, mut state) in query.iter_mut() {
-        if event.target.eq(&entity) {
-            state.hovered = false;
-        }
+fn on_internal_mouse_leave(event: Trigger<Pointer<Out>>, mut query: Query<&mut UiElementState, With<DivContainer>>) {
+    if let Ok(mut state) = query.get_mut(event.target) {
+        state.hovered = false;
     }
 }
