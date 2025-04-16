@@ -1,8 +1,8 @@
 use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
-use crate::global::{ UiGenID, UiElementState };
+use crate::global::{UiGenID, UiElementState };
 use crate::resources::ExtendedUiConfiguration;
-use crate::styles::{BaseStyle, HoverStyle, SelectedStyle, Style};
+use crate::styles::{BaseStyle, HoverStyle, SelectedStyle};
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
@@ -33,20 +33,35 @@ fn internal_generate_component_system(
             Node {
                 ..default()
             },
-            BaseStyle(Style {
-                width: Val::Px(100.),
-                height: Val::Px(100.),
-                border: UiRect::all(Val::Px(5.)),
-                border_color: Color::srgba(0.0, 0.0, 1.0, 1.0),
-                ..default()
-            }),
-
-            HoverStyle::default(),
-
-            SelectedStyle::default(),
-
             RenderLayers::layer(*layer),
             DivRoot
-        ));
+        ))
+            .observe(on_internal_mouse_click)
+            .observe(on_internal_mouse_entered)
+            .observe(on_internal_mouse_leave);
+    }
+}
+
+fn on_internal_mouse_click(event: Trigger<Pointer<Click>>, mut query: Query<(Entity, &mut UiElementState), With<DivContainer>>) {
+    for (entity, mut state) in query.iter_mut() {
+        if event.target.eq(&entity) {
+            state.selected = !state.selected;
+        }
+    }
+}
+
+fn on_internal_mouse_entered(event: Trigger<Pointer<Over>>, mut query: Query<(Entity, &mut UiElementState), With<DivContainer>>) {
+    for (entity, mut state) in query.iter_mut() {
+        if event.target.eq(&entity) {
+            state.hovered = true;
+        }
+    }
+}
+
+fn on_internal_mouse_leave(event: Trigger<Pointer<Out>>, mut query: Query<(Entity, &mut UiElementState), With<DivRoot>>) {
+    for (entity, mut state) in query.iter_mut() {
+        if event.target.eq(&entity) {
+            state.hovered = false;
+        }
     }
 }

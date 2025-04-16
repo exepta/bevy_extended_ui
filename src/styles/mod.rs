@@ -1,4 +1,7 @@
+pub mod css_types;
+
 use bevy::prelude::*;
+use crate::styles::css_types::Background;
 use crate::utils::Radius;
 
 pub trait Styles {}
@@ -21,6 +24,7 @@ pub struct Style {
     pub border: UiRect,
     pub border_radius: Radius,
     pub border_color: Color,
+    pub background: Background,
     pub display: Display,
     pub position_type: PositionType,
     pub flex_direction: FlexDirection,
@@ -56,6 +60,7 @@ impl Default for Style {
             border: UiRect::all(Val::Px(0.0)),
             border_radius: Radius::default(),
             border_color: Color::BLACK,
+            background: Background::default(),
             display: Display::Block,
             position_type: PositionType::default(),
             flex_direction: FlexDirection::default(),
@@ -93,6 +98,7 @@ pub struct PartialStyle {
     pub border: Option<UiRect>,
     pub border_radius: Option<Radius>,
     pub border_color: Option<Color>,
+    pub background: Option<Background>,
     pub display: Option<Display>,
     pub position_type: Option<PositionType>,
     pub flex_direction: Option<FlexDirection>,
@@ -148,6 +154,7 @@ pub struct StylesPlugin;
 
 impl Plugin for StylesPlugin {
     fn build(&self, app: &mut App) {
+        app.register_type::<Background>();
         app.register_type::<Style>();
         app.register_type::<HoverStyle>();
         app.register_type::<SelectedStyle>();

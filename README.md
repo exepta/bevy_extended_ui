@@ -18,11 +18,11 @@ Otherwise, feel free to create a ticket.
 ### Todo:
 > Here's my current to-do list, which I'm working on. Note that this list isn't final. If you have any ideas, open a ticket and we'll talk about it!
 
-- [ ] Create System for handle Ui States
-- [ ] Create Style handling for:
-  - [ ] Base
-  - [ ] Hover
-  - [ ] Focus
+- [x] Create System for handle Ui States
+- [x] Create Style handling for:
+  - [x] Base
+  - [x] Hover
+  - [x] Focus
 - [ ] Create Widget Div
 - [ ] Create Widget Button
 - [ ] Create Widget InputField

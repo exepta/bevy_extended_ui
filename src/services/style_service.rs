@@ -11,7 +11,9 @@ impl Plugin for StyleService {
 }
 
 fn internal_ui_element_styling(
+    mut commands: Commands,
     mut query: Query<(
+        Entity,
         &UiElementState,
         &BaseStyle,
         Option<&HoverStyle>,
@@ -19,9 +21,15 @@ fn internal_ui_element_styling(
         &mut Node,
         &mut BorderRadius,
         &mut BorderColor,
+        &mut BackgroundColor,
+        Option<&mut ImageNode>
     ), With<UiGenID>>,
 ) {
-    for (state, base_style, hover_style, selected_style, mut node, mut border_radius, mut border_color) in query.iter_mut() {
+    for (entity, state, base_style, hover_style, selected_style,
+        mut node, mut border_radius, mut border_color,
+        mut background_color, mut image_node)
+    in query.iter_mut() {
+
         let mut current_style = base_style.0.clone();
 
         if state.selected {
@@ -36,7 +44,8 @@ fn internal_ui_element_styling(
             }
         }
 
-        apply_to_bevy_style(&current_style, &mut node, &mut border_radius, &mut border_color);
+        apply_to_bevy_style(&mut commands, &entity, &current_style, &mut node, &mut border_radius,
+                            &mut border_color, &mut background_color, &mut image_node);
     }
 }
 
@@ -69,6 +78,7 @@ fn merge_styles(target: &mut Style, other: &PartialStyle) {
     }
     if let Some(val) = other.border { target.border = val; }
     if let Some(val) = other.border_color { target.border_color = val; }
+    if let Some(val) = other.background.clone() { target.background = val; }
     if let Some(val) = other.flex_grow { target.flex_grow = val; }
     if let Some(val) = other.flex_shrink { target.flex_shrink = val; }
     if let Some(val) = other.flex_direction { target.flex_direction = val; }
@@ -78,7 +88,10 @@ fn merge_styles(target: &mut Style, other: &PartialStyle) {
     if let Some(val) = other.gap_column { target.gap_column = val; }
 }
 
-fn apply_to_bevy_style(from: &Style, to: &mut Node, to_border_radius: &mut BorderRadius, to_border_color: &mut BorderColor) {
+fn apply_to_bevy_style(commands: &mut Commands, entity: &Entity, from: &Style, to: &mut Node, to_border_radius: &mut BorderRadius,
+                       to_border_color: &mut BorderColor, to_background_color: &mut BackgroundColor,
+                       image_node: &mut Option<Mut<ImageNode>>
+) {
     to.width = from.width;
     to.min_width = from.min_width;
     to.max_width = from.max_width;
@@ -105,6 +118,15 @@ fn apply_to_bevy_style(from: &Style, to: &mut Node, to_border_radius: &mut Borde
     to_border_radius.bottom_left = from.border_radius.bottom_left;
     to.border = from.border;
     to_border_color.0 = from.border_color;
+    to_background_color.0 = from.background.color;
+    if let Some(image) = from.background.image.clone() {
+        if let Some(image_node) = image_node {
+            if !image_node.image.eq(&image) {}
+            image_node.image = image;
+        } else {
+            commands.entity(*entity).insert(ImageNode::new(image));
+        }
+    }
     to.flex_grow = from.flex_grow;
     to.flex_shrink = from.flex_shrink;
     to.flex_direction = from.flex_direction;
