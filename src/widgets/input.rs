@@ -54,6 +54,15 @@ pub enum InputType {
     Number
 }
 
+impl InputType {
+    pub fn is_valid_char(&self, c: char) -> bool {
+        match self {
+            InputType::Text | InputType::Password => true,
+            InputType::Number => c.is_ascii_digit() || "+-*/() ".contains(c),
+        }
+    }
+}
+
 #[derive(Reflect, Default, Debug, Clone, Eq, PartialEq)]
 pub enum InputCap {
     #[default]
@@ -236,29 +245,65 @@ fn update_cursor_visibility(
 }
 
 fn update_cursor_position(
+    mut key_repeat: ResMut<KeyRepeatTimers>,
     mut cursor_query: Query<(&mut Node, &Parent), With<InputCursor>>,
     mut text_field_query: Query<(&mut InputField, &InternalStyle, &Parent)>,
     keyboard_input: Res<ButtonInput<KeyCode>>,
+    time: Res<Time>,
 ) {
+    let initial_delay = 0.3;
+    let repeat_rate = 0.07;
+
     for (mut cursor_node, parent) in cursor_query.iter_mut() {
-        // Get the associated TextField for the current entity
         if let Ok((mut text_field, internal_style, _)) = text_field_query.get_mut(parent.get()) {
-            // Handle arrow key movement
+            // ARROW LEFT
             if keyboard_input.just_pressed(KeyCode::ArrowLeft) {
-                text_field.cursor_position = text_field.cursor_position.saturating_sub(1); // Move cursor left
+                text_field.cursor_position = text_field.cursor_position.saturating_sub(1);
+                key_repeat.timers.insert(
+                    KeyCode::ArrowLeft,
+                    Timer::from_seconds(initial_delay, TimerMode::Once),
+                );
             }
+
+            // ARROW RIGHT
             if keyboard_input.just_pressed(KeyCode::ArrowRight) {
-                text_field.cursor_position += 1; // Move cursor right
+                text_field.cursor_position = (text_field.cursor_position + 1).min(text_field.text.len());
+                key_repeat.timers.insert(
+                    KeyCode::ArrowRight,
+                    Timer::from_seconds(initial_delay, TimerMode::Once),
+                );
             }
 
-            // Ensure cursor position does not exceed text bounds
-            text_field.cursor_position = text_field.cursor_position.min(text_field.text.len());
+            for key in [KeyCode::ArrowLeft, KeyCode::ArrowRight] {
+                if keyboard_input.pressed(key) {
+                    if let Some(timer) = key_repeat.timers.get_mut(&key) {
+                        timer.tick(time.delta());
+                        if timer.finished() {
+                            match key {
+                                KeyCode::ArrowLeft => {
+                                    text_field.cursor_position = text_field.cursor_position.saturating_sub(1);
+                                }
+                                KeyCode::ArrowRight => {
+                                    text_field.cursor_position = (text_field.cursor_position + 1).min(text_field.text.len());
+                                }
+                                _ => {}
+                            }
 
-            // Update the cursor position based on the cursor position in the text
+                            timer.set_duration(Duration::from_secs_f32(repeat_rate));
+                            timer.reset();
+                        }
+                    }
+                }
+            }
+
             let cursor_x_position = calculate_cursor_x_position(&text_field, text_field.cursor_position, &internal_style.0);
-            cursor_node.left = Val::Px(cursor_x_position); // Set the cursor's X position
+            cursor_node.left = Val::Px(cursor_x_position);
         }
     }
+
+    key_repeat
+        .timers
+        .retain(|key, _| keyboard_input.pressed(*key));
 }
 
 fn handle_typing(
@@ -312,6 +357,9 @@ fn handle_typing(
 
                     for key in keyboard.get_pressed() {
                         if let Some(char) = keycode_to_char(*key, shift, alt) {
+                            if !in_field.input_type.is_valid_char(char) {
+                                return;
+                            }
                             if keyboard.just_pressed(*key) {
                                 let pos = in_field.cursor_position;
 
