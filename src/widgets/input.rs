@@ -68,7 +68,17 @@ pub enum InputCap {
     #[default]
     NoCap,
     CapAtNodeSize,
-    CapAt(usize), // 0 means nothing to print!
+    CapAt(usize), // 0 means no cap!
+}
+
+impl InputCap {
+    pub fn get_value(&self) -> usize {
+        match self {
+            Self::CapAt(value) => *value,
+            Self::NoCap => 0,
+            Self::CapAtNodeSize => 0
+        }
+    }
 }
 
 #[derive(Component)]
@@ -112,7 +122,8 @@ impl Plugin for InputWidget {
             internal_generate_component_system,
             update_cursor_visibility,
             update_cursor_position,
-            handle_typing
+            handle_typing,
+            handle_input_horizontal_scroll
         ));
     }
 }
@@ -126,7 +137,13 @@ fn internal_generate_component_system(
     for (entity , gen_id, in_field, option_base_style) in query.iter() {
         commands.entity(entity).insert((
             Name::new(format!("InputField-{}", gen_id.0)),
-            Node::default(),
+            Node {
+                overflow: Overflow {
+                    y: OverflowAxis::Hidden,
+                    x: OverflowAxis::Scroll,
+                },
+                ..default()
+            },
             default_style(option_base_style),
             RenderLayers::layer(*layer),
             InputFieldRoot,
@@ -186,6 +203,10 @@ fn internal_generate_component_system(
                     ..default()
                 },
                 Text::new(text),
+                TextLayout {
+                    linebreak: LineBreak::NoWrap,
+                    ..default()
+                },
                 PickingBehavior::IGNORE,
                 RenderLayers::layer(*layer),
                 InputFieldText
@@ -306,12 +327,44 @@ fn update_cursor_position(
         .retain(|key, _| keyboard_input.pressed(*key));
 }
 
+fn handle_input_horizontal_scroll(
+    mut query: Query<(
+        &InputField,
+        &InternalStyle,
+        &ComputedNode,
+        Entity
+    ), With<InputFieldRoot>>,
+    mut scroll_query: Query<&mut ScrollPosition>,
+) {
+    for (input_field, internal_style, parent_node, entity) in &mut query {
+            let available_width = parent_node.size().x - 10.0;
+
+            let new_cursor_pos = input_field.cursor_position;
+
+            let char_width = internal_style.0.font_size;
+            let cursor_x = new_cursor_pos as f32 * char_width;
+
+            if let Ok(mut scroll) = scroll_query.get_mut(entity) {
+                match input_field.cap_text_at {
+                    InputCap::NoCap => {
+                        if cursor_x - scroll.offset_x > available_width {
+                            scroll.offset_x = cursor_x - available_width;
+                        } else if cursor_x - scroll.offset_x < 0.0 {
+                            scroll.offset_x = cursor_x;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+    }
+}
+
 fn handle_typing(
     time: Res<Time>,
     mut key_repeat: ResMut<KeyRepeatTimers>,
     mut query: Query<(&mut InputField, &mut UiElementState, &InternalStyle, &Children)>,
     keyboard: Res<ButtonInput<KeyCode>>,
-    mut text_query: Query<(&mut Text, &mut TextColor), With<InputFieldText>>,
+    mut text_query: Query<(&mut Text, &mut TextColor, &ComputedNode), With<InputFieldText>>,
 ) {
     let shift = keyboard.pressed(KeyCode::ShiftLeft) || keyboard.pressed(KeyCode::ShiftRight);
     let alt = keyboard.pressed(KeyCode::AltLeft) || keyboard.pressed(KeyCode::AltRight);
@@ -322,7 +375,7 @@ fn handle_typing(
     for (mut in_field, mut state, style, children) in query.iter_mut() {
         if state.selected {
             for child in children.iter() {
-                if let Ok((mut text, mut text_color)) = text_query.get_mut(*child) {
+                if let Ok((mut text, mut text_color, computed_node)) = text_query.get_mut(*child) {
                     // ENTER
                     if keyboard.just_pressed(KeyCode::Enter) {
                         state.selected = false;
@@ -362,6 +415,20 @@ fn handle_typing(
                             }
                             if keyboard.just_pressed(*key) {
                                 let pos = in_field.cursor_position;
+
+                                if in_field.cap_text_at.get_value() > 0 {
+                                    let cap = in_field.cap_text_at.clone();
+                                    if pos >= cap.get_value() {
+                                        return;
+                                    }
+                                }
+
+                                if in_field.cap_text_at.eq(&InputCap::CapAtNodeSize) {
+                                    let allowed_char_len = (computed_node.size().x / (style.0.font_size * 0.65)).round() as usize;
+                                    if pos >= allowed_char_len {
+                                        return;
+                                    }
+                                }
 
                                 if in_field.input_type.eq(&InputType::Password) {
                                     in_field.text.insert(pos, char);

@@ -5,7 +5,7 @@ use bevy_extended_ui::ExtendedUiPlugin;
 use bevy_extended_ui::styles::{BaseStyle, PartialStyle};
 use bevy_extended_ui::widgets::containers::{ DivContainer };
 use bevy_extended_ui::widgets::button::Button;
-use bevy_extended_ui::widgets::input::{InputField, InputType};
+use bevy_extended_ui::widgets::input::{InputCap, InputField, InputType};
 
 fn main() {
     let _ = App::new()
@@ -48,6 +48,7 @@ fn example_widget(mut commands: Commands, asset_server: Res<AssetServer>) {
                 placeholder_text: "Placeholder".to_string(),
                 icon: Some(asset_server.load("icons/user-icon.png")),
                 input_type: InputType::Text,
+                cap_text_at: InputCap::NoCap,
                 ..default()
             }
         );
