@@ -41,6 +41,7 @@ pub struct Style {
     pub justify_content: JustifyContent,
     pub justify_self: JustifySelf,
     pub color: Color,
+    pub placeholder_color: Color,
     pub font: Handle<Font>,
     pub font_size: f32,
 }
@@ -79,6 +80,7 @@ impl Default for Style {
             justify_items: JustifyItems::default(),
             justify_self: JustifySelf::default(),
             justify_content: JustifyContent::default(),
+            placeholder_color: Color::srgb(0.6, 0.6, 0.6),
             color: Color::BLACK,
             font: Default::default(),
             font_size: 12.0
@@ -121,6 +123,7 @@ pub struct PartialStyle {
     pub justify_content: Option<JustifyContent>,
     pub justify_self: Option<JustifySelf>,
     pub color: Option<Color>,
+    pub placeholder_color: Option<Color>,
     pub font: Option<Handle<Font>>,
     pub font_size: Option<f32>,
 }
@@ -167,6 +170,10 @@ impl InternalStyle {
         if let Some(val) = other.flex_wrap { self.0.flex_wrap = val; }
         if let Some(val) = other.gap_row { self.0.gap_row = val; }
         if let Some(val) = other.gap_column { self.0.gap_column = val; }
+        if let Some(val) = other.color { self.0.color = val; }
+        if let Some(val) = other.font.clone() { self.0.font = val; }
+        if let Some(val) = other.font_size { self.0.font_size = val; }
+        if let Some(val) = other.placeholder_color { self.0.placeholder_color = val; }
     }
 }
 

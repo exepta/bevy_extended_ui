@@ -5,6 +5,7 @@ use bevy_extended_ui::ExtendedUiPlugin;
 use bevy_extended_ui::styles::{BaseStyle, PartialStyle};
 use bevy_extended_ui::widgets::containers::{ DivContainer };
 use bevy_extended_ui::widgets::button::Button;
+use bevy_extended_ui::widgets::input::InputField;
 
 fn main() {
     let _ = App::new()
@@ -15,7 +16,6 @@ fn main() {
 }
 
 fn example_widget(mut commands: Commands, asset_server: Res<AssetServer>) {
-    let icon = asset_server.load::<Image>("icons/drop-arrow.png");
     commands.spawn((
         DivContainer,
         BaseStyle(PartialStyle {
@@ -32,13 +32,21 @@ fn example_widget(mut commands: Commands, asset_server: Res<AssetServer>) {
             ..default()
         }),
     )).with_children(| builder | {
-        builder.spawn((
-            Button::default(),
-        ));
+        builder.spawn(
+            Button::default()
+        );
 
         builder.spawn(
             Button {
-                icon: Some(icon),
+                icon: Some(asset_server.load("icons/drop-arrow.png")),
+                ..default()
+            }
+        );
+
+        builder.spawn(
+            InputField {
+                placeholder_text: "Placeholder".to_string(),
+                icon: Some(asset_server.load("icons/user-icon.png")),
                 ..default()
             }
         );
