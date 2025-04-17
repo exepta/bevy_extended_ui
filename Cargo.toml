@@ -8,10 +8,6 @@ authors = ["Daniel Ramke <genshin.exepta@outlook.com>"]
 name = "bevy_extended_ui"
 path = "src/lib.rs"
 
-[dependencies.bevy_svg]
-version = "0.15.1"
-features = ["2d"]
-
 [dependencies.bevy-inspector-egui]
 version = "0.30.0"
 

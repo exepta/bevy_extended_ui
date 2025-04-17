@@ -23,8 +23,8 @@ Otherwise, feel free to create a ticket.
   - [x] Base
   - [x] Hover
   - [x] Focus
-- [ ] Create Widget Div
-- [ ] Create Widget Button
+- [x] Create Widget Div
+- [x] Create Widget Button
 - [ ] Create Widget InputField
   - [ ] Type Text
   - [ ] Type Number

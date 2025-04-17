@@ -12,7 +12,7 @@ impl Plugin for StateService {
 }
 
 fn internal_state_check(
-    mut current_state_element: ResMut<CurrentElementSelected>,
+    current_state_element: Res<CurrentElementSelected>,
     mut query: Query<(&mut UiElementState, &UiGenID), With<UiGenID>>
 ) {
     if current_state_element.0 == 0 {

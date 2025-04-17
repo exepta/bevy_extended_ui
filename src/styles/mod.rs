@@ -40,6 +40,9 @@ pub struct Style {
     pub justify_items: JustifyItems,
     pub justify_content: JustifyContent,
     pub justify_self: JustifySelf,
+    pub color: Color,
+    pub font: Handle<Font>,
+    pub font_size: f32,
 }
 
 impl Default for Style {
@@ -76,6 +79,9 @@ impl Default for Style {
             justify_items: JustifyItems::default(),
             justify_self: JustifySelf::default(),
             justify_content: JustifyContent::default(),
+            color: Color::BLACK,
+            font: Default::default(),
+            font_size: 12.0
         }
     }
 }
@@ -114,6 +120,9 @@ pub struct PartialStyle {
     pub justify_items: Option<JustifyItems>,
     pub justify_content: Option<JustifyContent>,
     pub justify_self: Option<JustifySelf>,
+    pub color: Option<Color>,
+    pub font: Option<Handle<Font>>,
+    pub font_size: Option<f32>,
 }
 
 #[derive(Component, Reflect, Debug, Clone)]

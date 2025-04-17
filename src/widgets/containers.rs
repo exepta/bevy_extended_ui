@@ -23,16 +23,14 @@ impl Plugin for DivWidget {
 
 fn internal_generate_component_system(
     mut commands: Commands,
-    query: Query<(Entity, &UiGenID), Without<DivRoot>>,
+    query: Query<(Entity, &UiGenID), (Without<DivRoot>, With<DivContainer>)>,
     config: Res<ExtendedUiConfiguration>
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
     for (entity , gen_id) in query.iter() {
         commands.entity(entity).insert((
             Name::new(format!("Div-{}", gen_id.0)),
-            Node {
-                ..default()
-            },
+            Node::default(),
             RenderLayers::layer(*layer),
             DivRoot
         ))

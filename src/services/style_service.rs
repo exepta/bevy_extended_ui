@@ -22,21 +22,18 @@ fn internal_ui_element_styling(
         &mut BorderRadius,
         &mut BorderColor,
         &mut BackgroundColor,
-        Option<&mut ImageNode>
+        Option<&mut ImageNode>,
+        Option<&Children>,
     ), With<UiGenID>>,
+    mut text_query: Query<(Option<&mut TextColor>, Option<&mut TextFont>, Option<&mut ImageNode>), Without<UiGenID>>,
 ) {
     for (entity, state, base_style, hover_style, selected_style,
         mut node, mut border_radius, mut border_color,
-        mut background_color, mut image_node)
+        mut background_color, mut image_node,
+        children)
     in query.iter_mut() {
 
         let mut current_style = base_style.0.clone();
-
-        if state.selected {
-            if let Some(focus) = selected_style {
-                merge_styles(&mut current_style, &focus.0);
-            }
-        }
 
         if state.hovered {
             if let Some(hover) = hover_style {
@@ -44,8 +41,16 @@ fn internal_ui_element_styling(
             }
         }
 
+
+        if state.selected {
+            if let Some(focus) = selected_style {
+                merge_styles(&mut current_style, &focus.0);
+            }
+        }
+
         apply_to_bevy_style(&mut commands, &entity, &current_style, &mut node, &mut border_radius,
-                            &mut border_color, &mut background_color, &mut image_node);
+                            &mut border_color, &mut background_color, &mut image_node,
+                            children, &mut text_query);
     }
 }
 
@@ -90,7 +95,8 @@ fn merge_styles(target: &mut Style, other: &PartialStyle) {
 
 fn apply_to_bevy_style(commands: &mut Commands, entity: &Entity, from: &Style, to: &mut Node, to_border_radius: &mut BorderRadius,
                        to_border_color: &mut BorderColor, to_background_color: &mut BackgroundColor,
-                       image_node: &mut Option<Mut<ImageNode>>
+                       image_node: &mut Option<Mut<ImageNode>>, children: Option<&Children>,
+                       text_query: &mut Query<(Option<&mut TextColor>, Option<&mut TextFont>, Option<&mut ImageNode>), Without<UiGenID>>
 ) {
     to.width = from.width;
     to.min_width = from.min_width;
@@ -134,4 +140,22 @@ fn apply_to_bevy_style(commands: &mut Commands, entity: &Entity, from: &Style, t
     to.flex_wrap = from.flex_wrap;
     to.column_gap = from.gap_row;
     to.row_gap = from.gap_column;
+    if let Some(children) = children {
+        for child in children {
+            if let Ok((text_color, text_font, image_node)) = text_query.get_mut(*child) {
+                if let Some(mut text_color) = text_color {
+                    text_color.0 = from.color;
+                }
+
+                if let Some(mut text_font) = text_font {
+                    text_font.font = from.font.clone();
+                    text_font.font_size = from.font_size;
+                }
+
+                if let Some(mut image_node) = image_node {
+                    image_node.color = from.color;
+                }
+            }
+        }
+    }
 }
