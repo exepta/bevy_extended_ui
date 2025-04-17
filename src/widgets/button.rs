@@ -2,13 +2,13 @@ use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use crate::global::{UiGenID, UiElementState};
 use crate::resources::{CurrentElementSelected, ExtendedUiConfiguration};
-use crate::styles::{BaseStyle, HoverStyle, SelectedStyle, Style};
+use crate::styles::{BaseStyle, HoverStyle, SelectedStyle, InternalStyle, Style};
 use crate::styles::css_types::Background;
 use crate::utils::Radius;
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
-#[require(UiGenID, UiElementState, BaseStyle, HoverStyle, SelectedStyle)]
+#[require(UiGenID, UiElementState, BaseStyle, HoverStyle, SelectedStyle, InternalStyle)]
 pub struct Button {
     pub label: String,
     pub icon: Option<Handle<Image>>,
@@ -51,26 +51,15 @@ impl Plugin for ButtonWidget {
 
 fn internal_generate_component_system(
     mut commands: Commands,
-    query: Query<(Entity, &UiGenID, &Button), (Without<ButtonBase>, With<Button>)>,
+    query: Query<(Entity, &UiGenID, &Button, Option<&BaseStyle>), (Without<ButtonBase>, With<Button>)>,
     config: Res<ExtendedUiConfiguration>
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
-    for (entity , gen_id, btn) in query.iter() {
+    for (entity , gen_id, btn, option_base_style) in query.iter() {
         commands.entity(entity).insert((
             Name::new(format!("Button-{}", gen_id.0)),
             Node::default(),
-            BaseStyle(Style {
-                width: Val::Px(150.),
-                height: Val::Px(50.),
-                display: Display::Flex,
-                justify_content: JustifyContent::Center,
-                align_items: AlignItems::Center,
-                gap_row: Val::Px(15.),
-                background: Background { color: Color::srgba(0.95, 0.95, 0.95, 1.0), ..default() },
-                border: UiRect::all(Val::Px(2.)),
-                border_radius: Radius::all(Val::Px(5.)),
-                ..default()
-            }),
+            default_style(option_base_style),
             RenderLayers::layer(*layer),
             ButtonBase
         )).with_children(|builder| {
@@ -130,4 +119,24 @@ fn place_icon(builder: &mut ChildBuilder, btn: &Button, id: usize, layer: usize)
             ZIndex(1)
         ));
     }
+}
+
+fn default_style(overwrite: Option<&BaseStyle>) -> InternalStyle {
+    let mut internal_style = InternalStyle(Style {
+        width: Val::Px(150.),
+        height: Val::Px(50.),
+        display: Display::Flex,
+        justify_content: JustifyContent::Center,
+        align_items: AlignItems::Center,
+        gap_row: Val::Px(15.),
+        background: Background { color: Color::srgba(0.95, 0.95, 0.95, 1.0), ..default() },
+        border: UiRect::all(Val::Px(2.)),
+        border_radius: Radius::all(Val::Px(5.)),
+        ..default()
+    });
+
+    if let Some(style) = overwrite {
+        internal_style.merge_styles(&style.0);
+    }
+    internal_style
 }

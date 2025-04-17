@@ -4,6 +4,7 @@ use crate::widgets::containers::DivWidget;
 
 pub mod containers;
 pub mod button;
+mod input;
 
 pub struct WidgetsPlugin;
 

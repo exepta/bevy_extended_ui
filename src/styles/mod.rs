@@ -125,6 +125,51 @@ pub struct PartialStyle {
     pub font_size: Option<f32>,
 }
 
+#[derive(Component, Reflect, Default, Debug, Clone)]
+#[reflect(Component)]
+pub struct InternalStyle(pub Style);
+
+impl InternalStyle {
+    pub fn merge_styles(&mut self, other: &PartialStyle) {
+        if let Some(val) = other.width { self.0.width = val; }
+        if let Some(val) = other.min_width { self.0.min_width = val; }
+        if let Some(val) = other.max_width { self.0.max_width = val; }
+        if let Some(val) = other.height { self.0.height = val; }
+        if let Some(val) = other.min_height { self.0.min_height = val; }
+        if let Some(val) = other.max_height { self.0.max_height = val; }
+        if let Some(val) = other.top { self.0.top = val; }
+        if let Some(val) = other.bottom { self.0.bottom = val; }
+        if let Some(val) = other.left { self.0.left = val; }
+        if let Some(val) = other.right { self.0.right = val; }
+        if let Some(val) = other.padding { self.0.padding = val; }
+        if let Some(val) = other.margin { self.0.margin = val; }
+        if let Some(val) = other.align_content { self.0.align_content = val; }
+        if let Some(val) = other.align_self { self.0.align_self = val; }
+        if let Some(val) = other.align_items { self.0.align_items = val; }
+        if let Some(val) = other.justify_content { self.0.justify_content = val; }
+        if let Some(val) = other.justify_self { self.0.justify_self = val; }
+        if let Some(val) = other.justify_items { self.0.justify_items = val; }
+        if let Some(val) = other.display { self.0.display = val; }
+        if let Some(val) = other.position_type { self.0.position_type = val; }
+        if let Some(val) = other.border_radius.clone() {
+            self.0.border_radius.top_left = val.top_left;
+            self.0.border_radius.top_right = val.top_right;
+            self.0.border_radius.bottom_left = val.bottom_left;
+            self.0.border_radius.bottom_right = val.bottom_right;
+        }
+        if let Some(val) = other.border { self.0.border = val; }
+        if let Some(val) = other.border_color { self.0.border_color = val; }
+        if let Some(val) = other.background.clone() { self.0.background = val; }
+        if let Some(val) = other.flex_grow { self.0.flex_grow = val; }
+        if let Some(val) = other.flex_shrink { self.0.flex_shrink = val; }
+        if let Some(val) = other.flex_direction { self.0.flex_direction = val; }
+        if let Some(val) = other.flex_basis { self.0.flex_basis = val; }
+        if let Some(val) = other.flex_wrap { self.0.flex_wrap = val; }
+        if let Some(val) = other.gap_row { self.0.gap_row = val; }
+        if let Some(val) = other.gap_column { self.0.gap_column = val; }
+    }
+}
+
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
 pub struct HoverStyle(pub PartialStyle);
@@ -155,9 +200,21 @@ impl Default for SelectedStyle {
     }
 }
 
-#[derive(Component, Reflect, Default, Debug, Clone)]
+#[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
-pub struct BaseStyle(pub Style);
+pub struct BaseStyle(pub PartialStyle);
+
+impl Default for BaseStyle {
+    fn default() -> Self {
+        Self(
+            PartialStyle {
+                border_color: Some(Color::srgba(0.0, 0.0, 1.0, 1.0)),
+                ..default()
+            }
+        )
+    }
+}
+
 
 pub struct StylesPlugin;
 
