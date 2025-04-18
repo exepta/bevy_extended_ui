@@ -178,7 +178,8 @@ fn internal_generate_component_system(
                 Name::new(format!("TextContainer-{}", gen_id.0)),
                 Node {
                     height: Val::Percent(100.),
-                    flex_grow: 1.0,
+                    width: Val::Percent(80.),
+                    max_width: Val::Percent(80.),
                     display: Display::Flex,
                     justify_content: JustifyContent::FlexStart,
                     align_items: AlignItems::Center,
@@ -186,7 +187,7 @@ fn internal_generate_component_system(
                         y: OverflowAxis::Hidden,
                         x: OverflowAxis::Scroll,
                     },
-                    padding: UiRect::horizontal(Val::Px(10.0)),
+                    padding: UiRect::left(Val::Px(10.0)),
                     ..default()
                 },
                 RenderLayers::layer(*layer),
@@ -216,7 +217,7 @@ fn internal_generate_component_system(
                 builder.spawn((
                     Name::new(format!("Input-Text-{}", gen_id.0)),
                     Node {
-                        flex_grow: 1.0,
+                        width: Val::Percent(90.0),
                         ..default()
                     },
                     Text::new(text),
@@ -355,33 +356,47 @@ fn handle_input_horizontal_scroll(
     mut query: Query<(
         &InputField,
         &InternalStyle,
-        &ComputedNode,
         &UiGenID
     ), With<InputFieldRoot>>,
     mut scroll_query: Query<(&mut ScrollPosition, &BindToID), With<BindToID>>,
+    text_node_query: Query<(&ComputedNode, &BindToID), With<InputFieldText>>
 ) {
-    for (input_field, internal_style, parent_node, ui_id) in &mut query {
-            let available_width = parent_node.size().x - 10.0;
+    for (input_field, internal_style, ui_id) in &mut query {
+        let char_width = internal_style.0.font_size;
+        let cursor_x = input_field.cursor_position as f32 * char_width;
 
-            let new_cursor_pos = input_field.cursor_position;
+        let Some((text_node, _)) = text_node_query
+            .iter()
+            .find(|(_, bind_id)| bind_id.0 == ui_id.0)
+        else {
+            continue;
+        };
 
-            let char_width = internal_style.0.font_size;
-            let cursor_x = new_cursor_pos as f32 * char_width;
+        let available_width = text_node.size().x - 10.0;
 
-            for (mut scroll, bind_id) in scroll_query.iter_mut() {
-                if bind_id.0 == ui_id.0 {
-                    match input_field.cap_text_at {
-                        InputCap::NoCap => {
-                            if cursor_x - scroll.offset_x > available_width {
-                                scroll.offset_x = cursor_x - available_width;
-                            } else if cursor_x - scroll.offset_x < 0.0 {
-                                scroll.offset_x = cursor_x;
-                            }
+        for (mut scroll, bind_id) in scroll_query.iter_mut() {
+            if bind_id.0 == ui_id.0 {
+                match input_field.cap_text_at {
+                    InputCap::NoCap => {
+                        let visible_left = scroll.offset_x;
+                        let visible_right = scroll.offset_x + available_width;
+
+                        if cursor_x > visible_right {
+                            scroll.offset_x = cursor_x - available_width + char_width;
                         }
-                        _ => {}
+                        else if cursor_x < visible_left {
+                            scroll.offset_x = cursor_x;
+                        }
+
+                        let total_text_width = input_field.text.len() as f32 * char_width;
+                        if total_text_width < available_width {
+                            scroll.offset_x = 0.0;
+                        }
                     }
+                    _ => {}
                 }
             }
+        }
     }
 }
 
@@ -631,7 +646,8 @@ fn on_internal_mouse_leave(event: Trigger<Pointer<Out>>, mut query: Query<&mut U
 
 fn default_style(overwrite: Option<&BaseStyle>) -> InternalStyle {
     let mut internal_style = InternalStyle(Style {
-        width: Val::Px(250.),
+        width: Val::Px(350.),
+        min_width: Val::Px(150.),
         height: Val::Px(50.),
         display: Display::Flex,
         justify_content: JustifyContent::FlexStart,
