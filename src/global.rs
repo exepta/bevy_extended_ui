@@ -13,6 +13,9 @@ impl Default for UiGenID {
     }
 }
 
+#[derive(Component, Debug, Clone)]
+pub struct BindToID(pub usize);
+
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
 pub struct UiElementState {

@@ -2,7 +2,7 @@ use std::time::Duration;
 use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use bevy::utils::HashMap;
-use crate::global::{UiGenID, UiElementState};
+use crate::global::{UiGenID, UiElementState, BindToID};
 use crate::styles::{BaseStyle, HoverStyle, SelectedStyle, InternalStyle, Style};
 use crate::resources::{CurrentElementSelected, ExtendedUiConfiguration};
 use crate::styles::css_types::Background;
@@ -137,13 +137,7 @@ fn internal_generate_component_system(
     for (entity , gen_id, in_field, option_base_style) in query.iter() {
         commands.entity(entity).insert((
             Name::new(format!("InputField-{}", gen_id.0)),
-            Node {
-                overflow: Overflow {
-                    y: OverflowAxis::Hidden,
-                    x: OverflowAxis::Scroll,
-                },
-                ..default()
-            },
+            Node::default(),
             default_style(option_base_style),
             RenderLayers::layer(*layer),
             InputFieldRoot,
@@ -153,64 +147,86 @@ fn internal_generate_component_system(
                 builder.spawn((
                     Name::new(format!("InputIcon-{}", gen_id.0)),
                     Node {
-                        width: Val::Px(32.0),
-                        min_width: Val::Px(25.0),
+                        width: Val::Px(45.0),
+                        min_width: Val::Px(45.0),
                         height: Val::Percent(100.0),
                         display: Display::Flex,
                         justify_content: JustifyContent::Center,
                         align_items: AlignItems::Center,
                         ..default()
                     },
+                    BackgroundColor(Color::srgb(0.7, 0.7, 0.7)),
                     RenderLayers::layer(*layer),
                     PickingBehavior::IGNORE,
                     InputFieldIcon,
+                    BindToID(gen_id.0),
                 )).with_children(|builder| {
                     builder.spawn((
                         Name::new(format!("InputIconNode-{}", gen_id.0)),
                         ImageNode {
                             image: icon,
-                            color: Color::BLACK,
                             ..default()
                         },
                         RenderLayers::layer(*layer),
                         PickingBehavior::IGNORE,
+                        BindToID(gen_id.0),
                     ));
                 });
             }
 
             builder.spawn((
-                Name::new(format!("InputCursor-{}", gen_id.0)),
+                Name::new(format!("TextContainer-{}", gen_id.0)),
                 Node {
-                    width: Val::Px(1.5),
-                    height: Val::Px(18.0),
-                    ..default()
-                },
-                BackgroundColor(Color::BLACK),
-                RenderLayers::layer(*layer),
-                Visibility::Hidden,
-                PickingBehavior::IGNORE,
-                InputCursor,
-            ));
-
-            let mut text = in_field.placeholder_text.clone();
-            if text.is_empty() {
-                text = in_field.text.clone();
-            }
-            builder.spawn((
-                Name::new(format!("Input-Text-{}", gen_id.0)),
-                Node {
+                    height: Val::Percent(100.),
                     flex_grow: 1.0,
+                    display: Display::Flex,
+                    justify_content: JustifyContent::FlexStart,
+                    align_items: AlignItems::Center,
+                    overflow: Overflow {
+                        y: OverflowAxis::Hidden,
+                        x: OverflowAxis::Scroll,
+                    },
+                    padding: UiRect::horizontal(Val::Px(10.0)),
                     ..default()
                 },
-                Text::new(text),
-                TextLayout {
-                    linebreak: LineBreak::NoWrap,
-                    ..default()
-                },
-                PickingBehavior::IGNORE,
                 RenderLayers::layer(*layer),
-                InputFieldText
-            ));
+                PickingBehavior::IGNORE,
+                BindToID(gen_id.0),
+            )).with_children(|builder| {
+
+                builder.spawn((
+                    Name::new(format!("InputCursor-{}", gen_id.0)),
+                    Node {
+                        width: Val::Px(1.5),
+                        height: Val::Px(18.0),
+                        ..default()
+                    },
+                    BackgroundColor(Color::BLACK),
+                    RenderLayers::layer(*layer),
+                    Visibility::Hidden,
+                    PickingBehavior::IGNORE,
+                    InputCursor,
+                    BindToID(gen_id.0),
+                ));
+
+                let mut text = in_field.placeholder_text.clone();
+                if text.is_empty() {
+                    text = in_field.text.clone();
+                }
+                builder.spawn((
+                    Name::new(format!("Input-Text-{}", gen_id.0)),
+                    Node {
+                        flex_grow: 1.0,
+                        ..default()
+                    },
+                    Text::new(text),
+                    PickingBehavior::IGNORE,
+                    RenderLayers::layer(*layer),
+                    InputFieldText,
+                    BindToID(gen_id.0),
+                ));
+
+            });
 
         })
             .observe(on_internal_mouse_click)
@@ -222,14 +238,17 @@ fn internal_generate_component_system(
 fn update_cursor_visibility(
     time: Res<Time>,
     mut cursor_blink_timer: ResMut<CursorBlinkTimer>,
-    mut cursor_query: Query<(&mut Visibility, &mut BackgroundColor, &Parent), With<InputCursor>>,
-    mut input_field_query: Query<(&InputField, &mut UiElementState, &Children), With<InputFieldRoot>>, // Assuming Focus component indicates if field is focused
-    mut text_query: Query<&mut Text, With<InputFieldText>>,
+    mut cursor_query: Query<(&mut Visibility, &mut BackgroundColor, &BindToID), With<InputCursor>>,
+    mut input_field_query: Query<(&InputField, &mut UiElementState, &UiGenID), With<InputFieldRoot>>, // Assuming Focus component indicates if field is focused
+    mut text_query: Query<(&mut Text, &BindToID), With<InputFieldText>>,
 ) {
     cursor_blink_timer.timer.tick(time.delta());
 
-    for (mut visibility, mut background, parent) in cursor_query.iter_mut() {
-        if let Ok((in_field, state, children)) = input_field_query.get_mut(parent.get()) {
+    for (mut visibility, mut background, bind_cursor_id) in cursor_query.iter_mut() {
+        for (in_field, state, ui_id) in input_field_query.iter_mut() {
+            if bind_cursor_id.0 != ui_id.0 {
+                continue;
+            }
             // Show the cursor if the input field is focused
             if state.selected {
                 let alpha = (cursor_blink_timer.timer.elapsed_secs() * 2.0 * std::f32::consts::PI).sin() * 0.5 + 0.5;
@@ -238,25 +257,27 @@ fn update_cursor_visibility(
                 if !visibility.eq(&Visibility::Visible) {
 
                     *visibility = Visibility::Visible;
-                    for child in children.iter() {
-                        if let Ok(mut text) = text_query.get_mut(*child) {
-                            if in_field.input_type.eq(&InputType::Password) {
-                                let masked_text: String = "*".repeat(in_field.text.chars().count());
-                                text.0 = masked_text;
-                            } else {
-                                text.0 = in_field.text.clone();
-                            }
+                    for (mut text, bind_id) in text_query.iter_mut() {
+                        if bind_id.0 != ui_id.0 {
+                            continue;
+                        }
+                        if in_field.input_type.eq(&InputType::Password) {
+                            let masked_text: String = "*".repeat(in_field.text.chars().count());
+                            text.0 = masked_text;
+                        } else {
+                            text.0 = in_field.text.clone();
                         }
                     }
                 }
             } else {
                 if !visibility.eq(&Visibility::Hidden) {
                     *visibility = Visibility::Hidden;
-                    for child in children.iter() {
-                        if let Ok(mut text) = text_query.get_mut(*child) {
-                            if in_field.text.is_empty() {
-                                text.0 = in_field.placeholder_text.clone();
-                            }
+                    for (mut text, bind_id) in text_query.iter_mut() {
+                        if bind_id.0 != ui_id.0 {
+                            continue;
+                        }
+                        if in_field.text.is_empty() {
+                            text.0 = in_field.placeholder_text.clone();
                         }
                     }
                 }
@@ -267,16 +288,19 @@ fn update_cursor_visibility(
 
 fn update_cursor_position(
     mut key_repeat: ResMut<KeyRepeatTimers>,
-    mut cursor_query: Query<(&mut Node, &Parent), With<InputCursor>>,
-    mut text_field_query: Query<(&mut InputField, &InternalStyle, &Parent)>,
+    mut cursor_query: Query<(&mut Node, &BindToID), With<InputCursor>>,
+    mut text_field_query: Query<(&mut InputField, &InternalStyle, &UiGenID)>,
     keyboard_input: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
 ) {
     let initial_delay = 0.3;
     let repeat_rate = 0.07;
 
-    for (mut cursor_node, parent) in cursor_query.iter_mut() {
-        if let Ok((mut text_field, internal_style, _)) = text_field_query.get_mut(parent.get()) {
+    for (mut cursor_node, bind_id) in cursor_query.iter_mut() {
+        for (mut text_field, internal_style, ui_id) in text_field_query.iter_mut() {
+            if bind_id.0 != ui_id.0 {
+                continue;
+            }
             // ARROW LEFT
             if keyboard_input.just_pressed(KeyCode::ArrowLeft) {
                 text_field.cursor_position = text_field.cursor_position.saturating_sub(1);
@@ -332,11 +356,11 @@ fn handle_input_horizontal_scroll(
         &InputField,
         &InternalStyle,
         &ComputedNode,
-        Entity
+        &UiGenID
     ), With<InputFieldRoot>>,
-    mut scroll_query: Query<&mut ScrollPosition>,
+    mut scroll_query: Query<(&mut ScrollPosition, &BindToID), With<BindToID>>,
 ) {
-    for (input_field, internal_style, parent_node, entity) in &mut query {
+    for (input_field, internal_style, parent_node, ui_id) in &mut query {
             let available_width = parent_node.size().x - 10.0;
 
             let new_cursor_pos = input_field.cursor_position;
@@ -344,16 +368,18 @@ fn handle_input_horizontal_scroll(
             let char_width = internal_style.0.font_size;
             let cursor_x = new_cursor_pos as f32 * char_width;
 
-            if let Ok(mut scroll) = scroll_query.get_mut(entity) {
-                match input_field.cap_text_at {
-                    InputCap::NoCap => {
-                        if cursor_x - scroll.offset_x > available_width {
-                            scroll.offset_x = cursor_x - available_width;
-                        } else if cursor_x - scroll.offset_x < 0.0 {
-                            scroll.offset_x = cursor_x;
+            for (mut scroll, bind_id) in scroll_query.iter_mut() {
+                if bind_id.0 == ui_id.0 {
+                    match input_field.cap_text_at {
+                        InputCap::NoCap => {
+                            if cursor_x - scroll.offset_x > available_width {
+                                scroll.offset_x = cursor_x - available_width;
+                            } else if cursor_x - scroll.offset_x < 0.0 {
+                                scroll.offset_x = cursor_x;
+                            }
                         }
+                        _ => {}
                     }
-                    _ => {}
                 }
             }
     }
@@ -362,9 +388,9 @@ fn handle_input_horizontal_scroll(
 fn handle_typing(
     time: Res<Time>,
     mut key_repeat: ResMut<KeyRepeatTimers>,
-    mut query: Query<(&mut InputField, &mut UiElementState, &InternalStyle, &Children)>,
+    mut query: Query<(&mut InputField, &mut UiElementState, &InternalStyle, &UiGenID)>,
     keyboard: Res<ButtonInput<KeyCode>>,
-    mut text_query: Query<(&mut Text, &mut TextColor, &ComputedNode), With<InputFieldText>>,
+    mut text_query: Query<(&mut Text, &mut TextColor, &ComputedNode, &BindToID), (With<InputFieldText>, With<BindToID>)>,
 ) {
     let shift = keyboard.pressed(KeyCode::ShiftLeft) || keyboard.pressed(KeyCode::ShiftRight);
     let alt = keyboard.pressed(KeyCode::AltLeft) || keyboard.pressed(KeyCode::AltRight);
@@ -372,10 +398,10 @@ fn handle_typing(
     let initial_delay = 0.3;
     let repeat_rate = 0.07;
 
-    for (mut in_field, mut state, style, children) in query.iter_mut() {
+    for (mut in_field, mut state, style, ui_id) in query.iter_mut() {
         if state.selected {
-            for child in children.iter() {
-                if let Ok((mut text, mut text_color, computed_node)) = text_query.get_mut(*child) {
+            for (mut text, mut text_color, computed_node, bind_id) in text_query.iter_mut() {
+                if bind_id.0 == ui_id.0 {
                     // ENTER
                     if keyboard.just_pressed(KeyCode::Enter) {
                         state.selected = false;
@@ -424,7 +450,7 @@ fn handle_typing(
                                 }
 
                                 if in_field.cap_text_at.eq(&InputCap::CapAtNodeSize) {
-                                    let allowed_char_len = (computed_node.size().x / (style.0.font_size * 0.65)).round() as usize;
+                                    let allowed_char_len = (computed_node.size().x / (style.0.font_size)).round() as usize;
                                     if pos >= allowed_char_len {
                                         return;
                                     }
@@ -613,7 +639,6 @@ fn default_style(overwrite: Option<&BaseStyle>) -> InternalStyle {
         background: Background { color: Color::srgba(1.0, 1.0, 1.0, 1.0), ..default() },
         border: UiRect::all(Val::Px(2.)),
         border_radius: Radius::all(Val::Px(5.)),
-        padding: UiRect::all(Val::Px(5.)),
         ..default()
     });
 

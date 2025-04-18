@@ -44,6 +44,7 @@ pub struct Style {
     pub placeholder_color: Color,
     pub font: Handle<Font>,
     pub font_size: f32,
+    pub line_break: LineBreak,
 }
 
 impl Default for Style {
@@ -83,7 +84,8 @@ impl Default for Style {
             placeholder_color: Color::srgb(0.6, 0.6, 0.6),
             color: Color::BLACK,
             font: Default::default(),
-            font_size: 12.0
+            font_size: 12.0,
+            line_break: LineBreak::NoWrap,
         }
     }
 }
@@ -126,6 +128,7 @@ pub struct PartialStyle {
     pub placeholder_color: Option<Color>,
     pub font: Option<Handle<Font>>,
     pub font_size: Option<f32>,
+    pub line_break: Option<LineBreak>
 }
 
 #[derive(Component, Reflect, Default, Debug, Clone)]
@@ -173,6 +176,7 @@ impl InternalStyle {
         if let Some(val) = other.color { self.0.color = val; }
         if let Some(val) = other.font.clone() { self.0.font = val; }
         if let Some(val) = other.font_size { self.0.font_size = val; }
+        if let Some(val) = other.line_break { self.0.line_break = val; }
         if let Some(val) = other.placeholder_color { self.0.placeholder_color = val; }
     }
 }

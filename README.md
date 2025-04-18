@@ -25,10 +25,10 @@ Otherwise, feel free to create a ticket.
   - [x] Focus
 - [x] Create Widget Div
 - [x] Create Widget Button
-- [ ] Create Widget InputField
-  - [ ] Type Text
-  - [ ] Type Number
-  - [ ] Type Password
+- [x] Create Widget InputField
+  - [x] Type Text
+  - [x] Type Number
+  - [x] Type Password
 - [ ] Create Widget Slider
 - [ ] Create Widget CheckBox
 - [ ] Create Widget ChoiceBox
