@@ -1,6 +1,7 @@
 # bevy_extended_ui
 ___
 [![license](https://img.shields.io/badge/license-Apache-blue.svg)](./LICENSE)
+[![Build](https://github.com/exepta/bevy_extended_ui/actions/workflows/build.yml/badge.svg)](https://github.com/exepta/bevy_extended_ui/actions/workflows/build.yml)
 
 
 Since I've been writing a game in the [_Bevy_](https://bevyengine.org/) engine lately, 
