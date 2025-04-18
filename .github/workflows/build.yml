@@ -1,0 +1,47 @@
+name: Build Project
+
+on:
+  push:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # Run unit test which ar in Rust code
+  test:
+    name: Unit Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+      - name: Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.toml') }}${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.toml') }}
+      - name: Install Nightly toolchain
+        uses: dtolnay/rust-toolchain@nightly
+      - name: Install Dependencies
+        run: sudo apt-get update; sudo apt-get install --no-install-recommends libasound2-dev libudev-dev
+
+      - name: Install coverage tool if not installed
+        run: |
+          if ! command -v cargo-llvm-cov &> /dev/null; then
+            cargo install cargo-llvm-cov
+          else
+            echo "cargo-llvm-cov is already installed"
+          fi
+
+      - name: Run cargo test coverage
+        run: cargo llvm-cov --workspace --lcov --output-path coverage.lcov
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
