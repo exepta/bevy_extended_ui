@@ -30,11 +30,11 @@ Otherwise, feel free to create a ticket.
   - [x] Type Text
   - [x] Type Number
   - [x] Type Password
-- [ ] Create Widget Slider
+- [x] Create Widget Slider
 - [ ] Create Widget CheckBox
 - [ ] Create Widget ChoiceBox
 - [ ] Create Widget Radio Button
-- [ ] Create Widget Toggle Button
+- [ ] Create Widget Switch Button
 
 | `Bevy` version | `bevy_extended_ui` version |
 |----------------|----------------------------|

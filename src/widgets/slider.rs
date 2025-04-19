@@ -3,7 +3,7 @@ use bevy::render::view::RenderLayers;
 use bevy::window::PrimaryWindow;
 use crate::global::{UiGenID, UiElementState, BindToID};
 use crate::styles::{BaseStyle, HoverStyle, SelectedStyle, InternalStyle, Style};
-use crate::resources::ExtendedUiConfiguration;
+use crate::resources::{CurrentElementSelected, ExtendedUiConfiguration};
 use crate::styles::css_types::Background;
 use crate::utils::Radius;
 
@@ -45,7 +45,10 @@ impl Plugin for SliderWidget {
     fn build(&self, app: &mut App) {
         app.register_type::<Slider>();
         app.register_type::<SliderThumb>();
-        app.add_systems(Update, internal_generate_component_system);
+        app.add_systems(Update, (
+            internal_generate_component_system,
+            detect_change_slider_values
+        ));
     }
 }
 
@@ -72,6 +75,7 @@ fn internal_generate_component_system(
             SliderRoot
         ))
             .observe(on_click_track)
+            .observe(on_internal_mouse_click)
             .with_children(|builder| {
 
             // Slider Track
@@ -118,6 +122,53 @@ fn internal_generate_component_system(
             )).observe(on_move_thumb);
 
         });
+    }
+}
+
+fn detect_change_slider_values(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    mut query: Query<(&mut Slider, &UiElementState, &ComputedNode, &Children, &UiGenID), With<Slider>>,
+    mut track_query: Query<(&mut Node, &BindToID), (With<SliderTrack>, Without<SliderThumb>)>,
+    mut thumb_query: Query<(&mut Node, &mut SliderThumb, &BindToID), (With<SliderThumb>, Without<SliderTrack>)>,
+) {
+    let shift = keyboard.pressed(KeyCode::ShiftLeft) || keyboard.pressed(KeyCode::ShiftRight);
+    for (mut slider, state, computed_node, children, ui_id) in query.iter_mut() {
+        // Skip unfocused sliders
+        if !state.selected {
+            continue;
+        }
+        
+        let old_value = slider.value;
+
+        // Value change via arrow keys
+        if keyboard.just_pressed(KeyCode::ArrowRight) {
+            slider.value = (slider.value + if shift {slider.step * 10} else {slider.step}).min(slider.max);
+        }
+        if keyboard.just_pressed(KeyCode::ArrowLeft) {
+            slider.value = (slider.value - if shift {slider.step * 10} else {slider.step}).max(slider.min);
+        }
+
+        if slider.value != old_value {
+            let slider_width = computed_node.size().x / 1.5;
+            let percent = (slider.value - slider.min) as f32 / (slider.max - slider.min) as f32;
+            let clamped_x = percent * slider_width;
+
+            for child in children.iter() {
+                if let Ok((mut thumb_node, mut thumb, bind_to_thumb)) = thumb_query.get_mut(*child) {
+                    if bind_to_thumb.0 != ui_id.0 {
+                        continue;
+                    }
+                    thumb.current_x = clamped_x;
+                    thumb_node.left = Val::Px(clamped_x - 8.0);
+                }
+                if let Ok((mut track_node, bind_to_track)) = track_query.get_mut(*child) {
+                    if bind_to_track.0 != ui_id.0 {
+                        continue;
+                    }
+                    track_node.width = Val::Px(clamped_x);
+                }
+            }
+        }
     }
 }
 
@@ -170,14 +221,6 @@ fn on_click_track(
             let click_x = event.pointer_location.position.x - track_left;
             let clamped_x = click_x.clamp(0.0, slider_width);
 
-            info!("Data: {:?}", event.pointer_location);
-            info!("slider_width: {:?}", slider_width);
-            info!("track_left: {:?}", track_left);
-            info!("click_x: {:?}", click_x);
-            info!("window w:: {:?}", window.width());
-            info!("clamped_x: {:?}", clamped_x);
-            info!("=============================");
-
             for child in children.iter() {
                 let next_child = children.iter().next();
                 if let Some(track_child) = next_child {
@@ -207,10 +250,21 @@ fn on_click_track(
     }
 }
 
+fn on_internal_mouse_click(
+    event: Trigger<Pointer<Click>>,
+    mut query: Query<(&mut UiElementState, &UiGenID), With<Slider>>,
+    mut current_element_selected: ResMut<CurrentElementSelected>
+) {
+    if let Ok((mut state, gen_id)) = query.get_mut(event.target) {
+        state.selected = true;
+        current_element_selected.0 = gen_id.0;
+    }
+}
+
 
 fn default_style(overwrite: Option<&BaseStyle>) -> InternalStyle {
     let mut internal_style = InternalStyle(Style {
-        width: Val::Px(200.),
+        width: Val::Px(400.),
         min_width: Val::Px(100.),
         height: Val::Px(8.),
         display: Display::Flex,
