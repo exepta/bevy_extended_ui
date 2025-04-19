@@ -45,6 +45,13 @@ pub struct Style {
     pub font: Handle<Font>,
     pub font_size: f32,
     pub line_break: LineBreak,
+    pub thumb_color: Color,
+    pub thumb_border_radius: Radius,
+    pub thumb_box_shadow: BoxShadow,
+    pub thumb_border: UiRect,
+    pub thumb_width: Val,
+    pub thumb_height: Val,
+    pub track_color: Color,
 }
 
 impl Default for Style {
@@ -86,6 +93,18 @@ impl Default for Style {
             font: Default::default(),
             font_size: 12.0,
             line_break: LineBreak::NoWrap,
+            thumb_border: UiRect::all(Val::Px(0.)),
+            thumb_border_radius: Radius::all(Val::Percent(50.)),
+            thumb_box_shadow: BoxShadow {
+                color: Color::srgba(0.0, 0.0, 0.0, 0.7),
+                x_offset: Val::Px(0.),
+                y_offset: Val::Px(0.),
+                blur_radius: Val::Px(3.),
+                spread_radius: Val::Px(3.) },
+            thumb_color: Color::WHITE,
+            thumb_height: Val::Px(16.),
+            thumb_width: Val::Px(16.),
+            track_color: Color::srgb(0.7, 0.0, 0.7)
         }
     }
 }
