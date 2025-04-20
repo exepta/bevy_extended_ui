@@ -33,6 +33,7 @@ Otherwise, feel free to create a ticket.
 - [x] Create Widget Slider
 - [ ] Create Widget CheckBox
 - [ ] Create Widget ChoiceBox
+- [ ] Create Group Widget
 - [ ] Create Widget Radio Button
 - [ ] Create Widget Switch Button
 

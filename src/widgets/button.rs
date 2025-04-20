@@ -2,28 +2,10 @@ use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use crate::global::{UiGenID, UiElementState};
 use crate::resources::{CurrentElementSelected, ExtendedUiConfiguration};
-use crate::styles::{BaseStyle, HoverStyle, SelectedStyle, InternalStyle, Style};
+use crate::styles::{BaseStyle, InternalStyle, Style};
 use crate::styles::css_types::Background;
 use crate::utils::Radius;
-
-#[derive(Component, Reflect, Debug, Clone)]
-#[reflect(Component)]
-#[require(UiGenID, UiElementState, BaseStyle, HoverStyle, SelectedStyle, InternalStyle)]
-pub struct Button {
-    pub label: String,
-    pub icon: Option<Handle<Image>>,
-    pub icon_place: IconPlace
-}
-
-impl Default for Button {
-    fn default() -> Self {
-        Self {
-            label: String::from("Button"),
-            icon: None,
-            icon_place: IconPlace::Right,
-        }
-    }
-}
+use crate::widgets::Button;
 
 #[derive(Reflect, Debug, Clone, PartialEq)]
 pub enum IconPlace {
@@ -44,7 +26,6 @@ pub struct ButtonWidget;
 
 impl Plugin for ButtonWidget {
     fn build(&self, app: &mut App) {
-        app.register_type::<Button>();
         app.add_systems(Update, internal_generate_component_system);
     }
 }

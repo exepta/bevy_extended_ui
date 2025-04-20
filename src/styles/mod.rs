@@ -45,6 +45,7 @@ pub struct Style {
     pub font: Handle<Font>,
     pub font_size: f32,
     pub line_break: LineBreak,
+    pub box_shadow: BoxShadow,
     pub thumb_color: Color,
     pub thumb_border_radius: Radius,
     pub thumb_box_shadow: BoxShadow,
@@ -52,6 +53,15 @@ pub struct Style {
     pub thumb_width: Val,
     pub thumb_height: Val,
     pub track_color: Color,
+    pub check_label_space: Val,
+    pub check_size: f32,
+    pub check_mark_size: f32,
+    pub check_border: UiRect,
+    pub check_border_radius: Radius,
+    pub check_color: Color,
+    pub check_background_color: Color,
+    pub check_border_color: Color,
+    pub check_icon: Option<Handle<Image>>,
 }
 
 impl Default for Style {
@@ -93,18 +103,23 @@ impl Default for Style {
             font: Default::default(),
             font_size: 12.0,
             line_break: LineBreak::NoWrap,
+            box_shadow: default_shadow(),
             thumb_border: UiRect::all(Val::Px(0.)),
             thumb_border_radius: Radius::all(Val::Percent(50.)),
-            thumb_box_shadow: BoxShadow {
-                color: Color::srgba(0.0, 0.0, 0.0, 0.7),
-                x_offset: Val::Px(0.),
-                y_offset: Val::Px(0.),
-                blur_radius: Val::Px(3.),
-                spread_radius: Val::Px(3.) },
+            thumb_box_shadow: default_shadow(),
             thumb_color: Color::WHITE,
             thumb_height: Val::Px(16.),
             thumb_width: Val::Px(16.),
-            track_color: Color::srgb(0.7, 0.0, 0.7)
+            track_color: Color::srgb(0.7, 0.0, 0.7),
+            check_border: UiRect::all(Val::Px(1.)),
+            check_border_color: Color::BLACK,
+            check_border_radius: Radius::all(Val::Px(4.0)),
+            check_background_color: Color::srgb(0.0, 0.4, 0.8),
+            check_color: Color::WHITE,
+            check_icon: None,
+            check_label_space: Val::Px(20.),
+            check_size: 25.,
+            check_mark_size: 12.5,
         }
     }
 }
@@ -256,4 +271,13 @@ impl Plugin for StylesPlugin {
         app.register_type::<SelectedStyle>();
         app.register_type::<BaseStyle>();
     }
+}
+
+fn default_shadow() -> BoxShadow {
+    BoxShadow {
+        color: Color::srgba(0.0, 0.0, 0.0, 0.7),
+        x_offset: Val::Px(0.),
+        y_offset: Val::Px(0.),
+        blur_radius: Val::Px(3.),
+        spread_radius: Val::Px(3.) }
 }

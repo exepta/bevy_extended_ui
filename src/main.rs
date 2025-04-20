@@ -5,10 +5,8 @@ use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_extended_ui::ExtendedUiPlugin;
 use bevy_extended_ui::styles::{BaseStyle, PartialStyle};
 use bevy_extended_ui::styles::css_types::Background;
-use bevy_extended_ui::widgets::containers::{ DivContainer };
-use bevy_extended_ui::widgets::button::Button;
-use bevy_extended_ui::widgets::input::{InputCap, InputField, InputType};
-use bevy_extended_ui::widgets::slider::Slider;
+use bevy_extended_ui::widgets::{DivContainer, Button, InputField, Slider, CheckBox};
+use bevy_extended_ui::widgets::input::{InputCap, InputType};
 
 fn main() {
     let _ = App::new()
@@ -78,5 +76,7 @@ fn example_widget(mut commands: Commands, asset_server: Res<AssetServer>) {
 
         builder.spawn(Slider::default());
         builder.spawn(Slider::default());
+        
+        builder.spawn(CheckBox::default());
     });
 }

@@ -2,12 +2,8 @@ use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use crate::global::{UiGenID, UiElementState };
 use crate::resources::{CurrentElementSelected, ExtendedUiConfiguration};
-use crate::styles::{BaseStyle, HoverStyle, InternalStyle, SelectedStyle, Style};
-
-#[derive(Component, Reflect, Debug, Clone)]
-#[reflect(Component)]
-#[require(UiGenID, UiElementState, BaseStyle, HoverStyle, SelectedStyle, InternalStyle)]
-pub struct DivContainer;
+use crate::styles::{BaseStyle, InternalStyle, Style};
+use crate::widgets::DivContainer;
 
 #[derive(Component)]
 pub struct DivRoot;
@@ -16,7 +12,6 @@ pub struct DivWidget;
 
 impl Plugin for DivWidget {
     fn build(&self, app: &mut App) {
-        app.register_type::<DivContainer>();
         app.add_systems(Update, internal_generate_component_system);
     }
 }

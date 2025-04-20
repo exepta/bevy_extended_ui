@@ -3,48 +3,11 @@ use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use bevy::utils::HashMap;
 use crate::global::{UiGenID, UiElementState, BindToID};
-use crate::styles::{BaseStyle, HoverStyle, SelectedStyle, InternalStyle, Style};
+use crate::styles::{BaseStyle, InternalStyle, Style};
 use crate::resources::{CurrentElementSelected, ExtendedUiConfiguration};
 use crate::styles::css_types::Background;
 use crate::utils::Radius;
-
-#[derive(Component, Reflect, Debug, Clone)]
-#[reflect(Component)]
-#[require(UiGenID, UiElementState, BaseStyle, HoverStyle, SelectedStyle, InternalStyle)]
-pub struct InputField {
-    pub text: String,
-    pub placeholder_text: String,
-    pub cap_text_at: InputCap,
-    pub cursor_position: usize,
-    pub input_type: InputType,
-    pub clear_after_focus_lost: bool,
-    pub icon: Option<Handle<Image>>,
-}
-
-impl Default for InputField {
-    fn default() -> Self {
-        Self {
-            text: String::from(""),
-            placeholder_text: String::from(""),
-            cap_text_at: InputCap::default(),
-            input_type: InputType::default(),
-            cursor_position: 0,
-            clear_after_focus_lost: false,
-            icon: None,
-        }
-    }
-}
-
-impl InputField {
-    pub fn new(text: &str, placeholder_text: &str, input_type: InputType) -> Self {
-        Self {
-            text: text.to_string(),
-            placeholder_text: placeholder_text.to_string(),
-            input_type,
-            ..default()
-        }
-    }
-}
+use crate::widgets::InputField;
 
 #[derive(Reflect, Default, Debug, Clone, Eq, PartialEq)]
 pub enum InputType {
@@ -117,7 +80,6 @@ impl Plugin for InputWidget {
     fn build(&self, app: &mut App) {
         app.insert_resource(KeyRepeatTimers::default());
         app.insert_resource(CursorBlinkTimer::default());
-        app.register_type::<InputField>();
         app.add_systems(Update, (
             internal_generate_component_system,
             update_cursor_visibility,

@@ -2,31 +2,11 @@ use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use bevy::window::PrimaryWindow;
 use crate::global::{UiGenID, UiElementState, BindToID};
-use crate::styles::{BaseStyle, HoverStyle, SelectedStyle, InternalStyle, Style};
+use crate::styles::{BaseStyle, InternalStyle, Style};
 use crate::resources::{CurrentElementSelected, ExtendedUiConfiguration};
 use crate::styles::css_types::Background;
 use crate::utils::Radius;
-
-#[derive(Component, Reflect, Debug, Clone)]
-#[reflect(Component)]
-#[require(UiGenID, UiElementState, BaseStyle, HoverStyle, SelectedStyle, InternalStyle)]
-pub struct Slider {
-    pub value: i32,
-    pub step: i32,
-    pub min: i32,
-    pub max: i32,
-}
-
-impl Default for Slider {
-    fn default() -> Self {
-        Self {
-            value: 0,
-            step: 1,
-            min: 0,
-            max: 100,
-        }
-    }
-}
+use crate::widgets::Slider;
 
 #[derive(Component)]
 struct SliderRoot;
@@ -43,7 +23,6 @@ pub struct SliderWidget;
 
 impl Plugin for SliderWidget {
     fn build(&self, app: &mut App) {
-        app.register_type::<Slider>();
         app.register_type::<SliderThumb>();
         app.add_systems(Update, (
             internal_generate_component_system,
@@ -78,8 +57,6 @@ fn internal_generate_component_system(
             .observe(on_click_track)
             .observe(on_internal_mouse_click)
             .with_children(|builder| {
-
-                info!("Radius: {:?}", style.0.border_radius);
             // Slider Track
             builder.spawn((
                 Name::new(format!("Slider-Track-{}", gen_id.0)),
