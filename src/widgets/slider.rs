@@ -59,10 +59,11 @@ fn internal_generate_component_system(
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
     for (entity, gen_id, style, option_base_style) in query.iter() {
+        let default_style = default_style(option_base_style);
         commands.entity(entity).insert((
             Name::new(format!("Slider-{}", gen_id.0)),
             Node::default(),
-            default_style(option_base_style),
+            default_style.clone(),
             BoxShadow {
                 color: Color::BLACK,
                 spread_radius: Val::Px(3.),
@@ -78,6 +79,7 @@ fn internal_generate_component_system(
             .observe(on_internal_mouse_click)
             .with_children(|builder| {
 
+                info!("Radius: {:?}", style.0.border_radius);
             // Slider Track
             builder.spawn((
                 Name::new(format!("Slider-Track-{}", gen_id.0)),
@@ -87,10 +89,10 @@ fn internal_generate_component_system(
                     ..default()
                 },
                 BorderRadius {
-                    top_left: style.0.border_radius.top_left,
-                    top_right: style.0.border_radius.top_right,
-                    bottom_left: style.0.border_radius.bottom_left,
-                    bottom_right: style.0.border_radius.bottom_right,
+                    top_left: default_style.0.border_radius.top_left,
+                    top_right: default_style.0.border_radius.top_right,
+                    bottom_left: default_style.0.border_radius.bottom_left,
+                    bottom_right: default_style.0.border_radius.bottom_right,
                 },
                 BackgroundColor(style.0.track_color),
                 RenderLayers::layer(*layer),
