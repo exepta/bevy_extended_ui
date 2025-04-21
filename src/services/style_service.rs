@@ -1,12 +1,17 @@
 use bevy::prelude::*;
-use crate::global::{UiElementState, UiGenID};
+use crate::global::{BindToID, UiElementState, UiGenID};
 use crate::styles::{BaseStyle, HoverStyle, InternalStyle, SelectedStyle, Style};
+use crate::widgets::check_box::CheckBoxMark;
+use crate::widgets::CheckBox;
 
 pub struct StyleService;
 
 impl Plugin for StyleService {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, internal_ui_element_styling);
+        app.add_systems(Update, 
+                        internal_check_box_styling_system
+                            .after(internal_ui_element_styling));
     }
 }
 
@@ -55,6 +60,46 @@ fn internal_ui_element_styling(
         apply_to_bevy_style(&mut commands, &entity, &internal_style.0, &mut node, &mut border_radius,
                             &mut border_color, &mut background_color, &mut image_node,
                             children, &mut text_query, &children_query);
+    }
+}
+
+fn internal_check_box_styling_system(
+    query: Query<(
+        &UiGenID,
+        &InternalStyle,
+        &CheckBox,
+    ), (With<UiGenID>, With<CheckBox>)>,
+    mut inner_query: Query<(
+        Entity, 
+        &mut Node, 
+        &mut BackgroundColor, 
+        &mut BorderColor,
+        &mut BorderRadius,
+        &BindToID), With<BindToID>>,
+    mark_query: Query<&CheckBoxMark>,
+) {
+    for (ui_id, internal_style, checkbox) 
+    in query.iter() {
+        for (entity, mut node, 
+            mut background_color, mut border_color, mut border_radius,
+            bind_to) 
+        in inner_query.iter_mut() {
+            if bind_to.0 != ui_id.0 {
+                continue;
+            }
+            
+            if mark_query.get(entity).is_ok() {
+                node.width = Val::Px(internal_style.0.check_size);
+                node.height = Val::Px(internal_style.0.check_size);
+                node.border = internal_style.0.check_border;
+                border_radius.top_left = internal_style.0.check_border_radius.top_left;
+                border_radius.top_right = internal_style.0.check_border_radius.top_right;
+                border_radius.bottom_left = internal_style.0.check_border_radius.bottom_left;
+                border_radius.bottom_right = internal_style.0.check_border_radius.bottom_right;
+                border_color.0 = internal_style.0.check_border_color;
+                background_color.0 = if checkbox.checked { internal_style.0.check_background_color } else { Color::srgba(0.0, 0.0, 0.0, 0.0) };
+            }
+        }
     }
 }
 
@@ -145,7 +190,7 @@ fn apply_style_recursively(
             text_layout.linebreak = from.line_break;
         }
         if let Some(mut image_node) = image_node {
-            image_node.color = from.color;
+            image_node.color = if let Some(icon_color) = from.icon_color { icon_color } else { from.color };
         }
     }
 

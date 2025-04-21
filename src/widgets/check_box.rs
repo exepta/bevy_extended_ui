@@ -4,6 +4,7 @@ use crate::global::{BindToID, UiGenID};
 use crate::resources::ExtendedUiConfiguration;
 use crate::styles::{BaseStyle, InternalStyle, Style};
 use crate::styles::css_types::Background;
+use crate::styles::types::CheckBoxStyle;
 use crate::utils::Radius;
 use crate::widgets::{CheckBox};
 
@@ -14,7 +15,7 @@ struct CheckBoxRoot;
 struct CheckBoxLabel;
 
 #[derive(Component)]
-struct CheckBoxMark;
+pub struct CheckBoxMark;
 
 pub struct CheckBoxWidget;
 
@@ -37,8 +38,11 @@ fn internal_generate_component_system(
             Node::default(),
             default_style.clone(),
             RenderLayers::layer(*layer),
-            CheckBoxRoot
-        )).with_children(|builder| {
+            CheckBoxRoot,
+            CheckBoxStyle
+        ))
+            .observe(on_internal_click)
+            .with_children(|builder| {
             builder.spawn((
                 Name::new(format!("Check-Mark-{}", gen_id.0)),
                 Node {
@@ -59,12 +63,9 @@ fn internal_generate_component_system(
                 BorderColor(default_style.0.check_border_color),
                 BackgroundColor(if checkbox.checked { default_style.0.check_background_color } else { Color::srgba(0.0, 0.0, 0.0, 0.0) }),
                 CheckBoxMark,
+                PickingBehavior::IGNORE,
                 BindToID(gen_id.0)
-            )).with_children(|builder| {
-                builder.spawn((
-                    Name::new(format!("Mark-{}", gen_id.0)),
-                ));
-            });
+            ));
 
             builder.spawn((
                 Name::new(format!("Check-Label-{}", gen_id.0)),
@@ -73,31 +74,72 @@ fn internal_generate_component_system(
                     font_size: default_style.0.font_size,
                     ..default()
                 },
-                PickingBehavior::IGNORE,
                 TextColor(default_style.0.color),
                 RenderLayers::layer(*layer),
                 CheckBoxLabel,
-                BindToID(gen_id.0)
+                PickingBehavior::IGNORE,
+                BindToID(gen_id.0),
             ));
         });
     }
 }
 
-/*fn on_internal_click(
-    event: Trigger<Pointer<Click>>,
-    mut query: Query<(&mut CheckBox, &Children), With<CheckBox>>,
+fn on_internal_click(
+    event: Trigger<Pointer<Click>>, 
+    mut query: Query<(Entity, &InternalStyle, &mut CheckBox, &UiGenID), With<CheckBox>>,
+    inner_query: Query<(Entity, &BindToID, Option<&Children>), With<CheckBoxMark>>,
+    mut commands: Commands,
+    config: Res<ExtendedUiConfiguration>,
+    asset_server: Res<AssetServer>,
 ) {
-    
-}*/
+    let target = event.target;
+    let layer = config.render_layers.first().unwrap_or(&1);
+    for (entity, style, mut checkbox, ui_id) in query.iter_mut() {
+        if target.eq(&entity) {
+            checkbox.checked = !checkbox.checked;
+            
+            for (inner_entity, bind_to, children) in inner_query.iter() {
+                if ui_id.0 != bind_to.0 {
+                    continue;
+                }
+                
+                if checkbox.checked {
+                    commands.entity(inner_entity).with_children(|builder| {
+                        builder.spawn((
+                            Name::new(format!("Mark-{}", ui_id.0)),
+                            Node {
+                                width: Val::Px(style.0.check_mark_size),
+                                height: Val::Px(style.0.check_mark_size),
+                                ..default()
+                            },
+                            ImageNode {
+                                color: if let Some(icon_color) = style.0.icon_color { icon_color } else { style.0.color },
+                                image: asset_server.load("icons/check-mark.png"),
+                                ..default()
+                            },
+                            PickingBehavior::IGNORE,
+                            RenderLayers::layer(*layer),
+                        ));
+                    });
+                } else {
+                    if let Some(children) = children {
+                        for child in children.iter() {
+                            commands.entity(*child).despawn_recursive();
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
 fn default_style(overwrite: Option<&BaseStyle>) -> InternalStyle {
     let mut internal_style = InternalStyle(Style {
-        width: Val::Px(200.),
-        min_width: Val::Px(100.),
-        height: Val::Px(50.),
         display: Display::Flex,
         justify_content: JustifyContent::FlexStart,
-        gap_row: Val::Px(20.),
+        font_size: 15.,
+        gap_row: Val::Px(15.),
+        icon_color: Some(Color::WHITE),
         align_items: AlignItems::Center,
         background: Background { color: Color::srgba(1.0, 1.0, 1.0, 1.0), ..default() },
         border: UiRect::all(Val::Px(0.)),

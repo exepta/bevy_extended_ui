@@ -76,7 +76,8 @@ fn example_widget(mut commands: Commands, asset_server: Res<AssetServer>) {
 
         builder.spawn(Slider::default());
         builder.spawn(Slider::default());
-        
+
+        builder.spawn(CheckBox::default());
         builder.spawn(CheckBox::default());
     });
 }

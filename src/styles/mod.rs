@@ -1,4 +1,5 @@
 pub mod css_types;
+pub mod types;
 
 use bevy::prelude::*;
 use crate::styles::css_types::Background;
@@ -58,7 +59,7 @@ pub struct Style {
     pub check_mark_size: f32,
     pub check_border: UiRect,
     pub check_border_radius: Radius,
-    pub check_color: Color,
+    pub icon_color: Option<Color>,
     pub check_background_color: Color,
     pub check_border_color: Color,
     pub check_icon: Option<Handle<Image>>,
@@ -111,15 +112,15 @@ impl Default for Style {
             thumb_height: Val::Px(16.),
             thumb_width: Val::Px(16.),
             track_color: Color::srgb(0.7, 0.0, 0.7),
-            check_border: UiRect::all(Val::Px(1.)),
+            check_border: UiRect::all(Val::Px(1.5)),
             check_border_color: Color::BLACK,
-            check_border_radius: Radius::all(Val::Px(4.0)),
+            check_border_radius: Radius::all(Val::Px(1.0)),
             check_background_color: Color::srgb(0.0, 0.4, 0.8),
-            check_color: Color::WHITE,
+            icon_color: None,
             check_icon: None,
             check_label_space: Val::Px(20.),
-            check_size: 25.,
-            check_mark_size: 12.5,
+            check_size: 22.5,
+            check_mark_size: 12.0,
         }
     }
 }
