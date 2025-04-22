@@ -12,6 +12,7 @@ pub mod button;
 pub mod input;
 pub mod slider;
 pub mod check_box;
+mod choice_box;
 
 /// ===============================================
 ///                 Div
@@ -131,6 +132,46 @@ impl Default for CheckBox {
             checked: false,
             icon: None,
             label: String::from("CheckBox"),
+        }
+    }
+}
+
+/// ===============================================
+///                 ChoiceBox
+/// ===============================================
+
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+#[require(UiGenID, UiElementState, BaseStyle, HoverStyle, SelectedStyle, InternalStyle)]
+pub struct ChoiceBox {
+    pub value: ChoiceOption,
+    pub options: Vec<ChoiceOption>
+}
+
+impl Default for ChoiceBox {
+    fn default() -> Self {
+        Self {
+            value: ChoiceOption { selected: true, ..default() },
+            options: vec![ChoiceOption { selected: true, ..default() }]
+        }
+    }
+}
+
+#[derive(Component, Reflect, Debug, Clone)]
+pub struct ChoiceOption {
+    pub label: String,
+    pub internal_val: String,
+    pub icon: Option<Handle<Image>>,
+    pub selected: bool
+}
+
+impl Default for ChoiceOption {
+    fn default() -> Self {
+        Self {
+            label: String::from("Option 1"),
+            internal_val: String::from("option1"),
+            icon: None,
+            selected: false,
         }
     }
 }

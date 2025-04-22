@@ -5,7 +5,48 @@ use bevy::prelude::*;
 use crate::styles::css_types::Background;
 use crate::utils::Radius;
 
-pub trait Styles {}
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+pub struct GeneralStyle {
+    pub width: Val,
+    pub height: Val,
+    pub min_width: Val,
+    pub min_height: Val,
+    pub max_width: Val,
+    pub max_height: Val,
+    pub top: Val,
+    pub left: Val,
+    pub right: Val,
+    pub bottom: Val,
+    pub padding: UiRect,
+    pub margin: UiRect,
+    pub background: Background,
+    pub display: Display,
+    pub position_type: PositionType,
+    pub flex_direction: FlexDirection,
+    pub flex_wrap: FlexWrap,
+    pub flex_grow: f32,
+    pub flex_shrink: f32,
+    pub flex_basis: Val,
+    pub gap_column: Val,
+    pub gap_row: Val,
+    pub align_items: AlignItems,
+    pub align_content: AlignContent,
+    pub align_self: AlignSelf,
+    pub justify_items: JustifyItems,
+    pub justify_content: JustifyContent,
+    pub justify_self: JustifySelf,
+    pub box_shadow: BoxShadow,
+}
+
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+pub struct FontStyle {
+    pub font: Handle<Font>,
+    pub size: f32,
+    pub color: Color,
+    pub line_break: LineBreak,
+}
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]

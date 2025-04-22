@@ -31,7 +31,7 @@ Otherwise, feel free to create a ticket.
   - [x] Type Number
   - [x] Type Password
 - [x] Create Widget Slider
-- [ ] Create Widget CheckBox
+- [x] Create Widget CheckBox
 - [ ] Create Widget ChoiceBox
 - [ ] Create Group Widget
 - [ ] Create Widget Radio Button
