@@ -2,7 +2,6 @@ use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use bevy::window::PrimaryWindow;
 use crate::global::{UiGenID, UiElementState, BindToID};
-use crate::styles::{BaseStyle, InternalStyle, Style};
 use crate::resources::{CurrentElementSelected, ExtendedUiConfiguration};
 use crate::styles::css_types::Background;
 use crate::utils::Radius;
@@ -24,14 +23,14 @@ pub struct SliderWidget;
 impl Plugin for SliderWidget {
     fn build(&self, app: &mut App) {
         app.register_type::<SliderThumb>();
-        app.add_systems(Update, (
+/*        app.add_systems(Update, (
             internal_generate_component_system,
             detect_change_slider_values
-        ));
+        ));*/
     }
 }
 
-fn internal_generate_component_system(
+/*fn internal_generate_component_system(
     mut commands: Commands,
     query: Query<(Entity, &UiGenID, &InternalStyle, Option<&BaseStyle>), (Without<SliderRoot>, With<Slider>)>,
     config: Res<ExtendedUiConfiguration>
@@ -238,26 +237,4 @@ fn on_internal_mouse_click(
         state.selected = true;
         current_element_selected.0 = gen_id.0;
     }
-}
-
-
-fn default_style(overwrite: Option<&BaseStyle>) -> InternalStyle {
-    let mut internal_style = InternalStyle(Style {
-        width: Val::Px(400.),
-        min_width: Val::Px(100.),
-        height: Val::Px(8.),
-        display: Display::Flex,
-        justify_content: JustifyContent::FlexStart,
-        align_items: AlignItems::Center,
-        background: Background { color: Color::srgba(1.0, 1.0, 1.0, 1.0), ..default() },
-        border: UiRect::all(Val::Px(0.)),
-        border_radius: Radius::all(Val::Px(5.)),
-        ..default()
-    });
-
-    if let Some(style) = overwrite {
-        internal_style.merge_styles(&style.0);
-    }
-    internal_style
-}
-
+}*/

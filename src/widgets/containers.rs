@@ -2,7 +2,6 @@ use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use crate::global::{UiGenID, UiElementState };
 use crate::resources::{CurrentElementSelected, ExtendedUiConfiguration};
-use crate::styles::{BaseStyle, InternalStyle, Style};
 use crate::widgets::DivContainer;
 
 #[derive(Component)]
@@ -18,15 +17,14 @@ impl Plugin for DivWidget {
 
 fn internal_generate_component_system(
     mut commands: Commands,
-    query: Query<(Entity, &UiGenID, Option<&BaseStyle>), (Without<DivRoot>, With<DivContainer>)>,
+    query: Query<(Entity, &UiGenID), (Without<DivRoot>, With<DivContainer>)>,
     config: Res<ExtendedUiConfiguration>
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
-    for (entity , gen_id, option_base_style) in query.iter() {
+    for (entity , gen_id) in query.iter() {
         commands.entity(entity).insert((
             Name::new(format!("Div-{}", gen_id.0)),
             Node::default(),
-            default_div_style(option_base_style),
             RenderLayers::layer(*layer),
             DivRoot
         ))
@@ -57,16 +55,4 @@ fn on_internal_mouse_leave(event: Trigger<Pointer<Out>>, mut query: Query<&mut U
     if let Ok(mut state) = query.get_mut(event.target) {
         state.hovered = false;
     }
-}
-
-fn default_div_style(overwrite: Option<&BaseStyle>) -> InternalStyle {
-    let mut internal_style = InternalStyle(Style {
-        margin: UiRect::all(Val::Px(10.0)),
-        ..default()
-    });
-
-    if let Some(style) = overwrite {
-        internal_style.merge_styles(&style.0);
-    }
-    internal_style
 }

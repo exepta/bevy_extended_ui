@@ -1,11 +1,11 @@
 use bevy::prelude::*;
-use crate::widgets::button::{ButtonWidget, IconPlace};
+use crate::widgets::button::{ButtonWidget};
 use crate::widgets::containers::DivWidget;
 use crate::widgets::input::{InputCap, InputType, InputWidget};
 use crate::widgets::slider::SliderWidget;
-use crate::styles::{BaseStyle, HoverStyle, SelectedStyle, InternalStyle};
 use crate::global::{UiGenID, UiElementState};
 use crate::widgets::check_box::CheckBoxWidget;
+use crate::styles::types::ButtonStyle;
 
 pub mod containers;
 pub mod button;
@@ -20,7 +20,7 @@ mod choice_box;
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
-#[require(UiGenID, UiElementState, BaseStyle, HoverStyle, SelectedStyle, InternalStyle)]
+#[require(UiGenID, UiElementState)]
 pub struct DivContainer;
 
 /// ===============================================
@@ -29,7 +29,7 @@ pub struct DivContainer;
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
-#[require(UiGenID, UiElementState, BaseStyle, HoverStyle, SelectedStyle, InternalStyle)]
+#[require(UiGenID, UiElementState)]
 pub struct Slider {
     pub value: i32,
     pub step: i32,
@@ -54,20 +54,12 @@ impl Default for Slider {
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
-#[require(UiGenID, UiElementState, BaseStyle, HoverStyle, SelectedStyle, InternalStyle)]
-pub struct Button {
-    pub label: String,
-    pub icon: Option<Handle<Image>>,
-    pub icon_place: IconPlace
-}
+#[require(UiGenID, UiElementState, ButtonStyle)]
+pub struct Button(pub String);
 
 impl Default for Button {
     fn default() -> Self {
-        Self {
-            label: String::from("Button"),
-            icon: None,
-            icon_place: IconPlace::Right,
-        }
+        Self("Button".to_string())
     }
 }
 
@@ -77,7 +69,7 @@ impl Default for Button {
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
-#[require(UiGenID, UiElementState, BaseStyle, HoverStyle, SelectedStyle, InternalStyle)]
+#[require(UiGenID, UiElementState)]
 pub struct InputField {
     pub text: String,
     pub placeholder_text: String,
@@ -119,7 +111,7 @@ impl InputField {
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
-#[require(UiGenID, UiElementState, BaseStyle, HoverStyle, SelectedStyle, InternalStyle)]
+#[require(UiGenID, UiElementState)]
 pub struct CheckBox {
     pub label: String,
     pub icon: Option<Handle<Image>>,
@@ -142,7 +134,7 @@ impl Default for CheckBox {
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
-#[require(UiGenID, UiElementState, BaseStyle, HoverStyle, SelectedStyle, InternalStyle)]
+#[require(UiGenID, UiElementState)]
 pub struct ChoiceBox {
     pub value: ChoiceOption,
     pub options: Vec<ChoiceOption>

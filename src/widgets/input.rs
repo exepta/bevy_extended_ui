@@ -3,7 +3,6 @@ use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use bevy::utils::HashMap;
 use crate::global::{UiGenID, UiElementState, BindToID};
-use crate::styles::{BaseStyle, InternalStyle, Style};
 use crate::resources::{CurrentElementSelected, ExtendedUiConfiguration};
 use crate::styles::css_types::Background;
 use crate::utils::Radius;
@@ -80,27 +79,27 @@ impl Plugin for InputWidget {
     fn build(&self, app: &mut App) {
         app.insert_resource(KeyRepeatTimers::default());
         app.insert_resource(CursorBlinkTimer::default());
-        app.add_systems(Update, (
+/*        app.add_systems(Update, (
             internal_generate_component_system,
             update_cursor_visibility,
             update_cursor_position,
             handle_typing,
             handle_input_horizontal_scroll
-        ));
+        ));*/
     }
 }
 
-fn internal_generate_component_system(
+/*fn internal_generate_component_system(
     mut commands: Commands,
-    query: Query<(Entity, &UiGenID, &InputField, Option<&BaseStyle>), (Without<InputFieldRoot>, With<InputField>)>,
+    query: Query<(Entity, &UiGenID, &InputField), (Without<InputFieldRoot>, With<InputField>)>,
     config: Res<ExtendedUiConfiguration>
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
-    for (entity , gen_id, in_field, option_base_style) in query.iter() {
+    for (entity , gen_id, in_field) in query.iter() {
         commands.entity(entity).insert((
             Name::new(format!("InputField-{}", gen_id.0)),
             Node::default(),
-            default_style(option_base_style),
+
             RenderLayers::layer(*layer),
             InputFieldRoot,
         )).with_children(|builder| {
@@ -604,24 +603,4 @@ fn on_internal_mouse_leave(event: Trigger<Pointer<Out>>, mut query: Query<&mut U
     if let Ok(mut state) = query.get_mut(event.target) {
         state.hovered = false;
     }
-}
-
-fn default_style(overwrite: Option<&BaseStyle>) -> InternalStyle {
-    let mut internal_style = InternalStyle(Style {
-        width: Val::Px(350.),
-        min_width: Val::Px(150.),
-        height: Val::Px(50.),
-        display: Display::Flex,
-        justify_content: JustifyContent::FlexStart,
-        align_items: AlignItems::Center,
-        background: Background { color: Color::srgba(1.0, 1.0, 1.0, 1.0), ..default() },
-        border: UiRect::all(Val::Px(2.)),
-        border_radius: Radius::all(Val::Px(5.)),
-        ..default()
-    });
-
-    if let Some(style) = overwrite {
-        internal_style.merge_styles(&style.0);
-    }
-    internal_style
-}
+}*/

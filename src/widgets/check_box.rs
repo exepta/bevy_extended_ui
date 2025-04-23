@@ -2,10 +2,6 @@ use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use crate::global::{BindToID, UiGenID};
 use crate::resources::ExtendedUiConfiguration;
-use crate::styles::{BaseStyle, InternalStyle, Style};
-use crate::styles::css_types::Background;
-use crate::styles::types::CheckBoxStyle;
-use crate::utils::Radius;
 use crate::widgets::{CheckBox};
 
 #[derive(Component)]
@@ -21,22 +17,20 @@ pub struct CheckBoxWidget;
 
 impl Plugin for CheckBoxWidget {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, internal_generate_component_system);
+/*        app.add_systems(Update, internal_generate_component_system);*/
     }
 }
 
-fn internal_generate_component_system(
+/*fn internal_generate_component_system(
     mut commands: Commands,
-    query: Query<(Entity, &UiGenID, &CheckBox, Option<&BaseStyle>), (Without<CheckBoxRoot>, With<CheckBox>)>,
+    query: Query<(Entity, &UiGenID, &CheckBox), (Without<CheckBoxRoot>, With<CheckBox>)>,
     config: Res<ExtendedUiConfiguration>
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
-    for (entity, gen_id, checkbox, option_base_style) in query.iter() {
-        let default_style = default_style(option_base_style);
+    for (entity, gen_id, checkbox) in query.iter() {
         commands.entity(entity).insert((
             Name::new(format!("CheckBox-{}", gen_id.0)),
             Node::default(),
-            default_style.clone(),
             RenderLayers::layer(*layer),
             CheckBoxRoot,
             CheckBoxStyle
@@ -82,11 +76,11 @@ fn internal_generate_component_system(
             ));
         });
     }
-}
+}*/
 
 fn on_internal_click(
     event: Trigger<Pointer<Click>>, 
-    mut query: Query<(Entity, &InternalStyle, &mut CheckBox, &UiGenID), With<CheckBox>>,
+    mut query: Query<(Entity, &mut CheckBox, &UiGenID), With<CheckBox>>,
     inner_query: Query<(Entity, &BindToID, Option<&Children>), With<CheckBoxMark>>,
     mut commands: Commands,
     config: Res<ExtendedUiConfiguration>,
@@ -94,29 +88,29 @@ fn on_internal_click(
 ) {
     let target = event.target;
     let layer = config.render_layers.first().unwrap_or(&1);
-    for (entity, style, mut checkbox, ui_id) in query.iter_mut() {
+    for (entity, mut checkbox, ui_id) in query.iter_mut() {
         if target.eq(&entity) {
             checkbox.checked = !checkbox.checked;
-            
+
             for (inner_entity, bind_to, children) in inner_query.iter() {
                 if ui_id.0 != bind_to.0 {
                     continue;
                 }
-                
+
                 if checkbox.checked {
                     commands.entity(inner_entity).with_children(|builder| {
                         builder.spawn((
                             Name::new(format!("Mark-{}", ui_id.0)),
-                            Node {
+/*                            Node {
                                 width: Val::Px(style.0.check_mark_size),
                                 height: Val::Px(style.0.check_mark_size),
                                 ..default()
-                            },
-                            ImageNode {
+                            },*/
+/*                            ImageNode {
                                 color: if let Some(icon_color) = style.0.icon_color { icon_color } else { style.0.color },
                                 image: asset_server.load("icons/check-mark.png"),
                                 ..default()
-                            },
+                            },*/
                             PickingBehavior::IGNORE,
                             RenderLayers::layer(*layer),
                         ));
@@ -131,25 +125,5 @@ fn on_internal_click(
             }
         }
     }
-}
-
-fn default_style(overwrite: Option<&BaseStyle>) -> InternalStyle {
-    let mut internal_style = InternalStyle(Style {
-        display: Display::Flex,
-        justify_content: JustifyContent::FlexStart,
-        font_size: 15.,
-        gap_row: Val::Px(15.),
-        icon_color: Some(Color::WHITE),
-        align_items: AlignItems::Center,
-        background: Background { color: Color::srgba(1.0, 1.0, 1.0, 1.0), ..default() },
-        border: UiRect::all(Val::Px(0.)),
-        border_radius: Radius::all(Val::Px(0.)),
-        ..default()
-    });
-
-    if let Some(style) = overwrite {
-        internal_style.merge_styles(&style.0);
-    }
-    internal_style
 }
 

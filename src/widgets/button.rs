@@ -2,16 +2,10 @@ use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use crate::global::{UiGenID, UiElementState};
 use crate::resources::{CurrentElementSelected, ExtendedUiConfiguration};
-use crate::styles::{BaseStyle, InternalStyle, Style};
-use crate::styles::css_types::Background;
-use crate::utils::Radius;
+use crate::styles::css_types::IconPlace;
+use crate::styles::types::ButtonStyle;
+use crate::styles::utils::{apply_base_component_style, apply_design_styles};
 use crate::widgets::Button;
-
-#[derive(Reflect, Debug, Clone, PartialEq)]
-pub enum IconPlace {
-    Left,
-    Right
-}
 
 #[derive(Component)]
 struct ButtonBase;
@@ -26,38 +20,46 @@ pub struct ButtonWidget;
 
 impl Plugin for ButtonWidget {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, internal_generate_component_system);
+        app.add_systems(Update, (
+            internal_generate_component_system,
+            internal_style_update_que
+                .after(internal_generate_component_system),
+        ));
     }
 }
 
 fn internal_generate_component_system(
     mut commands: Commands,
-    query: Query<(Entity, &UiGenID, &Button, Option<&BaseStyle>), (Without<ButtonBase>, With<Button>)>,
-    config: Res<ExtendedUiConfiguration>
+    query: Query<(Entity, &UiGenID, &Button, &ButtonStyle), (Without<ButtonBase>, With<Button>)>,
+    config: Res<ExtendedUiConfiguration>,
+    asset_server: Res<AssetServer>,
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
-    for (entity , gen_id, btn, option_base_style) in query.iter() {
+    for (entity , gen_id, btn, style) in query.iter() {
         commands.entity(entity).insert((
             Name::new(format!("Button-{}", gen_id.0)),
             Node::default(),
-            default_style(option_base_style),
+            BackgroundColor::default(),
+            BorderColor::default(),
+            BorderRadius::all(Val::Px(0.)),
+            BoxShadow::default(),
             RenderLayers::layer(*layer),
             ButtonBase
         )).with_children(|builder| {
-            if btn.icon_place == IconPlace::Left {
-                place_icon(builder, btn, gen_id.0, *layer);
+            if style.icon_place == IconPlace::Left {
+                place_icon(builder, style, &asset_server, gen_id.0, *layer);
             }
 
             builder.spawn((
                 Name::new(format!("Button-Label-{}", gen_id.0)),
-                Text::new(btn.label.clone()),
+                Text::new(btn.0.clone()),
                 RenderLayers::layer(*layer),
                 PickingBehavior::IGNORE,
                 ButtonLabel,
             ));
 
-            if btn.icon_place == IconPlace::Right {
-                place_icon(builder, btn, gen_id.0, *layer);
+            if style.icon_place == IconPlace::Right {
+                place_icon(builder, style, &asset_server, gen_id.0, *layer);
             }
         })
             .observe(on_internal_mouse_click)
@@ -89,11 +91,11 @@ fn on_internal_mouse_leave(event: Trigger<Pointer<Out>>, mut query: Query<&mut U
     }
 }
 
-fn place_icon(builder: &mut ChildBuilder, btn: &Button, id: usize, layer: usize) {
-    if let Some(icon) = btn.icon.clone() {
+fn place_icon(builder: &mut ChildBuilder, style: &ButtonStyle, asset_server: &Res<AssetServer>, id: usize, layer: usize) {
+    if let Some(icon) = style.icon_path.clone() {
         builder.spawn((
             Name::new(format!("Button-Icon-{}", id)),
-            ImageNode::new(icon),
+            ImageNode::new(asset_server.load(icon.as_str())),
             RenderLayers::layer(layer),
             PickingBehavior::IGNORE,
             ButtonImage,
@@ -102,22 +104,28 @@ fn place_icon(builder: &mut ChildBuilder, btn: &Button, id: usize, layer: usize)
     }
 }
 
-fn default_style(overwrite: Option<&BaseStyle>) -> InternalStyle {
-    let mut internal_style = InternalStyle(Style {
-        width: Val::Px(150.),
-        height: Val::Px(50.),
-        display: Display::Flex,
-        justify_content: JustifyContent::Center,
-        align_items: AlignItems::Center,
-        gap_row: Val::Px(15.),
-        background: Background { color: Color::srgba(0.95, 0.95, 0.95, 1.0), ..default() },
-        border: UiRect::all(Val::Px(2.)),
-        border_radius: Radius::all(Val::Px(5.)),
-        ..default()
-    });
+fn internal_style_update_que(
+    mut query: Query<(&UiElementState, &UiGenID, &Children, &ButtonStyle,
+                      &mut Node,
+                      &mut BackgroundColor,
+                      &mut BoxShadow,
+                      &mut BorderRadius,
+                      &mut BorderColor
+    ), With<Button>>
+) {
+    for (state, ui_id, children, style,
+        mut node,
+        mut background_color,
+        mut box_shadow,
+        mut border_radius,
+        mut border_color) in query.iter_mut() {
 
-    if let Some(style) = overwrite {
-        internal_style.merge_styles(&style.0);
+        let mut internal_style = style.style.clone();
+        if state.hovered {
+            internal_style.background.color = Color::srgb_u8(74, 207, 108);
+        }
+
+        apply_base_component_style(&internal_style, &mut node);
+        apply_design_styles(&internal_style, &mut background_color, &mut border_color, &mut border_radius, &mut box_shadow);
     }
-    internal_style
 }
