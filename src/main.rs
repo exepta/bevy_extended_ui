@@ -3,10 +3,11 @@ use bevy::prelude::*;
 use bevy::window::WindowResolution;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_extended_ui::ExtendedUiPlugin;
+use bevy_extended_ui::global::UiElementState;
 use bevy_extended_ui::styles::css_types::Background;
 use bevy_extended_ui::styles::Style;
 use bevy_extended_ui::styles::types::DivStyle;
-use bevy_extended_ui::widgets::{DivContainer, Button, CheckBox};
+use bevy_extended_ui::widgets::{DivContainer, Button, CheckBox, Slider};
 
 fn main() {
     let _ = App::new()
@@ -63,12 +64,20 @@ fn example_widget(mut commands: Commands) {
                 Button::default()
             );
 
-            builder.spawn(
-                Button::default()
-            );
+            builder.spawn((
+                Button::default(),
+                UiElementState {
+                    disabled: true,
+                    ..default()
+                }
+            ));
 
             builder.spawn(
                 CheckBox::default()
+            );
+            
+            builder.spawn(
+                Slider::default()
             );
         });
     });

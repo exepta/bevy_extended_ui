@@ -2,9 +2,9 @@ use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use crate::global::{BindToID, UiElementState, UiGenID};
 use crate::resources::ExtendedUiConfiguration;
-use crate::styles::state_styles::{Checked, Hover, Styling};
+use crate::styles::state_styles::{Checked, Disabled, Hover, Selected, Styling};
 use crate::styles::types::CheckBoxStyle;
-use crate::styles::utils::{apply_base_component_style, apply_design_styles, apply_text_styles};
+use crate::styles::utils::{apply_base_component_style, apply_design_styles, apply_label_styles_to_child, resolve_style_by_state};
 use crate::widgets::{CheckBox};
 
 #[derive(Component)]
@@ -43,8 +43,8 @@ fn internal_generate_component_system(
             BackgroundColor::default(),
             BoxShadow::default(),
             Checked(Styling::CheckBox(CheckBoxStyle {
-                check_border_color: Color::srgb_u8(50, 168, 80),
-                check_background: Color::srgb_u8(50, 168, 80),
+                check_border_color: Color::srgb_u8(143, 201,  249),
+                check_background: Color::srgb_u8(143, 201,  249),
                 ..default()
             })),
             RenderLayers::layer(*layer),
@@ -142,7 +142,8 @@ fn on_internal_click(
 }
 
 fn internal_style_update_que(
-    mut query: Query<(&UiElementState, &UiGenID, &Children, &CheckBox, &CheckBoxStyle, Option<&Hover>, Option<&Checked>,
+    mut query: Query<(&UiElementState, &UiGenID, &Children, &CheckBox, &CheckBoxStyle, 
+                      Option<&Hover>, Option<&Checked>, Option<&Selected>, Option<&Disabled>,
                       &mut Node,
                       &mut BackgroundColor,
                       &mut BoxShadow,
@@ -158,76 +159,62 @@ fn internal_style_update_que(
                            &mut BorderColor),
         Without<CheckBox>>,
 ) {
-    for (state, ui_id, children, check_box, style, hover_style, checked_style,
+    for (state, ui_id, children, check_box, style, 
+        hover_style, checked_style, selected_style, disabled_style,
         mut node,
         mut background_color,
         mut box_shadow,
         mut border_radius,
         mut border_color) in query.iter_mut() {
-
-        let mut internal_style = style.clone();
-        if state.hovered {
-            if let Some(Hover(style_rule)) = hover_style {
-                match style_rule {
-                    Styling::CheckBox(hover) => {
-                        internal_style.style.background.color = hover.style.background.color;
-                    }
-                    _ => { }
-                }
-            }
-        }
-
+        let mut internal_style = resolve_style_by_state(
+            &Styling::CheckBox(style.clone()),
+            state,
+            hover_style,
+            selected_style,
+            disabled_style,
+        );
+        
         if check_box.checked {
-            if let Some(Checked(style_rule)) = checked_style {
-                match style_rule {
-                    Styling::CheckBox(hover) => {
-                        internal_style.check_background = hover.check_background;
-                        internal_style.check_border_color = hover.check_border_color;
-                    }
-                    _ => { }
-                }
+            if let Some(checked) = checked_style {
+                internal_style = checked.0.clone();
             }
         }
 
-        apply_base_component_style(&internal_style.style, &mut node);
-        apply_design_styles(&internal_style.style, &mut background_color, &mut border_color, &mut border_radius, &mut box_shadow);
+        if let Styling::CheckBox(check_box_style) = internal_style {
+            apply_base_component_style(&check_box_style.style, &mut node);
+            apply_design_styles(&check_box_style.style, &mut background_color, &mut border_color, &mut border_radius, &mut box_shadow);
 
-        for child in children.iter() {
-            if let Ok((bind_to, mut text_color, mut text_font, mut text_layout)) = label_query.get_mut(*child) {
-                if bind_to.0 != ui_id.0 {
-                    continue;
+            for child in children.iter() {
+                apply_label_styles_to_child(*child, ui_id, &check_box_style.label_style, &mut label_query);
+
+                if let Ok((bind_to, mut node, mut check_background_color,
+                              mut check_box_shadow, mut check_border_radius,
+                              mut check_border_color)) = mark_query.get_mut(*child) {
+                    if bind_to.0 != ui_id.0 {
+                        continue;
+                    }
+
+                    node.width = Val::Px(check_box_style.check_size);
+                    node.height = Val::Px(check_box_style.check_size);
+                    node.border = check_box_style.check_border;
+                    if let Some(apply_box_shadow) = check_box_style.check_box_shadow {
+                        check_box_shadow.color = apply_box_shadow.color;
+                        check_box_shadow.blur_radius = apply_box_shadow.blur_radius;
+                        check_box_shadow.spread_radius = apply_box_shadow.spread_radius;
+                        check_box_shadow.x_offset = apply_box_shadow.x_offset;
+                        check_box_shadow.y_offset = apply_box_shadow.y_offset;
+                    } else {
+                        check_box_shadow.color = Color::srgba(0.0, 0.0, 0.0, 0.0);
+                        check_box_shadow.blur_radius = Val::Px(0.);
+                        check_box_shadow.spread_radius = Val::Px(0.);
+                    }
+                    check_border_radius.top_left = check_box_style.check_border_radius.top_left;
+                    check_border_radius.top_right = check_box_style.check_border_radius.top_right;
+                    check_border_radius.bottom_left = check_box_style.check_border_radius.bottom_left;
+                    check_border_radius.bottom_right = check_box_style.check_border_radius.bottom_right;
+                    check_border_color.0 = check_box_style.check_border_color;
+                    check_background_color.0 = check_box_style.check_background;
                 }
-
-                apply_text_styles(&style.label_style, &mut text_color, &mut text_font, &mut text_layout);
-            }
-
-            if let Ok((bind_to, mut node, mut check_background_color,
-                          mut check_box_shadow, mut check_border_radius,
-                          mut check_border_color)) = mark_query.get_mut(*child) {
-                if bind_to.0 != ui_id.0 {
-                    continue;
-                }
-
-                node.width = Val::Px(internal_style.check_size);
-                node.height = Val::Px(internal_style.check_size);
-                node.border = internal_style.check_border;
-                if let Some(apply_box_shadow) = internal_style.check_box_shadow {
-                    check_box_shadow.color = apply_box_shadow.color;
-                    check_box_shadow.blur_radius = apply_box_shadow.blur_radius;
-                    check_box_shadow.spread_radius = apply_box_shadow.spread_radius;
-                    check_box_shadow.x_offset = apply_box_shadow.x_offset;
-                    check_box_shadow.y_offset = apply_box_shadow.y_offset;
-                } else {
-                    check_box_shadow.color = Color::srgba(0.0, 0.0, 0.0, 0.0);
-                    check_box_shadow.blur_radius = Val::Px(0.);
-                    check_box_shadow.spread_radius = Val::Px(0.);
-                }
-                check_border_radius.top_left = internal_style.check_border_radius.top_left;
-                check_border_radius.top_right = internal_style.check_border_radius.top_right;
-                check_border_radius.bottom_left = internal_style.check_border_radius.bottom_left;
-                check_border_radius.bottom_right = internal_style.check_border_radius.bottom_right;
-                check_border_color.0 = internal_style.check_border_color;
-                check_background_color.0 = internal_style.check_background;
             }
         }
     }

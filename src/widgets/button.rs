@@ -3,10 +3,10 @@ use bevy::render::view::RenderLayers;
 use crate::global::{UiGenID, UiElementState, BindToID};
 use crate::resources::{CurrentElementSelected, ExtendedUiConfiguration};
 use crate::styles::css_types::{Background, IconPlace};
-use crate::styles::state_styles::{Hover, Styling};
-use crate::styles::Style;
+use crate::styles::state_styles::{Disabled, Hover, Selected, Styling};
+use crate::styles::{LabelStyle, Style};
 use crate::styles::types::ButtonStyle;
-use crate::styles::utils::{apply_base_component_style, apply_design_styles, apply_text_styles};
+use crate::styles::utils::{apply_base_component_style, apply_design_styles, apply_label_styles_to_child, resolve_style_by_state};
 use crate::widgets::Button;
 
 #[derive(Component)]
@@ -37,6 +37,7 @@ fn internal_generate_component_system(
     asset_server: Res<AssetServer>,
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
+    let default_button_style = ButtonStyle::default();
     for (entity , gen_id, btn, style) in query.iter() {
         commands.entity(entity).insert((
             Name::new(format!("Button-{}", gen_id.0)),
@@ -48,10 +49,22 @@ fn internal_generate_component_system(
             RenderLayers::layer(*layer),
             Hover(Styling::Button(ButtonStyle {
                 style: Style {
-                    background: Background { color: Color::srgb_u8(50, 168, 80), ..default() },
-                    ..default()
+                    background: Background { color: Color::srgb_u8(111, 162, 205), ..default() },
+                    ..default_button_style.style.clone()
                 },
-                ..default()
+                ..default_button_style.clone()
+            })),
+            Disabled(Styling::Button(ButtonStyle {
+                style: Style {
+                    background: Background { color: Color::srgba_u8(144, 148, 150, 255), ..default() },
+                    box_shadow: None,
+                    ..default_button_style.style.clone()
+                },
+                label_style: LabelStyle {
+                    color: Color::srgba_u8(103, 109, 111, 255),
+                    ..default_button_style.label_style.clone()
+                },
+                ..default_button_style.clone()
             })),
             ButtonBase
         )).with_children(|builder| {
@@ -119,7 +132,7 @@ fn place_icon(builder: &mut ChildBuilder, style: &ButtonStyle, asset_server: &Re
 }
 
 fn internal_style_update_que(
-    mut query: Query<(&UiElementState, &UiGenID, &Children, &ButtonStyle, Option<&Hover>,
+    mut query: Query<(&UiElementState, &UiGenID, &Children, &ButtonStyle, Option<&Hover>, Option<&Selected>, Option<&Disabled>,
                       &mut Node,
                       &mut BackgroundColor,
                       &mut BoxShadow,
@@ -128,35 +141,26 @@ fn internal_style_update_que(
     ), With<Button>>,
     mut label_query: Query<(&BindToID, &mut TextColor, &mut TextFont, &mut TextLayout)>
 ) {
-    for (state, ui_id, children, style, hover_style,
+    for (state, ui_id, children, style, hover_style, selected_style, disabled_style,
         mut node,
         mut background_color,
         mut box_shadow,
         mut border_radius,
         mut border_color) in query.iter_mut() {
+        let internal_style = resolve_style_by_state(
+            &Styling::Button(style.clone()),
+            state,
+            hover_style,
+            selected_style,
+            disabled_style,
+        );
 
-        let mut internal_style = style.style.clone();
-        if state.hovered {
-            if let Some(Hover(style_rule)) = hover_style {
-                match style_rule {
-                    Styling::Button(hover) => {
-                        internal_style.background.color = hover.style.background.color;
-                    }
-                    _ => { }
-                }
-            }
-        }
+        if let Styling::Button(button_style) = internal_style {
+            apply_base_component_style(&button_style.style, &mut node);
+            apply_design_styles(&button_style.style, &mut background_color, &mut border_color, &mut border_radius, &mut box_shadow);
 
-        apply_base_component_style(&internal_style, &mut node);
-        apply_design_styles(&internal_style, &mut background_color, &mut border_color, &mut border_radius, &mut box_shadow);
-
-        for child in children.iter() {
-            if let Ok((bind_to, mut text_color, mut text_font, mut text_layout)) = label_query.get_mut(*child) {
-                if bind_to.0 != ui_id.0 {
-                    continue;
-                }
-
-                apply_text_styles(&style.label_style, &mut text_color, &mut text_font, &mut text_layout);
+            for child in children.iter() {
+                apply_label_styles_to_child(*child, ui_id, &button_style.label_style, &mut label_query);
             }
         }
     }

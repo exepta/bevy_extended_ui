@@ -5,14 +5,14 @@ use crate::widgets::input::{InputCap, InputType, InputWidget};
 use crate::widgets::slider::SliderWidget;
 use crate::global::{UiGenID, UiElementState};
 use crate::widgets::check_box::CheckBoxWidget;
-use crate::styles::types::{ButtonStyle, DivStyle, CheckBoxStyle};
+use crate::styles::types::{ButtonStyle, DivStyle, CheckBoxStyle, SliderStyle};
 
 pub mod containers;
 pub mod button;
 pub mod input;
 pub mod slider;
 pub mod check_box;
-mod choice_box;
+pub mod choice_box;
 
 /// ===============================================
 ///                 Div
@@ -29,7 +29,7 @@ pub struct DivContainer;
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
-#[require(UiGenID, UiElementState)]
+#[require(UiGenID, UiElementState, SliderStyle)]
 pub struct Slider {
     pub value: i32,
     pub step: i32,

@@ -3,8 +3,9 @@ use bevy::render::view::RenderLayers;
 use bevy::window::PrimaryWindow;
 use crate::global::{UiGenID, UiElementState, BindToID};
 use crate::resources::{CurrentElementSelected, ExtendedUiConfiguration};
-use crate::styles::css_types::Background;
-use crate::utils::Radius;
+use crate::styles::state_styles::{Disabled, Hover, Selected, Styling};
+use crate::styles::types::SliderStyle;
+use crate::styles::utils::{apply_base_component_style, apply_design_styles, resolve_style_by_state};
 use crate::widgets::Slider;
 
 #[derive(Component)]
@@ -23,33 +24,29 @@ pub struct SliderWidget;
 impl Plugin for SliderWidget {
     fn build(&self, app: &mut App) {
         app.register_type::<SliderThumb>();
-/*        app.add_systems(Update, (
+        app.add_systems(Update, (
             internal_generate_component_system,
+            internal_style_update_que
+                .after(internal_generate_component_system),
             detect_change_slider_values
-        ));*/
+        ));
     }
 }
 
-/*fn internal_generate_component_system(
+fn internal_generate_component_system(
     mut commands: Commands,
-    query: Query<(Entity, &UiGenID, &InternalStyle, Option<&BaseStyle>), (Without<SliderRoot>, With<Slider>)>,
+    query: Query<(Entity, &UiGenID), (Without<SliderRoot>, With<Slider>)>,
     config: Res<ExtendedUiConfiguration>
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
-    for (entity, gen_id, style, option_base_style) in query.iter() {
-        let default_style = default_style(option_base_style);
+    for (entity, gen_id) in query.iter() {
         commands.entity(entity).insert((
             Name::new(format!("Slider-{}", gen_id.0)),
             Node::default(),
-            default_style.clone(),
-            BoxShadow {
-                color: Color::BLACK,
-                spread_radius: Val::Px(3.),
-                blur_radius: Val::Px(3.),
-                y_offset: Val::Px(0.),
-                x_offset: Val::Px(0.),
-                ..default()
-            },
+            BoxShadow::default(),
+            BackgroundColor::default(),
+            BorderColor::default(),
+            BorderRadius::default(),
             RenderLayers::layer(*layer),
             SliderRoot
         ))
@@ -64,13 +61,9 @@ impl Plugin for SliderWidget {
                     height: Val::Percent(100.),
                     ..default()
                 },
-                BorderRadius {
-                    top_left: default_style.0.border_radius.top_left,
-                    top_right: default_style.0.border_radius.top_right,
-                    bottom_left: default_style.0.border_radius.bottom_left,
-                    bottom_right: default_style.0.border_radius.bottom_right,
-                },
-                BackgroundColor(style.0.track_color),
+                BorderRadius::default(),
+                BackgroundColor::default(),
+                BorderColor::default(),
                 RenderLayers::layer(*layer),
                 PickingBehavior::IGNORE,
                 SliderTrack,
@@ -81,19 +74,13 @@ impl Plugin for SliderWidget {
             builder.spawn((
                 Name::new(format!("Slider-Thumb-{}", gen_id.0)),
                 Node {
-                    width: style.0.thumb_width,
-                    height: style.0.thumb_height,
                     position_type: PositionType::Absolute,
                     ..default()
                 },
-                BorderRadius {
-                    top_left: style.0.thumb_border_radius.top_left,
-                    top_right: style.0.thumb_border_radius.top_right,
-                    bottom_left: style.0.thumb_border_radius.bottom_left,
-                    bottom_right: style.0.thumb_border_radius.bottom_right,
-                },
-                BackgroundColor(style.0.thumb_color),
-                style.0.thumb_box_shadow,
+                BorderRadius::default(),
+                BorderColor::default(),
+                BackgroundColor::default(),
+                BoxShadow::default(),
                 RenderLayers::layer(*layer),
                 SliderThumb { current_x: 0. },
                 BindToID(gen_id.0)
@@ -237,4 +224,79 @@ fn on_internal_mouse_click(
         state.selected = true;
         current_element_selected.0 = gen_id.0;
     }
-}*/
+}
+
+fn internal_style_update_que(
+    mut query: Query<(&UiElementState, &UiGenID, &Children, &SliderStyle, Option<&Hover>, Option<&Selected>, Option<&Disabled>,
+                      &mut Node,
+                      &mut BackgroundColor,
+                      &mut BoxShadow,
+                      &mut BorderRadius,
+                      &mut BorderColor
+    ), With<Slider>>,
+    mut thumb_query: Query<(&BindToID, &mut Node, &mut BackgroundColor, &mut BorderRadius, &mut BorderColor, &mut BoxShadow), (With<SliderThumb>, Without<SliderTrack>, Without<Slider>)>,
+    mut track_query: Query<(&BindToID, &mut Node, &mut BackgroundColor, &mut BorderRadius, &mut BorderColor), (With<SliderTrack>, Without<SliderThumb>, Without<Slider>)>,
+) {
+    for (state, ui_id, children, style, hover_style, selected_style, disabled_style,
+        mut node,
+        mut background_color,
+        mut box_shadow,
+        mut border_radius,
+        mut border_color) in query.iter_mut() {
+        let internal_style = resolve_style_by_state(
+            &Styling::Slider(style.clone()),
+            state,
+            hover_style,
+            selected_style,
+            disabled_style,
+        );
+
+        if let Styling::Slider(slider_style) = internal_style {
+            apply_base_component_style(&slider_style.style, &mut node);
+            apply_design_styles(&slider_style.style, &mut background_color, &mut border_color, &mut border_radius, &mut box_shadow);
+
+            for child in children.iter() {
+                if let Ok((bind_to, mut track_node, 
+                              mut track_background_color, mut track_border_radius, mut track_border_color)) 
+                    = track_query.get_mut(*child) {
+                    if bind_to.0 != ui_id.0 {
+                        continue;
+                    }
+                    
+                    track_node.border = slider_style.track_border;
+                    track_border_radius.top_left = slider_style.track_border_radius.top_left;
+                    track_border_radius.top_right = slider_style.track_border_radius.top_right;
+                    track_border_radius.bottom_left = slider_style.track_border_radius.bottom_left;
+                    track_border_radius.bottom_right = slider_style.track_border_radius.bottom_right;
+                    track_border_color.0 = slider_style.track_border_color;
+                    track_background_color.0 = slider_style.track_color;
+                }
+
+                if let Ok((bind_to, mut thumb_node,
+                              mut thumb_background_color, mut thumb_border_radius, mut thumb_border_color, mut thumb_box_shadow))
+                    = thumb_query.get_mut(*child) {
+                    if bind_to.0 != ui_id.0 {
+                        continue;
+                    }
+
+                    thumb_node.width = slider_style.thumb_width;
+                    thumb_node.height = slider_style.thumb_height;
+                    thumb_node.border = slider_style.thumb_border;
+                    if let Some(box_shadow) = slider_style.thumb_box_shadow {
+                        thumb_box_shadow.color = box_shadow.color;
+                        thumb_box_shadow.blur_radius = box_shadow.blur_radius;
+                        thumb_box_shadow.spread_radius = box_shadow.spread_radius;
+                        thumb_box_shadow.x_offset = box_shadow.x_offset;
+                        thumb_box_shadow.y_offset = box_shadow.y_offset;
+                    }
+                    thumb_border_radius.top_left = slider_style.thumb_border_radius.top_left;
+                    thumb_border_radius.top_right = slider_style.thumb_border_radius.top_right;
+                    thumb_border_radius.bottom_left = slider_style.thumb_border_radius.bottom_left;
+                    thumb_border_radius.bottom_right = slider_style.thumb_border_radius.bottom_right;
+                    thumb_border_color.0 = slider_style.thumb_border_color;
+                    thumb_background_color.0 = slider_style.thumb_color;
+                }
+            }
+        }
+    }
+}

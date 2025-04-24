@@ -2,8 +2,9 @@ use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use crate::global::{UiGenID, UiElementState };
 use crate::resources::{CurrentElementSelected, ExtendedUiConfiguration};
+use crate::styles::state_styles::{Disabled, Hover, Selected, Styling};
 use crate::styles::types::DivStyle;
-use crate::styles::utils::{apply_base_component_style, apply_design_styles};
+use crate::styles::utils::{apply_base_component_style, apply_design_styles, resolve_style_by_state};
 use crate::widgets::DivContainer;
 
 #[derive(Component)]
@@ -68,7 +69,7 @@ fn on_internal_mouse_leave(event: Trigger<Pointer<Out>>, mut query: Query<&mut U
 }
 
 fn internal_style_update_que(
-    mut query: Query<(&UiElementState, &UiGenID, &Children, &DivStyle,
+    mut query: Query<(&UiElementState, &DivStyle, Option<&Hover>, Option<&Selected>, Option<&Disabled>,
                       &mut Node,
                       &mut BackgroundColor,
                       &mut BoxShadow,
@@ -76,16 +77,23 @@ fn internal_style_update_que(
                       &mut BorderColor
     ), With<DivContainer>>
 ) {
-    for (state, ui_id, children, style,
+    for (state, style, hover_style, selected_style, disabled_style,
         mut node,
         mut background_color,
         mut box_shadow,
         mut border_radius,
         mut border_color) in query.iter_mut() {
+        let internal_style = resolve_style_by_state(
+            &Styling::Div(style.clone()),
+            state,
+            hover_style,
+            selected_style,
+            disabled_style,
+        );
 
-        let internal_style = style.style.clone();
-
-        apply_base_component_style(&internal_style, &mut node);
-        apply_design_styles(&internal_style, &mut background_color, &mut border_color, &mut border_radius, &mut box_shadow);
+        if let Styling::Div(div_style) = internal_style {
+            apply_base_component_style(&div_style.style, &mut node);
+            apply_design_styles(&div_style.style, &mut background_color, &mut border_color, &mut border_radius, &mut box_shadow);
+        }
     }
 }

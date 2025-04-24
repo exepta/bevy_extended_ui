@@ -76,7 +76,7 @@ impl Default for ButtonStyle {
                 border_radius: Radius::all(Val::Px(5.)),
                 background: Background {
                     image: None,
-                    color: Color::srgb_u8(74, 207, 108)
+                    color: Color::srgb_u8(143, 201,  249)
                 },
                 box_shadow: Some(BoxShadow {
                     color: Color::srgba(0.0, 0.0, 0.0, 0.75),
@@ -95,6 +95,62 @@ impl Default for ButtonStyle {
             },
             icon_path: None,
             icon_place: Default::default()
+        }
+    }
+}
+
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+pub struct SliderStyle {
+    pub style: Style,
+    pub thumb_width: Val,
+    pub thumb_height: Val,
+    pub thumb_color: Color,
+    pub thumb_border: UiRect,
+    pub thumb_border_radius: Radius,
+    pub thumb_border_color: Color,
+    pub thumb_box_shadow: Option<BoxShadow>,
+    pub track_color: Color,
+    pub track_border: UiRect,
+    pub track_border_radius: Radius,
+    pub track_border_color: Color
+}
+
+impl Default for SliderStyle {
+    fn default() -> Self {
+        Self {
+            style: Style {
+                width: Val::Px(300.),
+                min_width: Val::Px(100.),
+                height: Val::Px(10.),
+                display: Display::Flex,
+                justify_content: JustifyContent::FlexStart,
+                align_items: AlignItems::Center,
+                background: Background {
+                    color: Color::srgb_u8(65, 88,  108),
+                    ..default()
+                },
+                border: UiRect::all(Val::Px(0.)),
+                border_radius: Radius::all(Val::Px(5.)),
+                ..default()
+            },
+            thumb_width: Val::Px(18.0),
+            thumb_height: Val::Px(18.0),
+            thumb_border: UiRect::all(Val::Px(0.0)),
+            thumb_border_radius: Radius::all(Val::Percent(50.)),
+            thumb_color: Color::srgb_u8(143, 201,  249),
+            thumb_box_shadow: Some(BoxShadow {
+                color: Color::srgba(0.0, 0.0, 0.0, 0.85),
+                blur_radius: Val::Px(3.),
+                spread_radius: Val::Px(3.),
+                x_offset: Val::Px(0.0),
+                y_offset: Val::Px(0.0),
+            }),
+            track_border_radius: Radius::all(Val::Px(5.)),
+            track_color: Color::srgb_u8(143, 201,  249),
+            track_border_color: Color::default(),
+            track_border: UiRect::all(Val::Px(0.)),
+            thumb_border_color: Color::default()
         }
     }
 }

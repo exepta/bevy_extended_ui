@@ -1,5 +1,50 @@
 use bevy::prelude::*;
+use crate::global::{BindToID, UiElementState, UiGenID};
 use crate::styles::{LabelStyle, Style};
+use crate::styles::state_styles::{Disabled, Hover, Selected, Styling};
+
+pub fn resolve_style_by_state<'a>(
+    base: &'a Styling,
+    state: &UiElementState,
+    hover: Option<&Hover>,
+    selected: Option<&Selected>,
+    disabled: Option<&Disabled>,
+) -> Styling {
+    if state.disabled {
+        if let Some(Disabled(style)) = disabled {
+            return style.clone();
+        }
+    }
+
+    if state.selected {
+        if let Some(Selected(style)) = selected {
+            return style.clone();
+        }
+    }
+
+    if state.hovered {
+        if let Some(Hover(style)) = hover {
+            return style.clone();
+        }
+    }
+
+    base.clone()
+}
+
+pub fn apply_label_styles_to_child(
+    child: Entity,
+    ui_id: &UiGenID,
+    label_style: &LabelStyle,
+    label_query: &mut Query<(&BindToID, &mut TextColor, &mut TextFont, &mut TextLayout)>
+) {
+    if let Ok((bind_to, mut text_color, mut text_font, mut text_layout)) = label_query.get_mut(child) {
+        if bind_to.0 != ui_id.0 {
+            return;
+        }
+
+        apply_text_styles(label_style, &mut text_color, &mut text_font, &mut text_layout);
+    }
+}
 
 pub fn apply_base_component_style(style: &Style, node: &mut Node) {
     node.width = style.width;
@@ -58,7 +103,7 @@ pub fn apply_design_styles(
     }
 }
 
-pub fn apply_text_styles(
+fn apply_text_styles(
     style: &LabelStyle,
     text_color: &mut TextColor,
     text_font: &mut TextFont,

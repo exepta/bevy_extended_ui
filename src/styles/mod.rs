@@ -7,7 +7,7 @@ use bevy::prelude::*;
 use bevy::text::FontSmoothing;
 use crate::styles::css_types::{Background};
 use crate::styles::state_styles::Hover;
-use crate::styles::types::{ButtonStyle, DivStyle};
+use crate::styles::types::{ButtonStyle, CheckBoxStyle, DivStyle, SliderStyle};
 use crate::utils::Radius;
 
 #[derive(Component, Default, Reflect, Debug, Clone)]
@@ -69,14 +69,7 @@ impl Plugin for StylesPlugin {
         app.register_type::<Hover>();
         app.register_type::<ButtonStyle>();
         app.register_type::<DivStyle>();
+        app.register_type::<CheckBoxStyle>();
+        app.register_type::<SliderStyle>();
     }
-}
-
-fn default_shadow() -> BoxShadow {
-    BoxShadow {
-        color: Color::srgba(0.0, 0.0, 0.0, 0.7),
-        x_offset: Val::Px(0.),
-        y_offset: Val::Px(0.),
-        blur_radius: Val::Px(3.),
-        spread_radius: Val::Px(3.) }
 }
