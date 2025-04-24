@@ -6,7 +6,7 @@ use bevy_extended_ui::ExtendedUiPlugin;
 use bevy_extended_ui::styles::css_types::Background;
 use bevy_extended_ui::styles::Style;
 use bevy_extended_ui::styles::types::DivStyle;
-use bevy_extended_ui::widgets::{DivContainer, Button};
+use bevy_extended_ui::widgets::{DivContainer, Button, CheckBox};
 
 fn main() {
     let _ = App::new()
@@ -65,7 +65,11 @@ fn example_widget(mut commands: Commands) {
 
             builder.spawn(
                 Button::default()
-            ); 
+            );
+
+            builder.spawn(
+                CheckBox::default()
+            );
         });
     });
 }

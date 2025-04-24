@@ -5,7 +5,7 @@ use crate::widgets::input::{InputCap, InputType, InputWidget};
 use crate::widgets::slider::SliderWidget;
 use crate::global::{UiGenID, UiElementState};
 use crate::widgets::check_box::CheckBoxWidget;
-use crate::styles::types::{ButtonStyle, DivStyle};
+use crate::styles::types::{ButtonStyle, DivStyle, CheckBoxStyle};
 
 pub mod containers;
 pub mod button;
@@ -111,10 +111,9 @@ impl InputField {
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
-#[require(UiGenID, UiElementState)]
+#[require(UiGenID, UiElementState, CheckBoxStyle)]
 pub struct CheckBox {
     pub label: String,
-    pub icon: Option<Handle<Image>>,
     pub checked: bool
 }
 
@@ -122,7 +121,6 @@ impl Default for CheckBox {
     fn default() -> Self {
         Self {
             checked: false,
-            icon: None,
             label: String::from("CheckBox"),
         }
     }

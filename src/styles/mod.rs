@@ -1,10 +1,13 @@
 pub mod css_types;
 pub mod types;
-mod state_styles;
+pub mod state_styles;
 pub mod utils;
 
 use bevy::prelude::*;
+use bevy::text::FontSmoothing;
 use crate::styles::css_types::{Background};
+use crate::styles::state_styles::Hover;
+use crate::styles::types::{ButtonStyle, DivStyle};
 use crate::utils::Radius;
 
 #[derive(Component, Default, Reflect, Debug, Clone)]
@@ -37,7 +40,7 @@ pub struct Style {
     pub justify_items: JustifyItems,
     pub justify_content: JustifyContent,
     pub justify_self: JustifySelf,
-    pub box_shadow: BoxShadow,
+    pub box_shadow: Option<BoxShadow>,
     pub background: Background,
     pub border: UiRect,
     pub border_radius: Radius,
@@ -47,11 +50,13 @@ pub struct Style {
 #[derive(Component, Reflect, Default, Debug, Clone)]
 #[reflect(Component)]
 pub struct LabelStyle {
-    pub font_path: String,
+    pub font_path: Option<String>,
     pub font_weight: u16,
     pub font_size: f32,
     pub color: Color,
-    pub line_break: LineBreak
+    pub line_break: LineBreak,
+    pub justify: JustifyText,
+    pub smoothing: FontSmoothing
 }
 
 pub struct StylesPlugin;
@@ -61,6 +66,9 @@ impl Plugin for StylesPlugin {
         app.register_type::<Background>();
         app.register_type::<Style>();
         app.register_type::<LabelStyle>();
+        app.register_type::<Hover>();
+        app.register_type::<ButtonStyle>();
+        app.register_type::<DivStyle>();
     }
 }
 

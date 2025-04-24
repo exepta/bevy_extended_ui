@@ -1,10 +1,12 @@
 use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
-use crate::global::{UiGenID, UiElementState};
+use crate::global::{UiGenID, UiElementState, BindToID};
 use crate::resources::{CurrentElementSelected, ExtendedUiConfiguration};
-use crate::styles::css_types::IconPlace;
+use crate::styles::css_types::{Background, IconPlace};
+use crate::styles::state_styles::{Hover, Styling};
+use crate::styles::Style;
 use crate::styles::types::ButtonStyle;
-use crate::styles::utils::{apply_base_component_style, apply_design_styles};
+use crate::styles::utils::{apply_base_component_style, apply_design_styles, apply_text_styles};
 use crate::widgets::Button;
 
 #[derive(Component)]
@@ -44,6 +46,13 @@ fn internal_generate_component_system(
             BorderRadius::all(Val::Px(0.)),
             BoxShadow::default(),
             RenderLayers::layer(*layer),
+            Hover(Styling::Button(ButtonStyle {
+                style: Style {
+                    background: Background { color: Color::srgb_u8(50, 168, 80), ..default() },
+                    ..default()
+                },
+                ..default()
+            })),
             ButtonBase
         )).with_children(|builder| {
             if style.icon_place == IconPlace::Left {
@@ -53,9 +62,13 @@ fn internal_generate_component_system(
             builder.spawn((
                 Name::new(format!("Button-Label-{}", gen_id.0)),
                 Text::new(btn.0.clone()),
+                TextColor::default(),
+                TextFont::default(),
+                TextLayout::default(),
                 RenderLayers::layer(*layer),
                 PickingBehavior::IGNORE,
                 ButtonLabel,
+                BindToID(gen_id.0)
             ));
 
             if style.icon_place == IconPlace::Right {
@@ -99,21 +112,23 @@ fn place_icon(builder: &mut ChildBuilder, style: &ButtonStyle, asset_server: &Re
             RenderLayers::layer(layer),
             PickingBehavior::IGNORE,
             ButtonImage,
+            BindToID(id),
             ZIndex(1)
         ));
     }
 }
 
 fn internal_style_update_que(
-    mut query: Query<(&UiElementState, &UiGenID, &Children, &ButtonStyle,
+    mut query: Query<(&UiElementState, &UiGenID, &Children, &ButtonStyle, Option<&Hover>,
                       &mut Node,
                       &mut BackgroundColor,
                       &mut BoxShadow,
                       &mut BorderRadius,
                       &mut BorderColor
-    ), With<Button>>
+    ), With<Button>>,
+    mut label_query: Query<(&BindToID, &mut TextColor, &mut TextFont, &mut TextLayout)>
 ) {
-    for (state, ui_id, children, style,
+    for (state, ui_id, children, style, hover_style,
         mut node,
         mut background_color,
         mut box_shadow,
@@ -122,10 +137,27 @@ fn internal_style_update_que(
 
         let mut internal_style = style.style.clone();
         if state.hovered {
-            internal_style.background.color = Color::srgb_u8(74, 207, 108);
+            if let Some(Hover(style_rule)) = hover_style {
+                match style_rule {
+                    Styling::Button(hover) => {
+                        internal_style.background.color = hover.style.background.color;
+                    }
+                    _ => { }
+                }
+            }
         }
 
         apply_base_component_style(&internal_style, &mut node);
         apply_design_styles(&internal_style, &mut background_color, &mut border_color, &mut border_radius, &mut box_shadow);
+
+        for child in children.iter() {
+            if let Ok((bind_to, mut text_color, mut text_font, mut text_layout)) = label_query.get_mut(*child) {
+                if bind_to.0 != ui_id.0 {
+                    continue;
+                }
+
+                apply_text_styles(&style.label_style, &mut text_color, &mut text_font, &mut text_layout);
+            }
+        }
     }
 }

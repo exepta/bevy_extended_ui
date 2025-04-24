@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use crate::styles::Style;
+use crate::styles::{LabelStyle, Style};
 
 pub fn apply_base_component_style(style: &Style, node: &mut Node) {
     node.width = style.width;
@@ -45,9 +45,28 @@ pub fn apply_design_styles(
     border_radius.top_right = style.border_radius.top_right;
     border_radius.bottom_left = style.border_radius.bottom_left;
     border_radius.bottom_right = style.border_radius.bottom_right;
-    box_shadow.color = style.box_shadow.color;
-    box_shadow.blur_radius = style.box_shadow.blur_radius;
-    box_shadow.spread_radius = style.box_shadow.spread_radius;
-    box_shadow.x_offset = style.box_shadow.x_offset;
-    box_shadow.y_offset = style.box_shadow.y_offset;
+    if let Some(apply_box_shadow) = style.box_shadow {
+        box_shadow.color = apply_box_shadow.color;
+        box_shadow.blur_radius = apply_box_shadow.blur_radius;
+        box_shadow.spread_radius = apply_box_shadow.spread_radius;
+        box_shadow.x_offset = apply_box_shadow.x_offset;
+        box_shadow.y_offset = apply_box_shadow.y_offset;
+    } else {
+        box_shadow.color = Color::srgba(0.0, 0.0, 0.0, 0.0);
+        box_shadow.blur_radius = Val::Px(0.);
+        box_shadow.spread_radius = Val::Px(0.);
+    }
+}
+
+pub fn apply_text_styles(
+    style: &LabelStyle,
+    text_color: &mut TextColor,
+    text_font: &mut TextFont,
+    text_layout: &mut TextLayout,
+) {
+    text_color.0 = style.color;
+    text_font.font_size = style.font_size;
+    text_font.font_smoothing = style.smoothing;
+    text_layout.linebreak = style.line_break;
+    text_layout.justify = style.justify;
 }
