@@ -134,13 +134,13 @@ impl Default for SliderStyle {
                 border_radius: Radius::all(Val::Px(5.)),
                 ..default()
             },
-            thumb_width: Val::Px(18.0),
-            thumb_height: Val::Px(18.0),
+            thumb_width: Val::Px(20.0),
+            thumb_height: Val::Px(20.0),
             thumb_border: UiRect::all(Val::Px(0.0)),
             thumb_border_radius: Radius::all(Val::Percent(50.)),
             thumb_color: Color::srgb_u8(143, 201,  249),
             thumb_box_shadow: Some(BoxShadow {
-                color: Color::srgba(0.0, 0.0, 0.0, 0.85),
+                color: Color::srgba_u8(143, 201,  249, 180),
                 blur_radius: Val::Px(3.),
                 spread_radius: Val::Px(3.),
                 x_offset: Val::Px(0.0),

@@ -126,12 +126,7 @@ fn detect_change_slider_values(
                     thumb.current_x = clamped_x;
                     thumb_node.left = Val::Px(clamped_x - 8.0);
                 }
-                if let Ok((mut track_node, bind_to_track)) = track_query.get_mut(*child) {
-                    if bind_to_track.0 != ui_id.0 {
-                        continue;
-                    }
-                    track_node.width = Val::Px(clamped_x);
-                }
+                update_slider_track_width(&mut track_query, child, &ui_id, clamped_x);
             }
         }
     }
@@ -196,12 +191,7 @@ fn on_click_track(
                         slider_thumb.current_x = clamped_x;
                         thumb_node.left = Val::Px(clamped_x - 8.0);
 
-                        if let Ok((mut track_node, bind_to_track)) = track_query.get_mut(*track_child) {
-                            if bind_to_track.0 != ui_id.0 {
-                                continue;
-                            }
-                            track_node.width = Val::Px(clamped_x);
-                        }
+                        update_slider_track_width(&mut track_query, track_child, &ui_id, clamped_x);
 
                         let percent = slider_thumb.current_x / slider_width;
                         let range = (slider.max - slider.min) as f32;
@@ -223,6 +213,20 @@ fn on_internal_mouse_click(
     if let Ok((mut state, gen_id)) = query.get_mut(event.target) {
         state.selected = true;
         current_element_selected.0 = gen_id.0;
+    }
+}
+
+fn update_slider_track_width(
+    track_query: &mut Query<(&mut Node, &BindToID), (With<SliderTrack>, Without<SliderThumb>)>,
+    track_child: &Entity,
+    ui_id: &UiGenID,
+    clamped_x: f32,
+) {
+    if let Ok((mut track_node, bind_to)) = track_query.get_mut(*track_child) {
+        if bind_to.0 != ui_id.0 {
+            return;
+        }
+        track_node.width = Val::Px(clamped_x);
     }
 }
 
