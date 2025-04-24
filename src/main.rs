@@ -3,6 +3,9 @@ use bevy::prelude::*;
 use bevy::window::WindowResolution;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_extended_ui::ExtendedUiPlugin;
+use bevy_extended_ui::styles::css_types::Background;
+use bevy_extended_ui::styles::Style;
+use bevy_extended_ui::styles::types::DivStyle;
 use bevy_extended_ui::widgets::{DivContainer, Button};
 
 fn main() {
@@ -22,14 +25,47 @@ fn main() {
         .run();
 }
 
-fn example_widget(mut commands: Commands, asset_server: Res<AssetServer>) {
-    commands.spawn(DivContainer).with_children(| builder | {
-        builder.spawn(
-            Button::default()
-        );
+fn example_widget(mut commands: Commands) {
+    commands.spawn((
+        DivContainer, 
+        DivStyle {
+            style: Style {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                display: Display::Flex,
+                flex_direction: FlexDirection::Column,
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                ..default()
+            }
+        }
+    )).with_children(| builder | {
+        builder.spawn((
+            DivContainer,
+            DivStyle {
+                style: Style {
+                    width: Val::Percent(50.),
+                    height: Val::Percent(50.),
+                    display: Display::Flex,
+                    flex_direction: FlexDirection::Column,
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::Center,
+                    gap_column: Val::Px(20.),
+                    background: Background { 
+                        color: Color::srgba(0.9, 0.9, 0.9, 1.0),
+                        image: None,
+                    },
+                    ..default()
+                },
+            }
+        )).with_children(|builder| {
+            builder.spawn(
+                Button::default()
+            );
 
-        builder.spawn(
-            Button::default()
-        );
+            builder.spawn(
+                Button::default()
+            ); 
+        });
     });
 }

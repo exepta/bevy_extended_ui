@@ -5,7 +5,7 @@ use crate::widgets::input::{InputCap, InputType, InputWidget};
 use crate::widgets::slider::SliderWidget;
 use crate::global::{UiGenID, UiElementState};
 use crate::widgets::check_box::CheckBoxWidget;
-use crate::styles::types::ButtonStyle;
+use crate::styles::types::{ButtonStyle, DivStyle};
 
 pub mod containers;
 pub mod button;
@@ -20,7 +20,7 @@ mod choice_box;
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
-#[require(UiGenID, UiElementState)]
+#[require(UiGenID, UiElementState, DivStyle)]
 pub struct DivContainer;
 
 /// ===============================================

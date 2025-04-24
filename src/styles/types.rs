@@ -29,6 +29,13 @@ impl Default for ButtonStyle {
                     image: None,
                     color: Color::srgb_u8(50, 168, 80)
                 },
+                box_shadow: BoxShadow { 
+                    color: Color::srgba(0.0, 0.0, 0.0, 0.75),
+                    blur_radius: Val::Px(4.),
+                    spread_radius: Val::Px(4.),
+                    x_offset: Val::Px(0.0),
+                    y_offset: Val::Px(1.0),
+                },
                 ..default()
             },
             label_style: LabelStyle {
@@ -41,4 +48,10 @@ impl Default for ButtonStyle {
             icon_place: Default::default()
         }
     }
+}
+
+#[derive(Component, Reflect, Default, Debug, Clone)]
+#[reflect(Component)]
+pub struct DivStyle {
+    pub style: Style
 }
