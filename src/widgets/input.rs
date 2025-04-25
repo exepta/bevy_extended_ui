@@ -5,6 +5,7 @@ use bevy::utils::HashMap;
 use crate::global::{UiGenID, UiElementState, BindToID};
 use crate::resources::{CurrentElementSelected, ExtendedUiConfiguration};
 use crate::styles::{LabelStyle, Style};
+use crate::styles::css_types::Colored;
 use crate::styles::state_styles::{Base, Disabled, Hover, Selected, Styling};
 use crate::styles::types::InputStyle;
 use crate::styles::utils::{apply_base_component_style, apply_design_styles, apply_label_styles_to_child, resolve_style_by_state};
@@ -117,7 +118,7 @@ fn internal_generate_component_system(
             Base(Styling::InputField(default_input_style.clone())),
             Selected(Styling::InputField(InputStyle {
                 style: Style {
-                    border_color: Color::srgb_u8(111, 162, 205),
+                    border_color: Colored::hex_to_color("#2aa149"),
                     ..default_input_style.style.clone()
                 },
                 ..default_input_style.clone()
@@ -148,6 +149,7 @@ fn internal_generate_component_system(
                     builder.spawn((
                         Name::new(format!("InputIconNode-{}", gen_id.0)),
                         ImageNode {
+                            color: Color::srgb(0.1, 0.1, 0.1),
                             image: icon,
                             ..default()
                         },

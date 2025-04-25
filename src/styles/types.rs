@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use crate::styles::css_types::{Background, IconPlace};
+use crate::styles::css_types::{Background, Colored, IconPlace};
 use crate::styles::{LabelStyle, Style};
 use crate::utils::Radius;
 
@@ -76,7 +76,7 @@ impl Default for ButtonStyle {
                 border_radius: Radius::all(Val::Px(5.)),
                 background: Background {
                     image: None,
-                    color: Color::srgb_u8(143, 201,  249)
+                    color: Colored::hex_to_color("#4acf6c")
                 },
                 box_shadow: Some(BoxShadow {
                     color: Color::srgba(0.0, 0.0, 0.0, 0.75),
@@ -127,7 +127,7 @@ impl Default for SliderStyle {
                 justify_content: JustifyContent::FlexStart,
                 align_items: AlignItems::Center,
                 background: Background {
-                    color: Color::srgb_u8(65, 88,  108),
+                    color: Colored::hex_to_color("#4acf6c50"),
                     ..default()
                 },
                 border: UiRect::all(Val::Px(0.)),
@@ -138,16 +138,16 @@ impl Default for SliderStyle {
             thumb_height: Val::Px(20.0),
             thumb_border: UiRect::all(Val::Px(0.0)),
             thumb_border_radius: Radius::all(Val::Percent(50.)),
-            thumb_color: Color::srgb_u8(143, 201,  249),
+            thumb_color: Colored::hex_to_color("#4acf6c"),
             thumb_box_shadow: Some(BoxShadow {
-                color: Color::srgba_u8(143, 201,  249, 180),
+                color: Colored::hex_to_color("#4acf6cfa"),
                 blur_radius: Val::Px(3.),
                 spread_radius: Val::Px(3.),
                 x_offset: Val::Px(0.0),
                 y_offset: Val::Px(0.0),
             }),
             track_border_radius: Radius::all(Val::Px(5.)),
-            track_color: Color::srgb_u8(143, 201,  249),
+            track_color: Colored::hex_to_color("#4acf6c"),
             track_border_color: Color::default(),
             track_border: UiRect::all(Val::Px(0.)),
             thumb_border_color: Color::default()
@@ -182,14 +182,14 @@ impl Default for InputStyle {
                 },
                 border: UiRect::bottom(Val::Px(2.)),
                 background: Background {
-                    color: Color::srgb_u8(60, 60, 70),
+                    color: Color::srgba_u8(230, 230, 230, 50),
                     ..default()
                 },
                 border_color: Color::srgb_u8(210, 210, 210),
                 ..default()
             },
             label_style: LabelStyle {
-                color: Color::srgb(1.0, 1.0, 1.0),
+                color: Color::srgb(0.1, 0.1, 0.1),
                 font_size: 14.,
                 line_break: LineBreak::NoWrap,
                 ..default()

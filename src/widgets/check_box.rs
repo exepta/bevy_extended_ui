@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use crate::global::{BindToID, UiElementState, UiGenID};
 use crate::resources::ExtendedUiConfiguration;
+use crate::styles::css_types::Colored;
 use crate::styles::state_styles::{Checked, Disabled, Hover, Selected, Styling};
 use crate::styles::types::CheckBoxStyle;
 use crate::styles::utils::{apply_base_component_style, apply_design_styles, apply_label_styles_to_child, resolve_style_by_state};
@@ -43,8 +44,8 @@ fn internal_generate_component_system(
             BackgroundColor::default(),
             BoxShadow::default(),
             Checked(Styling::CheckBox(CheckBoxStyle {
-                check_border_color: Color::srgb_u8(143, 201,  249),
-                check_background: Color::srgb_u8(143, 201,  249),
+                check_border_color: Colored::hex_to_color("#4acf6c"),
+                check_background: Colored::hex_to_color("#4acf6c"),
                 ..default()
             })),
             RenderLayers::layer(*layer),

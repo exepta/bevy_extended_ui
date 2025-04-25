@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use crate::global::{UiGenID, UiElementState, BindToID};
 use crate::resources::{CurrentElementSelected, ExtendedUiConfiguration};
-use crate::styles::css_types::{Background, IconPlace};
+use crate::styles::css_types::{Background, Colored, IconPlace};
 use crate::styles::state_styles::{Disabled, Hover, Selected, Styling};
 use crate::styles::{LabelStyle, Style};
 use crate::styles::types::ButtonStyle;
@@ -49,14 +49,14 @@ fn internal_generate_component_system(
             RenderLayers::layer(*layer),
             Hover(Styling::Button(ButtonStyle {
                 style: Style {
-                    background: Background { color: Color::srgb_u8(111, 162, 205), ..default() },
+                    background: Background { color: Colored::hex_to_color("#86df9d"), ..default() },
                     ..default_button_style.style.clone()
                 },
                 ..default_button_style.clone()
             })),
             Disabled(Styling::Button(ButtonStyle {
                 style: Style {
-                    background: Background { color: Color::srgba_u8(144, 148, 150, 255), ..default() },
+                    background: Background { color: Colored::hex_to_color("#7f9986"), ..default() },
                     box_shadow: None,
                     ..default_button_style.style.clone()
                 },

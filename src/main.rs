@@ -53,7 +53,7 @@ fn example_widget(mut commands: Commands, asset_server: Res<AssetServer>) {
                     align_items: AlignItems::Center,
                     gap_column: Val::Px(20.),
                     background: Background { 
-                        color: Color::srgba(0.1, 0.1, 0.115, 1.0),
+                        color: Color::srgba(0.99, 0.99, 0.99, 1.0),
                         image: None,
                     },
                     ..default()
@@ -83,7 +83,7 @@ fn example_widget(mut commands: Commands, asset_server: Res<AssetServer>) {
             builder.spawn(
                 CheckBox::default()
             );
-            
+
             builder.spawn(
                 Slider::default()
             );
