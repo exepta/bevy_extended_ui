@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use crate::styles::types::{ButtonStyle, CheckBoxStyle, DivStyle, SliderStyle};
+use crate::styles::types::{ButtonStyle, CheckBoxStyle, DivStyle, InputStyle, SliderStyle};
 
 #[derive(Debug, Clone, Reflect)]
 pub enum Styling {
@@ -7,7 +7,12 @@ pub enum Styling {
     Div(DivStyle),
     CheckBox(CheckBoxStyle),
     Slider(SliderStyle),
+    InputField(InputStyle),
 }
+
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+pub struct Base(pub Styling);
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]

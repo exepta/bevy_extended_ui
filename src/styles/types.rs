@@ -122,7 +122,7 @@ impl Default for SliderStyle {
             style: Style {
                 width: Val::Px(300.),
                 min_width: Val::Px(100.),
-                height: Val::Px(10.),
+                height: Val::Px(8.),
                 display: Display::Flex,
                 justify_content: JustifyContent::FlexStart,
                 align_items: AlignItems::Center,
@@ -151,6 +151,54 @@ impl Default for SliderStyle {
             track_border_color: Color::default(),
             track_border: UiRect::all(Val::Px(0.)),
             thumb_border_color: Color::default()
+        }
+    }
+}
+
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+pub struct InputStyle {
+    pub style: Style,
+    pub label_style: LabelStyle,
+    pub placeholder_color: Color,
+    pub placeholder_font_size: f32,
+    pub label_color: Color,
+    pub label_font_size: f32,
+    pub icon_color: Option<Color>,
+}
+
+impl Default for InputStyle {
+    fn default() -> Self {
+        Self {
+            style: Style {
+                width: Val::Px(250.),
+                min_width: Val::Px(100.),
+                height: Val::Px(50.),
+                border_radius: Radius {
+                    top_left: Val::Px(5.),
+                    top_right: Val::Px(5.),
+                    bottom_right: Val::Px(0.),
+                    bottom_left: Val::Px(0.)
+                },
+                border: UiRect::bottom(Val::Px(2.)),
+                background: Background {
+                    color: Color::srgb_u8(60, 60, 70),
+                    ..default()
+                },
+                border_color: Color::srgb_u8(210, 210, 210),
+                ..default()
+            },
+            label_style: LabelStyle {
+                color: Color::srgb(1.0, 1.0, 1.0),
+                font_size: 14.,
+                line_break: LineBreak::NoWrap,
+                ..default()
+            },
+            label_color: Color::srgb_u8(210, 210, 210),
+            icon_color: None,
+            label_font_size: 15.,
+            placeholder_color: Color::srgb_u8(150, 150, 150),
+            placeholder_font_size: 14.,
         }
     }
 }

@@ -5,7 +5,7 @@ use crate::widgets::input::{InputCap, InputType, InputWidget};
 use crate::widgets::slider::SliderWidget;
 use crate::global::{UiGenID, UiElementState};
 use crate::widgets::check_box::CheckBoxWidget;
-use crate::styles::types::{ButtonStyle, DivStyle, CheckBoxStyle, SliderStyle};
+use crate::styles::types::{ButtonStyle, DivStyle, CheckBoxStyle, SliderStyle, InputStyle};
 
 pub mod containers;
 pub mod button;
@@ -69,9 +69,10 @@ impl Default for Button {
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
-#[require(UiGenID, UiElementState)]
+#[require(UiGenID, UiElementState, InputStyle)]
 pub struct InputField {
     pub text: String,
+    pub label: String,
     pub placeholder_text: String,
     pub cap_text_at: InputCap,
     pub cursor_position: usize,
@@ -84,6 +85,7 @@ impl Default for InputField {
     fn default() -> Self {
         Self {
             text: String::from(""),
+            label: String::from("Label"),
             placeholder_text: String::from(""),
             cap_text_at: InputCap::default(),
             input_type: InputType::default(),

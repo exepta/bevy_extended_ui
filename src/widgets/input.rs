@@ -4,8 +4,10 @@ use bevy::render::view::RenderLayers;
 use bevy::utils::HashMap;
 use crate::global::{UiGenID, UiElementState, BindToID};
 use crate::resources::{CurrentElementSelected, ExtendedUiConfiguration};
-use crate::styles::css_types::Background;
-use crate::utils::Radius;
+use crate::styles::{LabelStyle, Style};
+use crate::styles::state_styles::{Base, Disabled, Hover, Selected, Styling};
+use crate::styles::types::InputStyle;
+use crate::styles::utils::{apply_base_component_style, apply_design_styles, apply_label_styles_to_child, resolve_style_by_state};
 use crate::widgets::InputField;
 
 #[derive(Reflect, Default, Debug, Clone, Eq, PartialEq)]
@@ -55,6 +57,12 @@ struct InputFieldIcon;
 #[derive(Component)]
 struct InputCursor;
 
+#[derive(Component, Clone)]
+pub struct CursorColor(pub Color);
+
+#[derive(Component)]
+struct InputContainer;
+
 #[derive(Resource, Default)]
 struct KeyRepeatTimers {
     timers: HashMap<KeyCode, Timer>,
@@ -68,7 +76,7 @@ pub struct CursorBlinkTimer {
 impl Default for CursorBlinkTimer {
     fn default() -> Self {
         Self {
-            timer: Timer::from_seconds(0.85, TimerMode::Repeating)
+            timer: Timer::from_seconds(0.95, TimerMode::Repeating)
         }
     }
 }
@@ -79,27 +87,41 @@ impl Plugin for InputWidget {
     fn build(&self, app: &mut App) {
         app.insert_resource(KeyRepeatTimers::default());
         app.insert_resource(CursorBlinkTimer::default());
-/*        app.add_systems(Update, (
+        app.add_systems(Update, (
             internal_generate_component_system,
+            internal_style_update_que
+                .after(internal_generate_component_system),
             update_cursor_visibility,
             update_cursor_position,
             handle_typing,
             handle_input_horizontal_scroll
-        ));*/
+        ));
     }
 }
 
-/*fn internal_generate_component_system(
+fn internal_generate_component_system(
     mut commands: Commands,
     query: Query<(Entity, &UiGenID, &InputField), (Without<InputFieldRoot>, With<InputField>)>,
     config: Res<ExtendedUiConfiguration>
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
+    let default_input_style = InputStyle::default();
     for (entity , gen_id, in_field) in query.iter() {
         commands.entity(entity).insert((
             Name::new(format!("InputField-{}", gen_id.0)),
             Node::default(),
-
+            BorderRadius::default(),
+            BorderColor::default(),
+            BackgroundColor::default(),
+            BoxShadow::default(),
+            Base(Styling::InputField(default_input_style.clone())),
+            Selected(Styling::InputField(InputStyle {
+                style: Style {
+                    border_color: Color::srgb_u8(111, 162, 205),
+                    ..default_input_style.style.clone()
+                },
+                ..default_input_style.clone()
+            })),
             RenderLayers::layer(*layer),
             InputFieldRoot,
         )).with_children(|builder| {
@@ -108,15 +130,16 @@ impl Plugin for InputWidget {
                 builder.spawn((
                     Name::new(format!("InputIcon-{}", gen_id.0)),
                     Node {
-                        width: Val::Px(45.0),
-                        min_width: Val::Px(45.0),
+                        width: Val::Px(40.0),
+                        min_width: Val::Px(40.0),
                         height: Val::Percent(100.0),
                         display: Display::Flex,
                         justify_content: JustifyContent::Center,
                         align_items: AlignItems::Center,
                         ..default()
                     },
-                    BackgroundColor(Color::srgb(0.7, 0.7, 0.7)),
+                    BackgroundColor::default(),
+                    BorderRadius::default(),
                     RenderLayers::layer(*layer),
                     PickingBehavior::IGNORE,
                     InputFieldIcon,
@@ -139,8 +162,8 @@ impl Plugin for InputWidget {
                 Name::new(format!("TextContainer-{}", gen_id.0)),
                 Node {
                     height: Val::Percent(100.),
-                    width: Val::Percent(80.),
-                    max_width: Val::Percent(80.),
+                    width: if in_field.icon.is_some() { Val::Percent(80.) } else { Val::Percent(95.) },
+                    max_width: if in_field.icon.is_some() { Val::Percent(80.) } else { Val::Percent(95.) },
                     display: Display::Flex,
                     justify_content: JustifyContent::FlexStart,
                     align_items: AlignItems::Center,
@@ -148,12 +171,13 @@ impl Plugin for InputWidget {
                         y: OverflowAxis::Hidden,
                         x: OverflowAxis::Scroll,
                     },
-                    padding: UiRect::left(Val::Px(10.0)),
+                    padding: if in_field.icon.is_some() { UiRect::left(Val::Px(0.0)) } else { UiRect::left(Val::Px(10.0)) },
                     ..default()
                 },
                 RenderLayers::layer(*layer),
                 PickingBehavior::IGNORE,
                 BindToID(gen_id.0),
+                InputContainer
             )).with_children(|builder| {
 
                 builder.spawn((
@@ -163,7 +187,7 @@ impl Plugin for InputWidget {
                         height: Val::Px(18.0),
                         ..default()
                     },
-                    BackgroundColor(Color::BLACK),
+                    BackgroundColor(Color::WHITE),
                     RenderLayers::layer(*layer),
                     Visibility::Hidden,
                     PickingBehavior::IGNORE,
@@ -182,6 +206,9 @@ impl Plugin for InputWidget {
                         ..default()
                     },
                     Text::new(text),
+                    TextColor::default(),
+                    TextFont::default(),
+                    TextLayout::default(),
                     PickingBehavior::IGNORE,
                     RenderLayers::layer(*layer),
                     InputFieldText,
@@ -251,7 +278,7 @@ fn update_cursor_visibility(
 fn update_cursor_position(
     mut key_repeat: ResMut<KeyRepeatTimers>,
     mut cursor_query: Query<(&mut Node, &BindToID), With<InputCursor>>,
-    mut text_field_query: Query<(&mut InputField, &InternalStyle, &UiGenID)>,
+    mut text_field_query: Query<(&mut InputField, &InputStyle, &UiGenID)>,
     keyboard_input: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
 ) {
@@ -303,7 +330,7 @@ fn update_cursor_position(
                 }
             }
 
-            let cursor_x_position = calculate_cursor_x_position(&text_field, text_field.cursor_position, &internal_style.0);
+            let cursor_x_position = calculate_cursor_x_position(&text_field, text_field.cursor_position, &internal_style.label_style);
             cursor_node.left = Val::Px(cursor_x_position);
         }
     }
@@ -316,14 +343,14 @@ fn update_cursor_position(
 fn handle_input_horizontal_scroll(
     mut query: Query<(
         &InputField,
-        &InternalStyle,
+        &InputStyle,
         &UiGenID
     ), With<InputFieldRoot>>,
     mut scroll_query: Query<(&mut ScrollPosition, &BindToID), With<BindToID>>,
     text_node_query: Query<(&ComputedNode, &BindToID), With<InputFieldText>>
 ) {
     for (input_field, internal_style, ui_id) in &mut query {
-        let char_width = internal_style.0.font_size;
+        let char_width = internal_style.label_style.font_size;
         let cursor_x = input_field.cursor_position as f32 * char_width;
 
         let Some((text_node, _)) = text_node_query
@@ -364,7 +391,7 @@ fn handle_input_horizontal_scroll(
 fn handle_typing(
     time: Res<Time>,
     mut key_repeat: ResMut<KeyRepeatTimers>,
-    mut query: Query<(&mut InputField, &mut UiElementState, &InternalStyle, &UiGenID)>,
+    mut query: Query<(&mut InputField, &mut UiElementState, &InputStyle, &UiGenID)>,
     keyboard: Res<ButtonInput<KeyCode>>,
     mut text_query: Query<(&mut Text, &mut TextColor, &ComputedNode, &BindToID), (With<InputFieldText>, With<BindToID>)>,
 ) {
@@ -401,7 +428,7 @@ fn handle_typing(
                             }
                         }
                         if text.0.is_empty() {
-                            text_color.0 = style.0.placeholder_color;
+                            text_color.0 = style.placeholder_color;
                         }
                         key_repeat.timers.insert(
                             KeyCode::Backspace,
@@ -426,7 +453,7 @@ fn handle_typing(
                                 }
 
                                 if in_field.cap_text_at.eq(&InputCap::CapAtNodeSize) {
-                                    let allowed_char_len = (computed_node.size().x / (style.0.font_size)).round() as usize;
+                                    let allowed_char_len = (computed_node.size().x / (style.label_style.font_size)).round() as usize;
                                     if pos >= allowed_char_len {
                                         return;
                                     }
@@ -441,7 +468,7 @@ fn handle_typing(
                                     in_field.cursor_position += 1;
                                     text.0 = in_field.text.clone();
                                 }
-                                text_color.0 = style.0.color;
+                                text_color.0 = style.label_style.color;
                                 key_repeat.timers.insert(
                                     *key,
                                     Timer::from_seconds(initial_delay, TimerMode::Once),
@@ -560,7 +587,7 @@ fn keycode_to_char(key: KeyCode, shift: bool, alt: bool) -> Option<char> {
     }
 }
 
-fn calculate_cursor_x_position(text_field: &InputField, cursor_pos: usize, style: &Style) -> f32 {
+fn calculate_cursor_x_position(text_field: &InputField, cursor_pos: usize, style: &LabelStyle) -> f32 {
     // Ensure the cursor position is within the bounds of the text
     if text_field.text.is_empty() || cursor_pos == 0 {
         return 0.0; // No text or cursor at the start
@@ -576,7 +603,7 @@ fn calculate_cursor_x_position(text_field: &InputField, cursor_pos: usize, style
     text_width + 1.0 // Add some padding so the cursor isn't directly on the text
 }
 
-fn calculate_text_width(text: &str, style: &Style) -> f32 {
+fn calculate_text_width(text: &str, style: &LabelStyle) -> f32 {
     // Calculate text width based on font size
     let font_size = style.font_size; // Default font size if none is provided
     text.len() as f32 * font_size * 0.6 // Adjust factor based on font characteristics
@@ -603,4 +630,79 @@ fn on_internal_mouse_leave(event: Trigger<Pointer<Out>>, mut query: Query<&mut U
     if let Ok(mut state) = query.get_mut(event.target) {
         state.hovered = false;
     }
-}*/
+}
+
+fn internal_style_update_que(
+    mut query: Query<(&UiElementState, &UiGenID, &Children, &InputStyle, Option<&Base>, Option<&Hover>, Option<&Selected>, Option<&Disabled>,
+                      &mut Node,
+                      &mut BackgroundColor,
+                      &mut BoxShadow,
+                      &mut BorderRadius,
+                      &mut BorderColor
+    ), (With<InputField>, Without<InputCursor>)>,
+    cursor_blink_timer: Res<CursorBlinkTimer>,
+    mut label_query: Query<(&BindToID, &mut TextColor, &mut TextFont, &mut TextLayout)>,
+    mut icon_container: Query<(&BindToID, &mut BackgroundColor, &mut BorderRadius), (With<InputFieldIcon>, Without<InputField>, Without<InputCursor>)>,
+    mut text_cursor_query: Query<(&mut BackgroundColor, &BindToID), With<InputCursor>>,
+    container_query: Query<&Children, With<InputContainer>>,
+) {
+    for (state, ui_id, children, style, base_style, hover_style, selected_style, disabled_style,
+        mut node,
+        mut background_color,
+        mut box_shadow,
+        mut border_radius,
+        mut border_color) in query.iter_mut() {
+        let mut manipulated = style.clone();
+        if let Some(Base(style)) = base_style {
+            if let Styling::InputField(input_style) = style {
+                manipulated = input_style.clone();
+            }
+        }
+
+        let internal_style = resolve_style_by_state(
+            &Styling::InputField(manipulated.clone()),
+            state,
+            hover_style,
+            selected_style,
+            disabled_style,
+        );
+
+        if let Styling::InputField(input_style) = internal_style {
+            apply_base_component_style(&input_style.style, &mut node);
+            apply_design_styles(&input_style.style, &mut background_color, &mut border_color, &mut border_radius, &mut box_shadow);
+
+            for child in children.iter() {
+                if let Ok((bind_to,
+                              mut icon_background,
+                              mut icon_border_radius)) =
+                    icon_container.get_mut(*child) {
+                    if bind_to.0 != ui_id.0 {
+                        continue;
+                    }
+
+                    icon_background.0 = input_style.style.background.color;
+                    icon_border_radius.top_left = input_style.style.border_radius.top_left;
+                    icon_border_radius.bottom_left = input_style.style.border_radius.top_left;
+                    icon_border_radius.top_right = Val::Px(0.);
+                    icon_border_radius.bottom_right = Val::Px(0.);
+                }
+
+                if let Ok(children) = container_query.get(*child) {
+                    for inner_child in children.iter() {
+                        apply_label_styles_to_child(*inner_child, ui_id, &input_style.label_style, &mut label_query);
+
+                        if let Ok((mut cursor_color, bind_to)) = text_cursor_query.get_mut(*inner_child) {
+                            if bind_to.0 != ui_id.0 {
+                                continue;
+                            }
+
+                            if cursor_blink_timer.timer.finished() {
+                                cursor_color.0 = input_style.label_style.color;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

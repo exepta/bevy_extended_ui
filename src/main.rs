@@ -7,7 +7,7 @@ use bevy_extended_ui::global::UiElementState;
 use bevy_extended_ui::styles::css_types::Background;
 use bevy_extended_ui::styles::Style;
 use bevy_extended_ui::styles::types::DivStyle;
-use bevy_extended_ui::widgets::{DivContainer, Button, CheckBox, Slider};
+use bevy_extended_ui::widgets::{DivContainer, Button, CheckBox, Slider, InputField};
 
 fn main() {
     let _ = App::new()
@@ -26,7 +26,7 @@ fn main() {
         .run();
 }
 
-fn example_widget(mut commands: Commands) {
+fn example_widget(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn((
         DivContainer, 
         DivStyle {
@@ -53,13 +53,21 @@ fn example_widget(mut commands: Commands) {
                     align_items: AlignItems::Center,
                     gap_column: Val::Px(20.),
                     background: Background { 
-                        color: Color::srgba(0.9, 0.9, 0.9, 1.0),
+                        color: Color::srgba(0.1, 0.1, 0.115, 1.0),
                         image: None,
                     },
                     ..default()
                 },
             }
         )).with_children(|builder| {
+            builder.spawn(
+                InputField {
+                    label: String::from("Username"),
+                    icon: Some(asset_server.load("icons/user-icon.png")),
+                    ..default()
+                }
+            );
+
             builder.spawn(
                 Button::default()
             );

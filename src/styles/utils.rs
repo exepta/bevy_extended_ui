@@ -4,7 +4,7 @@ use crate::styles::{LabelStyle, Style};
 use crate::styles::state_styles::{Disabled, Hover, Selected, Styling};
 
 pub fn resolve_style_by_state<'a>(
-    base: &'a Styling,
+    base_style: &'a Styling,
     state: &UiElementState,
     hover: Option<&Hover>,
     selected: Option<&Selected>,
@@ -28,7 +28,7 @@ pub fn resolve_style_by_state<'a>(
         }
     }
 
-    base.clone()
+    base_style.clone()
 }
 
 pub fn apply_label_styles_to_child(

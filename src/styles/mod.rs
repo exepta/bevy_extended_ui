@@ -6,8 +6,8 @@ pub mod utils;
 use bevy::prelude::*;
 use bevy::text::FontSmoothing;
 use crate::styles::css_types::{Background};
-use crate::styles::state_styles::Hover;
-use crate::styles::types::{ButtonStyle, CheckBoxStyle, DivStyle, SliderStyle};
+use crate::styles::state_styles::{Base, Hover};
+use crate::styles::types::{ButtonStyle, CheckBoxStyle, DivStyle, InputStyle, SliderStyle};
 use crate::utils::Radius;
 
 #[derive(Component, Default, Reflect, Debug, Clone)]
@@ -66,10 +66,12 @@ impl Plugin for StylesPlugin {
         app.register_type::<Background>();
         app.register_type::<Style>();
         app.register_type::<LabelStyle>();
+        app.register_type::<Base>();
         app.register_type::<Hover>();
         app.register_type::<ButtonStyle>();
         app.register_type::<DivStyle>();
         app.register_type::<CheckBoxStyle>();
         app.register_type::<SliderStyle>();
+        app.register_type::<InputStyle>();
     }
 }

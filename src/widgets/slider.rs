@@ -95,7 +95,12 @@ fn detect_change_slider_values(
     mut query: Query<(&mut Slider, &UiElementState, &ComputedNode, &Children, &UiGenID), With<Slider>>,
     mut track_query: Query<(&mut Node, &BindToID), (With<SliderTrack>, Without<SliderThumb>)>,
     mut thumb_query: Query<(&mut Node, &mut SliderThumb, &BindToID), (With<SliderThumb>, Without<SliderTrack>)>,
+    window_query: Query<&Window, With<PrimaryWindow>>
 ) {
+    let window = match window_query.get_single() {
+        Ok(window) => window,
+        Err(_) => return
+    };
     let shift = keyboard.pressed(KeyCode::ShiftLeft) || keyboard.pressed(KeyCode::ShiftRight);
     for (mut slider, state, computed_node, children, ui_id) in query.iter_mut() {
         // Skip unfocused sliders
@@ -114,7 +119,7 @@ fn detect_change_slider_values(
         }
 
         if slider.value != old_value {
-            let slider_width = computed_node.size().x / 1.5;
+            let slider_width = computed_node.size().x / window.scale_factor();
             let percent = (slider.value - slider.min) as f32 / (slider.max - slider.min) as f32;
             let clamped_x = percent * slider_width;
 
@@ -137,9 +142,14 @@ fn on_move_thumb(
     mut query: Query<(&mut Slider, &ComputedNode, &Children), With<Slider>>,
     mut track_query: Query<&mut Node, (With<SliderTrack>, Without<SliderThumb>)>,
     mut thumb_query: Query<(&mut Node, &mut SliderThumb), (With<SliderThumb>, Without<SliderTrack>)>,
+    window_query: Query<&Window, With<PrimaryWindow>>,
 ) {
+    let window = match window_query.get_single() {
+        Ok(window) => window,
+        Err(_) => return
+    };
     for (mut slider, computed_node, children) in query.iter_mut() {
-        let slider_width = computed_node.size().x / 1.5;
+        let slider_width = computed_node.size().x / window.scale_factor();
         for child in children.iter() {
             if event.target.eq(child) {
                 let next_child = children.iter().next();
@@ -173,10 +183,13 @@ fn on_click_track(
     mut thumb_query: Query<(&mut Node, &mut SliderThumb, &BindToID), (With<SliderThumb>, Without<SliderTrack>)>,
     window_query: Query<&Window, With<PrimaryWindow>>,
 ) {
-    let window = window_query.single();
+    let window = match window_query.get_single() {
+        Ok(window) => window,
+        Err(_) => return
+    };
     for (entity, mut slider, computed_node, ui_id, children) in query.iter_mut() {
         if event.target.eq(&entity) {
-            let slider_width = computed_node.size().x / 1.5;
+            let slider_width = computed_node.size().x / window.scale_factor();
             let track_left = (window.width() - slider_width) / 2.0;
             let click_x = event.pointer_location.position.x - track_left;
             let clamped_x = click_x.clamp(0.0, slider_width);
