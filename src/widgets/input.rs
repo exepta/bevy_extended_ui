@@ -64,6 +64,9 @@ pub struct CursorColor(pub Color);
 #[derive(Component)]
 struct InputContainer;
 
+#[derive(Component)]
+struct OverlayLabel;
+
 #[derive(Resource, Default)]
 struct KeyRepeatTimers {
     timers: HashMap<KeyCode, Timer>,
@@ -95,7 +98,8 @@ impl Plugin for InputWidget {
             update_cursor_visibility,
             update_cursor_position,
             handle_typing,
-            handle_input_horizontal_scroll
+            handle_input_horizontal_scroll,
+            handle_overlay_label
         ));
     }
 }
@@ -127,6 +131,7 @@ fn internal_generate_component_system(
             InputFieldRoot,
         )).with_children(|builder| {
 
+            // Icon on the left side
             if let Some(icon) = in_field.icon.clone() {
                 builder.spawn((
                     Name::new(format!("InputIcon-{}", gen_id.0)),
@@ -160,6 +165,31 @@ fn internal_generate_component_system(
                 });
             }
 
+            builder.spawn((
+                Name::new(format!("Overlay-Label-{}", gen_id.0)),
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: if in_field.icon.is_some() { Val::Px(40.0) } else { Val::Px(10.0) },
+                    top: Val::Px(19.5),
+                    ..default()
+                },
+                Text::new(in_field.label.clone()),
+                TextColor(Colored::BLACK),
+                TextFont { 
+                    font_size: 13.,
+                    ..default()
+                },
+                TextLayout {
+                    justify: JustifyText::Center,
+                    ..default()
+                },
+                RenderLayers::layer(*layer),
+                PickingBehavior::IGNORE,
+                BindToID(gen_id.0),
+                OverlayLabel
+            ));
+            
+            // Text Area in the Field
             builder.spawn((
                 Name::new(format!("TextContainer-{}", gen_id.0)),
                 Node {
@@ -521,6 +551,31 @@ fn handle_typing(
     }
 
     key_repeat.timers.retain(|key, _| keyboard.pressed(*key));
+}
+
+fn handle_overlay_label(
+    query: Query<(&UiElementState, &UiGenID, &InputField, &Children), With<InputField>>,
+    mut label_query: Query<(&BindToID, &mut Node, &mut TextFont), With<OverlayLabel>>,
+) {
+    for (state, gen_id, in_field, children) in query.iter() {
+        for child in children.iter() {
+            if let Ok((bind_to, mut node, mut text_font)) = label_query.get_mut(*child) {
+                if bind_to.0 != gen_id.0 {
+                    continue;
+                }
+
+                if state.selected {
+                    node.top = Val::Px(5.);
+                    text_font.font_size = 10.;
+                } else {
+                    if in_field.text.is_empty() {
+                        node.top = Val::Px(19.5);
+                        text_font.font_size = 13.;
+                    }
+                }
+            }
+        }
+    }
 }
 
 fn keycode_to_char(key: KeyCode, shift: bool, alt: bool) -> Option<char> {

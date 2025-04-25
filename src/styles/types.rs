@@ -173,7 +173,7 @@ impl Default for InputStyle {
             style: Style {
                 width: Val::Px(250.),
                 min_width: Val::Px(100.),
-                height: Val::Px(50.),
+                height: Val::Px(55.),
                 border_radius: Radius {
                     top_left: Val::Px(5.),
                     top_right: Val::Px(5.),

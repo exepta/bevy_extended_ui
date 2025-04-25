@@ -8,6 +8,7 @@ use bevy_extended_ui::styles::css_types::Background;
 use bevy_extended_ui::styles::Style;
 use bevy_extended_ui::styles::types::DivStyle;
 use bevy_extended_ui::widgets::{DivContainer, Button, CheckBox, Slider, InputField};
+use bevy_extended_ui::widgets::input::InputType;
 
 fn main() {
     let _ = App::new()
@@ -64,6 +65,15 @@ fn example_widget(mut commands: Commands, asset_server: Res<AssetServer>) {
                 InputField {
                     label: String::from("Username"),
                     icon: Some(asset_server.load("icons/user-icon.png")),
+                    ..default()
+                }
+            );
+
+            builder.spawn(
+                InputField {
+                    label: String::from("Password"),
+                    icon: Some(asset_server.load("icons/pass-icon.png")),
+                    input_type: InputType::Password,
                     ..default()
                 }
             );
