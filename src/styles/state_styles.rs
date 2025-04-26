@@ -29,3 +29,7 @@ pub struct Disabled(pub Styling);
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
 pub struct Checked(pub Styling);
+
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+pub struct Filled(pub Styling);

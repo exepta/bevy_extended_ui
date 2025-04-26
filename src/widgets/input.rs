@@ -6,9 +6,9 @@ use crate::global::{UiGenID, UiElementState, BindToID};
 use crate::resources::{CurrentElementSelected, ExtendedUiConfiguration};
 use crate::styles::{LabelStyle, Style};
 use crate::styles::css_types::Colored;
-use crate::styles::state_styles::{Base, Disabled, Hover, Selected, Styling};
+use crate::styles::state_styles::{Base, Disabled, Filled, Hover, Selected, Styling};
 use crate::styles::types::InputStyle;
-use crate::styles::utils::{apply_base_component_style, apply_design_styles, apply_label_styles_to_child, resolve_style_by_state};
+use crate::styles::utils::{apply_base_component_style, apply_design_styles, resolve_style_by_state};
 use crate::widgets::InputField;
 
 #[derive(Reflect, Default, Debug, Clone, Eq, PartialEq)]
@@ -125,6 +125,12 @@ fn internal_generate_component_system(
                     border_color: Colored::hex_to_color("#2aa149"),
                     ..default_input_style.style.clone()
                 },
+                label_color: Colored::hex_to_color("#2aa149"),
+                label_font_size: 10.,
+                ..default_input_style.clone()
+            })),
+            Filled(Styling::InputField(InputStyle {
+                label_font_size: 10.,
                 ..default_input_style.clone()
             })),
             RenderLayers::layer(*layer),
@@ -226,18 +232,14 @@ fn internal_generate_component_system(
                     InputCursor,
                     BindToID(gen_id.0),
                 ));
-
-                let mut text = in_field.placeholder_text.clone();
-                if text.is_empty() {
-                    text = in_field.text.clone();
-                }
+                
                 builder.spawn((
                     Name::new(format!("Input-Text-{}", gen_id.0)),
                     Node {
                         width: Val::Percent(90.0),
                         ..default()
                     },
-                    Text::new(text),
+                    Text::new(in_field.text.clone()),
                     TextColor::default(),
                     TextFont::default(),
                     TextLayout::default(),
@@ -283,22 +285,31 @@ fn update_cursor_visibility(
                             continue;
                         }
                         if in_field.input_type.eq(&InputType::Password) {
-                            let masked_text: String = "*".repeat(in_field.text.chars().count());
-                            text.0 = masked_text;
+                            if in_field.text.is_empty() {
+                                text.0 = in_field.placeholder_text.clone();
+                            } else {
+                                let masked_text: String = "*".repeat(in_field.text.chars().count());
+                                text.0 = masked_text;
+                            }
                         } else {
-                            text.0 = in_field.text.clone();
+                            let mut show_text = in_field.text.clone();
+                            if show_text.is_empty() {
+                                show_text = in_field.placeholder_text.clone();
+                            }
+                            text.0 = show_text;
                         }
                     }
                 }
             } else {
                 if !visibility.eq(&Visibility::Hidden) {
                     *visibility = Visibility::Hidden;
+
                     for (mut text, bind_id) in text_query.iter_mut() {
                         if bind_id.0 != ui_id.0 {
                             continue;
                         }
                         if in_field.text.is_empty() {
-                            text.0 = in_field.placeholder_text.clone();
+                            text.0 = String::from("");
                         }
                     }
                 }
@@ -461,6 +472,7 @@ fn handle_typing(
                         }
                         if text.0.is_empty() {
                             text_color.0 = style.placeholder_color;
+                            text.0 = in_field.placeholder_text.clone();
                         }
                         key_repeat.timers.insert(
                             KeyCode::Backspace,
@@ -476,7 +488,7 @@ fn handle_typing(
                             }
                             if keyboard.just_pressed(*key) {
                                 let pos = in_field.cursor_position;
-
+                                
                                 if in_field.cap_text_at.get_value() > 0 {
                                     let cap = in_field.cap_text_at.clone();
                                     if pos >= cap.get_value() {
@@ -494,7 +506,8 @@ fn handle_typing(
                                 if in_field.input_type.eq(&InputType::Password) {
                                     in_field.text.insert(pos, char);
                                     in_field.cursor_position += 1;
-                                    text.0.insert(pos, '*');
+                                    let masked_text: String = "*".repeat(in_field.text.chars().count());
+                                    text.0 = masked_text;
                                 } else {
                                     in_field.text.insert(pos, char);
                                     in_field.cursor_position += 1;
@@ -690,7 +703,7 @@ fn on_internal_mouse_leave(event: Trigger<Pointer<Out>>, mut query: Query<&mut U
 }
 
 fn internal_style_update_que(
-    mut query: Query<(&UiElementState, &UiGenID, &Children, &InputStyle, Option<&Base>, Option<&Hover>, Option<&Selected>, Option<&Disabled>,
+    mut query: Query<(&UiElementState, &UiGenID, &InputField, &Children, &InputStyle, Option<&Base>, Option<&Hover>, Option<&Selected>, Option<&Disabled>, Option<&Filled>,
                       &mut Node,
                       &mut BackgroundColor,
                       &mut BoxShadow,
@@ -698,12 +711,13 @@ fn internal_style_update_que(
                       &mut BorderColor
     ), (With<InputField>, Without<InputCursor>)>,
     cursor_blink_timer: Res<CursorBlinkTimer>,
-    mut label_query: Query<(&BindToID, &mut TextColor, &mut TextFont, &mut TextLayout)>,
+    mut text_query: Query<(&BindToID, &mut TextColor, &mut TextFont, &mut TextLayout), (With<InputFieldText>, Without<OverlayLabel>)>,
+    mut label_query: Query<(&BindToID, &mut TextColor, &mut TextFont), (With<OverlayLabel>, Without<InputFieldText>)>,
     mut icon_container: Query<(&BindToID, &mut BackgroundColor, &mut BorderRadius), (With<InputFieldIcon>, Without<InputField>, Without<InputCursor>)>,
     mut text_cursor_query: Query<(&mut BackgroundColor, &BindToID), With<InputCursor>>,
     container_query: Query<&Children, With<InputContainer>>,
 ) {
-    for (state, ui_id, children, style, base_style, hover_style, selected_style, disabled_style,
+    for (state, ui_id, in_field, children, style, base_style, hover_style, selected_style, disabled_style, filled_style,
         mut node,
         mut background_color,
         mut box_shadow,
@@ -716,6 +730,14 @@ fn internal_style_update_que(
             }
         }
 
+        if !in_field.text.is_empty() {
+            if let Some(Filled(filled)) = filled_style {
+                if let Styling::InputField(input_style) = filled {
+                    manipulated = input_style.clone();
+                }
+            }
+        }
+        
         let internal_style = resolve_style_by_state(
             &Styling::InputField(manipulated.clone()),
             state,
@@ -729,6 +751,15 @@ fn internal_style_update_que(
             apply_design_styles(&input_style.style, &mut background_color, &mut border_color, &mut border_radius, &mut box_shadow);
 
             for child in children.iter() {
+                if let Ok((bind_to, mut text_color, mut text_font)) = label_query.get_mut(*child) {
+                    if bind_to.0 != ui_id.0 {
+                        continue;
+                    }
+                    
+                    text_color.0 = input_style.label_color;
+                    text_font.font_size = input_style.label_font_size;
+                }
+                
                 if let Ok((bind_to,
                               mut icon_background,
                               mut icon_border_radius)) =
@@ -746,7 +777,18 @@ fn internal_style_update_que(
 
                 if let Ok(children) = container_query.get(*child) {
                     for inner_child in children.iter() {
-                        apply_label_styles_to_child(*inner_child, ui_id, &input_style.label_style, &mut label_query);
+                        if let Ok((bind_to, mut text_color, mut text_font, mut text_layout)) = text_query.get_mut(*inner_child) {
+                            if bind_to.0 != ui_id.0 {
+                                return;
+                            }
+
+                            text_color.0 = if in_field.text.is_empty() { input_style.placeholder_color } else { input_style.label_style.color };
+                            text_font.font_size = if in_field.text.is_empty() { input_style.placeholder_font_size } else { input_style.label_style.font_size };
+                            text_font.font_smoothing = input_style.label_style.smoothing;
+                            text_layout.linebreak = input_style.label_style.line_break;
+                            text_layout.justify = input_style.label_style.justify;
+                        }
+                        
 
                         if let Ok((mut cursor_color, bind_to)) = text_cursor_query.get_mut(*inner_child) {
                             if bind_to.0 != ui_id.0 {

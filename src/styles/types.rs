@@ -196,7 +196,7 @@ impl Default for InputStyle {
             },
             label_color: Color::srgb_u8(210, 210, 210),
             icon_color: None,
-            label_font_size: 15.,
+            label_font_size: 13.,
             placeholder_color: Color::srgb_u8(150, 150, 150),
             placeholder_font_size: 14.,
         }

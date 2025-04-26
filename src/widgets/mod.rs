@@ -86,7 +86,7 @@ impl Default for InputField {
         Self {
             text: String::from(""),
             label: String::from("Label"),
-            placeholder_text: String::from(""),
+            placeholder_text: String::from("label"),
             cap_text_at: InputCap::default(),
             input_type: InputType::default(),
             cursor_position: 0,
