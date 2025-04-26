@@ -2,7 +2,9 @@ use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use crate::global::{UiGenID, UiElementState };
 use crate::resources::{CurrentElementSelected, ExtendedUiConfiguration};
-use crate::styles::{BaseStyle, InternalStyle, Style};
+use crate::styles::state_styles::{Disabled, Hover, Selected, Styling};
+use crate::styles::types::DivStyle;
+use crate::styles::utils::{apply_base_component_style, apply_design_styles, resolve_style_by_state};
 use crate::widgets::DivContainer;
 
 #[derive(Component)]
@@ -12,21 +14,28 @@ pub struct DivWidget;
 
 impl Plugin for DivWidget {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, internal_generate_component_system);
+        app.add_systems(Update, (
+            internal_generate_component_system, 
+            internal_style_update_que
+                .after(internal_generate_component_system)
+        ));
     }
 }
 
 fn internal_generate_component_system(
     mut commands: Commands,
-    query: Query<(Entity, &UiGenID, Option<&BaseStyle>), (Without<DivRoot>, With<DivContainer>)>,
+    query: Query<(Entity, &UiGenID), (Without<DivRoot>, With<DivContainer>)>,
     config: Res<ExtendedUiConfiguration>
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
-    for (entity , gen_id, option_base_style) in query.iter() {
+    for (entity , gen_id) in query.iter() {
         commands.entity(entity).insert((
             Name::new(format!("Div-{}", gen_id.0)),
             Node::default(),
-            default_div_style(option_base_style),
+            BoxShadow::default(),
+            BorderRadius::default(),
+            BorderColor::default(),
+            BackgroundColor::default(),
             RenderLayers::layer(*layer),
             DivRoot
         ))
@@ -59,14 +68,32 @@ fn on_internal_mouse_leave(event: Trigger<Pointer<Out>>, mut query: Query<&mut U
     }
 }
 
-fn default_div_style(overwrite: Option<&BaseStyle>) -> InternalStyle {
-    let mut internal_style = InternalStyle(Style {
-        margin: UiRect::all(Val::Px(10.0)),
-        ..default()
-    });
+fn internal_style_update_que(
+    mut query: Query<(&UiElementState, &DivStyle, Option<&Hover>, Option<&Selected>, Option<&Disabled>,
+                      &mut Node,
+                      &mut BackgroundColor,
+                      &mut BoxShadow,
+                      &mut BorderRadius,
+                      &mut BorderColor
+    ), With<DivContainer>>
+) {
+    for (state, style, hover_style, selected_style, disabled_style,
+        mut node,
+        mut background_color,
+        mut box_shadow,
+        mut border_radius,
+        mut border_color) in query.iter_mut() {
+        let internal_style = resolve_style_by_state(
+            &Styling::Div(style.clone()),
+            state,
+            hover_style,
+            selected_style,
+            disabled_style,
+        );
 
-    if let Some(style) = overwrite {
-        internal_style.merge_styles(&style.0);
+        if let Styling::Div(div_style) = internal_style {
+            apply_base_component_style(&div_style.style, &mut node);
+            apply_design_styles(&div_style.style, &mut background_color, &mut border_color, &mut border_radius, &mut box_shadow);
+        }
     }
-    internal_style
 }

@@ -1,18 +1,18 @@
 use bevy::prelude::*;
-use crate::widgets::button::{ButtonWidget, IconPlace};
+use crate::widgets::button::{ButtonWidget};
 use crate::widgets::containers::DivWidget;
 use crate::widgets::input::{InputCap, InputType, InputWidget};
 use crate::widgets::slider::SliderWidget;
-use crate::styles::{BaseStyle, HoverStyle, SelectedStyle, InternalStyle};
 use crate::global::{UiGenID, UiElementState};
 use crate::widgets::check_box::CheckBoxWidget;
+use crate::styles::types::{ButtonStyle, DivStyle, CheckBoxStyle, SliderStyle, InputStyle};
 
 pub mod containers;
 pub mod button;
 pub mod input;
 pub mod slider;
 pub mod check_box;
-mod choice_box;
+pub mod choice_box;
 
 /// ===============================================
 ///                 Div
@@ -20,7 +20,7 @@ mod choice_box;
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
-#[require(UiGenID, UiElementState, BaseStyle, HoverStyle, SelectedStyle, InternalStyle)]
+#[require(UiGenID, UiElementState, DivStyle)]
 pub struct DivContainer;
 
 /// ===============================================
@@ -29,7 +29,7 @@ pub struct DivContainer;
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
-#[require(UiGenID, UiElementState, BaseStyle, HoverStyle, SelectedStyle, InternalStyle)]
+#[require(UiGenID, UiElementState, SliderStyle)]
 pub struct Slider {
     pub value: i32,
     pub step: i32,
@@ -54,20 +54,12 @@ impl Default for Slider {
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
-#[require(UiGenID, UiElementState, BaseStyle, HoverStyle, SelectedStyle, InternalStyle)]
-pub struct Button {
-    pub label: String,
-    pub icon: Option<Handle<Image>>,
-    pub icon_place: IconPlace
-}
+#[require(UiGenID, UiElementState, ButtonStyle)]
+pub struct Button(pub String);
 
 impl Default for Button {
     fn default() -> Self {
-        Self {
-            label: String::from("Button"),
-            icon: None,
-            icon_place: IconPlace::Right,
-        }
+        Self("Button".to_string())
     }
 }
 
@@ -77,9 +69,10 @@ impl Default for Button {
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
-#[require(UiGenID, UiElementState, BaseStyle, HoverStyle, SelectedStyle, InternalStyle)]
+#[require(UiGenID, UiElementState, InputStyle)]
 pub struct InputField {
     pub text: String,
+    pub label: String,
     pub placeholder_text: String,
     pub cap_text_at: InputCap,
     pub cursor_position: usize,
@@ -92,7 +85,8 @@ impl Default for InputField {
     fn default() -> Self {
         Self {
             text: String::from(""),
-            placeholder_text: String::from(""),
+            label: String::from("Label"),
+            placeholder_text: String::from("label"),
             cap_text_at: InputCap::default(),
             input_type: InputType::default(),
             cursor_position: 0,
@@ -119,10 +113,9 @@ impl InputField {
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
-#[require(UiGenID, UiElementState, BaseStyle, HoverStyle, SelectedStyle, InternalStyle)]
+#[require(UiGenID, UiElementState, CheckBoxStyle)]
 pub struct CheckBox {
     pub label: String,
-    pub icon: Option<Handle<Image>>,
     pub checked: bool
 }
 
@@ -130,7 +123,6 @@ impl Default for CheckBox {
     fn default() -> Self {
         Self {
             checked: false,
-            icon: None,
             label: String::from("CheckBox"),
         }
     }
@@ -142,7 +134,7 @@ impl Default for CheckBox {
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
-#[require(UiGenID, UiElementState, BaseStyle, HoverStyle, SelectedStyle, InternalStyle)]
+#[require(UiGenID, UiElementState)]
 pub struct ChoiceBox {
     pub value: ChoiceOption,
     pub options: Vec<ChoiceOption>

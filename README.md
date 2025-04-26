@@ -37,6 +37,63 @@ Otherwise, feel free to create a ticket.
 - [ ] Create Widget Radio Button
 - [ ] Create Widget Switch Button
 
+## Example
+___
+
+Here I will show you how to use the bevy_extended_ui:
+
+
+First we need to integrate the plugin into your project.
+```rust
+fn main() {
+  let _ = App::new()
+          .add_plugins((DefaultPlugins, ExtendedUiPlugin))
+          .run();
+}
+```
+
+
+Next, you can get started right away. Currently, there are widgets (Div, Button, Checkbox, InputField, and Slider). Note that these aren't all the widgets! More are coming soon.
+
+Here's a simple example of a button that we spawn and label "Github."
+```rust
+        commands.spawn((
+            DivContainer, // The Div Widget
+            DivStyle { // You can Style the widget like Nodes
+                style: Style {
+                    width: Val::Percent(50.),
+                    height: Val::Percent(50.),
+                    display: Display::Flex,
+                    flex_direction: FlexDirection::Column,
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::Center,
+                    gap_column: Val::Px(20.),
+                    background: Background { 
+                        color: Color::srgba(0.99, 0.99, 0.99, 1.0),
+                        image: None,
+                    },
+                    ..default()
+                },
+            }
+        )).with_children(|builder| {
+            // This button shows the label Github with default style
+            builder.spawn(
+                Button(String::from("GitHub"))
+            );
+            // This Button shows the label Github with Disabled style.
+            builder.spawn((
+                Button(String::from("GitHub")),
+                UiElementState {
+                    disabled: true,
+                    ..default()
+                }
+            ));
+        });
+```
+In the end it should look like this:
+
+![Result Example](docs/example_readme.png)
+
 | `Bevy` version | `bevy_extended_ui` version |
 |----------------|----------------------------|
 | 0.15.3         | 0.1.0                      |

@@ -19,17 +19,15 @@ pub struct BindToID(pub usize);
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
 pub struct UiElementState {
+    pub disabled: bool,
     pub hovered: bool,
-    pub selected: bool,
-    pub visible: bool,
-    pub enabled: bool
+    pub selected: bool
 }
 
 impl Default for UiElementState {
     fn default() -> Self {
         Self {
-            enabled: true,
-            visible: true,
+            disabled: false,
             hovered: false,
             selected: false,
         }

@@ -3,10 +3,12 @@ use bevy::prelude::*;
 use bevy::window::WindowResolution;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_extended_ui::ExtendedUiPlugin;
-use bevy_extended_ui::styles::{BaseStyle, PartialStyle};
+use bevy_extended_ui::global::UiElementState;
 use bevy_extended_ui::styles::css_types::Background;
-use bevy_extended_ui::widgets::{DivContainer, Button, InputField, Slider, CheckBox};
-use bevy_extended_ui::widgets::input::{InputCap, InputType};
+use bevy_extended_ui::styles::Style;
+use bevy_extended_ui::styles::types::DivStyle;
+use bevy_extended_ui::widgets::{DivContainer, Button, CheckBox, Slider, InputField};
+use bevy_extended_ui::widgets::input::InputType;
 
 fn main() {
     let _ = App::new()
@@ -27,57 +29,74 @@ fn main() {
 
 fn example_widget(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn((
-        DivContainer,
-        BaseStyle(PartialStyle {
-            width: Some(Val::Percent(100.0)),
-            height: Some(Val::Percent(100.0)),
-            display: Some(Display::Flex),
-            flex_direction: Some(FlexDirection::Column),
-            gap_column: Some(Val::Px(20.0)),
-            justify_content: Some(JustifyContent::Center),
-            align_items: Some(AlignItems::Center),
-            border: Some(UiRect::all(Val::Px(5.0))),
-            margin: Some(UiRect::all(Val::Px(0.0))),
-            border_color: Some(Color::srgb(0.0, 0.0, 1.0)),
-            background: Some(Background { /*image: Some(asset_server.load("backgrounds/test.jpg")), */ ..default() }),
-            ..default()
-        }),
+        DivContainer, 
+        DivStyle {
+            style: Style {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                display: Display::Flex,
+                flex_direction: FlexDirection::Column,
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                ..default()
+            }
+        }
     )).with_children(| builder | {
-        builder.spawn(
-            Button::default()
-        );
-
-        builder.spawn(
-            Button {
-                icon: Some(asset_server.load("icons/drop-arrow.png")),
-                ..default()
+        builder.spawn((
+            DivContainer,
+            DivStyle {
+                style: Style {
+                    width: Val::Percent(50.),
+                    height: Val::Percent(50.),
+                    display: Display::Flex,
+                    flex_direction: FlexDirection::Column,
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::Center,
+                    gap_column: Val::Px(20.),
+                    background: Background { 
+                        color: Color::srgba(0.99, 0.99, 0.99, 1.0),
+                        image: None,
+                    },
+                    ..default()
+                },
             }
-        );
+        )).with_children(|builder| {
+            builder.spawn(
+                InputField {
+                    label: String::from("Username"),
+                    icon: Some(asset_server.load("icons/user-icon.png")),
+                    ..default()
+                }
+            );
 
-        builder.spawn(
-            InputField {
-                placeholder_text: "Username".to_string(),
-                icon: Some(asset_server.load("icons/user-icon.png")),
-                input_type: InputType::Text,
-                cap_text_at: InputCap::NoCap,
-                ..default()
-            }
-        );
+            builder.spawn(
+                InputField {
+                    label: String::from("Password"),
+                    icon: Some(asset_server.load("icons/pass-icon.png")),
+                    input_type: InputType::Password,
+                    ..default()
+                }
+            );
 
-        builder.spawn(
-            InputField {
-                placeholder_text: "Password".to_string(),
-                icon: Some(asset_server.load("icons/pass-icon.png")),
-                input_type: InputType::Password,
-                cap_text_at: InputCap::NoCap,
-                ..default()
-            }
-        );
+            builder.spawn(
+                Button::default()
+            );
 
-        builder.spawn(Slider::default());
-        builder.spawn(Slider::default());
+            builder.spawn((
+                Button::default(),
+                UiElementState {
+                    disabled: true,
+                    ..default()
+                }
+            ));
 
-        builder.spawn(CheckBox::default());
-        builder.spawn(CheckBox::default());
+            builder.spawn(
+                CheckBox::default()
+            );
+
+            builder.spawn(
+                Slider::default()
+            );
+        });
     });
 }
