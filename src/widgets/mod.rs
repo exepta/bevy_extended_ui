@@ -5,7 +5,8 @@ use crate::widgets::input::{InputCap, InputType, InputWidget};
 use crate::widgets::slider::SliderWidget;
 use crate::global::{UiGenID, UiElementState};
 use crate::widgets::check_box::CheckBoxWidget;
-use crate::styles::types::{ButtonStyle, DivStyle, CheckBoxStyle, SliderStyle, InputStyle};
+use crate::styles::types::{ButtonStyle, DivStyle, CheckBoxStyle, SliderStyle, InputStyle, ChoiceBoxStyle};
+use crate::widgets::choice_box::ChoiceBoxWidget;
 
 pub mod containers;
 pub mod button;
@@ -134,17 +135,19 @@ impl Default for CheckBox {
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
-#[require(UiGenID, UiElementState)]
+#[require(UiGenID, UiElementState, ChoiceBoxStyle)]
 pub struct ChoiceBox {
     pub value: ChoiceOption,
-    pub options: Vec<ChoiceOption>
+    pub options: Vec<ChoiceOption>,
+    pub icon: Option<String>,
 }
 
 impl Default for ChoiceBox {
     fn default() -> Self {
         Self {
             value: ChoiceOption { selected: true, ..default() },
-            options: vec![ChoiceOption { selected: true, ..default() }]
+            options: vec![ChoiceOption { selected: true, ..default() }],
+            icon: Some(String::from("icons/drop-arrow.png")),
         }
     }
 }
@@ -153,7 +156,7 @@ impl Default for ChoiceBox {
 pub struct ChoiceOption {
     pub label: String,
     pub internal_val: String,
-    pub icon: Option<Handle<Image>>,
+    pub icon_path: Option<String>,
     pub selected: bool
 }
 
@@ -162,7 +165,7 @@ impl Default for ChoiceOption {
         Self {
             label: String::from("Option 1"),
             internal_val: String::from("option1"),
-            icon: None,
+            icon_path: None,
             selected: false,
         }
     }
@@ -177,12 +180,15 @@ impl Plugin for WidgetsPlugin {
         app.register_type::<Button>();
         app.register_type::<InputField>();
         app.register_type::<Slider>();
+        app.register_type::<ChoiceOption>();
+        app.register_type::<ChoiceBox>();
         app.add_plugins((
             DivWidget,
             ButtonWidget,
             InputWidget,
             SliderWidget,
-            CheckBoxWidget
+            CheckBoxWidget,
+            ChoiceBoxWidget,
         ));
     }
 }

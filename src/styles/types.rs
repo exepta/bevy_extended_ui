@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use crate::styles::css_types::{Background, Colored, IconPlace};
-use crate::styles::{LabelStyle, Style};
+use crate::styles::{LabelStyle, OptionStyle, Style};
 use crate::utils::Radius;
 
 #[derive(Component, Reflect, Debug, Clone)]
@@ -199,6 +199,75 @@ impl Default for InputStyle {
             label_font_size: 13.,
             placeholder_color: Color::srgb_u8(150, 150, 150),
             placeholder_font_size: 14.,
+        }
+    }
+}
+
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+pub struct ChoiceBoxStyle {
+    pub style: Style,
+    pub layout: Style,
+    pub label_style: LabelStyle,
+    pub option_style: OptionStyle,
+}
+
+impl Default for ChoiceBoxStyle {
+    fn default() -> Self {
+        Self {
+            style: Style {
+                width: Val::Px(250.),
+                min_width: Val::Px(100.),
+                height: Val::Px(55.),
+                border_radius: Radius {
+                    top_left: Val::Px(5.),
+                    top_right: Val::Px(5.),
+                    bottom_right: Val::Px(0.),
+                    bottom_left: Val::Px(0.)
+                },
+                border: UiRect::bottom(Val::Px(2.)),
+                background: Background {
+                    color: Color::srgba_u8(230, 230, 230, 50),
+                    ..default()
+                },
+                border_color: Color::srgb_u8(210, 210, 210),
+                ..default()
+            },
+            layout: Style {
+                width: Val::Percent(100.),
+                min_height: Val::Px(100.),
+                max_height: Val::Px(200.),
+                position_type: PositionType::Absolute,
+                display: Display::Flex,
+                justify_content: JustifyContent::FlexStart,
+                align_items: AlignItems::Start,
+                flex_direction: FlexDirection::Column,
+                background: Background {
+                    color: Colored::WHITE,
+                    ..default()
+                },
+                box_shadow: Some(BoxShadow {
+                    color: Color::srgba(0.0, 0.0, 0.0, 0.6),
+                    spread_radius: Val::Px(4.),
+                    blur_radius: Val::Px(4.),
+                    x_offset: Val::Px(0.),
+                    y_offset: Val::Px(1.)
+                }),
+                padding: UiRect::left(Val::Px(15.)),
+                overflow: Overflow {
+                    y: OverflowAxis::Scroll,
+                    x: OverflowAxis::Hidden,
+                },
+                top: Val::Px(56.),
+                ..default()
+            },
+            label_style: LabelStyle {
+                color: Color::srgb(0.1, 0.1, 0.1),
+                font_size: 14.,
+                line_break: LineBreak::NoWrap,
+                ..default()
+            },
+            option_style: OptionStyle::default(),
         }
     }
 }

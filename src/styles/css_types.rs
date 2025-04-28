@@ -48,6 +48,8 @@ pub struct Colored;
 
 impl Colored {
 
+    pub const TRANSPARENT: Color = Color::Srgba(Srgba::new(0.0, 0.0, 0.0, 0.0));
+    
     pub const ALICE_BLUE: Color = Color::Srgba(Srgba::new(0.941, 0.973, 1.0, 1.0));
     pub const ANTIQUE_WHITE: Color = Color::Srgba(Srgba::new(0.980, 0.922, 0.843, 1.0));
     pub const AQUA: Color = Color::Srgba(Srgba::new(0.0, 1.0, 1.0, 1.0));

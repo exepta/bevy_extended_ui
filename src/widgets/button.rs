@@ -37,7 +37,6 @@ fn internal_generate_component_system(
     asset_server: Res<AssetServer>,
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
-    let default_button_style = ButtonStyle::default();
     for (entity , gen_id, btn, style) in query.iter() {
         commands.entity(entity).insert((
             Name::new(format!("Button-{}", gen_id.0)),
@@ -50,21 +49,21 @@ fn internal_generate_component_system(
             Hover(Styling::Button(ButtonStyle {
                 style: Style {
                     background: Background { color: Colored::hex_to_color("#86df9d"), ..default() },
-                    ..default_button_style.style.clone()
+                    ..style.style.clone()
                 },
-                ..default_button_style.clone()
+                ..style.clone()
             })),
             Disabled(Styling::Button(ButtonStyle {
                 style: Style {
                     background: Background { color: Colored::hex_to_color("#7f9986"), ..default() },
                     box_shadow: None,
-                    ..default_button_style.style.clone()
+                    ..style.style.clone()
                 },
                 label_style: LabelStyle {
                     color: Color::srgba_u8(103, 109, 111, 255),
-                    ..default_button_style.label_style.clone()
+                    ..style.label_style.clone()
                 },
-                ..default_button_style.clone()
+                ..style.clone()
             })),
             ButtonBase
         )).with_children(|builder| {

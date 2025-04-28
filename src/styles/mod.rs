@@ -7,11 +7,10 @@ use bevy::prelude::*;
 use bevy::text::FontSmoothing;
 use crate::styles::css_types::{Background};
 use crate::styles::state_styles::{Base, Hover};
-use crate::styles::types::{ButtonStyle, CheckBoxStyle, DivStyle, InputStyle, SliderStyle};
+use crate::styles::types::{ButtonStyle, CheckBoxStyle, ChoiceBoxStyle, DivStyle, InputStyle, SliderStyle};
 use crate::utils::Radius;
 
-#[derive(Component, Default, Reflect, Debug, Clone)]
-#[reflect(Component)]
+#[derive(Component, Reflect, Default, Debug, Clone)]
 pub struct Style {
     pub width: Val,
     pub height: Val,
@@ -45,10 +44,10 @@ pub struct Style {
     pub border: UiRect,
     pub border_radius: Radius,
     pub border_color: Color,
+    pub overflow: Overflow,
 }
 
 #[derive(Component, Reflect, Default, Debug, Clone)]
-#[reflect(Component)]
 pub struct LabelStyle {
     pub font_path: Option<String>,
     pub font_weight: u16,
@@ -59,13 +58,17 @@ pub struct LabelStyle {
     pub smoothing: FontSmoothing
 }
 
+#[derive(Component, Reflect, Default, Debug, Clone)]
+pub struct OptionStyle {
+    pub background_color: Option<Color>,
+    pub icon_color: Option<Color>,
+}
+
 pub struct StylesPlugin;
 
 impl Plugin for StylesPlugin {
     fn build(&self, app: &mut App) {
         app.register_type::<Background>();
-        app.register_type::<Style>();
-        app.register_type::<LabelStyle>();
         app.register_type::<Base>();
         app.register_type::<Hover>();
         app.register_type::<ButtonStyle>();
@@ -73,5 +76,6 @@ impl Plugin for StylesPlugin {
         app.register_type::<CheckBoxStyle>();
         app.register_type::<SliderStyle>();
         app.register_type::<InputStyle>();
+        app.register_type::<ChoiceBoxStyle>();
     }
 }

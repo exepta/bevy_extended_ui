@@ -7,7 +7,7 @@ use bevy_extended_ui::global::UiElementState;
 use bevy_extended_ui::styles::css_types::Background;
 use bevy_extended_ui::styles::Style;
 use bevy_extended_ui::styles::types::DivStyle;
-use bevy_extended_ui::widgets::{DivContainer, Button, CheckBox, Slider, InputField};
+use bevy_extended_ui::widgets::{DivContainer, Button, CheckBox, Slider, InputField, ChoiceBox, ChoiceOption};
 use bevy_extended_ui::widgets::input::InputType;
 
 fn main() {
@@ -97,6 +97,12 @@ fn example_widget(mut commands: Commands, asset_server: Res<AssetServer>) {
             builder.spawn(
                 Slider::default()
             );
+            
+            builder.spawn(ChoiceBox {
+                value: ChoiceOption::default(),
+                options: vec![ChoiceOption {selected: true, ..default()}, ChoiceOption {label: "Option 2".to_string(), ..default()}],
+                ..default()
+            });
         });
     });
 }
