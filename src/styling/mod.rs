@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use crate::styling::paint::Colored;
-use crate::styling::convert::{CssBase, CssClass, CssDisabled, CssFile, CssFocus, CssHover, CssID, CssReadOnly};
+use crate::styling::convert::{CssClass, CssSource, CssID};
 use crate::styling::system::WidgetStyle;
 
 pub mod css;
@@ -152,12 +152,7 @@ pub struct StylingPlugin;
 impl Plugin for StylingPlugin {
     fn build(&self, app: &mut App) {
         app.register_type::<WidgetStyle>();
-        app.register_type::<CssBase>();
-        app.register_type::<CssHover>();
-        app.register_type::<CssDisabled>();
-        app.register_type::<CssReadOnly>();
-        app.register_type::<CssFocus>();
-        app.register_type::<CssFile>();
+        app.register_type::<CssSource>();
         app.register_type::<CssClass>();
         app.register_type::<CssID>();
     }

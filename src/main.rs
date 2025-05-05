@@ -4,7 +4,7 @@ use bevy::window::WindowResolution;
 use bevy_inspector_egui::bevy_egui::EguiPlugin;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_extended_ui::ExtendedUiPlugin;
-use bevy_extended_ui::styling::convert::{CssBase, CssFile, CssHover};
+use bevy_extended_ui::styling::convert::CssSource;
 use bevy_extended_ui::widgets::{Button, Div};
 
 fn main() {
@@ -30,13 +30,10 @@ fn main() {
 fn test_button(mut commands: Commands) {
     commands.spawn((
         Div::default(),
-        CssFile(String::from("test.css")),
-        CssBase(String::from(".div-center")),
+        CssSource(String::from("test.css")),
         children![
-            (
-                Button::default(),
-                CssHover(String::from("button:hover"))
-            )
+            Button::default(),
+            Button::default()
         ]
     ));
 }
