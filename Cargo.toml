@@ -9,10 +9,10 @@ name = "bevy_extended_ui"
 path = "src/lib.rs"
 
 [dependencies.bevy-inspector-egui]
-version = "0.30.0"
+version = "0.31.0"
 
 [dependencies.bevy]
-version = "0.15.3"
+version = "0.16.0"
 default-features = false
 features = [
     "bevy_asset",
@@ -33,5 +33,12 @@ features = [
     "custom_cursor",
     "bevy_ui_picking_backend",
     "bevy_winit",
-    "x11"
+    "x11",
+    "bevy_log"
 ]
+
+[dependencies.lightningcss]
+version = "1.0.0-alpha.65"
+
+[dependencies.once_cell]
+version = "1.21.3"

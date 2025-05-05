@@ -1,189 +1,61 @@
+mod button;
+mod div;
+
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering::Relaxed;
 use bevy::prelude::*;
-use crate::widgets::button::{ButtonWidget};
-use crate::widgets::containers::DivWidget;
-use crate::widgets::input::{InputCap, InputType, InputWidget};
-use crate::widgets::slider::SliderWidget;
-use crate::global::{UiGenID, UiElementState};
-use crate::widgets::check_box::CheckBoxWidget;
-use crate::styles::types::{ButtonStyle, DivStyle, CheckBoxStyle, SliderStyle, InputStyle};
+use crate::{UIGenID, UIWidgetState};
+use crate::widgets::button::ButtonWidget;
+use crate::widgets::div::DivWidget;
 
-pub mod containers;
-pub mod button;
-pub mod input;
-pub mod slider;
-pub mod check_box;
-pub mod choice_box;
+static BUTTON_COUNT: AtomicUsize = AtomicUsize::new(1);
+static DIV_COUNT: AtomicUsize = AtomicUsize::new(1);
 
-/// ===============================================
-///                 Div
-/// ===============================================
+// ===============================================
+//                       Div
+// ===============================================
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
-#[require(UiGenID, UiElementState, DivStyle)]
-pub struct DivContainer;
+#[require(UIGenID, UIWidgetState, GlobalTransform, InheritedVisibility)]
+pub struct Div(usize);
 
-/// ===============================================
-///                 Slider
-/// ===============================================
-
-#[derive(Component, Reflect, Debug, Clone)]
-#[reflect(Component)]
-#[require(UiGenID, UiElementState, SliderStyle)]
-pub struct Slider {
-    pub value: i32,
-    pub step: i32,
-    pub min: i32,
-    pub max: i32,
-}
-
-impl Default for Slider {
+impl Default for Div {
     fn default() -> Self {
-        Self {
-            value: 0,
-            step: 1,
-            min: 0,
-            max: 100,
-        }
+        Self(DIV_COUNT.fetch_add(1, Relaxed))
     }
 }
 
-/// ===============================================
-///                 Button
-/// ===============================================
+// ===============================================
+//                       Button
+// ===============================================
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
-#[require(UiGenID, UiElementState, ButtonStyle)]
-pub struct Button(pub String);
+#[require(UIGenID, UIWidgetState)]
+pub struct Button {
+    pub w_count: usize,
+    pub text: String,
+}
 
 impl Default for Button {
     fn default() -> Self {
-        Self("Button".to_string())
-    }
-}
-
-/// ===============================================
-///                 InputField
-/// ===============================================
-
-#[derive(Component, Reflect, Debug, Clone)]
-#[reflect(Component)]
-#[require(UiGenID, UiElementState, InputStyle)]
-pub struct InputField {
-    pub text: String,
-    pub label: String,
-    pub placeholder_text: String,
-    pub cap_text_at: InputCap,
-    pub cursor_position: usize,
-    pub input_type: InputType,
-    pub clear_after_focus_lost: bool,
-    pub icon: Option<Handle<Image>>,
-}
-
-impl Default for InputField {
-    fn default() -> Self {
         Self {
-            text: String::from(""),
-            label: String::from("Label"),
-            placeholder_text: String::from("label"),
-            cap_text_at: InputCap::default(),
-            input_type: InputType::default(),
-            cursor_position: 0,
-            clear_after_focus_lost: false,
-            icon: None,
+            w_count: BUTTON_COUNT.fetch_add(1, Relaxed),
+            text: String::from("Button")
         }
     }
 }
 
-impl InputField {
-    pub fn new(text: &str, placeholder_text: &str, input_type: InputType) -> Self {
-        Self {
-            text: text.to_string(),
-            placeholder_text: placeholder_text.to_string(),
-            input_type,
-            ..default()
-        }
-    }
-}
+pub struct WidgetPlugin;
 
-/// ===============================================
-///                 CheckBox
-/// ===============================================
-
-#[derive(Component, Reflect, Debug, Clone)]
-#[reflect(Component)]
-#[require(UiGenID, UiElementState, CheckBoxStyle)]
-pub struct CheckBox {
-    pub label: String,
-    pub checked: bool
-}
-
-impl Default for CheckBox {
-    fn default() -> Self {
-        Self {
-            checked: false,
-            label: String::from("CheckBox"),
-        }
-    }
-}
-
-/// ===============================================
-///                 ChoiceBox
-/// ===============================================
-
-#[derive(Component, Reflect, Debug, Clone)]
-#[reflect(Component)]
-#[require(UiGenID, UiElementState)]
-pub struct ChoiceBox {
-    pub value: ChoiceOption,
-    pub options: Vec<ChoiceOption>
-}
-
-impl Default for ChoiceBox {
-    fn default() -> Self {
-        Self {
-            value: ChoiceOption { selected: true, ..default() },
-            options: vec![ChoiceOption { selected: true, ..default() }]
-        }
-    }
-}
-
-#[derive(Component, Reflect, Debug, Clone)]
-pub struct ChoiceOption {
-    pub label: String,
-    pub internal_val: String,
-    pub icon: Option<Handle<Image>>,
-    pub selected: bool
-}
-
-impl Default for ChoiceOption {
-    fn default() -> Self {
-        Self {
-            label: String::from("Option 1"),
-            internal_val: String::from("option1"),
-            icon: None,
-            selected: false,
-        }
-    }
-}
-
-pub struct WidgetsPlugin;
-
-impl Plugin for WidgetsPlugin {
+impl Plugin for WidgetPlugin {
     fn build(&self, app: &mut App) {
-        app.register_type::<DivContainer>();
-        app.register_type::<CheckBox>();
+        app.register_type::<Div>();
         app.register_type::<Button>();
-        app.register_type::<InputField>();
-        app.register_type::<Slider>();
         app.add_plugins((
-            DivWidget,
-            ButtonWidget,
-            InputWidget,
-            SliderWidget,
-            CheckBoxWidget
+            DivWidget, 
+            ButtonWidget
         ));
     }
 }
-
