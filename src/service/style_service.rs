@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use crate::styling::convert::{CssClass, TagName};
+use crate::styling::convert::{CssClass, CssID, TagName};
 use crate::styling::Style;
 use crate::styling::system::WidgetStyle;
 use crate::UIWidgetState;
@@ -19,7 +19,8 @@ fn update_widget_styles_system(
         &mut WidgetStyle,
         Option<&CssClass>,
         Option<&TagName>,
-    ), Or<(Changed<WidgetStyle>, Changed<UIWidgetState>, Changed<CssClass>)>>,
+        Option<&CssID>,
+    ), Or<(Changed<WidgetStyle>, Changed<UIWidgetState>, Changed<CssClass>, Changed<CssID>)>>,
     mut style_query: Query<(
         Option<&mut Node>,
         Option<&mut BackgroundColor>,
@@ -31,15 +32,14 @@ fn update_widget_styles_system(
         Option<&mut TextLayout>,
     )>,
 ) {
-    for (entity, state_opt, widget_style, class_opt, tag_opt) in query.iter_mut() {
+    for (entity, state_opt, widget_style, class_opt, tag_opt, id_opt) in query.iter_mut() {
         let current = state_opt.cloned().unwrap_or_default();
 
         let mut selector_variants = vec![];
-
+        
+        // Tag
         if let Some(tag) = tag_opt {
-            selector_variants.push(tag.0.clone()); // e.g. "button"
-
-            // add state variants like `button:hover`, etc.
+            selector_variants.push(tag.0.clone());
             if current.hovered {
                 selector_variants.push(format!("{}:hover", tag.0));
             }
@@ -54,9 +54,10 @@ fn update_widget_styles_system(
             }
         }
 
+        // Class
         if let Some(classes) = class_opt {
             for class in &classes.0 {
-                selector_variants.push(class.clone()); // .my-class
+                selector_variants.push(class.clone());
                 if current.hovered {
                     selector_variants.push(format!("{}:hover", class));
                 }
@@ -71,14 +72,33 @@ fn update_widget_styles_system(
                 }
             }
         }
+        
+        // ID
+        if let Some(css_id) = id_opt {
+            let id = format!("#{}", css_id.0);
+            selector_variants.push(id.clone());
 
+            if current.hovered {
+                selector_variants.push(format!("{}:hover", id));
+            }
+            if current.focused {
+                selector_variants.push(format!("{}:focus", id));
+            }
+            if current.readonly {
+                selector_variants.push(format!("{}:read-only", id));
+            }
+            if current.disabled {
+                selector_variants.push(format!("{}:disabled", id));
+            }
+        }
+        
         let mut final_style = Style::default();
         for sel in selector_variants {
             if let Some(style) = widget_style.styles.get(&sel) {
                 final_style.merge(style);
             }
         }
-
+        
         if let Ok((
                       node,
                       background,
@@ -92,13 +112,8 @@ fn update_widget_styles_system(
         {
             apply_style_to_node(&final_style, node);
             if let Some(mut background) = background {
-                background.0 = final_style
-                    .background
-                    .as_ref()
-                    .map(|bg| bg.color)
-                    .unwrap_or(Color::NONE);
+                background.0 = final_style.background.map(|b| b.color).unwrap_or(Color::NONE);
             }
-
             if let Some(mut border_radius) = border_radius {
                 if let Some(radius) = final_style.border_radius.clone() {
                     border_radius.top_left = radius.top_left;
@@ -112,29 +127,17 @@ fn update_widget_styles_system(
                     border_radius.bottom_right = Val::ZERO;
                 }
             }
-
             if let Some(mut border_color) = border_color {
-                border_color.0 = final_style
-                    .border_color
-                    .unwrap_or(Color::NONE);
+                border_color.0 = final_style.border_color.unwrap_or(Color::NONE);
             }
-
             if let Some(mut text_color) = text_color {
-                text_color.0 = final_style
-                    .color
-                    .unwrap_or(Color::WHITE);
+                text_color.0 = final_style.color.unwrap_or(Color::WHITE);
             }
-
             if let Some(mut text_font) = text_font {
                 text_font.font_size = 15.0;
             }
-
             if let Some(mut box_shadow) = box_shadow {
-                box_shadow.0 = final_style
-                    .box_shadow
-                    .as_ref()
-                    .map(|b| b.0.clone())
-                    .unwrap_or_default();
+                box_shadow.0 = final_style.box_shadow.map(|b| b.0.clone()).unwrap_or_default();
             }
         }
     }

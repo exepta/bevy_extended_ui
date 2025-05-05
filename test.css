@@ -11,3 +11,8 @@ div {
 .div-override {
     justify-content: start;
 }
+
+#container {
+    justify-content: center;
+    background: #2f3135;
+}

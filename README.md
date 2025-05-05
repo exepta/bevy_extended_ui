@@ -16,27 +16,6 @@ Otherwise, feel free to create a ticket.
 
 > *Note:* This project is currently under construction and not suitable for large projects!.
 
-### Todo:
-> Here's my current to-do list, which I'm working on. Note that this list isn't final. If you have any ideas, open a ticket and we'll talk about it!
-
-- [x] Create System for handle Ui States
-- [x] Create Style handling for:
-  - [x] Base
-  - [x] Hover
-  - [x] Focus
-- [x] Create Widget Div
-- [x] Create Widget Button
-- [x] Create Widget InputField
-  - [x] Type Text
-  - [x] Type Number
-  - [x] Type Password
-- [x] Create Widget Slider
-- [x] Create Widget CheckBox
-- [ ] Create Widget ChoiceBox
-- [ ] Create Group Widget
-- [ ] Create Widget Radio Button
-- [ ] Create Widget Switch Button
-
 ## Example
 ___
 
@@ -55,40 +34,17 @@ fn main() {
 
 Next, you can get started right away. Currently, there are widgets (Div, Button, Checkbox, InputField, and Slider). Note that these aren't all the widgets! More are coming soon.
 
-Here's a simple example of a button that we spawn and label "Github."
+Here's a simple example of a button that we spawn
 ```rust
-        commands.spawn((
-            DivContainer, // The Div Widget
-            DivStyle { // You can Style the widget like Nodes
-                style: Style {
-                    width: Val::Percent(50.),
-                    height: Val::Percent(50.),
-                    display: Display::Flex,
-                    flex_direction: FlexDirection::Column,
-                    justify_content: JustifyContent::Center,
-                    align_items: AlignItems::Center,
-                    gap_column: Val::Px(20.),
-                    background: Background { 
-                        color: Color::srgba(0.99, 0.99, 0.99, 1.0),
-                        image: None,
-                    },
-                    ..default()
-                },
-            }
-        )).with_children(|builder| {
-            // This button shows the label Github with default style
-            builder.spawn(
-                Button(String::from("GitHub"))
-            );
-            // This Button shows the label Github with Disabled style.
-            builder.spawn((
-                Button(String::from("GitHub")),
-                UiElementState {
-                    disabled: true,
-                    ..default()
-                }
-            ));
-        });
+    commands.spawn((
+        Div::default(),
+        CssSource(String::from("test.css")),
+        CssClass(vec![".div-test".to_string(), ".div-override".to_string()]),
+        children![
+            Button::default(),
+            Button::default()
+        ]
+    ));
 ```
 In the end it should look like this:
 
@@ -96,4 +52,4 @@ In the end it should look like this:
 
 | `Bevy` version | `bevy_extended_ui` version |
 |----------------|----------------------------|
-| 0.15.3         | 0.1.0                      |
+| 0.16.0         | 0.1.0                      |

@@ -1,8 +1,12 @@
+use std::collections::HashSet;
 use bevy::prelude::*;
 
 // ==================================================
 //                     Self made
 // ==================================================
+
+#[derive(Resource, Default)]
+pub struct ExistingCssIDs(pub HashSet<String>);
 
 #[derive(Component, Reflect, Debug, Clone, Deref, DerefMut)]
 #[reflect(Component)]
