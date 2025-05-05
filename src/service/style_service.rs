@@ -1,4 +1,6 @@
 use bevy::prelude::*;
+use crate::styling::convert::{CssClass, TagName};
+use crate::styling::Style;
 use crate::styling::system::WidgetStyle;
 use crate::UIWidgetState;
 
@@ -15,7 +17,9 @@ fn update_widget_styles_system(
         Entity,
         Option<&UIWidgetState>,
         &mut WidgetStyle,
-    ), Or<(Changed<WidgetStyle>, Changed<UIWidgetState>)>>,
+        Option<&CssClass>,
+        Option<&TagName>,
+    ), Or<(Changed<WidgetStyle>, Changed<UIWidgetState>, Changed<CssClass>)>>,
     mut style_query: Query<(
         Option<&mut Node>,
         Option<&mut BackgroundColor>,
@@ -27,159 +31,146 @@ fn update_widget_styles_system(
         Option<&mut TextLayout>,
     )>,
 ) {
-    for (entity, state_opt, widget_style) in query.iter_mut() {
+    for (entity, state_opt, widget_style, class_opt, tag_opt) in query.iter_mut() {
         let current = state_opt.cloned().unwrap_or_default();
 
-            if let Ok((
-                          node,
-                          background,
-                          border_color,
-                          border_radius,
-                          box_shadow,
-                          text_color,
-                          text_font,
-                          _text_layout,
-                      )) = style_query.get_mut(entity)
-            {
-                let base_selector = widget_style.css_selector.clone();
+        let mut selector_variants = vec![];
 
-                // Build active selector string
-                let mut selector = base_selector.clone();
-                if current.hovered {
-                    selector.push_str(":hover");
-                }
-                if current.focused {
-                    selector.push_str(":focus");
-                }
-                if current.readonly {
-                    selector.push_str(":read-only");
-                }
-                if current.disabled {
-                    selector.push_str(":disabled");
-                }
+        if let Some(tag) = tag_opt {
+            selector_variants.push(tag.0.clone()); // e.g. "button"
 
-                // Start with base style
-                let mut final_style = widget_style
-                    .styles
-                    .get(&base_selector)
-                    .cloned()
-                    .unwrap_or_default();
-
-                // Then merge in state-specific style
-                if let Some(state_style) = widget_style.styles.get(&selector) {
-                    final_style.merge(state_style);
-                }
-
-                // Apply style to UI components
-                if let Some(mut node) = node {
-                    if let Some(v) = final_style.width {
-                        node.width = v;
-                    }
-                    if let Some(v) = final_style.min_width {
-                        node.min_width = v;
-                    }
-                    if let Some(v) = final_style.max_width {
-                        node.max_width = v;
-                    }
-                    if let Some(v) = final_style.height {
-                        node.height = v;
-                    }
-                    if let Some(v) = final_style.min_height {
-                        node.min_height = v;
-                    }
-                    if let Some(v) = final_style.max_height {
-                        node.max_height = v;
-                    }
-                    if let Some(v) = final_style.display {
-                        node.display = v;
-                    }
-                    if let Some(v) = final_style.position_type {
-                        node.position_type = v;
-                    }
-                    if let Some(v) = final_style.left {
-                        node.left = v;
-                    }
-                    if let Some(v) = final_style.top {
-                        node.top = v;
-                    }
-                    if let Some(v) = final_style.right {
-                        node.right = v;
-                    }
-                    if let Some(v) = final_style.bottom {
-                        node.bottom = v;
-                    }
-                    if let Some(v) = final_style.padding {
-                        node.padding = v;
-                    }
-                    if let Some(v) = final_style.margin {
-                        node.margin = v;
-                    }
-                    if let Some(v) = final_style.border {
-                        node.border = v;
-                    }
-                    if let Some(v) = final_style.justify_content {
-                        node.justify_content = v;
-                    }
-                    if let Some(v) = final_style.align_items {
-                        node.align_items = v;
-                    }
-                    if let Some(v) = final_style.flex_direction {
-                        node.flex_direction = v;
-                        match v {
-                            FlexDirection::Row | FlexDirection::RowReverse => {
-                                if let Some(gap) = final_style.gap {
-                                    node.column_gap = gap;
-                                }
-                            }
-                            _ => {
-                                if let Some(gap) = final_style.gap {
-                                    node.row_gap = gap;
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if let Some(mut background) = background {
-                    if let Some(bg) = final_style.background.clone() {
-                        background.0 = bg.color;
-                    }
-                }
-
-                if let Some(mut border_radius) = border_radius {
-                    if let Some(radius) = final_style.border_radius.clone() {
-                        border_radius.top_left = radius.top_left;
-                        border_radius.top_right = radius.top_right;
-                        border_radius.bottom_left = radius.bottom_left;
-                        border_radius.bottom_right = radius.bottom_right;
-                    }
-                }
-
-                if let Some(mut border_color) = border_color {
-                    if let Some(color) = final_style.border_color.clone() {
-                        border_color.0 = color;
-                    }
-                }
-
-                if let Some(mut text_color) = text_color {
-                    if let Some(color) = final_style.color {
-                        text_color.0 = color;
-                    }
-                }
-
-                if let Some(mut text_font) = text_font {
-                    if final_style.font_size.is_some() {
-                        text_font.font_size = 15.0;
-                    }
-                }
-
-                if let Some(mut box_shadow) = box_shadow {
-                    if let Some(shadow) = final_style.box_shadow.clone() {
-                        box_shadow.0 = shadow.0;
-                    }
-                }
-
-                info!("update");
+            // add state variants like `button:hover`, etc.
+            if current.hovered {
+                selector_variants.push(format!("{}:hover", tag.0));
+            }
+            if current.focused {
+                selector_variants.push(format!("{}:focus", tag.0));
+            }
+            if current.readonly {
+                selector_variants.push(format!("{}:read-only", tag.0));
+            }
+            if current.disabled {
+                selector_variants.push(format!("{}:disabled", tag.0));
             }
         }
+
+        if let Some(classes) = class_opt {
+            for class in &classes.0 {
+                selector_variants.push(class.clone()); // .my-class
+                if current.hovered {
+                    selector_variants.push(format!("{}:hover", class));
+                }
+                if current.focused {
+                    selector_variants.push(format!("{}:focus", class));
+                }
+                if current.readonly {
+                    selector_variants.push(format!("{}:read-only", class));
+                }
+                if current.disabled {
+                    selector_variants.push(format!("{}:disabled", class));
+                }
+            }
+        }
+
+        let mut final_style = Style::default();
+        for sel in selector_variants {
+            if let Some(style) = widget_style.styles.get(&sel) {
+                final_style.merge(style);
+            }
+        }
+
+        if let Ok((
+                      node,
+                      background,
+                      border_color,
+                      border_radius,
+                      box_shadow,
+                      text_color,
+                      text_font,
+                      _text_layout,
+                  )) = style_query.get_mut(entity)
+        {
+            apply_style_to_node(&final_style, node);
+            if let Some(mut background) = background {
+                background.0 = final_style
+                    .background
+                    .as_ref()
+                    .map(|bg| bg.color)
+                    .unwrap_or(Color::NONE);
+            }
+
+            if let Some(mut border_radius) = border_radius {
+                if let Some(radius) = final_style.border_radius.clone() {
+                    border_radius.top_left = radius.top_left;
+                    border_radius.top_right = radius.top_right;
+                    border_radius.bottom_left = radius.bottom_left;
+                    border_radius.bottom_right = radius.bottom_right;
+                } else {
+                    border_radius.top_left = Val::ZERO;
+                    border_radius.top_right = Val::ZERO;
+                    border_radius.bottom_left = Val::ZERO;
+                    border_radius.bottom_right = Val::ZERO;
+                }
+            }
+
+            if let Some(mut border_color) = border_color {
+                border_color.0 = final_style
+                    .border_color
+                    .unwrap_or(Color::NONE);
+            }
+
+            if let Some(mut text_color) = text_color {
+                text_color.0 = final_style
+                    .color
+                    .unwrap_or(Color::WHITE);
+            }
+
+            if let Some(mut text_font) = text_font {
+                text_font.font_size = 15.0;
+            }
+
+            if let Some(mut box_shadow) = box_shadow {
+                box_shadow.0 = final_style
+                    .box_shadow
+                    .as_ref()
+                    .map(|b| b.0.clone())
+                    .unwrap_or_default();
+            }
+        }
+    }
 }
+
+fn apply_style_to_node(style: &Style, node: Option<Mut<Node>>) {
+    if let Some(mut node) = node {
+        node.width = style.width.unwrap_or_default();
+        node.min_width = style.min_width.unwrap_or_default();
+        node.max_width = style.max_width.unwrap_or_default();
+        node.height = style.height.unwrap_or_default();
+        node.min_height = style.min_height.unwrap_or_default();
+        node.max_height = style.max_height.unwrap_or_default();
+        node.display = style.display.unwrap_or_default();
+        node.position_type = style.position_type.unwrap_or_default();
+        node.left = style.left.unwrap_or_default();
+        node.top = style.top.unwrap_or_default();
+        node.right = style.right.unwrap_or_default();
+        node.bottom = style.bottom.unwrap_or_default();
+        node.padding = style.padding.unwrap_or_default();
+        node.margin = style.margin.unwrap_or_default();
+        node.border = style.border.unwrap_or_default();
+        node.justify_content = style.justify_content.unwrap_or_default();
+        node.align_items = style.align_items.unwrap_or_default();
+
+        node.flex_direction = style.flex_direction.unwrap_or(FlexDirection::Row);
+        match node.flex_direction {
+            FlexDirection::Row | FlexDirection::RowReverse => {
+                node.column_gap = style.gap.unwrap_or_default();
+                node.row_gap = Val::Auto;
+            }
+            _ => {
+                node.row_gap = style.gap.unwrap_or_default();
+                node.column_gap = Val::Auto;
+            }
+        }
+    }
+}
+

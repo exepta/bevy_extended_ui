@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use crate::{BindToID, CurrentWidgetState, ExtendedUiConfiguration, UIGenID, UIWidgetState};
+use crate::styling::convert::{CssClass, TagName};
 use crate::styling::paint::Colored;
 use crate::styling::system::WidgetStyle;
 use crate::widgets::Button;
@@ -44,7 +45,8 @@ fn internal_node_creation_system(
             BorderColor::default(),
             BorderRadius::default(),
             BoxShadow::new(Colored::TRANSPARENT, Val::Px(0.), Val::Px(0.), Val::Px(0.), Val::Px(0.)),
-            WidgetStyle::load_from_file(css_internal, "button"),
+            WidgetStyle::load_from_file(css_internal),
+            TagName("button".to_string()),
             RenderLayers::layer(*layer),
             ButtonBase,
             children![
@@ -54,7 +56,8 @@ fn internal_node_creation_system(
                     TextColor::default(),
                     TextFont::default(),
                     TextLayout::default(),
-                    WidgetStyle::load_from_file(css_internal, ".button-text"),
+                    WidgetStyle::load_from_file(css_internal),
+                    CssClass(vec![".button-text".to_string()]),
                     Pickable::IGNORE,
                     BindToID(id.0),
                     RenderLayers::layer(*layer),

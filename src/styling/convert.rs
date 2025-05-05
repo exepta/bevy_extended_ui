@@ -4,6 +4,10 @@ use bevy::prelude::*;
 //                     Self made
 // ==================================================
 
+#[derive(Component, Reflect, Debug, Clone, Deref, DerefMut)]
+#[reflect(Component)]
+pub struct TagName(pub String);
+
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
 pub struct CssSource(pub String);

@@ -13,26 +13,15 @@ static CSS_CACHE: Lazy<RwLock<HashMap<String, HashMap<String, Style>>>> = Lazy::
 #[reflect(Component)]
 pub struct WidgetStyle {
     pub css_path: String,
-    pub css_selector: String,
     pub styles: HashMap<String, Style>,
 }
 
 impl WidgetStyle {
-    pub fn load_from_file(path: &str, selector: &str) -> Self {
-        if let Some(cached) = CSS_CACHE
-            .read()
-            .ok()
-            .and_then(|cache| cache.get(path).cloned())
-        {
-            let relevant = cached
-                .into_iter()
-                .filter(|(key, _)| key.starts_with(selector))
-                .collect();
-
+    pub fn load_from_file(path: &str) -> Self {
+        if let Some(cached) = CSS_CACHE.read().ok().and_then(|cache| cache.get(path).cloned()) {
             return Self {
                 css_path: path.to_string(),
-                css_selector: selector.to_string(),
-                styles: relevant,
+                styles: cached,
             };
         }
 
@@ -40,52 +29,44 @@ impl WidgetStyle {
             if let Ok(mut cache) = CSS_CACHE.write() {
                 cache.insert(path.to_string(), styles.clone());
             }
-
-            let relevant = styles
-                .into_iter()
-                .filter(|(key, _)| key.starts_with(selector))
-                .collect();
-
             return Self {
                 css_path: path.to_string(),
-                css_selector: selector.to_string(),
-                styles: relevant,
+                styles,
             };
         }
 
-        // Fallback
         Self {
-            css_path: String::from(""),
-            css_selector: selector.to_string(),
+            css_path: String::new(),
             styles: HashMap::new(),
         }
     }
 
-    pub fn load_selector(&self, selector: &str) -> Self {
-        Self::load_from_file(&self.css_path, selector)
-    }
-
     pub fn reload(&mut self) {
-        if let Some(cached) = CSS_CACHE
-            .read()
-            .ok()
-            .and_then(|cache| cache.get(&self.css_path).cloned())
-        {
-            self.styles = cached
-                .into_iter()
-                .filter(|(key, _)| key.starts_with(&self.css_selector))
-                .collect();
+        if let Some(cached) = CSS_CACHE.read().ok().and_then(|cache| cache.get(&self.css_path).cloned()) {
+            self.styles = cached;
         } else if let Ok(styles) = load_css(&self.css_path) {
             if let Ok(mut cache) = CSS_CACHE.write() {
                 cache.insert(self.css_path.clone(), styles.clone());
             }
-
-            self.styles = styles
-                .into_iter()
-                .filter(|(key, _)| key.starts_with(&self.css_selector))
-                .collect();
+            self.styles = styles;
         } else {
-            self.styles.clear(); // fallback
+            self.styles.clear();
+        }
+    }
+
+    pub fn ensure_class_loaded(&mut self, class: &str) {
+        if self.styles.contains_key(class) {
+            return;
+        }
+
+        if let Ok(styles) = load_css(&self.css_path) {
+            if let Ok(mut cache) = CSS_CACHE.write() {
+                cache.insert(self.css_path.clone(), styles.clone());
+            }
+
+            for (k, v) in styles.into_iter() {
+                self.styles.insert(k, v);
+            }
         }
     }
 }

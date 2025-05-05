@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use crate::{ExtendedUiConfiguration, UIWidgetState};
+use crate::styling::convert::TagName;
 use crate::styling::paint::Colored;
 use crate::styling::system::WidgetStyle;
 use crate::widgets::Div;
@@ -31,7 +32,8 @@ fn internal_node_creation_system(
             BorderColor::default(),
             BorderRadius::default(),
             BoxShadow::new(Colored::TRANSPARENT, Val::Px(0.), Val::Px(0.), Val::Px(0.), Val::Px(0.)),
-            WidgetStyle::load_from_file(css_internal, "div"),
+            WidgetStyle::load_from_file(css_internal),
+            TagName("div".to_string()),
             RenderLayers::layer(*layer),
             DivBase
         )).observe(on_internal_cursor_entered)

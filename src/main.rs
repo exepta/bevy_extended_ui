@@ -4,7 +4,7 @@ use bevy::window::WindowResolution;
 use bevy_inspector_egui::bevy_egui::EguiPlugin;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_extended_ui::ExtendedUiPlugin;
-use bevy_extended_ui::styling::convert::CssSource;
+use bevy_extended_ui::styling::convert::{CssClass, CssSource};
 use bevy_extended_ui::widgets::{Button, Div};
 
 fn main() {
@@ -31,6 +31,7 @@ fn test_button(mut commands: Commands) {
     commands.spawn((
         Div::default(),
         CssSource(String::from("test.css")),
+        CssClass(vec![".div-test".to_string(), ".div-override".to_string()]),
         children![
             Button::default(),
             Button::default()

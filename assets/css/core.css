@@ -9,6 +9,9 @@ div {
 /* Button */
 
 button {
+  display: flex;
+  justify-content: center;
+  align-items: center;
   width: 150px;
   height: 50px;
   border-radius: 5px;
