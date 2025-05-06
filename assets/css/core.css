@@ -22,6 +22,10 @@ button:hover {
   background-color: #3b926f;
 }
 
+button:focus {
+  background-color: #efd267;
+}
+
 .button-text {
   font-size: 15px;
   color: #303033;;
@@ -29,6 +33,10 @@ button:hover {
 
 .button-text:hover {
   color: #be347b;
+}
+
+.button-text:focus {
+  color: #303033;
 }
 
 /* Input */
