@@ -50,6 +50,34 @@ In the end it should look like this:
 
 ![Result Example](docs/example_readme.png)
 
+All Widgets support CSS3 and can apply many of the default css rules. Note that the current system working with css but
+not perfect yet! Let me explain it:
+
+```css
+button {
+    background: rgb(255, 255, 255); /* will be white */
+    display: flex; /* set node display flex */
+}
+
+button:hover {
+    background: rgba(200, 200, 200, 200); /* will work correctly */
+}
+
+.button-text {
+    color: #FFFFFF; /* is white and working */
+}
+
+/* THIS WORK IF THE BUTTON IS HOVERED! */
+.button-text:hover {
+    color: red; /* set red */
+}
+
+/* THIS WILL NOT WORK! */
+button:hover .button-text {
+    color: red; /* set red */
+}
+```
+
 | `Bevy` version | `bevy_extended_ui` version |
 |----------------|----------------------------|
 | 0.16.0         | 0.1.0                      |

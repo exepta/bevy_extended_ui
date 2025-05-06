@@ -34,7 +34,7 @@ fn test_button(mut commands: Commands) {
         CssClass(vec![".div-test".to_string(), ".div-override".to_string()]),
         CssID("container".to_string()),
         children![
-            (Button::default(), CssID("container".to_string()),),
+            Button::default(),
             Button::default()
         ]
     ));

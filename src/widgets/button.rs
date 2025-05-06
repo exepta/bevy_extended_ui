@@ -57,6 +57,7 @@ fn internal_node_creation_system(
                     TextFont::default(),
                     TextLayout::default(),
                     WidgetStyle::load_from_file(css_internal),
+                    UIWidgetState::default(),
                     CssClass(vec![".button-text".to_string()]),
                     Pickable::IGNORE,
                     BindToID(id.0),

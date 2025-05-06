@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use bevy::prelude::*;
 
 // ==================================================
-//                     Self made
+//                     Css Styling
 // ==================================================
 
 #[derive(Resource, Default)]

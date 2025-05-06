@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use crate::service::state_service::update_widget_states;
 use crate::styling::convert::{CssClass, CssID, TagName};
 use crate::styling::Style;
 use crate::styling::system::WidgetStyle;
@@ -8,7 +9,7 @@ pub struct StyleService;
 
 impl Plugin for StyleService {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, update_widget_styles_system);
+        app.add_systems(Update, update_widget_styles_system.after(update_widget_states));
     }
 }
 

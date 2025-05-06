@@ -27,4 +27,8 @@ button:hover {
   color: #303033;;
 }
 
+.button-text:hover {
+  color: #be347b;
+}
+
 /* Input */
