@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use crate::{BindToID, CurrentWidgetState, ExtendedUiConfiguration, UIGenID, UIWidgetState};
-use crate::styling::convert::{CssClass, TagName};
+use crate::styling::convert::{CssClass, CssSource, TagName};
 use crate::styling::paint::Colored;
 use crate::styling::system::WidgetStyle;
 use crate::widgets::Button;
@@ -25,12 +25,16 @@ impl Plugin for ButtonWidget {
 
 fn internal_node_creation_system(
     mut commands: Commands,
-    query: Query<(Entity, &UIGenID, &Button), (With<Button>, Without<ButtonBase>)>,
+    query: Query<(Entity, &UIGenID, &Button, Option<&CssSource>), (With<Button>, Without<ButtonBase>)>,
     config: Res<ExtendedUiConfiguration>
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
-    let css_internal = "assets/css/core.css";
-    for (entity, id, button) in query.iter() {
+    for (entity, id, button, source_opt) in query.iter() {
+        let mut css_internal = "assets/css/core.css";
+        if let Some(source) = source_opt {
+            css_internal = source.0.as_str();
+        }
+        info!("Spawn with {}", css_internal);
         commands.entity(entity).insert((
             Name::new(format!("Button-{}", button.w_count)),
             Node {

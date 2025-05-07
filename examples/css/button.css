@@ -7,7 +7,7 @@
     align-items: center;
 }
 
-#example-id .button-text {
+.button-text {
     color: #303033;
 }
 
@@ -15,6 +15,6 @@
     background: #ffb59a;
 }
 
-button .button-text:hover {
-    color: #303033;
+button:hover .button-text {
+    color: #c71a78;
 }
