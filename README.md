@@ -72,7 +72,7 @@ button:hover {
     color: red; /* set red */
 }
 
-/* THIS WILL NOT WORK! */
+/* THIS WILL WORK TOO! */
 button:hover .button-text {
     color: red; /* set red */
 }

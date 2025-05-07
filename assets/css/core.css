@@ -31,12 +31,12 @@ button:focus {
   color: #303033;;
 }
 
-.button-text:hover {
-  color: #be347b;
+button:hover .button-text {
+  color: #ff926a;
 }
 
 .button-text:focus {
-  color: #303033;
+  color: #6afff3;
 }
 
 /* Input */
