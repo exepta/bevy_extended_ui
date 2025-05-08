@@ -34,7 +34,6 @@ fn internal_node_creation_system(
         if let Some(source) = source_opt {
             css_internal = source.0.as_str();
         }
-        info!("Spawn with {}", css_internal);
         commands.entity(entity).insert((
             Name::new(format!("Button-{}", button.w_count)),
             Node {

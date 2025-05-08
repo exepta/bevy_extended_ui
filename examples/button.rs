@@ -22,7 +22,11 @@ fn example_button(mut commands: Commands) {
                 CssID(String::from("example-id")),
             ),
                 // This generates a normal button without any custom styling
-                Button::default()
+            (
+                Button::default(),
+                CssSource(String::from("examples/css/button.css")),
+                CssID(String::from("example-id-2"))
+            ),
         ]
     ));
 }

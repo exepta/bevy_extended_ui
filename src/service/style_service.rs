@@ -37,8 +37,8 @@ fn update_widget_styles_system(
         let current = state_opt.cloned().unwrap_or_default();
 
         let mut selector_variants = vec![];
-        
-        // Tag
+
+        // Parent Selector Variants (Tag, Class, ID)
         if let Some(tag) = tag_opt {
             selector_variants.push(tag.0.clone());
             if current.hovered {
@@ -55,7 +55,6 @@ fn update_widget_styles_system(
             }
         }
 
-        // Class
         if let Some(classes) = class_opt {
             for class in &classes.0 {
                 selector_variants.push(class.clone());
@@ -73,12 +72,10 @@ fn update_widget_styles_system(
                 }
             }
         }
-        
-        // ID
+
         if let Some(css_id) = id_opt {
             let id = format!("#{}", css_id.0);
             selector_variants.push(id.clone());
-
             if current.hovered {
                 selector_variants.push(format!("{}:hover", id));
             }
@@ -92,14 +89,29 @@ fn update_widget_styles_system(
                 selector_variants.push(format!("{}:disabled", id));
             }
         }
-        
+
+        // Child selectors like `.button-text`
         let mut final_style = Style::default();
+
+        // Sort selectors to apply more specific ones first (ID > Class > Tag)
+        selector_variants.sort_by_key(|sel| {
+            if sel.starts_with('#') {
+                3
+            } else if sel.starts_with('.') {
+                2
+            } else {
+                1
+            }
+        });
+
+        // For each variant, check if the style exists and apply it
         for sel in selector_variants {
             if let Some(style) = widget_style.styles.get(&sel) {
                 final_style.merge(style);
             }
         }
-        
+
+        // Apply final style to the node and child elements
         if let Ok((
                       node,
                       background,
@@ -112,9 +124,13 @@ fn update_widget_styles_system(
                   )) = style_query.get_mut(entity)
         {
             apply_style_to_node(&final_style, node);
+
+            // Apply background
             if let Some(mut background) = background {
                 background.0 = final_style.background.map(|b| b.color).unwrap_or(Color::NONE);
             }
+
+            // Apply border radius
             if let Some(mut border_radius) = border_radius {
                 if let Some(radius) = final_style.border_radius.clone() {
                     border_radius.top_left = radius.top_left;
@@ -128,21 +144,30 @@ fn update_widget_styles_system(
                     border_radius.bottom_right = Val::ZERO;
                 }
             }
+
+            // Apply border color
             if let Some(mut border_color) = border_color {
                 border_color.0 = final_style.border_color.unwrap_or(Color::NONE);
             }
+
+            // Apply text color
             if let Some(mut text_color) = text_color {
                 text_color.0 = final_style.color.unwrap_or(Color::WHITE);
             }
+
+            // Apply text font size
             if let Some(mut text_font) = text_font {
                 text_font.font_size = 15.0;
             }
+
+            // Apply box shadow
             if let Some(mut box_shadow) = box_shadow {
                 box_shadow.0 = final_style.box_shadow.map(|b| b.0.clone()).unwrap_or_default();
             }
         }
     }
 }
+
 
 fn apply_style_to_node(style: &Style, node: Option<Mut<Node>>) {
     if let Some(mut node) = node {

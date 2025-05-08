@@ -34,8 +34,17 @@ fn test_button(mut commands: Commands) {
         CssClass(vec![".div-test".to_string(), ".div-override".to_string()]),
         CssID("container".to_string()),
         children![
-            Button::default(),
-            Button::default()
+            (
+                Button::default(),
+                CssSource(String::from("examples/css/button.css")),
+                CssID(String::from("example-id")),
+            ),
+                // This generates a normal button without any custom styling
+            (
+                Button::default(),
+                CssSource(String::from("examples/css/button.css")),
+                CssID(String::from("example-id-2"))
+            ),
         ]
     ));
 }

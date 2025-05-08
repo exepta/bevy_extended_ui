@@ -1,4 +1,4 @@
-#example-id {
+button {
     width: 300px;
     height: 50px;
     background: #ff926a;
@@ -11,8 +11,12 @@
     color: #303033;
 }
 
-#example-id:hover {
+button:hover {
     background: #ffb59a;
+}
+
+#example-id-2:hover .button-text {
+    color: chartreuse;
 }
 
 button:hover .button-text {

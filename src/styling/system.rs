@@ -25,9 +25,7 @@ impl WidgetStyle {
             };
         }
 
-        let mut styles = load_css(path).unwrap_or_else(|_| HashMap::new());
-
-        Self::flatten_nested_selectors(&mut styles);
+        let styles = load_css(path).unwrap_or_else(|_| HashMap::new());
 
         if let Ok(mut cache) = CSS_CACHE.write() {
             cache.insert(path.to_string(), styles.clone());
@@ -44,13 +42,11 @@ impl WidgetStyle {
     }
 
     pub fn ensure_class_loaded(&mut self, class: &str) {
-        if self.styles.contains_key(class) {
+        if self.styles.keys().any(|k| k.contains(class)) {
             return;
         }
 
-        if let Ok(mut new_styles) = load_css(&self.css_path) {
-            Self::flatten_nested_selectors(&mut new_styles);
-
+        if let Ok(new_styles) = load_css(&self.css_path) {
             if let Ok(mut cache) = CSS_CACHE.write() {
                 cache.insert(self.css_path.clone(), new_styles.clone());
             }
@@ -58,38 +54,6 @@ impl WidgetStyle {
             for (k, v) in new_styles {
                 self.styles.insert(k, v);
             }
-        }
-    }
-
-    fn flatten_nested_selectors(styles: &mut HashMap<String, Style>) {
-        let mut new_entries = vec![];
-
-        for (selector, style) in styles.iter() {
-            let parts: Vec<&str> = selector.split_whitespace().collect();
-            if parts.len() >= 2 {
-                let parent = parts[0];
-                let child = parts[1];
-
-                if let Some((prefix, name, pseudo)) = Self::extract_name_and_pseudo(parent, child) {
-                    let new_selector = format!("{}{}:{}", prefix, name, pseudo);
-                    new_entries.push((new_selector, style.clone()));
-                }
-            }
-        }
-
-        for (k, v) in new_entries {
-            styles.insert(k, v);
-        }
-    }
-
-    fn extract_name_and_pseudo(parent: &str, child: &str) -> Option<(char, String, String)> {
-        let prefix = child.chars().next()?;
-        if (prefix == '.' || prefix == '#') && parent.contains(':') {
-            let name = child[1..].to_string();
-            let pseudo = parent.split(':').nth(1)?.to_string();
-            Some((prefix, name, pseudo))
-        } else {
-            None
         }
     }
 }
