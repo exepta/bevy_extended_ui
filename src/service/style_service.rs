@@ -37,7 +37,7 @@ fn update_widget_styles_system(
         let current = state_opt.cloned().unwrap_or_default();
 
         let mut selector_variants = vec![];
-
+        
         // Parent Selector Variants (Tag, Class, ID)
         if let Some(tag) = tag_opt {
             selector_variants.push(tag.0.clone());

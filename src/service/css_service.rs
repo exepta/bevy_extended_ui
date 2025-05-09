@@ -1,6 +1,6 @@
 use std::path::Path;
 use bevy::prelude::*;
-use crate::styling::convert::{CssClass, CssID, CssSource, ExistingCssIDs};
+use crate::styling::convert::{CssClass, CssID, CssSource, ExistingCssIDs, TagName};
 use crate::styling::system::WidgetStyle;
 
 pub struct CssService;
@@ -10,28 +10,52 @@ impl Plugin for CssService {
         app.init_resource::<ExistingCssIDs>();
         app.add_systems(Update, (
             cleanup_css_ids_by_remove,
-            update_css_conventions,
             update_css_classes,
             update_css_id,
             validate_unique_css_ids,
+            update_css_conventions,
         ).chain());
     }
 }
 
 fn update_css_conventions(
-    query: Query<(Entity, &CssSource)>,
-    mut widget_query: Query<&mut WidgetStyle>,
+    mut commands: Commands,
+    query: Query<(Entity, &CssSource, Option<&CssID>, Option<&CssClass>, Option<&TagName>)>,
+    mut widget_query: Query<Option<&mut WidgetStyle>>,
 ) {
-    for (entity, file) in query.iter() {
-        if let Ok(mut widget_style) = widget_query.get_mut(entity) {
-            if widget_style.css_path.eq(&file.0.to_string()) {
-                continue;
+    for (entity, file, id_opt, class_opt, tag_opt) in query.iter() {
+        let css_path = file.0.as_str();
+
+        // Skip if file doesn't exist
+        if !Path::new(css_path).exists() {
+            continue;
+        }
+
+        // Load full style from file
+        let full_style = WidgetStyle::load_from_file(css_path);
+
+        // Filter style based on entity attributes
+        let mut filtered = full_style.filtered_clone(id_opt, class_opt, tag_opt);
+        filtered.css_path = css_path.to_string();
+        filtered.reload();
+
+        // Check if entity already has WidgetStyle
+        match widget_query.get_mut(entity) {
+            Ok(Some(mut existing_style)) => {
+                // Only update if file path is different
+                if existing_style.css_path != css_path {
+                    *existing_style = filtered;
+                    commands.entity(entity).insert(existing_style.clone());
+                } else {
+                    // Still re-apply filtering, in case something changed
+                    commands.entity(entity).insert(filtered);
+                }
             }
-            if !Path::new(&file.0).exists() {
-                continue;
+            _ => {
+                // Insert new style if none exists
+                info!("Inserting new style for entity: {:?}, id={:?}, class={:?}, tag={:?}", entity, id_opt, class_opt, tag_opt);
+                commands.entity(entity).insert(filtered);
             }
-            widget_style.css_path = file.0.to_string();
-            widget_style.reload();
         }
     }
 }

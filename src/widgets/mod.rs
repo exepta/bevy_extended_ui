@@ -11,13 +11,16 @@ use crate::widgets::div::DivWidget;
 static BUTTON_COUNT: AtomicUsize = AtomicUsize::new(1);
 static DIV_COUNT: AtomicUsize = AtomicUsize::new(1);
 
+#[derive(Component, Default)]
+pub struct Widget;
+
 // ===============================================
 //                       Div
 // ===============================================
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
-#[require(UIGenID, UIWidgetState, GlobalTransform, InheritedVisibility)]
+#[require(UIGenID, UIWidgetState, GlobalTransform, InheritedVisibility, Widget)]
 pub struct Div(usize);
 
 impl Default for Div {
@@ -32,7 +35,7 @@ impl Default for Div {
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
-#[require(UIGenID, UIWidgetState)]
+#[require(UIGenID, UIWidgetState, Widget)]
 pub struct Button {
     pub w_count: usize,
     pub text: String,

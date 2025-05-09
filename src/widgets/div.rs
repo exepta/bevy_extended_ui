@@ -1,9 +1,8 @@
 use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use crate::{ExtendedUiConfiguration, UIWidgetState};
-use crate::styling::convert::TagName;
+use crate::styling::convert::{CssSource, TagName};
 use crate::styling::paint::Colored;
-use crate::styling::system::WidgetStyle;
 use crate::widgets::Div;
 
 #[derive(Component)]
@@ -19,12 +18,16 @@ impl Plugin for DivWidget {
 
 fn internal_node_creation_system(
     mut commands: Commands,
-    query: Query<(Entity, &Div), (With<Div>, Without<DivBase>)>,
+    query: Query<(Entity, &Div, Option<&CssSource>), (With<Div>, Without<DivBase>)>,
     config: Res<ExtendedUiConfiguration>
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
-    let css_internal = "assets/css/core.css";
-    for (entity, div) in query.iter() {
+    for (entity, div, source_opt) in query.iter() {
+        let mut css_source = CssSource(String::from("assets/css/core.css"));
+        if let Some(source) = source_opt {
+            css_source = source.clone();
+        }
+        
         commands.entity(entity).insert((
             Name::new(format!("Div-{}", div.0)),
             Node::default(),
@@ -32,7 +35,7 @@ fn internal_node_creation_system(
             BorderColor::default(),
             BorderRadius::default(),
             BoxShadow::new(Colored::TRANSPARENT, Val::Px(0.), Val::Px(0.), Val::Px(0.), Val::Px(0.)),
-            WidgetStyle::load_from_file(css_internal),
+            css_source,
             TagName("div".to_string()),
             RenderLayers::layer(*layer),
             DivBase

@@ -3,7 +3,6 @@ use bevy::render::view::RenderLayers;
 use crate::{BindToID, CurrentWidgetState, ExtendedUiConfiguration, UIGenID, UIWidgetState};
 use crate::styling::convert::{CssClass, CssSource, TagName};
 use crate::styling::paint::Colored;
-use crate::styling::system::WidgetStyle;
 use crate::widgets::Button;
 
 #[derive(Component)]
@@ -30,10 +29,11 @@ fn internal_node_creation_system(
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
     for (entity, id, button, source_opt) in query.iter() {
-        let mut css_internal = "assets/css/core.css";
+        let mut css_source = CssSource(String::from("assets/css/core.css"));
         if let Some(source) = source_opt {
-            css_internal = source.0.as_str();
+            css_source = source.clone();
         }
+        
         commands.entity(entity).insert((
             Name::new(format!("Button-{}", button.w_count)),
             Node {
@@ -48,7 +48,7 @@ fn internal_node_creation_system(
             BorderColor::default(),
             BorderRadius::default(),
             BoxShadow::new(Colored::TRANSPARENT, Val::Px(0.), Val::Px(0.), Val::Px(0.), Val::Px(0.)),
-            WidgetStyle::load_from_file(css_internal),
+            css_source.clone(),
             TagName("button".to_string()),
             RenderLayers::layer(*layer),
             ButtonBase,
@@ -59,7 +59,7 @@ fn internal_node_creation_system(
                     TextColor::default(),
                     TextFont::default(),
                     TextLayout::default(),
-                    WidgetStyle::load_from_file(css_internal),
+                    css_source.clone(),
                     UIWidgetState::default(),
                     CssClass(vec![".button-text".to_string()]),
                     Pickable::IGNORE,
