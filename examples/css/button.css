@@ -15,14 +15,14 @@ button:hover {
     background: #ffb59a;
 }
 
-#example-id:hover .button-text {  /* .button-text:hover */
-    color: #6a00ff;
-}
-
 #example-id-2:hover .button-text {
     color: #ff006a;
 }
 
 button:hover .button-text {
     color: #00ff8c;
+}
+
+#example-id:hover .button-text {  /* .button-text:hover */
+    color: #6a00ff;
 }

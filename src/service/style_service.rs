@@ -4,12 +4,28 @@ use crate::styling::convert::{CssClass, CssID, TagName};
 use crate::styling::Style;
 use crate::styling::system::WidgetStyle;
 use crate::UIWidgetState;
+use crate::widgets::Widget;
 
 pub struct StyleService;
 
 impl Plugin for StyleService {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, update_widget_styles_system.after(update_widget_states));
+        app.add_systems(Update, (
+            sorted_css_selectors,
+            update_widget_styles_system.after(update_widget_states)
+        ).chain());
+    }
+}
+
+fn sorted_css_selectors(
+    widget_query: Query<(&WidgetStyle, &Children), 
+        (Or<(Changed<CssClass>, Changed<CssID>, Changed<WidgetStyle>, Added<WidgetStyle>)>, With<Widget>)>
+) {
+    for (widget, children) in widget_query.iter() {
+        info!("==========================================");
+        info!("{:?}", children);
+        info!("==========================================");
+        info!("{:?}", widget);
     }
 }
 
@@ -37,7 +53,7 @@ fn update_widget_styles_system(
         let current = state_opt.cloned().unwrap_or_default();
 
         let mut selector_variants = vec![];
-        
+
         // Parent Selector Variants (Tag, Class, ID)
         if let Some(tag) = tag_opt {
             selector_variants.push(tag.0.clone());

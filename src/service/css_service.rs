@@ -20,7 +20,7 @@ impl Plugin for CssService {
 
 fn update_css_conventions(
     mut commands: Commands,
-    query: Query<(Entity, &CssSource, Option<&CssID>, Option<&CssClass>, Option<&TagName>)>,
+    query: Query<(Entity, &CssSource, Option<&CssID>, Option<&CssClass>, Option<&TagName>), Or<(Changed<CssSource>, Added<CssSource>)>>,
     mut widget_query: Query<Option<&mut WidgetStyle>>,
 ) {
     for (entity, file, id_opt, class_opt, tag_opt) in query.iter() {
@@ -32,13 +32,13 @@ fn update_css_conventions(
         }
 
         // Load full style from file
-        let full_style = WidgetStyle::load_from_file(css_path);
+        let mut full_style = WidgetStyle::load_from_file(css_path);
 
         // Filter style based on entity attributes
         let mut filtered = full_style.filtered_clone(id_opt, class_opt, tag_opt);
+        full_style.reload();
         filtered.css_path = css_path.to_string();
-        filtered.reload();
-
+        
         // Check if entity already has WidgetStyle
         match widget_query.get_mut(entity) {
             Ok(Some(mut existing_style)) => {
@@ -53,7 +53,6 @@ fn update_css_conventions(
             }
             _ => {
                 // Insert new style if none exists
-                info!("Inserting new style for entity: {:?}, id={:?}, class={:?}, tag={:?}", entity, id_opt, class_opt, tag_opt);
                 commands.entity(entity).insert(filtered);
             }
         }
