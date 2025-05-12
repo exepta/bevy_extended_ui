@@ -23,6 +23,6 @@ button:hover .button-text {
     color: #00ff8c;
 }
 
-#example-id:hover .button-text {  /* .button-text:hover */
+#example-id:hover .button-text {
     color: #6a00ff;
 }
