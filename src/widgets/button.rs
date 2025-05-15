@@ -54,11 +54,7 @@ fn internal_node_creation_system(
             css_source.clone(),
             TagName("button".to_string()),
             RenderLayers::layer(*layer),
-            ButtonBase,
-            children![
-                (
-                ),
-            ]
+            ButtonBase
         )).with_children(|builder| {
             if button.icon_place == IconPlace::Left {
                 place_icon(builder, button, &asset_server, id.0, *layer, css_source.clone());
@@ -131,7 +127,7 @@ fn place_icon(
             ButtonImage,
             UIWidgetState::default(),
             css_source.clone(),
-            CssClass(vec!["button-icon".to_string()]),
+            CssClass(vec!["button-text".to_string()]),
             BindToID(id),
             ZIndex(1)
         ));

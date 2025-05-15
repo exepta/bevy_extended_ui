@@ -158,6 +158,10 @@ pub fn convert_to_font_size(value: String) -> Option<FontVal> {
 pub fn convert_to_color(value: String) -> Option<Color> {
     let mut color = None;
     let trimmed = value.trim();
+    if trimmed.eq_ignore_ascii_case("transparent") {
+        return Some(Colored::TRANSPARENT);
+    }
+    
     if trimmed.starts_with("#") {
         color = Some(Colored::hex_to_color(trimmed));
     } else if trimmed.starts_with("rgb(") {

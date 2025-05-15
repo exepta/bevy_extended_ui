@@ -24,6 +24,7 @@ pub fn update_widget_states(
             inner_state.focused = state.focused;
             inner_state.readonly = state.readonly;
             inner_state.disabled = state.disabled;
+            inner_state.checked = state.checked;
         }
     }
 }

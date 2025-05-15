@@ -103,10 +103,11 @@ fn selector_matches_state(selector: &str, state: &UIWidgetState) -> bool {
     let parts: Vec<&str> = first.split(':').collect();
     for pseudo in &parts[1..] {
         match *pseudo {
-            "hover" if !state.hovered => return false,
-            "focus" if !state.focused => return false,
             "read-only" if !state.readonly => return false,
             "disabled" if !state.disabled => return false,
+            "checked" if !state.checked => return false,
+            "focus" if !state.focused => return false,
+            "hover" if !state.hovered => return false,
             _ => {}
         }
     }

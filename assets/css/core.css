@@ -29,8 +29,36 @@ button:hover {
   color: #303033;;
 }
 
-.button-icon {
-  color: #303033;;
+/* CheckBox */
+
+input[type="checkbox"] {
+  width: 150px;
+  height: 40px;
+  display: flex;
+  justify-content: start;
+  align-items: center;
+  flex-direction: row;
+  gap: 10px;
 }
 
-/* Input */
+input[type="checkbox"] .mark-box {
+  width: 20px;
+  height: 20px;
+  border-radius: 2px;
+  border-width: 2px;
+  border-color: black;
+}
+
+.mark-box .mark {
+  color: #ff006a;
+}
+
+input[type="checkbox"]:checked .mark-box {
+  border-color: #5bcd96;
+  background: #5bcd96;
+}
+
+input[type="checkbox"] .check-text {
+  color: #303033;
+  font-size: 13px;
+}

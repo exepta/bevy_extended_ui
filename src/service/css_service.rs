@@ -1,4 +1,5 @@
-
+use std::collections::HashMap;
+use std::path::Path;
 use bevy::prelude::*;
 use crate::styling::convert::{CssClass, CssID, CssSource, ExistingCssIDs, TagName};
 use crate::styling::Style;
@@ -37,16 +38,14 @@ fn update_css_conventions(
     ), With<Widget>>,
     mut widget_query: Query<Option<&mut WidgetStyle>>,
 ) {
-    use std::collections::HashMap;
-    use std::path::Path;
-
     for (entity, file, id_opt, class_opt, tag_opt, parent_opt) in query.iter() {
+
         let css_path = file.0.as_str();
 
         if !Path::new(css_path).exists() {
             continue;
         }
-
+        
         let full_style = WidgetStyle::load_from_file(css_path);
         let mut merged_styles: HashMap<String, Style> = HashMap::new();
 

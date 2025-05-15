@@ -70,7 +70,8 @@ pub struct UIWidgetState {
     pub focused: bool,
     pub hovered: bool,
     pub disabled: bool,
-    pub readonly: bool
+    pub readonly: bool,
+    pub checked: bool,
 }
 
 #[derive(Component, Default, Clone, PartialEq, Eq, Debug)]
@@ -79,6 +80,7 @@ pub struct LastWidgetState {
     pub disabled: bool,
     pub readonly: bool,
     pub focused: bool,
+    pub checked: bool,
 }
 
 pub struct ExtendedUiPlugin;
