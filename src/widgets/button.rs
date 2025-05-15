@@ -1,7 +1,9 @@
+use bevy::ecs::relationship::RelatedSpawnerCommands;
 use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use crate::{BindToID, CurrentWidgetState, ExtendedUiConfiguration, UIGenID, UIWidgetState};
 use crate::styling::convert::{CssClass, CssSource, TagName};
+use crate::styling::IconPlace;
 use crate::styling::paint::Colored;
 use crate::widgets::Button;
 
@@ -25,7 +27,8 @@ impl Plugin for ButtonWidget {
 fn internal_node_creation_system(
     mut commands: Commands,
     query: Query<(Entity, &UIGenID, &Button, Option<&CssSource>), (With<Button>, Without<ButtonBase>)>,
-    config: Res<ExtendedUiConfiguration>
+    config: Res<ExtendedUiConfiguration>,
+    asset_server: Res<AssetServer>,
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
     for (entity, id, button, source_opt) in query.iter() {
@@ -54,21 +57,32 @@ fn internal_node_creation_system(
             ButtonBase,
             children![
                 (
-                    Name::new(format!("Button-Text-{}", button.w_count)),
-                    Text::new(button.text.clone()),
-                    TextColor::default(),
-                    TextFont::default(),
-                    TextLayout::default(),
-                    css_source.clone(),
-                    UIWidgetState::default(),
-                    CssClass(vec!["button-text".to_string()]),
-                    Pickable::IGNORE,
-                    BindToID(id.0),
-                    RenderLayers::layer(*layer),
-                    ButtonText
                 ),
             ]
-        )).observe(on_internal_click)
+        )).with_children(|builder| {
+            if button.icon_place == IconPlace::Left {
+                place_icon(builder, button, &asset_server, id.0, *layer, css_source.clone());
+            }
+            
+            builder.spawn((                    
+                Name::new(format!("Button-Text-{}", button.w_count)),
+                Text::new(button.text.clone()),
+                TextColor::default(),
+                TextFont::default(),
+                TextLayout::default(),
+                css_source.clone(),
+                UIWidgetState::default(),
+                CssClass(vec!["button-text".to_string()]),
+                Pickable::IGNORE,
+                BindToID(id.0),
+                RenderLayers::layer(*layer),
+                ButtonText
+            ));
+
+            if button.icon_place == IconPlace::Right {
+                place_icon(builder, button, &asset_server, id.0, *layer, css_source.clone());
+            }
+        }).observe(on_internal_click)
             .observe(on_internal_cursor_entered)
             .observe(on_internal_cursor_leave);
     }
@@ -100,5 +114,26 @@ fn on_internal_cursor_leave(
 ) {
     if let Ok(mut state) = query.get_mut(trigger.target) {
         state.hovered = false;
+    }
+}
+
+fn place_icon(
+    builder: &mut RelatedSpawnerCommands<ChildOf>, btn: &Button, 
+    asset_server: &Res<AssetServer>, id: usize, layer: usize,
+    css_source: CssSource,
+) {
+    if let Some(icon) = btn.icon_path.clone() {
+        builder.spawn((
+            Name::new(format!("Button-Icon-{}", btn.w_count)),
+            ImageNode::new(asset_server.load(icon.as_str())),
+            RenderLayers::layer(layer),
+            Pickable::IGNORE,
+            ButtonImage,
+            UIWidgetState::default(),
+            css_source.clone(),
+            CssClass(vec!["button-icon".to_string()]),
+            BindToID(id),
+            ZIndex(1)
+        ));
     }
 }

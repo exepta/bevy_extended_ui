@@ -150,6 +150,21 @@ impl Colored {
         // Remove the "#" prefix if it exists
         let hex = hex.trim_start_matches('#');
 
+        // Ensure the hex string is either 3, 6, or 8 characters long
+        if hex.len() != 3 && hex.len() != 6 && hex.len() != 8 {
+            panic!("Invalid hex string length: {}", hex);
+        }
+
+        // If the length is 3, expand it to 6 (e.g. "fff" -> "ffffff")
+        let hex = if hex.len() == 3 {
+            format!("{}{}{}{}{}{}",
+                    &hex[0..1], &hex[0..1],
+                    &hex[1..2], &hex[1..2],
+                    &hex[2..3], &hex[2..3])
+        } else {
+            hex.to_string()
+        };
+
         // Parse the hex string into the RGBA components (values between 0 and 255)
         let r = u8::from_str_radix(&hex[0..2], 16).unwrap_or(0);
         let g = u8::from_str_radix(&hex[2..4], 16).unwrap_or(0);

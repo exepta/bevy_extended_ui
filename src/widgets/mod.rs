@@ -5,6 +5,7 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
 use bevy::prelude::*;
 use crate::{UIGenID, UIWidgetState};
+use crate::styling::IconPlace;
 use crate::widgets::button::ButtonWidget;
 use crate::widgets::div::DivWidget;
 
@@ -39,13 +40,17 @@ impl Default for Div {
 pub struct Button {
     pub w_count: usize,
     pub text: String,
+    pub icon_place: IconPlace,
+    pub icon_path: Option<String>,
 }
 
 impl Default for Button {
     fn default() -> Self {
         Self {
             w_count: BUTTON_COUNT.fetch_add(1, Relaxed),
-            text: String::from("Button")
+            text: String::from("Button"),
+            icon_path: None,
+            icon_place: IconPlace::default(),
         }
     }
 }

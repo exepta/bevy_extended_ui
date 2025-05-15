@@ -29,12 +29,12 @@ fn update_widget_styles_system(
         Option<&mut TextColor>,
         Option<&mut TextFont>,
         Option<&mut TextLayout>,
+        Option<&mut ImageNode>
     )>,
 ) {
     for (entity, state_opt, widget_style) in query.iter_mut() {
         let state = state_opt.cloned().unwrap_or_default();
-
-        // 1) Filter: passt der State des ersten Teils?
+        
         let mut applicable: Vec<(&String, u32)> = widget_style
             .styles
             .keys()
@@ -46,18 +46,17 @@ fn update_widget_styles_system(
                 }
             })
             .collect();
-
-        // 2) Sortiere nach Spezifität (aufsteigend, low→high)
+        
         applicable.sort_by_key(|&(_, spec)| spec);
-
-        // 3) Merge in Reihenfolge
+        
         let mut final_style = Style::default();
         for (sel, _) in applicable {
             final_style.merge(&widget_style.styles[sel]);
         }
-
-        // 4) Anwenden
-        if let Ok((node, background, border_color, border_radius, box_shadow, text_color, text_font, _)) =
+        
+        if let Ok((node, background, border_color, 
+                      border_radius, box_shadow, text_color, 
+                      text_font, _, image_node)) =
             style_query.get_mut(entity)
         {
             apply_style_to_node(&final_style, node);
@@ -84,6 +83,11 @@ fn update_widget_styles_system(
             if let Some(mut tc) = text_color {
                 tc.0 = final_style.color.unwrap_or(Color::WHITE);
             }
+            
+            if let Some(mut image_node) = image_node {
+                image_node.color = final_style.color.unwrap_or(Color::WHITE);
+            }
+            
             if let Some(mut tf) = text_font {
                 tf.font_size = 15.0;
             }
@@ -94,7 +98,6 @@ fn update_widget_styles_system(
     }
 }
 
-/// Prüft nur den ersten Selektor-Teil auf Pseudoklassen (hover, focus, ...)
 fn selector_matches_state(selector: &str, state: &UIWidgetState) -> bool {
     let first = selector.split_whitespace().next().unwrap_or(selector);
     let parts: Vec<&str> = first.split(':').collect();
@@ -110,18 +113,12 @@ fn selector_matches_state(selector: &str, state: &UIWidgetState) -> bool {
     true
 }
 
-/// Berechnet Spezifität **über alle Teile**:
-/// - pro Segment vor Leerzeichen:
-///   - #id => +100
-///   - .class => +10
-///   - tag   => +1
-/// - pro `:pseudo` +1
 fn selector_specificity(selector: &str) -> u32 {
     let mut spec = 0;
     for part in selector.split_whitespace() {
-        let segs: Vec<&str> = part.split(':').collect();
+        let secs: Vec<&str> = part.split(':').collect();
         // Basis
-        let base = segs[0];
+        let base = secs[0];
         spec += if base.starts_with('#') {
             100
         } else if base.starts_with('.') {
@@ -129,8 +126,7 @@ fn selector_specificity(selector: &str) -> u32 {
         } else {
             1
         };
-        // Pseudoklassen
-        spec += (segs.len() as u32).saturating_sub(1);
+        spec += (secs.len() as u32).saturating_sub(1);
     }
     spec
 }

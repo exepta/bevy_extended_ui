@@ -12,6 +12,8 @@ button {
   display: flex;
   justify-content: center;
   align-items: center;
+  flex-direction: row;
+  gap: 8px;
   width: 150px;
   height: 50px;
   border-radius: 5px;
@@ -22,21 +24,13 @@ button:hover {
   background-color: #3b926f;
 }
 
-button:focus {
-  background-color: #efd267;
-}
-
 .button-text {
   font-size: 15px;
   color: #303033;;
 }
 
-button:hover .button-text {
-  color: #ff926a;
-}
-
-.button-text:focus {
-  color: #6afff3;
+.button-icon {
+  color: #303033;;
 }
 
 /* Input */
