@@ -1,6 +1,5 @@
 use bevy::prelude::*;
 use crate::service::state_service::update_widget_states;
-use crate::styling::convert::{CssClass, CssID, TagName};
 use crate::styling::Style;
 use crate::styling::system::WidgetStyle;
 use crate::UIWidgetState;
@@ -19,11 +18,8 @@ fn update_widget_styles_system(
     mut query: Query<(
         Entity,
         Option<&UIWidgetState>,
-        &mut WidgetStyle,
-        Option<&CssClass>,
-        Option<&TagName>,
-        Option<&CssID>,
-    ), Or<(Changed<WidgetStyle>, Changed<UIWidgetState>, Changed<CssClass>, Changed<CssID>)>>,
+        &WidgetStyle,
+    ), Or<(Changed<WidgetStyle>, Changed<UIWidgetState>)>>,
     mut style_query: Query<(
         Option<&mut Node>,
         Option<&mut BackgroundColor>,
@@ -35,104 +31,40 @@ fn update_widget_styles_system(
         Option<&mut TextLayout>,
     )>,
 ) {
-    for (entity, state_opt, widget_style, class_opt, tag_opt, id_opt) in query.iter_mut() {
-        let current = state_opt.cloned().unwrap_or_default();
+    for (entity, state_opt, widget_style) in query.iter_mut() {
+        let state = state_opt.cloned().unwrap_or_default();
 
-        let mut selector_variants = vec![];
-
-        // Parent Selector Variants (Tag, Class, ID)
-        if let Some(tag) = tag_opt {
-            selector_variants.push(tag.0.clone());
-            if current.hovered {
-                selector_variants.push(format!("{}:hover", tag.0));
-            }
-            if current.focused {
-                selector_variants.push(format!("{}:focus", tag.0));
-            }
-            if current.readonly {
-                selector_variants.push(format!("{}:read-only", tag.0));
-            }
-            if current.disabled {
-                selector_variants.push(format!("{}:disabled", tag.0));
-            }
-        }
-
-        if let Some(classes) = class_opt {
-            for class in &classes.0 {
-                selector_variants.push(format!(".{}", class.clone()));
-                if current.hovered {
-                    selector_variants.push(format!(".{}:hover", class));
+        // 1) Filter: passt der State des ersten Teils?
+        let mut applicable: Vec<(&String, u32)> = widget_style
+            .styles
+            .keys()
+            .filter_map(|sel| {
+                if selector_matches_state(sel, &state) {
+                    Some((sel, selector_specificity(sel)))
+                } else {
+                    None
                 }
-                if current.focused {
-                    selector_variants.push(format!(".{}:focus", class));
-                }
-                if current.readonly {
-                    selector_variants.push(format!(".{}:read-only", class));
-                }
-                if current.disabled {
-                    selector_variants.push(format!(".{}:disabled", class));
-                }
-            }
-        }
+            })
+            .collect();
 
-        if let Some(css_id) = id_opt {
-            let id = format!("#{}", css_id.0);
-            selector_variants.push(id.clone());
-            if current.hovered {
-                selector_variants.push(format!("{}:hover", id));
-            }
-            if current.focused {
-                selector_variants.push(format!("{}:focus", id));
-            }
-            if current.readonly {
-                selector_variants.push(format!("{}:read-only", id));
-            }
-            if current.disabled {
-                selector_variants.push(format!("{}:disabled", id));
-            }
-        }
+        // 2) Sortiere nach Spezifität (aufsteigend, low→high)
+        applicable.sort_by_key(|&(_, spec)| spec);
 
-        // Child selectors like `.button-text`
+        // 3) Merge in Reihenfolge
         let mut final_style = Style::default();
-
-        // Sort selectors to apply more specific ones first (ID > Class > Tag)
-        selector_variants.sort_by_key(|sel| {
-            if sel.starts_with('#') {
-                3
-            } else if sel.starts_with('.') {
-                2
-            } else {
-                1
-            }
-        });
-
-        // For each variant, check if the style exists and apply it
-        for sel in selector_variants {
-            if let Some(style) = widget_style.styles.get(&sel) {
-                final_style.merge(style);
-            }
+        for (sel, _) in applicable {
+            final_style.merge(&widget_style.styles[sel]);
         }
 
-        // Apply final style to the node and child elements
-        if let Ok((
-                      node,
-                      background,
-                      border_color,
-                      border_radius,
-                      box_shadow,
-                      text_color,
-                      text_font,
-                      _text_layout,
-                  )) = style_query.get_mut(entity)
+        // 4) Anwenden
+        if let Ok((node, background, border_color, border_radius, box_shadow, text_color, text_font, _)) =
+            style_query.get_mut(entity)
         {
             apply_style_to_node(&final_style, node);
-
-            // Apply background
-            if let Some(mut background) = background {
-                background.0 = final_style.background.map(|b| b.color).unwrap_or(Color::NONE);
+            if let Some(mut bg) = background {
+                bg.0 = final_style.background.map(|b| b.color).unwrap_or(Color::NONE);
             }
 
-            // Apply border radius
             if let Some(mut border_radius) = border_radius {
                 if let Some(radius) = final_style.border_radius.clone() {
                     border_radius.top_left = radius.top_left;
@@ -146,30 +78,62 @@ fn update_widget_styles_system(
                     border_radius.bottom_right = Val::ZERO;
                 }
             }
-
-            // Apply border color
-            if let Some(mut border_color) = border_color {
-                border_color.0 = final_style.border_color.unwrap_or(Color::NONE);
+            if let Some(mut bc) = border_color {
+                bc.0 = final_style.border_color.unwrap_or(Color::NONE);
             }
-
-            // Apply text color
-            if let Some(mut text_color) = text_color {
-                text_color.0 = final_style.color.unwrap_or(Color::WHITE);
+            if let Some(mut tc) = text_color {
+                tc.0 = final_style.color.unwrap_or(Color::WHITE);
             }
-
-            // Apply text font size
-            if let Some(mut text_font) = text_font {
-                text_font.font_size = 15.0;
+            if let Some(mut tf) = text_font {
+                tf.font_size = 15.0;
             }
-
-            // Apply box shadow
-            if let Some(mut box_shadow) = box_shadow {
-                box_shadow.0 = final_style.box_shadow.map(|b| b.0.clone()).unwrap_or_default();
+            if let Some(mut bs) = box_shadow {
+                bs.0 = final_style.box_shadow.unwrap_or_default().0;
             }
         }
     }
 }
 
+/// Prüft nur den ersten Selektor-Teil auf Pseudoklassen (hover, focus, ...)
+fn selector_matches_state(selector: &str, state: &UIWidgetState) -> bool {
+    let first = selector.split_whitespace().next().unwrap_or(selector);
+    let parts: Vec<&str> = first.split(':').collect();
+    for pseudo in &parts[1..] {
+        match *pseudo {
+            "hover" if !state.hovered => return false,
+            "focus" if !state.focused => return false,
+            "read-only" if !state.readonly => return false,
+            "disabled" if !state.disabled => return false,
+            _ => {}
+        }
+    }
+    true
+}
+
+/// Berechnet Spezifität **über alle Teile**:
+/// - pro Segment vor Leerzeichen:
+///   - #id => +100
+///   - .class => +10
+///   - tag   => +1
+/// - pro `:pseudo` +1
+fn selector_specificity(selector: &str) -> u32 {
+    let mut spec = 0;
+    for part in selector.split_whitespace() {
+        let segs: Vec<&str> = part.split(':').collect();
+        // Basis
+        let base = segs[0];
+        spec += if base.starts_with('#') {
+            100
+        } else if base.starts_with('.') {
+            10
+        } else {
+            1
+        };
+        // Pseudoklassen
+        spec += (segs.len() as u32).saturating_sub(1);
+    }
+    spec
+}
 
 fn apply_style_to_node(style: &Style, node: Option<Mut<Node>>) {
     if let Some(mut node) = node {
