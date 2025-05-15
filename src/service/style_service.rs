@@ -59,18 +59,18 @@ fn update_widget_styles_system(
 
         if let Some(classes) = class_opt {
             for class in &classes.0 {
-                selector_variants.push(class.clone());
+                selector_variants.push(format!(".{}", class.clone()));
                 if current.hovered {
-                    selector_variants.push(format!("{}:hover", class));
+                    selector_variants.push(format!(".{}:hover", class));
                 }
                 if current.focused {
-                    selector_variants.push(format!("{}:focus", class));
+                    selector_variants.push(format!(".{}:focus", class));
                 }
                 if current.readonly {
-                    selector_variants.push(format!("{}:read-only", class));
+                    selector_variants.push(format!(".{}:read-only", class));
                 }
                 if current.disabled {
-                    selector_variants.push(format!("{}:disabled", class));
+                    selector_variants.push(format!(".{}:disabled", class));
                 }
             }
         }

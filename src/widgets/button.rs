@@ -61,7 +61,7 @@ fn internal_node_creation_system(
                     TextLayout::default(),
                     css_source.clone(),
                     UIWidgetState::default(),
-                    CssClass(vec![".button-text".to_string()]),
+                    CssClass(vec!["button-text".to_string()]),
                     Pickable::IGNORE,
                     BindToID(id.0),
                     RenderLayers::layer(*layer),

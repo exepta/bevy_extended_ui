@@ -1,7 +1,9 @@
-use std::path::Path;
+
 use bevy::prelude::*;
 use crate::styling::convert::{CssClass, CssID, CssSource, ExistingCssIDs, TagName};
+use crate::styling::Style;
 use crate::styling::system::WidgetStyle;
+use crate::widgets::Widget;
 
 pub struct CssService;
 
@@ -9,10 +11,10 @@ impl Plugin for CssService {
     fn build(&self, app: &mut App) {
         app.init_resource::<ExistingCssIDs>();
         app.add_systems(Update, (
-            cleanup_css_ids_by_remove,
+/*            cleanup_css_ids_by_remove,
             update_css_classes,
             update_css_id,
-            validate_unique_css_ids,
+            validate_unique_css_ids,*/
             update_css_conventions,
         ).chain());
     }
@@ -20,46 +22,122 @@ impl Plugin for CssService {
 
 fn update_css_conventions(
     mut commands: Commands,
-    query: Query<(Entity, &CssSource, Option<&CssID>, Option<&CssClass>, Option<&TagName>), Or<(Changed<CssSource>, Added<CssSource>)>>,
+    query: Query<(
+        Entity,
+        &CssSource,
+        Option<&CssID>,
+        Option<&CssClass>,
+        Option<&TagName>,
+        Option<&ChildOf>,
+    ), Or<(Changed<CssSource>, Added<CssSource>)>>,
+    parent_query: Query<(
+        Option<&CssID>,
+        Option<&CssClass>,
+        &TagName,
+    ), With<Widget>>,
     mut widget_query: Query<Option<&mut WidgetStyle>>,
 ) {
-    for (entity, file, id_opt, class_opt, tag_opt) in query.iter() {
+    use std::collections::HashMap;
+    use std::path::Path;
+
+    for (entity, file, id_opt, class_opt, tag_opt, parent_opt) in query.iter() {
         let css_path = file.0.as_str();
 
-        // Skip if file doesn't exist
         if !Path::new(css_path).exists() {
             continue;
         }
 
-        // Load full style from file
-        let mut full_style = WidgetStyle::load_from_file(css_path);
+        let full_style = WidgetStyle::load_from_file(css_path);
+        let mut merged_styles: HashMap<String, Style> = HashMap::new();
 
-        // Filter style based on entity attributes
-        let mut filtered = full_style.filtered_clone(id_opt, class_opt, tag_opt);
-        full_style.reload();
-        filtered.css_path = css_path.to_string();
-        
-        // Check if entity already has WidgetStyle
+        for (selector, style) in full_style.styles.iter() {
+            let parts: Vec<&str> = selector.split_whitespace().collect();
+
+            match parts.len() {
+                1 => {
+                    // Simple selector: match directly
+                    if matches_selector(parts[0], id_opt, class_opt, tag_opt) {
+                        merged_styles.insert(selector.clone(), style.clone());
+                    }
+                }
+                2 => {
+                    // Parent > Child selector
+                    if let Some(parent) = parent_opt {
+                        if let Ok((pid_opt, pclass_opt, ptag)) = parent_query.get(parent.parent()) {
+                            let parent_sel = parts[0];
+                            let child_sel = parts[1];
+
+                            let parent_matches = matches_selector(parent_sel, pid_opt, pclass_opt, Some(ptag));
+                            let child_matches = matches_selector(child_sel, id_opt, class_opt, tag_opt);
+
+                            if parent_matches && child_matches {
+                                merged_styles.insert(selector.clone(), style.clone());
+                            }
+                        }
+                    }
+                }
+                _ => {
+                    // Ignore deeply nested selectors for now
+                }
+            }
+        }
+
+        let final_style = WidgetStyle {
+            styles: merged_styles,
+            css_path: css_path.to_string(),
+        };
+
         match widget_query.get_mut(entity) {
             Ok(Some(mut existing_style)) => {
-                // Only update if file path is different
                 if existing_style.css_path != css_path {
-                    *existing_style = filtered;
+                    *existing_style = final_style.clone();
                     commands.entity(entity).insert(existing_style.clone());
                 } else {
-                    // Still re-apply filtering, in case something changed
-                    commands.entity(entity).insert(filtered);
+                    commands.entity(entity).insert(final_style.clone());
                 }
             }
             _ => {
-                // Insert new style if none exists
-                commands.entity(entity).insert(filtered);
+                commands.entity(entity).insert(final_style.clone());
             }
         }
     }
 }
 
-fn update_css_classes(
+/// Matches a single selector against the given ID, class list, or tag name.
+fn matches_selector(
+    selector: &str,
+    id_opt: Option<&CssID>,
+    class_opt: Option<&CssClass>,
+    tag_opt: Option<&TagName>,
+) -> bool {
+    let base_selector = selector.split(':').next().unwrap_or(selector);
+
+    if let Some(id) = id_opt {
+        if base_selector == format!("#{}", id.0) {
+            return true;
+        }
+    }
+
+    if let Some(classes) = class_opt {
+        for class in &classes.0 {
+            if base_selector == format!(".{}", class) {
+                return true;
+            }
+        }
+    }
+
+    if let Some(tag) = tag_opt {
+        if base_selector == tag.0 {
+            return true;
+        }
+    }
+
+    false
+}
+
+
+
+/*fn update_css_classes(
     query: Query<(Entity, &CssClass), Or<(Changed<CssClass>, Added<CssClass>)>>,
     mut widget_query: Query<&mut WidgetStyle>,
 ) {
@@ -126,4 +204,4 @@ fn cleanup_css_ids_by_remove(
             existing_ids.0.remove(&css_id.0);
         }
     }
-}
+}*/

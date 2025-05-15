@@ -26,3 +26,11 @@ button:hover .button-text {
 #example-id:hover .button-text {
     color: #6a00ff;
 }
+
+#example-id {
+    background: #52d29c;
+}
+
+#example-id:hover {
+    background: #6affc1;
+}
