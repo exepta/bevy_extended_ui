@@ -89,7 +89,9 @@ fn update_widget_styles_system(
             }
             
             if let Some(mut tf) = text_font {
-                tf.font_size = 15.0;
+                if let Some(font_size) = final_style.font_size.clone() {
+                    tf.font_size = font_size.get(None);
+                }
             }
             if let Some(mut bs) = box_shadow {
                 bs.0 = final_style.box_shadow.unwrap_or_default().0;

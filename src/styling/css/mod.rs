@@ -64,6 +64,12 @@ pub fn load_css(path: &str) -> Result<HashMap<String, Style>, String> {
                     "max_height" => {
                         style.max_height = convert_to_val(value.clone());
                     },
+                    "padding" => {
+                        style.padding = convert_to_ui_rect(value.clone());
+                    },
+                    "margin" => {
+                        style.margin = convert_to_ui_rect(value.clone());
+                    },
                     "color" => {
                         style.color = convert_to_color(value.clone());
                     },
@@ -161,7 +167,7 @@ pub fn convert_to_color(value: String) -> Option<Color> {
     if trimmed.eq_ignore_ascii_case("transparent") {
         return Some(Colored::TRANSPARENT);
     }
-    
+
     if trimmed.starts_with("#") {
         color = Some(Colored::hex_to_color(trimmed));
     } else if trimmed.starts_with("rgb(") {

@@ -1,3 +1,4 @@
+use std::cmp::PartialEq;
 use bevy::prelude::*;
 use crate::styling::paint::Colored;
 use crate::styling::convert::{CssClass, CssSource, CssID};
@@ -81,6 +82,15 @@ pub enum FontVal {
 impl Default for FontVal {
     fn default() -> Self {
         FontVal::Px(12.0)
+    }
+}
+
+impl FontVal {
+    pub fn get(&self, base: Option<f32>) -> f32 {
+        match self { 
+            FontVal::Px(x) => x.clone(),
+            FontVal::Rem(x) => x * base.unwrap_or(1.0),
+        }
     }
 }
 
