@@ -98,7 +98,7 @@ fn on_internal_click(
     trigger: Trigger<Pointer<Click>>,
     mut commands: Commands,
     mut query: Query<(&mut UIWidgetState, &UIGenID, &CheckBox, &CssSource), With<CheckBox>>,
-    inner_query: Query<(Entity, &BindToID, Option<&Children>), With<CheckBoxMark>>,
+    inner_query: Query<(Entity, &BindToID, Option<&Children>, &ComputedNode), With<CheckBoxMark>>,
     mut current_widget_state: ResMut<CurrentWidgetState>,
     config: Res<ExtendedUiConfiguration>,
     asset_server: Res<AssetServer>
@@ -109,10 +109,13 @@ fn on_internal_click(
         state.checked = !state.checked;
         current_widget_state.widget_id = gen_id.0;
 
-        for (entity, id, children_opt) in inner_query.iter() {
+        for (entity, id, children_opt, computed_node) in inner_query.iter() {
             if gen_id.0 != id.0 {
                 continue;
             }
+            
+            let width = computed_node.size.x / 1.5;
+            let height = computed_node.size.y / 1.5;
 
             if state.checked {
                 let mut child = None;
@@ -120,12 +123,13 @@ fn on_internal_click(
                     let in_child = builder.spawn((
                         Name::new(format!("Mark-{}", checkbox.w_count)),
                         Node {
-                            width: Val::Px(16.0),
-                            height: Val::Px(16.0),
+                            width: Val::Px(width),
+                            height: Val::Px(height),
                             ..default()
                         },
                         Pickable::IGNORE,
                         css_source.clone(),
+                        UIWidgetState::default(),
                         CssClass(vec!["mark".to_string()]),
                         RenderLayers::layer(*layer),
                     )).id();

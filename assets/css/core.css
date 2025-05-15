@@ -49,8 +49,8 @@ input[type="checkbox"] .mark-box {
   border-color: black;
 }
 
-.mark-box .mark {
-  color: #ff006a;
+.mark {
+  color: #fff;
 }
 
 input[type="checkbox"]:checked .mark-box {
