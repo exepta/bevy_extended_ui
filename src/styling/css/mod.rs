@@ -67,8 +67,40 @@ pub fn load_css(path: &str) -> Result<HashMap<String, Style>, String> {
                     "padding" => {
                         style.padding = convert_to_ui_rect(value.clone());
                     },
+                    "padding-left" => {
+                        let correct_string = format!("{} 0 0 0", value.clone()).to_string();
+                        style.padding = convert_to_ui_rect(correct_string);
+                    },
+                    "padding-right" => {
+                        let correct_string = format!("0 {} 0 0", value.clone()).to_string();
+                        style.padding = convert_to_ui_rect(correct_string);
+                    },
+                    "padding-top" => {
+                        let correct_string = format!("0 0 {} 0", value.clone()).to_string();
+                        style.padding = convert_to_ui_rect(correct_string);
+                    },
+                    "padding-bottom" => {
+                        let correct_string = format!("0 0 0 {}", value.clone()).to_string();
+                        style.padding = convert_to_ui_rect(correct_string);
+                    },
                     "margin" => {
                         style.margin = convert_to_ui_rect(value.clone());
+                    },
+                    "margin-left" => {
+                        let correct_string = format!("{} 0 0 0", value.clone()).to_string();
+                        style.margin = convert_to_ui_rect(correct_string);
+                    },
+                    "margin-right" => {
+                        let correct_string = format!("0 {} 0 0", value.clone()).to_string();
+                        style.margin = convert_to_ui_rect(correct_string);
+                    },
+                    "margin-top" => {
+                        let correct_string = format!("0 0 {} 0", value.clone()).to_string();
+                        style.margin = convert_to_ui_rect(correct_string);
+                    },
+                    "margin-bottom" => {
+                        let correct_string = format!("0 0 0 {}", value.clone()).to_string();
+                        style.margin = convert_to_ui_rect(correct_string);
                     },
                     "color" => {
                         style.color = convert_to_color(value.clone());
@@ -111,6 +143,36 @@ pub fn load_css(path: &str) -> Result<HashMap<String, Style>, String> {
                     },
                     "font-size" => {
                         style.font_size = convert_to_font_size(value.clone());
+                    },
+                    "border" => {
+                        if let Some((rect, color)) = convert_css_border(value.clone()) {
+                            style.border = Some(rect);
+                            style.border_color = Some(color);
+                        }
+                    },
+                    "border-left" => {
+                        let val = convert_to_val(value.clone()).unwrap_or(Val::Px(0.));
+                        let mut border = style.border.unwrap_or_default();
+                        border.left = val;
+                        style.border = Some(border);
+                    },
+                    "border-right" => {
+                        let val = convert_to_val(value.clone()).unwrap_or(Val::Px(0.));
+                        let mut border = style.border.unwrap_or_default();
+                        border.right = val;
+                        style.border = Some(border);
+                    },
+                    "border-top" => {
+                        let val = convert_to_val(value.clone()).unwrap_or(Val::Px(0.));
+                        let mut border = style.border.unwrap_or_default();
+                        border.top = val;
+                        style.border = Some(border);
+                    },
+                    "border-bottom" => {
+                        let val = convert_to_val(value.clone()).unwrap_or(Val::Px(0.));
+                        let mut border = style.border.unwrap_or_default();
+                        border.bottom = val;
+                        style.border = Some(border);
                     },
                     "border-radius" => {
                         style.border_radius = convert_to_radius(value.clone());
@@ -334,6 +396,36 @@ pub fn convert_to_bevy_box_shadow(value: String) -> Option<BoxShadow> {
         spread,
         blur,
     ))
+}
+
+pub fn convert_css_border(value: String) -> Option<(UiRect, Color)> {
+    fn parse_val(input: &str) -> Option<Val> {
+        if input.ends_with("px") {
+            input.trim_end_matches("px").parse::<f32>().ok().map(Val::Px)
+        } else if input.ends_with('%') {
+            input.trim_end_matches('%').parse::<f32>().ok().map(Val::Percent)
+        } else if input == "0" {
+            Some(Val::Px(0.0))
+        } else {
+            None
+        }
+    }
+
+    let parts: Vec<&str> = value.split_whitespace().collect();
+    if parts.is_empty() {
+        return None;
+    }
+
+    let rect_val = parse_val(parts[0])?;
+    let rect = UiRect::all(rect_val);
+
+    let color = if parts.len() > 1 {
+        convert_to_color(parts[1].to_string())?
+    } else {
+        Colored::TRANSPARENT
+    };
+
+    Some((rect, color))
 }
 
 pub fn convert_to_bevy_justify_content(value: String) -> Option<JustifyContent> {
