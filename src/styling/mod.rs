@@ -120,7 +120,11 @@ pub struct Style {
     pub font_size: Option<FontVal>,
     pub box_shadow: Option<BoxShadow>,
     pub justify_content: Option<JustifyContent>,
+    pub justify_items: Option<JustifyItems>,
+    pub justify_self: Option<JustifySelf>,
+    pub align_content: Option<AlignContent>,
     pub align_items: Option<AlignItems>,
+    pub align_self: Option<AlignSelf>,
     pub flex_direction: Option<FlexDirection>,
     pub gap: Option<Val>,
 }
@@ -151,7 +155,11 @@ impl Style {
         if other.font_size.is_some()         { self.font_size = other.font_size.clone(); }
         if other.box_shadow.is_some()        { self.box_shadow = other.box_shadow.clone(); }
         if other.justify_content.is_some()   { self.justify_content = other.justify_content.clone(); }
+        if other.justify_items.is_some()     { self.justify_items = other.justify_items.clone(); }
+        if other.justify_self.is_some()      { self.justify_self = other.justify_self.clone(); }
+        if other.align_content.is_some()     { self.align_content = other.align_content.clone(); }
         if other.align_items.is_some()       { self.align_items = other.align_items.clone(); }
+        if other.align_self.is_some()        { self.align_self = other.align_self.clone(); }
         if other.flex_direction.is_some()    { self.flex_direction = other.flex_direction.clone(); }
         if other.gap.is_some()               { self.gap = other.gap.clone(); }
     }
