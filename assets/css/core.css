@@ -1,0 +1,63 @@
+/* Div */
+
+div {
+  display: flex;
+  justify-content: start;
+  align-items: start;
+}
+
+/* Button */
+
+button {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: row;
+  gap: 8px;
+  width: 150px;
+  height: 50px;
+  border-radius: 5px;
+  background-color: #5bcd96;
+}
+
+button:hover {
+  background-color: #3b926f;
+}
+
+.button-text {
+  font-size: 15px;
+  color: #303033;;
+}
+
+/* CheckBox */
+
+input[type="checkbox"] {
+  width: 150px;
+  height: 40px;
+  display: flex;
+  justify-content: start;
+  align-items: center;
+  flex-direction: row;
+  gap: 10px;
+}
+
+input[type="checkbox"] .mark-box {
+  width: 20px;
+  height: 20px;
+  border-radius: 2px;
+  border: 2px black;
+}
+
+.mark {
+  color: #fff;
+}
+
+input[type="checkbox"]:checked .mark-box {
+  border-color: #5bcd96;
+  background: #5bcd96;
+}
+
+input[type="checkbox"] .check-text {
+  color: #303033;
+  font-size: 13px;
+}

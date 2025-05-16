@@ -1,52 +1,11 @@
 use bevy::prelude::*;
 
-#[derive(Reflect, Component, Debug, Clone)]
-#[reflect(Component)]
-pub struct Background {
-    pub color: Color,
-    pub image: Option<String>,
-}
-
-impl Default for Background {
-    fn default() -> Self {
-        Self {
-            color: Color::WHITE,
-            image: None,
-        }
-    }
-}
-
-#[derive(Reflect, Debug, Clone)]
-pub struct FontWeight;
-
-impl FontWeight {
-    pub const THIN: u16 = 100;
-    pub const EXTRA_LIGHT: u16 = 200;
-    pub const LIGHT: u16 = 300;
-    pub const NORMAL: u16 = 400;
-    pub const MEDIUM: u16 = 500;
-    pub const SEMI_BOLD: u16 = 600;
-    pub const BOLD: u16 = 700;
-    pub const EXTRA_BOLD: u16 = 800;
-    pub const BLACK: u16 = 900;
-}
-
-#[derive(Reflect, Debug, Clone, PartialEq)]
-pub enum IconPlace {
-    Left,
-    Right
-}
-
-impl Default for IconPlace {
-    fn default() -> Self {
-        IconPlace::Right
-    }
-}
-
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Colored;
 
 impl Colored {
+
+    pub const TRANSPARENT: Color = Color::Srgba(Srgba::new(0.0, 0.0, 0.0, 0.0));
 
     pub const ALICE_BLUE: Color = Color::Srgba(Srgba::new(0.941, 0.973, 1.0, 1.0));
     pub const ANTIQUE_WHITE: Color = Color::Srgba(Srgba::new(0.980, 0.922, 0.843, 1.0));
@@ -190,6 +149,21 @@ impl Colored {
     pub fn hex_to_color(hex: &str) -> Color {
         // Remove the "#" prefix if it exists
         let hex = hex.trim_start_matches('#');
+
+        // Ensure the hex string is either 3, 6, or 8 characters long
+        if hex.len() != 3 && hex.len() != 6 && hex.len() != 8 {
+            panic!("Invalid hex string length: {}", hex);
+        }
+
+        // If the length is 3, expand it to 6 (e.g. "fff" -> "ffffff")
+        let hex = if hex.len() == 3 {
+            format!("{}{}{}{}{}{}",
+                    &hex[0..1], &hex[0..1],
+                    &hex[1..2], &hex[1..2],
+                    &hex[2..3], &hex[2..3])
+        } else {
+            hex.to_string()
+        };
 
         // Parse the hex string into the RGBA components (values between 0 and 255)
         let r = u8::from_str_radix(&hex[0..2], 16).unwrap_or(0);

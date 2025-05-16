@@ -1,19 +1,17 @@
+use bevy::ecs::relationship::RelatedSpawnerCommands;
 use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
-use crate::global::{UiGenID, UiElementState, BindToID};
-use crate::resources::{CurrentElementSelected, ExtendedUiConfiguration};
-use crate::styles::css_types::{Background, Colored, IconPlace};
-use crate::styles::state_styles::{Disabled, Hover, Selected, Styling};
-use crate::styles::{LabelStyle, Style};
-use crate::styles::types::ButtonStyle;
-use crate::styles::utils::{apply_base_component_style, apply_design_styles, apply_label_styles_to_child, resolve_style_by_state};
+use crate::{BindToID, CurrentWidgetState, ExtendedUiConfiguration, UIGenID, UIWidgetState};
+use crate::styling::convert::{CssClass, CssSource, TagName};
+use crate::styling::IconPlace;
+use crate::styling::paint::Colored;
 use crate::widgets::Button;
 
 #[derive(Component)]
 struct ButtonBase;
 
 #[derive(Component)]
-struct ButtonLabel;
+struct ButtonText;
 
 #[derive(Component)]
 struct ButtonImage;
@@ -22,146 +20,116 @@ pub struct ButtonWidget;
 
 impl Plugin for ButtonWidget {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (
-            internal_generate_component_system,
-            internal_style_update_que
-                .after(internal_generate_component_system),
-        ));
+        app.add_systems(Update, internal_node_creation_system);
     }
 }
 
-fn internal_generate_component_system(
+fn internal_node_creation_system(
     mut commands: Commands,
-    query: Query<(Entity, &UiGenID, &Button, &ButtonStyle), (Without<ButtonBase>, With<Button>)>,
+    query: Query<(Entity, &UIGenID, &Button, Option<&CssSource>), (With<Button>, Without<ButtonBase>)>,
     config: Res<ExtendedUiConfiguration>,
     asset_server: Res<AssetServer>,
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
-    let default_button_style = ButtonStyle::default();
-    for (entity , gen_id, btn, style) in query.iter() {
+    for (entity, id, button, source_opt) in query.iter() {
+        let mut css_source = CssSource(String::from("assets/css/core.css"));
+        if let Some(source) = source_opt {
+            css_source = source.clone();
+        }
+        
         commands.entity(entity).insert((
-            Name::new(format!("Button-{}", gen_id.0)),
-            Node::default(),
+            Name::new(format!("Button-{}", button.w_count)),
+            Node {
+                width: Val::Px(150.0),
+                height: Val::Px(50.0),
+                display: Display::Flex,
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                ..default()
+            },
             BackgroundColor::default(),
             BorderColor::default(),
-            BorderRadius::all(Val::Px(0.)),
-            BoxShadow::default(),
+            BorderRadius::default(),
+            BoxShadow::new(Colored::TRANSPARENT, Val::Px(0.), Val::Px(0.), Val::Px(0.), Val::Px(0.)),
+            css_source.clone(),
+            TagName("button".to_string()),
             RenderLayers::layer(*layer),
-            Hover(Styling::Button(ButtonStyle {
-                style: Style {
-                    background: Background { color: Colored::hex_to_color("#86df9d"), ..default() },
-                    ..default_button_style.style.clone()
-                },
-                ..default_button_style.clone()
-            })),
-            Disabled(Styling::Button(ButtonStyle {
-                style: Style {
-                    background: Background { color: Colored::hex_to_color("#7f9986"), ..default() },
-                    box_shadow: None,
-                    ..default_button_style.style.clone()
-                },
-                label_style: LabelStyle {
-                    color: Color::srgba_u8(103, 109, 111, 255),
-                    ..default_button_style.label_style.clone()
-                },
-                ..default_button_style.clone()
-            })),
             ButtonBase
         )).with_children(|builder| {
-            if style.icon_place == IconPlace::Left {
-                place_icon(builder, style, &asset_server, gen_id.0, *layer);
+            if button.icon_place == IconPlace::Left {
+                place_icon(builder, button, &asset_server, id.0, *layer, css_source.clone());
             }
-
-            builder.spawn((
-                Name::new(format!("Button-Label-{}", gen_id.0)),
-                Text::new(btn.0.clone()),
+            
+            builder.spawn((                    
+                Name::new(format!("Button-Text-{}", button.w_count)),
+                Text::new(button.text.clone()),
                 TextColor::default(),
                 TextFont::default(),
                 TextLayout::default(),
+                css_source.clone(),
+                UIWidgetState::default(),
+                CssClass(vec!["button-text".to_string()]),
+                Pickable::IGNORE,
+                BindToID(id.0),
                 RenderLayers::layer(*layer),
-                PickingBehavior::IGNORE,
-                ButtonLabel,
-                BindToID(gen_id.0)
+                ButtonText
             ));
 
-            if style.icon_place == IconPlace::Right {
-                place_icon(builder, style, &asset_server, gen_id.0, *layer);
+            if button.icon_place == IconPlace::Right {
+                place_icon(builder, button, &asset_server, id.0, *layer, css_source.clone());
             }
-        })
-            .observe(on_internal_mouse_click)
-            .observe(on_internal_mouse_entered)
-            .observe(on_internal_mouse_leave);
+        }).observe(on_internal_click)
+            .observe(on_internal_cursor_entered)
+            .observe(on_internal_cursor_leave);
     }
 }
 
-fn on_internal_mouse_click(
-    event: Trigger<Pointer<Click>>,
-    mut query: Query<(&mut UiElementState, &UiGenID), With<Button>>,
-    mut current_element_selected: ResMut<CurrentElementSelected>
+fn on_internal_click(
+    trigger: Trigger<Pointer<Click>>,
+    mut query: Query<(&mut UIWidgetState, &UIGenID), With<Button>>,
+    mut current_widget_state: ResMut<CurrentWidgetState>
 ) {
-    if let Ok((mut state, gen_id)) = query.get_mut(event.target) {
-        state.selected = true;
-        current_element_selected.0 = gen_id.0;
+    if let Ok((mut state, gen_id)) = query.get_mut(trigger.target) {
+        state.focused = true;
+        current_widget_state.widget_id = gen_id.0;
     }
 }
 
-fn on_internal_mouse_entered(event: Trigger<Pointer<Over>>, mut query: Query<&mut UiElementState, With<Button>>) {
-    if let Ok(mut state) = query.get_mut(event.target) {
+fn on_internal_cursor_entered(
+    trigger: Trigger<Pointer<Over>>,
+    mut query: Query<&mut UIWidgetState, With<Button>>,
+) {
+    if let Ok(mut state) = query.get_mut(trigger.target) {
         state.hovered = true;
     }
 }
 
-fn on_internal_mouse_leave(event: Trigger<Pointer<Out>>, mut query: Query<&mut UiElementState, With<Button>>) {
-    if let Ok(mut state) = query.get_mut(event.target) {
+fn on_internal_cursor_leave(
+    trigger: Trigger<Pointer<Out>>,
+    mut query: Query<&mut UIWidgetState, With<Button>>,
+) {
+    if let Ok(mut state) = query.get_mut(trigger.target) {
         state.hovered = false;
     }
 }
 
-fn place_icon(builder: &mut ChildBuilder, style: &ButtonStyle, asset_server: &Res<AssetServer>, id: usize, layer: usize) {
-    if let Some(icon) = style.icon_path.clone() {
+fn place_icon(
+    builder: &mut RelatedSpawnerCommands<ChildOf>, btn: &Button, 
+    asset_server: &Res<AssetServer>, id: usize, layer: usize,
+    css_source: CssSource,
+) {
+    if let Some(icon) = btn.icon_path.clone() {
         builder.spawn((
-            Name::new(format!("Button-Icon-{}", id)),
+            Name::new(format!("Button-Icon-{}", btn.w_count)),
             ImageNode::new(asset_server.load(icon.as_str())),
             RenderLayers::layer(layer),
-            PickingBehavior::IGNORE,
+            Pickable::IGNORE,
             ButtonImage,
+            UIWidgetState::default(),
+            css_source.clone(),
+            CssClass(vec!["button-text".to_string()]),
             BindToID(id),
             ZIndex(1)
         ));
-    }
-}
-
-fn internal_style_update_que(
-    mut query: Query<(&UiElementState, &UiGenID, &Children, &ButtonStyle, Option<&Hover>, Option<&Selected>, Option<&Disabled>,
-                      &mut Node,
-                      &mut BackgroundColor,
-                      &mut BoxShadow,
-                      &mut BorderRadius,
-                      &mut BorderColor
-    ), With<Button>>,
-    mut label_query: Query<(&BindToID, &mut TextColor, &mut TextFont, &mut TextLayout)>
-) {
-    for (state, ui_id, children, style, hover_style, selected_style, disabled_style,
-        mut node,
-        mut background_color,
-        mut box_shadow,
-        mut border_radius,
-        mut border_color) in query.iter_mut() {
-        let internal_style = resolve_style_by_state(
-            &Styling::Button(style.clone()),
-            state,
-            hover_style,
-            selected_style,
-            disabled_style,
-        );
-
-        if let Styling::Button(button_style) = internal_style {
-            apply_base_component_style(&button_style.style, &mut node);
-            apply_design_styles(&button_style.style, &mut background_color, &mut border_color, &mut border_radius, &mut box_shadow);
-
-            for child in children.iter() {
-                apply_label_styles_to_child(*child, ui_id, &button_style.label_style, &mut label_query);
-            }
-        }
     }
 }
