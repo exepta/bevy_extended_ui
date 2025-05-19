@@ -31,7 +31,7 @@ button:hover {
 
 /* CheckBox */
 
-input[type="checkbox"] {
+checkbox {
   width: 150px;
   height: 40px;
   display: flex;
@@ -41,7 +41,7 @@ input[type="checkbox"] {
   gap: 10px;
 }
 
-input[type="checkbox"] .mark-box {
+checkbox .mark-box {
   width: 20px;
   height: 20px;
   border-radius: 2px;
@@ -52,12 +52,41 @@ input[type="checkbox"] .mark-box {
   color: #fff;
 }
 
-input[type="checkbox"]:checked .mark-box {
+checkbox:checked .mark-box {
   border-color: #5bcd96;
   background: #5bcd96;
 }
 
-input[type="checkbox"] .check-text {
+checkbox .check-text {
   color: #303033;
   font-size: 13px;
+}
+
+/* Slider */
+
+slider {
+  display: flex;
+  justify-content: start;
+  align-items: center;
+  width: 150px;
+  height: 8px;
+  box-shadow: 0 0 3px 3px #303033;
+  background: #fff;
+  border-radius: 8px;
+}
+
+slider .track {
+  width: 0;
+  height: 100%;
+  background: #00ff8c;
+  border-radius: 8px;
+}
+
+slider .thumb {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  box-shadow: 0 0 3px 3px #303033;
+  background: #00ff8c;
 }

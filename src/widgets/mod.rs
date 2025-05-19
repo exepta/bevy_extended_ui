@@ -1,6 +1,7 @@
 mod button;
 mod div;
 mod check_box;
+mod slider;
 
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
@@ -10,10 +11,12 @@ use crate::styling::IconPlace;
 use crate::widgets::button::ButtonWidget;
 use crate::widgets::check_box::CheckBoxWidget;
 use crate::widgets::div::DivWidget;
+use crate::widgets::slider::SliderWidget;
 
 static BUTTON_COUNT: AtomicUsize = AtomicUsize::new(1);
 static CHECK_BOX_COUNT: AtomicUsize = AtomicUsize::new(1);
 static DIV_COUNT: AtomicUsize = AtomicUsize::new(1);
+static SLIDER_COUNT: AtomicUsize = AtomicUsize::new(1);
 
 #[derive(Component, Default)]
 pub struct Widget;
@@ -81,6 +84,33 @@ impl Default for CheckBox {
     }
 }
 
+// ===============================================
+//                       Slider
+// ===============================================
+
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+#[require(UIGenID, UIWidgetState, Widget)]
+pub struct Slider {
+    pub w_count: usize,
+    pub value: i32,
+    pub step: i32,
+    pub min: i32,
+    pub max: i32
+}
+
+impl Default for Slider {
+    fn default() -> Self {
+        Self {
+            w_count: SLIDER_COUNT.fetch_add(1, Relaxed),
+            value: 0,
+            step: 1,
+            min: 0,
+            max: 100,
+        }
+    }
+}
+
 pub struct WidgetPlugin;
 
 impl Plugin for WidgetPlugin {
@@ -88,10 +118,12 @@ impl Plugin for WidgetPlugin {
         app.register_type::<Div>();
         app.register_type::<Button>();
         app.register_type::<CheckBox>();
+        app.register_type::<Slider>();
         app.add_plugins((
             DivWidget, 
             ButtonWidget,
             CheckBoxWidget,
+            SliderWidget
         ));
     }
 }

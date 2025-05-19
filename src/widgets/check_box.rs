@@ -49,7 +49,7 @@ fn internal_node_creation_system(
             BorderRadius::default(),
             BoxShadow::new(Colored::TRANSPARENT, Val::Px(0.), Val::Px(0.), Val::Px(0.), Val::Px(0.)),
             css_source.clone(),
-            TagName(String::from("input[type=\"checkbox\"]")),
+            TagName(String::from("checkbox")),
             RenderLayers::layer(*layer),
             CheckBoxBase,
             children![
