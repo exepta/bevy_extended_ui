@@ -1,29 +1,97 @@
-pub mod resources;
-pub mod widgets;
-pub mod styles;
-mod services;
-pub mod global;
-pub mod utils;
-
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering::Relaxed;
 use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
-use crate::global::UiElementState;
-use crate::resources::{CurrentElementSelected, ExtendedUiConfiguration};
-use crate::services::ServicesPlugin;
-use crate::styles::StylesPlugin;
-use crate::widgets::WidgetsPlugin;
+use crate::service::ServicePlugin;
+use crate::styling::StylingPlugin;
+use crate::widgets::WidgetPlugin;
+
+pub mod widgets;
+pub mod styling;
+pub mod prelude;
+pub mod utils;
+mod service;
+
+static UI_ID_GENERATE: AtomicUsize = AtomicUsize::new(1);
+
+#[derive(Resource, Debug, Clone)]
+pub struct ExtendedUiConfiguration {
+    pub order: isize,
+    pub hdr_support: bool,
+    pub enable_default_camera: bool,
+    pub render_layers: Vec<usize>,
+}
+
+impl Default for ExtendedUiConfiguration {
+    fn default() -> Self {
+        Self {
+            order: 2,
+            hdr_support: true,
+            enable_default_camera: true,
+            render_layers: vec![1, 2],
+        }
+    }
+}
+
+#[derive(Resource, Debug, Clone)]
+pub struct CurrentWidgetState {
+    pub widget_id: usize,
+}
+
+impl Default for CurrentWidgetState {
+    fn default() -> Self {
+        Self {
+            widget_id: 0,
+        }
+    }
+}
 
 #[derive(Component)]
 struct UiCamera;
+
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+pub struct UIGenID(usize);
+
+impl Default for UIGenID {
+    fn default() -> Self {
+        Self(UI_ID_GENERATE.fetch_add(1, Relaxed))
+    }
+}
+
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+pub struct BindToID(pub usize);
+
+#[derive(Component, Reflect, Default, PartialEq, Eq, Debug, Clone)]
+#[reflect(Component)]
+pub struct UIWidgetState {
+    pub focused: bool,
+    pub hovered: bool,
+    pub disabled: bool,
+    pub readonly: bool,
+    pub checked: bool,
+}
+
+#[derive(Component, Default, Clone, PartialEq, Eq, Debug)]
+pub struct LastWidgetState {
+    pub hovered: bool,
+    pub disabled: bool,
+    pub readonly: bool,
+    pub focused: bool,
+    pub checked: bool,
+}
 
 pub struct ExtendedUiPlugin;
 
 impl Plugin for ExtendedUiPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ExtendedUiConfiguration>();
-        app.init_resource::<CurrentElementSelected>();
-        app.register_type::<UiElementState>();
-        app.add_plugins((ServicesPlugin, StylesPlugin, WidgetsPlugin));
+        app.init_resource::<CurrentWidgetState>();
+        app.register_type::<UIGenID>();
+        app.register_type::<BindToID>();
+        app.register_type::<UIWidgetState>();
+        app.add_plugins((StylingPlugin, ServicePlugin, WidgetPlugin));
         app.add_systems(Update, load_ui_camera_system
             .run_if(resource_changed::<ExtendedUiConfiguration>));
     }
@@ -59,10 +127,9 @@ fn load_ui_camera_system(
             info!("Ui Camera created!");
         }
     } else {
-        for (entity, _camera, _layers) in query.iter() {
-            commands.entity(entity).despawn_recursive();
+        for (entity, _, _) in query.iter() {
+            commands.entity(entity).despawn();
             info!("Ui Camera removed!");
         }
     }
 }
-

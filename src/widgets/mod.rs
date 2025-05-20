@@ -1,45 +1,111 @@
+mod button;
+mod div;
+mod check_box;
+mod slider;
+mod input;
+
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering::Relaxed;
 use bevy::prelude::*;
-use crate::widgets::button::{ButtonWidget};
-use crate::widgets::containers::DivWidget;
-use crate::widgets::input::{InputCap, InputType, InputWidget};
-use crate::widgets::slider::SliderWidget;
-use crate::global::{UiGenID, UiElementState};
+use crate::{UIGenID, UIWidgetState};
+use crate::styling::IconPlace;
+use crate::widgets::button::ButtonWidget;
 use crate::widgets::check_box::CheckBoxWidget;
-use crate::styles::types::{ButtonStyle, DivStyle, CheckBoxStyle, SliderStyle, InputStyle};
+use crate::widgets::div::DivWidget;
+use crate::widgets::input::InputWidget;
+use crate::widgets::slider::SliderWidget;
 
-pub mod containers;
-pub mod button;
-pub mod input;
-pub mod slider;
-pub mod check_box;
-pub mod choice_box;
+static BUTTON_COUNT: AtomicUsize = AtomicUsize::new(1);
+static CHECK_BOX_COUNT: AtomicUsize = AtomicUsize::new(1);
+static DIV_COUNT: AtomicUsize = AtomicUsize::new(1);
+static SLIDER_COUNT: AtomicUsize = AtomicUsize::new(1);
+static INPUT_COUNT: AtomicUsize = AtomicUsize::new(1);
 
-/// ===============================================
-///                 Div
-/// ===============================================
+#[derive(Component, Default)]
+pub struct Widget;
 
-#[derive(Component, Reflect, Debug, Clone)]
-#[reflect(Component)]
-#[require(UiGenID, UiElementState, DivStyle)]
-pub struct DivContainer;
-
-/// ===============================================
-///                 Slider
-/// ===============================================
+// ===============================================
+//                       Div
+// ===============================================
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
-#[require(UiGenID, UiElementState, SliderStyle)]
+#[require(UIGenID, UIWidgetState, GlobalTransform, InheritedVisibility, Widget)]
+pub struct Div(usize);
+
+impl Default for Div {
+    fn default() -> Self {
+        Self(DIV_COUNT.fetch_add(1, Relaxed))
+    }
+}
+
+// ===============================================
+//                       Button
+// ===============================================
+
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+#[require(UIGenID, UIWidgetState, Widget)]
+pub struct Button {
+    pub w_count: usize,
+    pub text: String,
+    pub icon_place: IconPlace,
+    pub icon_path: Option<String>,
+}
+
+impl Default for Button {
+    fn default() -> Self {
+        Self {
+            w_count: BUTTON_COUNT.fetch_add(1, Relaxed),
+            text: String::from("Button"),
+            icon_path: None,
+            icon_place: IconPlace::default(),
+        }
+    }
+}
+
+// ===============================================
+//                       CheckBox
+// ===============================================
+
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+#[require(UIGenID, UIWidgetState, Widget)]
+pub struct CheckBox {
+    pub w_count: usize,
+    pub label: String,
+    pub icon_path: Option<String>,
+}
+
+impl Default for CheckBox {
+    fn default() -> Self {
+        Self {
+            w_count: CHECK_BOX_COUNT.fetch_add(1, Relaxed),
+            label: String::from("label"),
+            icon_path: Some(String::from("icons/check-mark.png")),
+        }
+    }
+}
+
+// ===============================================
+//                       Slider
+// ===============================================
+
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+#[require(UIGenID, UIWidgetState, Widget)]
 pub struct Slider {
+    pub w_count: usize,
     pub value: i32,
     pub step: i32,
     pub min: i32,
-    pub max: i32,
+    pub max: i32
 }
 
 impl Default for Slider {
     fn default() -> Self {
         Self {
+            w_count: SLIDER_COUNT.fetch_add(1, Relaxed),
             value: 0,
             step: 1,
             min: 0,
@@ -48,142 +114,91 @@ impl Default for Slider {
     }
 }
 
-/// ===============================================
-///                 Button
-/// ===============================================
+// ===============================================
+//                       InputField
+// ===============================================
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
-#[require(UiGenID, UiElementState, ButtonStyle)]
-pub struct Button(pub String);
-
-impl Default for Button {
-    fn default() -> Self {
-        Self("Button".to_string())
-    }
-}
-
-/// ===============================================
-///                 InputField
-/// ===============================================
-
-#[derive(Component, Reflect, Debug, Clone)]
-#[reflect(Component)]
-#[require(UiGenID, UiElementState, InputStyle)]
+#[require(UIGenID, UIWidgetState, Widget)]
 pub struct InputField {
+    pub w_count: usize,
     pub text: String,
     pub label: String,
-    pub placeholder_text: String,
-    pub cap_text_at: InputCap,
+    pub placeholder: String,
     pub cursor_position: usize,
-    pub input_type: InputType,
     pub clear_after_focus_lost: bool,
-    pub icon: Option<Handle<Image>>,
+    pub icon_path: Option<String>,
+    pub input_type: InputType,
+    pub cap_text_at: InputCap
 }
 
 impl Default for InputField {
     fn default() -> Self {
         Self {
+            w_count: INPUT_COUNT.fetch_add(1, Relaxed),
             text: String::from(""),
             label: String::from("Label"),
-            placeholder_text: String::from("label"),
+            placeholder: String::from(""),
+            clear_after_focus_lost: false,
+            cursor_position: 0,
+            icon_path: None,
             cap_text_at: InputCap::default(),
             input_type: InputType::default(),
-            cursor_position: 0,
-            clear_after_focus_lost: false,
-            icon: None,
         }
     }
 }
 
-impl InputField {
-    pub fn new(text: &str, placeholder_text: &str, input_type: InputType) -> Self {
-        Self {
-            text: text.to_string(),
-            placeholder_text: placeholder_text.to_string(),
-            input_type,
-            ..default()
+#[derive(Reflect, Default, Debug, Clone, Eq, PartialEq)]
+pub enum InputType {
+    #[default]
+    Text,
+    Password,
+    Number
+}
+
+impl InputType {
+    pub fn is_valid_char(&self, c: char) -> bool {
+        match self {
+            InputType::Text | InputType::Password => true,
+            InputType::Number => c.is_ascii_digit() || "+-*/() ".contains(c),
         }
     }
 }
 
-/// ===============================================
-///                 CheckBox
-/// ===============================================
-
-#[derive(Component, Reflect, Debug, Clone)]
-#[reflect(Component)]
-#[require(UiGenID, UiElementState, CheckBoxStyle)]
-pub struct CheckBox {
-    pub label: String,
-    pub checked: bool
+#[derive(Reflect, Default, Debug, Clone, Eq, PartialEq)]
+pub enum InputCap {
+    #[default]
+    NoCap,
+    CapAtNodeSize,
+    CapAt(usize), // 0 means no cap!
 }
 
-impl Default for CheckBox {
-    fn default() -> Self {
-        Self {
-            checked: false,
-            label: String::from("CheckBox"),
+impl InputCap {
+    pub fn get_value(&self) -> usize {
+        match self {
+            Self::CapAt(value) => *value,
+            Self::NoCap => 0,
+            Self::CapAtNodeSize => 0
         }
     }
 }
 
-/// ===============================================
-///                 ChoiceBox
-/// ===============================================
+pub struct WidgetPlugin;
 
-#[derive(Component, Reflect, Debug, Clone)]
-#[reflect(Component)]
-#[require(UiGenID, UiElementState)]
-pub struct ChoiceBox {
-    pub value: ChoiceOption,
-    pub options: Vec<ChoiceOption>
-}
-
-impl Default for ChoiceBox {
-    fn default() -> Self {
-        Self {
-            value: ChoiceOption { selected: true, ..default() },
-            options: vec![ChoiceOption { selected: true, ..default() }]
-        }
-    }
-}
-
-#[derive(Component, Reflect, Debug, Clone)]
-pub struct ChoiceOption {
-    pub label: String,
-    pub internal_val: String,
-    pub icon: Option<Handle<Image>>,
-    pub selected: bool
-}
-
-impl Default for ChoiceOption {
-    fn default() -> Self {
-        Self {
-            label: String::from("Option 1"),
-            internal_val: String::from("option1"),
-            icon: None,
-            selected: false,
-        }
-    }
-}
-
-pub struct WidgetsPlugin;
-
-impl Plugin for WidgetsPlugin {
+impl Plugin for WidgetPlugin {
     fn build(&self, app: &mut App) {
-        app.register_type::<DivContainer>();
-        app.register_type::<CheckBox>();
+        app.register_type::<Div>();
         app.register_type::<Button>();
-        app.register_type::<InputField>();
+        app.register_type::<CheckBox>();
         app.register_type::<Slider>();
+        app.register_type::<InputField>();
         app.add_plugins((
-            DivWidget,
+            DivWidget, 
             ButtonWidget,
-            InputWidget,
+            CheckBoxWidget,
             SliderWidget,
-            CheckBoxWidget
+            InputWidget
         ));
     }
 }
-

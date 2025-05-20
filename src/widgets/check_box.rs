@@ -1,15 +1,12 @@
 use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
-use crate::global::{BindToID, UiElementState, UiGenID};
-use crate::resources::ExtendedUiConfiguration;
-use crate::styles::css_types::Colored;
-use crate::styles::state_styles::{Checked, Disabled, Hover, Selected, Styling};
-use crate::styles::types::CheckBoxStyle;
-use crate::styles::utils::{apply_base_component_style, apply_design_styles, apply_label_styles_to_child, resolve_style_by_state};
-use crate::widgets::{CheckBox};
+use crate::styling::convert::{CssClass, CssSource, TagName};
+use crate::{BindToID, CurrentWidgetState, ExtendedUiConfiguration, UIGenID, UIWidgetState};
+use crate::styling::paint::Colored;
+use crate::widgets::CheckBox;
 
 #[derive(Component)]
-struct CheckBoxRoot;
+struct CheckBoxBase;
 
 #[derive(Component)]
 struct CheckBoxLabel;
@@ -21,120 +18,133 @@ pub struct CheckBoxWidget;
 
 impl Plugin for CheckBoxWidget {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (
-            internal_generate_component_system,
-            internal_style_update_que
-                .after(internal_generate_component_system)
-        ));
+        app.add_systems(Update, internal_node_creation_system);
     }
 }
 
-fn internal_generate_component_system(
+fn internal_node_creation_system(
     mut commands: Commands,
-    query: Query<(Entity, &UiGenID, &CheckBox), (Without<CheckBoxRoot>, With<CheckBox>)>,
+    query: Query<(Entity, &UIGenID, &CheckBox, Option<&CssSource>), (With<CheckBox>, Without<CheckBoxBase>)>,
     config: Res<ExtendedUiConfiguration>
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
-    for (entity, gen_id, checkbox) in query.iter() {
-        commands.entity(entity).insert((
-            Name::new(format!("CheckBox-{}", gen_id.0)),
-            Node::default(),
-            BorderRadius::default(),
-            BorderColor::default(),
-            BackgroundColor::default(),
-            BoxShadow::default(),
-            Checked(Styling::CheckBox(CheckBoxStyle {
-                check_border_color: Colored::hex_to_color("#4acf6c"),
-                check_background: Colored::hex_to_color("#4acf6c"),
-                ..default()
-            })),
-            RenderLayers::layer(*layer),
-            CheckBoxRoot,
-        ))
-            .observe(on_internal_click)
-            .with_children(|builder| {
-            builder.spawn((
-                Name::new(format!("Check-Mark-{}", gen_id.0)),
-                Node {
-                    display: Display::Flex,
-                    justify_content: JustifyContent::Center,
-                    align_items: AlignItems::Center,
-                    ..default()
-                },
-                RenderLayers::layer(*layer),
-                BorderRadius::default(),
-                BorderColor::default(),
-                BackgroundColor::default(),
-                BoxShadow::default(),
-                CheckBoxMark,
-                PickingBehavior::IGNORE,
-                BindToID(gen_id.0)
-            ));
+    for (entity, id, checkbox, source_opt) in query.iter() {
+        let mut css_source = CssSource(String::from("assets/css/core.css"));
+        if let Some(source) = source_opt {
+            css_source = source.clone();
+        }
 
-            builder.spawn((
-                Name::new(format!("Check-Label-{}", gen_id.0)),
-                Text::new(checkbox.label.clone()),
-                TextFont::default(),
-                TextColor::default(),
-                TextLayout::default(),
-                RenderLayers::layer(*layer),
-                CheckBoxLabel,
-                PickingBehavior::IGNORE,
-                BindToID(gen_id.0),
-            ));
-        });
+        commands.entity(entity).insert((
+            Name::new(format!("CheckBox-{}", checkbox.w_count)),
+            Node {
+                width: Val::Px(200.0),
+                height: Val::Px(40.0),
+                display: Display::Flex,
+                justify_content: JustifyContent::Start,
+                align_items: AlignItems::Start,
+                ..default()
+            },
+            BackgroundColor::default(),
+            BorderColor::default(),
+            BorderRadius::default(),
+            BoxShadow::new(Colored::TRANSPARENT, Val::Px(0.), Val::Px(0.), Val::Px(0.), Val::Px(0.)),
+            css_source.clone(),
+            TagName(String::from("checkbox")),
+            RenderLayers::layer(*layer),
+            CheckBoxBase,
+            children![
+                (
+                    Name::new(format!("Check-Mark-{}", checkbox.w_count)),
+                    Node {
+                      display: Display::Flex,
+                      justify_content: JustifyContent::Center,
+                      align_items: AlignItems::Center,
+                      ..default()
+                    },
+                    BackgroundColor::default(),
+                    BorderColor::default(),
+                    BorderRadius::default(),
+                    BoxShadow::new(Colored::TRANSPARENT, Val::Px(0.), Val::Px(0.), Val::Px(0.), Val::Px(0.)),
+                    css_source.clone(),
+                    UIWidgetState::default(),
+                    CssClass(vec!["mark-box".to_string()]),
+                    Pickable::IGNORE,
+                    BindToID(id.0),
+                    RenderLayers::layer(*layer),
+                    CheckBoxMark,
+                ),
+                (
+                    Name::new(format!("Check-Label-{}", checkbox.w_count)),
+                    Text::new(checkbox.label.clone()),
+                    TextColor::default(),
+                    TextFont::default(),
+                    TextLayout::default(),
+                    css_source.clone(),
+                    UIWidgetState::default(),
+                    CssClass(vec!["check-text".to_string()]),
+                    Pickable::IGNORE,
+                    BindToID(id.0),
+                    RenderLayers::layer(*layer),
+                    CheckBoxLabel
+                )
+            ]
+        )).observe(on_internal_click)
+            .observe(on_internal_cursor_entered)
+            .observe(on_internal_cursor_leave);
     }
 }
 
 fn on_internal_click(
-    event: Trigger<Pointer<Click>>, 
-    mut query: Query<(Entity, &mut CheckBox, &CheckBoxStyle, &UiGenID), With<CheckBox>>,
-    inner_query: Query<(Entity, &BindToID, Option<&Children>), With<CheckBoxMark>>,
+    trigger: Trigger<Pointer<Click>>,
     mut commands: Commands,
+    mut query: Query<(&mut UIWidgetState, &UIGenID, &CheckBox, &CssSource), With<CheckBox>>,
+    inner_query: Query<(Entity, &BindToID, Option<&Children>, &ComputedNode), With<CheckBoxMark>>,
+    mut current_widget_state: ResMut<CurrentWidgetState>,
     config: Res<ExtendedUiConfiguration>,
-    asset_server: Res<AssetServer>,
+    asset_server: Res<AssetServer>
 ) {
-    let target = event.target;
     let layer = config.render_layers.first().unwrap_or(&1);
-    for (entity, mut checkbox, style, ui_id) in query.iter_mut() {
-        if target.eq(&entity) {
-            checkbox.checked = !checkbox.checked;
+    if let Ok((mut state, gen_id, checkbox, css_source)) = query.get_mut(trigger.target) {
+        state.focused = true;
+        state.checked = !state.checked;
+        current_widget_state.widget_id = gen_id.0;
 
-            for (inner_entity, bind_to, children) in inner_query.iter() {
-                if ui_id.0 != bind_to.0 {
-                    continue;
-                }
+        for (entity, id, children_opt, computed_node) in inner_query.iter() {
+            if gen_id.0 != id.0 {
+                continue;
+            }
+            
+            let width = computed_node.size.x / 1.5;
+            let height = computed_node.size.y / 1.5;
 
-                if checkbox.checked {
-                    let mut child = None;
-                    commands.entity(inner_entity).with_children(|builder| {
-                        let in_child = builder.spawn((
-                            Name::new(format!("Mark-{}", ui_id.0)),
-                            Node {
-                                width: Val::Px(style.check_size / 1.5),
-                                height: Val::Px(style.check_size / 1.5),
-                                ..default()
-                            },
-                            PickingBehavior::IGNORE,
-                            RenderLayers::layer(*layer),
-                        )).id();
+            if state.checked {
+                let mut child = None;
+                commands.entity(entity).with_children(|builder| {
+                    let in_child = builder.spawn((
+                        Name::new(format!("Mark-{}", checkbox.w_count)),
+                        Node {
+                            width: Val::Px(width),
+                            height: Val::Px(height),
+                            ..default()
+                        },
+                        Pickable::IGNORE,
+                        css_source.clone(),
+                        UIWidgetState::default(),
+                        CssClass(vec!["mark".to_string()]),
+                        RenderLayers::layer(*layer),
+                    )).id();
+                    child = Some(in_child);
+                });
 
-                        child = Some(in_child);
-                    });
-
-                    if let Some(child) = child {
-                        if let Some(path) = style.icon_path.clone() {
-                            commands.entity(child).insert(ImageNode::new(asset_server.load(path)).with_color(style.check_color));
-                        } else {
-                            commands.entity(child).insert(BackgroundColor(style.check_color));
-                        }
+                if let Some(child) = child {
+                    if let Some(path) = checkbox.icon_path.clone() {
+                        commands.entity(child).insert(ImageNode::new(asset_server.load(path)));
                     }
-
-                } else {
-                    if let Some(children) = children {
-                        for child in children.iter() {
-                            commands.entity(*child).despawn_recursive();
-                        }
+                }
+            } else {
+                if let Some(children) = children_opt {
+                    for child in children.iter() {
+                        commands.entity(child).despawn();
                     }
                 }
             }
@@ -142,81 +152,20 @@ fn on_internal_click(
     }
 }
 
-fn internal_style_update_que(
-    mut query: Query<(&UiElementState, &UiGenID, &Children, &CheckBox, &CheckBoxStyle, 
-                      Option<&Hover>, Option<&Checked>, Option<&Selected>, Option<&Disabled>,
-                      &mut Node,
-                      &mut BackgroundColor,
-                      &mut BoxShadow,
-                      &mut BorderRadius,
-                      &mut BorderColor
-    ), With<CheckBox>>,
-    mut label_query: Query<(&BindToID, &mut TextColor, &mut TextFont, &mut TextLayout)>,
-    mut mark_query: Query<(&BindToID,
-                           &mut Node,
-                           &mut BackgroundColor,
-                           &mut BoxShadow,
-                           &mut BorderRadius,
-                           &mut BorderColor),
-        Without<CheckBox>>,
+fn on_internal_cursor_entered(
+    trigger: Trigger<Pointer<Over>>,
+    mut query: Query<&mut UIWidgetState, With<CheckBox>>,
 ) {
-    for (state, ui_id, children, check_box, style, 
-        hover_style, checked_style, selected_style, disabled_style,
-        mut node,
-        mut background_color,
-        mut box_shadow,
-        mut border_radius,
-        mut border_color) in query.iter_mut() {
-        let mut internal_style = resolve_style_by_state(
-            &Styling::CheckBox(style.clone()),
-            state,
-            hover_style,
-            selected_style,
-            disabled_style,
-        );
-        
-        if check_box.checked {
-            if let Some(checked) = checked_style {
-                internal_style = checked.0.clone();
-            }
-        }
+    if let Ok(mut state) = query.get_mut(trigger.target) {
+        state.hovered = true;
+    }
+}
 
-        if let Styling::CheckBox(check_box_style) = internal_style {
-            apply_base_component_style(&check_box_style.style, &mut node);
-            apply_design_styles(&check_box_style.style, &mut background_color, &mut border_color, &mut border_radius, &mut box_shadow);
-
-            for child in children.iter() {
-                apply_label_styles_to_child(*child, ui_id, &check_box_style.label_style, &mut label_query);
-
-                if let Ok((bind_to, mut node, mut check_background_color,
-                              mut check_box_shadow, mut check_border_radius,
-                              mut check_border_color)) = mark_query.get_mut(*child) {
-                    if bind_to.0 != ui_id.0 {
-                        continue;
-                    }
-
-                    node.width = Val::Px(check_box_style.check_size);
-                    node.height = Val::Px(check_box_style.check_size);
-                    node.border = check_box_style.check_border;
-                    if let Some(apply_box_shadow) = check_box_style.check_box_shadow {
-                        check_box_shadow.color = apply_box_shadow.color;
-                        check_box_shadow.blur_radius = apply_box_shadow.blur_radius;
-                        check_box_shadow.spread_radius = apply_box_shadow.spread_radius;
-                        check_box_shadow.x_offset = apply_box_shadow.x_offset;
-                        check_box_shadow.y_offset = apply_box_shadow.y_offset;
-                    } else {
-                        check_box_shadow.color = Color::srgba(0.0, 0.0, 0.0, 0.0);
-                        check_box_shadow.blur_radius = Val::Px(0.);
-                        check_box_shadow.spread_radius = Val::Px(0.);
-                    }
-                    check_border_radius.top_left = check_box_style.check_border_radius.top_left;
-                    check_border_radius.top_right = check_box_style.check_border_radius.top_right;
-                    check_border_radius.bottom_left = check_box_style.check_border_radius.bottom_left;
-                    check_border_radius.bottom_right = check_box_style.check_border_radius.bottom_right;
-                    check_border_color.0 = check_box_style.check_border_color;
-                    check_background_color.0 = check_box_style.check_background;
-                }
-            }
-        }
+fn on_internal_cursor_leave(
+    trigger: Trigger<Pointer<Out>>,
+    mut query: Query<&mut UIWidgetState, With<CheckBox>>,
+) {
+    if let Ok(mut state) = query.get_mut(trigger.target) {
+        state.hovered = false;
     }
 }

@@ -1,53 +1,17 @@
+use std::collections::HashMap;
 use std::time::Duration;
 use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
-use bevy::utils::HashMap;
-use crate::global::{UiGenID, UiElementState, BindToID};
-use crate::resources::{CurrentElementSelected, ExtendedUiConfiguration};
-use crate::styles::{LabelStyle, Style};
-use crate::styles::css_types::Colored;
-use crate::styles::state_styles::{Base, Disabled, Filled, Hover, Selected, Styling};
-use crate::styles::types::InputStyle;
-use crate::styles::utils::{apply_base_component_style, apply_design_styles, resolve_style_by_state};
-use crate::widgets::InputField;
-
-#[derive(Reflect, Default, Debug, Clone, Eq, PartialEq)]
-pub enum InputType {
-    #[default]
-    Text,
-    Password,
-    Number
-}
-
-impl InputType {
-    pub fn is_valid_char(&self, c: char) -> bool {
-        match self {
-            InputType::Text | InputType::Password => true,
-            InputType::Number => c.is_ascii_digit() || "+-*/() ".contains(c),
-        }
-    }
-}
-
-#[derive(Reflect, Default, Debug, Clone, Eq, PartialEq)]
-pub enum InputCap {
-    #[default]
-    NoCap,
-    CapAtNodeSize,
-    CapAt(usize), // 0 means no cap!
-}
-
-impl InputCap {
-    pub fn get_value(&self) -> usize {
-        match self {
-            Self::CapAt(value) => *value,
-            Self::NoCap => 0,
-            Self::CapAtNodeSize => 0
-        }
-    }
-}
+use crate::styling::convert::{CssClass, CssSource, TagName};
+use crate::{BindToID, CurrentWidgetState, ExtendedUiConfiguration, UIGenID, UIWidgetState};
+use crate::styling::{Background, FontVal};
+use crate::styling::paint::Colored;
+use crate::styling::system::WidgetStyle;
+use crate::utils::keycode_to_char;
+use crate::widgets::{InputCap, InputField, InputType};
 
 #[derive(Component)]
-struct InputFieldRoot;
+struct InputFieldBase;
 
 #[derive(Component)]
 struct InputFieldText;
@@ -57,9 +21,6 @@ struct InputFieldIcon;
 
 #[derive(Component)]
 struct InputCursor;
-
-#[derive(Component, Clone)]
-pub struct CursorColor(pub Color);
 
 #[derive(Component)]
 struct InputContainer;
@@ -92,9 +53,7 @@ impl Plugin for InputWidget {
         app.insert_resource(KeyRepeatTimers::default());
         app.insert_resource(CursorBlinkTimer::default());
         app.add_systems(Update, (
-            internal_generate_component_system,
-            internal_style_update_que
-                .after(internal_generate_component_system),
+            internal_node_creation_system,
             update_cursor_visibility,
             update_cursor_position,
             handle_typing,
@@ -104,178 +63,162 @@ impl Plugin for InputWidget {
     }
 }
 
-fn internal_generate_component_system(
+fn internal_node_creation_system(
     mut commands: Commands,
-    query: Query<(Entity, &UiGenID, &InputField), (Without<InputFieldRoot>, With<InputField>)>,
-    config: Res<ExtendedUiConfiguration>
+    query: Query<(Entity, &UIGenID, &InputField, Option<&CssSource>), (With<InputField>, Without<InputFieldBase>)>,
+    config: Res<ExtendedUiConfiguration>,
+    asset_server: Res<AssetServer>,
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
-    let default_input_style = InputStyle::default();
-    for (entity , gen_id, in_field) in query.iter() {
+    for (entity, id, field, source_opt) in query.iter() {
+        let mut css_source = CssSource(String::from("assets/css/core.css"));
+        if let Some(source) = source_opt {
+            css_source = source.clone();
+        }
+
         commands.entity(entity).insert((
-            Name::new(format!("InputField-{}", gen_id.0)),
+            Name::new(format!("Input-{}", field.w_count)),
             Node::default(),
-            BorderRadius::default(),
-            BorderColor::default(),
             BackgroundColor::default(),
-            BoxShadow::default(),
-            Base(Styling::InputField(default_input_style.clone())),
-            Selected(Styling::InputField(InputStyle {
-                style: Style {
-                    border_color: Colored::hex_to_color("#2aa149"),
-                    ..default_input_style.style.clone()
-                },
-                label_color: Colored::hex_to_color("#2aa149"),
-                label_font_size: 10.,
-                ..default_input_style.clone()
-            })),
-            Filled(Styling::InputField(InputStyle {
-                label_font_size: 10.,
-                ..default_input_style.clone()
-            })),
+            BorderColor::default(),
+            BorderRadius::default(),
+            BoxShadow::new(Colored::TRANSPARENT, Val::Px(0.), Val::Px(0.), Val::Px(0.), Val::Px(0.)),
+            css_source.clone(),
+            TagName(String::from("input")),
             RenderLayers::layer(*layer),
-            InputFieldRoot,
+            InputFieldBase
         )).with_children(|builder| {
-
-            // Icon on the left side
-            if let Some(icon) = in_field.icon.clone() {
+            if let Some(icon_path) = field.icon_path.clone() {
+                // Icon left
                 builder.spawn((
-                    Name::new(format!("InputIcon-{}", gen_id.0)),
-                    Node {
-                        width: Val::Px(40.0),
-                        min_width: Val::Px(40.0),
-                        height: Val::Percent(100.0),
-                        display: Display::Flex,
-                        justify_content: JustifyContent::Center,
-                        align_items: AlignItems::Center,
-                        ..default()
-                    },
+                    Name::new(format!("Input-Icon-{}", field.w_count)),
+                    Node::default(),
                     BackgroundColor::default(),
+                    BorderColor::default(),
                     BorderRadius::default(),
+                    UIWidgetState::default(),
+                    css_source.clone(),
+                    CssClass(vec!["in-icon-container".to_string()]),
+                    Pickable::IGNORE,
                     RenderLayers::layer(*layer),
-                    PickingBehavior::IGNORE,
                     InputFieldIcon,
-                    BindToID(gen_id.0),
-                )).with_children(|builder| {
-                    builder.spawn((
-                        Name::new(format!("InputIconNode-{}", gen_id.0)),
-                        ImageNode {
-                            color: Color::srgb(0.1, 0.1, 0.1),
-                            image: icon,
-                            ..default()
-                        },
-                        RenderLayers::layer(*layer),
-                        PickingBehavior::IGNORE,
-                        BindToID(gen_id.0),
-                    ));
-                });
+                    BindToID(id.0),
+                    children![
+                        (
+                            Name::new(format!("Icon-{}", field.w_count)),
+                            ImageNode {
+                                image: asset_server.load(icon_path),
+                                ..default()
+                            },
+                            UIWidgetState::default(),
+                            css_source.clone(),
+                            CssClass(vec!["in-icon".to_string()]),
+                            Pickable::IGNORE,
+                            RenderLayers::layer(*layer),
+                            BindToID(id.0),
+                        )
+                    ]
+                ));
             }
-
+            
+            // Overlay label
             builder.spawn((
-                Name::new(format!("Overlay-Label-{}", gen_id.0)),
-                Node {
-                    position_type: PositionType::Absolute,
-                    left: if in_field.icon.is_some() { Val::Px(40.0) } else { Val::Px(10.0) },
-                    top: Val::Px(19.5),
-                    ..default()
-                },
-                Text::new(in_field.label.clone()),
-                TextColor(Colored::BLACK),
-                TextFont { 
-                    font_size: 13.,
-                    ..default()
-                },
-                TextLayout {
-                    justify: JustifyText::Center,
-                    ..default()
-                },
+                Name::new(format!("Input-Label-{}", field.w_count)),
+                Node::default(),
+                Text::new(field.label.clone()),
+                TextColor::default(),
+                TextLayout::default(),
+                TextFont::default(),
+                UIWidgetState::default(),
+                css_source.clone(),
+                CssClass(vec!["input-label".to_string()]),
+                Pickable::IGNORE,
                 RenderLayers::layer(*layer),
-                PickingBehavior::IGNORE,
-                BindToID(gen_id.0),
-                OverlayLabel
+                OverlayLabel,
+                BindToID(id.0)
             ));
             
-            // Text Area in the Field
+            // Text content children
             builder.spawn((
-                Name::new(format!("TextContainer-{}", gen_id.0)),
-                Node {
-                    height: Val::Percent(100.),
-                    width: if in_field.icon.is_some() { Val::Percent(80.) } else { Val::Percent(95.) },
-                    max_width: if in_field.icon.is_some() { Val::Percent(80.) } else { Val::Percent(95.) },
-                    display: Display::Flex,
-                    justify_content: JustifyContent::FlexStart,
-                    align_items: AlignItems::Center,
-                    overflow: Overflow {
-                        y: OverflowAxis::Hidden,
-                        x: OverflowAxis::Scroll,
-                    },
-                    padding: if in_field.icon.is_some() { UiRect::left(Val::Px(0.0)) } else { UiRect::left(Val::Px(10.0)) },
-                    ..default()
-                },
+                Name::new(format!("Input-Text-Container-{}", field.w_count)),
+                Node::default(),
+                BackgroundColor::default(),
+                BorderColor::default(),
+                BorderRadius::default(),
+                UIWidgetState::default(),
+                css_source.clone(),
+                CssClass(vec!["in-text-container".to_string()]),
+                Pickable::IGNORE,
                 RenderLayers::layer(*layer),
-                PickingBehavior::IGNORE,
-                BindToID(gen_id.0),
-                InputContainer
-            )).with_children(|builder| {
-
-                builder.spawn((
-                    Name::new(format!("InputCursor-{}", gen_id.0)),
-                    Node {
-                        width: Val::Px(1.5),
-                        height: Val::Px(18.0),
-                        ..default()
-                    },
-                    BackgroundColor(Color::WHITE),
-                    RenderLayers::layer(*layer),
-                    Visibility::Hidden,
-                    PickingBehavior::IGNORE,
-                    InputCursor,
-                    BindToID(gen_id.0),
-                ));
-                
-                builder.spawn((
-                    Name::new(format!("Input-Text-{}", gen_id.0)),
-                    Node {
-                        width: Val::Percent(90.0),
-                        ..default()
-                    },
-                    Text::new(in_field.text.clone()),
-                    TextColor::default(),
-                    TextFont::default(),
-                    TextLayout::default(),
-                    PickingBehavior::IGNORE,
-                    RenderLayers::layer(*layer),
-                    InputFieldText,
-                    BindToID(gen_id.0),
-                ));
-
-            });
-
-        })
-            .observe(on_internal_mouse_click)
-            .observe(on_internal_mouse_entered)
-            .observe(on_internal_mouse_leave);
+                InputContainer,
+                BindToID(id.0),
+                children![
+                    // Input Cursor
+                    (
+                        Name::new(format!("Cursor-{}", field.w_count)),
+                        Node::default(),
+                        BackgroundColor::default(),
+                        BorderColor::default(),
+                        BorderRadius::default(),
+                        UIWidgetState::default(),
+                        css_source.clone(),
+                        CssClass(vec!["input-cursor".to_string()]),
+                        Visibility::Hidden,
+                        Pickable::IGNORE,
+                        RenderLayers::layer(*layer),
+                        InputCursor,
+                        BindToID(id.0),
+                    ),
+                    // Input Text
+                    (
+                        Name::new(format!("Text-{}", field.w_count)),
+                        Node::default(),
+                        Text::new(field.text.clone()),
+                        TextColor::default(),
+                        TextLayout::default(),
+                        TextFont::default(),
+                        UIWidgetState::default(),
+                        css_source.clone(),
+                        CssClass(vec!["input-text".to_string()]),
+                        Pickable::IGNORE,
+                        RenderLayers::layer(*layer),
+                        InputFieldText,
+                        BindToID(id.0),
+                    )
+                ]
+            ));
+        }).observe(on_internal_click)
+            .observe(on_internal_cursor_entered)
+            .observe(on_internal_cursor_leave);
     }
 }
+
+// ===============================================
+//             Intern Functions
+// ===============================================
 
 fn update_cursor_visibility(
     time: Res<Time>,
     mut cursor_blink_timer: ResMut<CursorBlinkTimer>,
-    mut cursor_query: Query<(&mut Visibility, &mut BackgroundColor, &BindToID), With<InputCursor>>,
-    mut input_field_query: Query<(&InputField, &mut UiElementState, &UiGenID), With<InputFieldRoot>>, // Assuming Focus component indicates if field is focused
+    mut cursor_query: Query<(&mut Visibility, &mut BackgroundColor, &mut WidgetStyle, &BindToID), With<InputCursor>>,
+    mut input_field_query: Query<(&InputField, &mut UIWidgetState, &UIGenID), With<InputFieldBase>>, // Assuming Focus component indicates if field is focused
     mut text_query: Query<(&mut Text, &BindToID), With<InputFieldText>>,
 ) {
     cursor_blink_timer.timer.tick(time.delta());
 
-    for (mut visibility, mut background, bind_cursor_id) in cursor_query.iter_mut() {
+    for (mut visibility, mut background, mut styles, bind_cursor_id) in cursor_query.iter_mut() {
         for (in_field, state, ui_id) in input_field_query.iter_mut() {
             if bind_cursor_id.0 != ui_id.0 {
                 continue;
             }
             // Show the cursor if the input field is focused
-            if state.selected {
+            if state.focused {
                 let alpha = (cursor_blink_timer.timer.elapsed_secs() * 2.0 * std::f32::consts::PI).sin() * 0.5 + 0.5;
                 background.0.set_alpha(alpha);
+
+                for (_, style)  in styles.styles.iter_mut() {
+                    style.background = Some(Background { color: background.0, ..default() });
+                }
 
                 if !visibility.eq(&Visibility::Visible) {
 
@@ -286,7 +229,7 @@ fn update_cursor_visibility(
                         }
                         if in_field.input_type.eq(&InputType::Password) {
                             if in_field.text.is_empty() {
-                                text.0 = in_field.placeholder_text.clone();
+                                text.0 = in_field.placeholder.clone();
                             } else {
                                 let masked_text: String = "*".repeat(in_field.text.chars().count());
                                 text.0 = masked_text;
@@ -294,7 +237,7 @@ fn update_cursor_visibility(
                         } else {
                             let mut show_text = in_field.text.clone();
                             if show_text.is_empty() {
-                                show_text = in_field.placeholder_text.clone();
+                                show_text = in_field.placeholder.clone();
                             }
                             text.0 = show_text;
                         }
@@ -320,16 +263,17 @@ fn update_cursor_visibility(
 
 fn update_cursor_position(
     mut key_repeat: ResMut<KeyRepeatTimers>,
-    mut cursor_query: Query<(&mut Node, &BindToID), With<InputCursor>>,
-    mut text_field_query: Query<(&mut InputField, &InputStyle, &UiGenID)>,
+    mut cursor_query: Query<(&mut Node, &mut WidgetStyle, &BindToID), With<InputCursor>>,
+    mut text_field_query: Query<(&mut InputField, &UIGenID), (With<InputField>, Without<InputCursor>)>,
+    text_query: Query<(&TextFont, &BindToID), (With<InputFieldText>, Without<InputCursor>)>,
     keyboard_input: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
 ) {
     let initial_delay = 0.3;
     let repeat_rate = 0.07;
 
-    for (mut cursor_node, bind_id) in cursor_query.iter_mut() {
-        for (mut text_field, internal_style, ui_id) in text_field_query.iter_mut() {
+    for (mut cursor_node, mut styles, bind_id) in cursor_query.iter_mut() {
+        for (mut text_field, ui_id) in text_field_query.iter_mut() {
             if bind_id.0 != ui_id.0 {
                 continue;
             }
@@ -373,8 +317,19 @@ fn update_cursor_position(
                 }
             }
 
-            let cursor_x_position = calculate_cursor_x_position(&text_field, text_field.cursor_position, &internal_style.label_style);
+            let Some((text_font, _)) = text_query
+                .iter()
+                .find(|(_, bind_id)| bind_id.0 == ui_id.0)
+            else {
+                continue;
+            };
+
+            let cursor_x_position = calculate_cursor_x_position(&text_field, text_field.cursor_position, text_font);
             cursor_node.left = Val::Px(cursor_x_position);
+
+            for (_, style) in styles.styles.iter_mut() {
+                style.left = Some(cursor_node.left);
+            }
         }
     }
 
@@ -386,22 +341,26 @@ fn update_cursor_position(
 fn handle_input_horizontal_scroll(
     mut query: Query<(
         &InputField,
-        &InputStyle,
-        &UiGenID
-    ), With<InputFieldRoot>>,
-    mut scroll_query: Query<(&mut ScrollPosition, &BindToID), With<BindToID>>,
-    text_node_query: Query<(&ComputedNode, &BindToID), With<InputFieldText>>
+        &UIGenID,
+        &UIWidgetState
+    ), With<InputFieldBase>>,
+    mut scroll_query: Query<(&mut ScrollPosition, &BindToID), With<InputContainer>>,
+    text_node_query: Query<(&ComputedNode, &BindToID, &TextFont), With<InputFieldText>>
 ) {
-    for (input_field, internal_style, ui_id) in &mut query {
-        let char_width = internal_style.label_style.font_size;
-        let cursor_x = input_field.cursor_position as f32 * char_width;
+    for (input_field, ui_id, state) in &mut query {
+        if !state.focused {
+            continue;
+        }
 
-        let Some((text_node, _)) = text_node_query
+        let Some((text_node, _, text_font)) = text_node_query
             .iter()
-            .find(|(_, bind_id)| bind_id.0 == ui_id.0)
+            .find(|(_, bind_id, _)| bind_id.0 == ui_id.0)
         else {
             continue;
         };
+
+        let char_width = text_font.font_size;
+        let cursor_x = input_field.cursor_position as f32 * char_width;
 
         let available_width = text_node.size().x - 10.0;
 
@@ -434,9 +393,9 @@ fn handle_input_horizontal_scroll(
 fn handle_typing(
     time: Res<Time>,
     mut key_repeat: ResMut<KeyRepeatTimers>,
-    mut query: Query<(&mut InputField, &mut UiElementState, &InputStyle, &UiGenID)>,
+    mut query: Query<(&mut InputField, &mut UIWidgetState, &WidgetStyle, &UIGenID)>,
     keyboard: Res<ButtonInput<KeyCode>>,
-    mut text_query: Query<(&mut Text, &mut TextColor, &ComputedNode, &BindToID), (With<InputFieldText>, With<BindToID>)>,
+    mut text_query: Query<(&mut Text, &mut TextColor, &WidgetStyle, &ComputedNode, &BindToID), (With<InputFieldText>, With<BindToID>)>,
 ) {
     let shift = keyboard.pressed(KeyCode::ShiftLeft) || keyboard.pressed(KeyCode::ShiftRight);
     let alt = keyboard.pressed(KeyCode::AltLeft) || keyboard.pressed(KeyCode::AltRight);
@@ -445,12 +404,12 @@ fn handle_typing(
     let repeat_rate = 0.07;
 
     for (mut in_field, mut state, style, ui_id) in query.iter_mut() {
-        if state.selected {
-            for (mut text, mut text_color, computed_node, bind_id) in text_query.iter_mut() {
+        if state.focused {
+            for (mut text, mut text_color, widget_style, computed_node, bind_id) in text_query.iter_mut() {
                 if bind_id.0 == ui_id.0 {
                     // ENTER
                     if keyboard.just_pressed(KeyCode::Enter) {
-                        state.selected = false;
+                        state.focused = false;
                         if in_field.clear_after_focus_lost {
                             in_field.text.clear();
                             text.0 = in_field.text.clone();
@@ -471,8 +430,8 @@ fn handle_typing(
                             }
                         }
                         if text.0.is_empty() {
-                            text_color.0 = style.placeholder_color;
-                            text.0 = in_field.placeholder_text.clone();
+                            text_color.0 = get_active_text_color(widget_style);
+                            text.0 = in_field.placeholder.clone();
                         }
                         key_repeat.timers.insert(
                             KeyCode::Backspace,
@@ -488,7 +447,7 @@ fn handle_typing(
                             }
                             if keyboard.just_pressed(*key) {
                                 let pos = in_field.cursor_position;
-                                
+
                                 if in_field.cap_text_at.get_value() > 0 {
                                     let cap = in_field.cap_text_at.clone();
                                     if pos >= cap.get_value() {
@@ -497,7 +456,11 @@ fn handle_typing(
                                 }
 
                                 if in_field.cap_text_at.eq(&InputCap::CapAtNodeSize) {
-                                    let allowed_char_len = (computed_node.size().x / (style.label_style.font_size)).round() as usize;
+                                    let allowed_char_len = (computed_node.size().x / (
+                                        if let Some(active_style) = style.active_style.clone() { 
+                                            active_style.font_size.unwrap_or(FontVal::Px(13.)).get(None) 
+                                        } else { 13. }
+                                        )).round() as usize;
                                     if pos >= allowed_char_len {
                                         return;
                                     }
@@ -513,7 +476,7 @@ fn handle_typing(
                                     in_field.cursor_position += 1;
                                     text.0 = in_field.text.clone();
                                 }
-                                text_color.0 = style.label_style.color;
+                                text_color.0 = get_active_text_color(widget_style);
                                 key_repeat.timers.insert(
                                     *key,
                                     Timer::from_seconds(initial_delay, TimerMode::Once),
@@ -567,17 +530,17 @@ fn handle_typing(
 }
 
 fn handle_overlay_label(
-    query: Query<(&UiElementState, &UiGenID, &InputField, &Children), With<InputField>>,
-    mut label_query: Query<(&BindToID, &mut Node, &mut TextFont), With<OverlayLabel>>,
+    query: Query<(&UIWidgetState, &UIGenID, &InputField, &Children), With<InputField>>,
+    mut label_query: Query<(&BindToID, &mut Node, &mut TextFont, &mut WidgetStyle), With<OverlayLabel>>,
 ) {
     for (state, gen_id, in_field, children) in query.iter() {
         for child in children.iter() {
-            if let Ok((bind_to, mut node, mut text_font)) = label_query.get_mut(*child) {
+            if let Ok((bind_to, mut node, mut text_font, mut styles)) = label_query.get_mut(child) {
                 if bind_to.0 != gen_id.0 {
                     continue;
                 }
 
-                if state.selected {
+                if state.focused {
                     node.top = Val::Px(5.);
                     text_font.font_size = 10.;
                 } else {
@@ -586,78 +549,21 @@ fn handle_overlay_label(
                         text_font.font_size = 13.;
                     }
                 }
+
+                for (_, style) in styles.styles.iter_mut() {
+                    style.top = Some(node.top);
+                    style.font_size = Some(FontVal::Px(text_font.font_size));
+                }
             }
         }
     }
 }
 
-fn keycode_to_char(key: KeyCode, shift: bool, alt: bool) -> Option<char> {
-    match key {
-        KeyCode::KeyA => Some(if shift { 'A' } else { 'a' }),
-        KeyCode::KeyB => Some(if shift { 'B' } else { 'b' }),
-        KeyCode::KeyC => Some(if shift { 'C' } else { 'c' }),
-        KeyCode::KeyD => Some(if shift { 'D' } else { 'd' }),
-        KeyCode::KeyE => Some(if shift { 'E' } else if alt { 'E' } else { 'e' }),
-        KeyCode::KeyF => Some(if shift { 'F' } else { 'f' }),
-        KeyCode::KeyG => Some(if shift { 'G' } else { 'g' }),
-        KeyCode::KeyH => Some(if shift { 'H' } else { 'h' }),
-        KeyCode::KeyI => Some(if shift { 'I' } else { 'i' }),
-        KeyCode::KeyJ => Some(if shift { 'J' } else { 'j' }),
-        KeyCode::KeyK => Some(if shift { 'K' } else { 'k' }),
-        KeyCode::KeyL => Some(if shift { 'L' } else { 'l' }),
-        KeyCode::KeyM => Some(if shift { 'M' } else { 'm' }),
-        KeyCode::KeyN => Some(if shift { 'N' } else { 'n' }),
-        KeyCode::KeyO => Some(if shift { 'O' } else { 'o' }),
-        KeyCode::KeyP => Some(if shift { 'P' } else { 'p' }),
-        KeyCode::KeyQ => Some(if shift { 'Q' } else if alt { '@' } else { 'q' }),
-        KeyCode::KeyR => Some(if shift { 'R' } else { 'r' }),
-        KeyCode::KeyS => Some(if shift { 'S' } else { 's' }),
-        KeyCode::KeyT => Some(if shift { 'T' } else { 't' }),
-        KeyCode::KeyU => Some(if shift { 'U' } else { 'u' }),
-        KeyCode::KeyV => Some(if shift { 'V' } else { 'v' }),
-        KeyCode::KeyW => Some(if shift { 'W' } else { 'w' }),
-        KeyCode::KeyX => Some(if shift { 'X' } else { 'x' }),
-        KeyCode::KeyY => Some(if shift { 'Z' } else { 'z' }),
-        KeyCode::KeyZ => Some(if shift { 'Y' } else { 'y' }),
-        KeyCode::Digit0 => Some(if shift { '=' } else if alt { '}' } else { '0' }),
-        KeyCode::Digit1 => Some(if shift { '!' } else if alt { '1' } else { '1' }),
-        KeyCode::Digit2 => Some(if shift { '"' } else if alt { '2' } else { '2' }),
-        KeyCode::Digit3 => Some(if shift { '3' } else if alt { '3' } else { '3' }),
-        KeyCode::Digit4 => Some(if shift { '$' } else if alt { '4' } else { '4' }),
-        KeyCode::Digit5 => Some(if shift { '%' } else if alt { '5' } else { '5' }),
-        KeyCode::Digit6 => Some(if shift { '&' } else if alt { '6' } else { '6' }),
-        KeyCode::Digit7 => Some(if shift { '/' } else if alt { '{' } else { '7' }),
-        KeyCode::Digit8 => Some(if shift { '(' } else if alt { '[' } else { '8' }),
-        KeyCode::Digit9 => Some(if shift { ')' } else if alt { ']' } else { '9' }),
-        KeyCode::NumpadMultiply => Some('*'),
-        KeyCode::NumpadAdd => Some('+'),
-        KeyCode::NumpadSubtract => Some('-'),
-        KeyCode::NumpadDivide => Some('/'),
-        KeyCode::NumpadDecimal => Some(','),
-        KeyCode::Numpad0 => Some('0'),
-        KeyCode::Numpad1 => Some('1'),
-        KeyCode::Numpad2 => Some('2'),
-        KeyCode::Numpad3 => Some('3'),
-        KeyCode::Numpad4 => Some('4'),
-        KeyCode::Numpad5 => Some('5'),
-        KeyCode::Numpad6 => Some('6'),
-        KeyCode::Numpad7 => Some('7'),
-        KeyCode::Numpad8 => Some('8'),
-        KeyCode::Numpad9 => Some('9'),
-        KeyCode::Comma => Some(if shift {';'} else {','}),
-        KeyCode::Period => Some(if shift {':'} else {'.'}),
-        KeyCode::Slash => Some(if shift {'_'} else {'-'}),
-        KeyCode::IntlBackslash => Some(if shift {'>'} else if alt {'|'} else {'<'}),
-        KeyCode::Backquote => Some(if shift {'?'} else {'^'}),
-        KeyCode::Minus => Some(if shift {'?'} else if alt {'\\'} else {'?'}),
-        KeyCode::BracketRight => Some(if shift {'*'} else if alt {'~'} else {'+'}),
-        KeyCode::Backslash => Some(if shift {'\''} else {'#'}),
-        KeyCode::Space => Some(' '),
-        _ => None,
-    }
-}
+// ===============================================
+//             Intern Helper Functions
+// ===============================================
 
-fn calculate_cursor_x_position(text_field: &InputField, cursor_pos: usize, style: &LabelStyle) -> f32 {
+fn calculate_cursor_x_position(text_field: &InputField, cursor_pos: usize, style: &TextFont) -> f32 {
     // Ensure the cursor position is within the bounds of the text
     if text_field.text.is_empty() || cursor_pos == 0 {
         return 0.0; // No text or cursor at the start
@@ -673,135 +579,48 @@ fn calculate_cursor_x_position(text_field: &InputField, cursor_pos: usize, style
     text_width + 1.0 // Add some padding so the cursor isn't directly on the text
 }
 
-fn calculate_text_width(text: &str, style: &LabelStyle) -> f32 {
+fn calculate_text_width(text: &str, style: &TextFont) -> f32 {
     // Calculate text width based on font size
-    let font_size = style.font_size; // Default font size if none is provided
-    text.len() as f32 * font_size * 0.6 // Adjust factor based on font characteristics
+    text.len() as f32 * style.font_size * 0.6 // Adjust factor based on font characteristics
 }
 
-fn on_internal_mouse_click(
-    event: Trigger<Pointer<Click>>,
-    mut query: Query<(&mut UiElementState, &UiGenID), With<InputField>>,
-    mut current_element_selected: ResMut<CurrentElementSelected>
+fn get_active_text_color(style: &WidgetStyle) -> Color {
+    style
+        .active_style
+        .as_ref()
+        .and_then(|s| s.color)
+        .unwrap_or(Color::BLACK)
+}
+
+// ===============================================
+//                   Intern Events
+// ===============================================
+
+fn on_internal_click(
+    trigger: Trigger<Pointer<Click>>,
+    mut query: Query<(&mut UIWidgetState, &UIGenID), With<InputField>>,
+    mut current_widget_state: ResMut<CurrentWidgetState>
 ) {
-    if let Ok((mut state, gen_id)) = query.get_mut(event.target) {
-        state.selected = true;
-        current_element_selected.0 = gen_id.0;
+    if let Ok((mut state, gen_id)) = query.get_mut(trigger.target) {
+        state.focused = true;
+        current_widget_state.widget_id = gen_id.0;
     }
 }
 
-fn on_internal_mouse_entered(event: Trigger<Pointer<Over>>, mut query: Query<&mut UiElementState, With<InputField>>) {
-    if let Ok(mut state) = query.get_mut(event.target) {
+fn on_internal_cursor_entered(
+    trigger: Trigger<Pointer<Over>>,
+    mut query: Query<&mut UIWidgetState, With<InputField>>,
+) {
+    if let Ok(mut state) = query.get_mut(trigger.target) {
         state.hovered = true;
     }
 }
 
-fn on_internal_mouse_leave(event: Trigger<Pointer<Out>>, mut query: Query<&mut UiElementState, With<InputField>>) {
-    if let Ok(mut state) = query.get_mut(event.target) {
-        state.hovered = false;
-    }
-}
-
-fn internal_style_update_que(
-    mut query: Query<(&UiElementState, &UiGenID, &InputField, &Children, &InputStyle, Option<&Base>, Option<&Hover>, Option<&Selected>, Option<&Disabled>, Option<&Filled>,
-                      &mut Node,
-                      &mut BackgroundColor,
-                      &mut BoxShadow,
-                      &mut BorderRadius,
-                      &mut BorderColor
-    ), (With<InputField>, Without<InputCursor>)>,
-    cursor_blink_timer: Res<CursorBlinkTimer>,
-    mut text_query: Query<(&BindToID, &mut TextColor, &mut TextFont, &mut TextLayout), (With<InputFieldText>, Without<OverlayLabel>)>,
-    mut label_query: Query<(&BindToID, &mut TextColor, &mut TextFont), (With<OverlayLabel>, Without<InputFieldText>)>,
-    mut icon_container: Query<(&BindToID, &mut BackgroundColor, &mut BorderRadius), (With<InputFieldIcon>, Without<InputField>, Without<InputCursor>)>,
-    mut text_cursor_query: Query<(&mut BackgroundColor, &BindToID), With<InputCursor>>,
-    container_query: Query<&Children, With<InputContainer>>,
+fn on_internal_cursor_leave(
+    trigger: Trigger<Pointer<Out>>,
+    mut query: Query<&mut UIWidgetState, With<InputField>>,
 ) {
-    for (state, ui_id, in_field, children, style, base_style, hover_style, selected_style, disabled_style, filled_style,
-        mut node,
-        mut background_color,
-        mut box_shadow,
-        mut border_radius,
-        mut border_color) in query.iter_mut() {
-        let mut manipulated = style.clone();
-        if let Some(Base(style)) = base_style {
-            if let Styling::InputField(input_style) = style {
-                manipulated = input_style.clone();
-            }
-        }
-
-        if !in_field.text.is_empty() {
-            if let Some(Filled(filled)) = filled_style {
-                if let Styling::InputField(input_style) = filled {
-                    manipulated = input_style.clone();
-                }
-            }
-        }
-        
-        let internal_style = resolve_style_by_state(
-            &Styling::InputField(manipulated.clone()),
-            state,
-            hover_style,
-            selected_style,
-            disabled_style,
-        );
-
-        if let Styling::InputField(input_style) = internal_style {
-            apply_base_component_style(&input_style.style, &mut node);
-            apply_design_styles(&input_style.style, &mut background_color, &mut border_color, &mut border_radius, &mut box_shadow);
-
-            for child in children.iter() {
-                if let Ok((bind_to, mut text_color, mut text_font)) = label_query.get_mut(*child) {
-                    if bind_to.0 != ui_id.0 {
-                        continue;
-                    }
-                    
-                    text_color.0 = input_style.label_color;
-                    text_font.font_size = input_style.label_font_size;
-                }
-                
-                if let Ok((bind_to,
-                              mut icon_background,
-                              mut icon_border_radius)) =
-                    icon_container.get_mut(*child) {
-                    if bind_to.0 != ui_id.0 {
-                        continue;
-                    }
-
-                    icon_background.0 = input_style.style.background.color;
-                    icon_border_radius.top_left = input_style.style.border_radius.top_left;
-                    icon_border_radius.bottom_left = input_style.style.border_radius.top_left;
-                    icon_border_radius.top_right = Val::Px(0.);
-                    icon_border_radius.bottom_right = Val::Px(0.);
-                }
-
-                if let Ok(children) = container_query.get(*child) {
-                    for inner_child in children.iter() {
-                        if let Ok((bind_to, mut text_color, mut text_font, mut text_layout)) = text_query.get_mut(*inner_child) {
-                            if bind_to.0 != ui_id.0 {
-                                return;
-                            }
-
-                            text_color.0 = if in_field.text.is_empty() { input_style.placeholder_color } else { input_style.label_style.color };
-                            text_font.font_size = if in_field.text.is_empty() { input_style.placeholder_font_size } else { input_style.label_style.font_size };
-                            text_font.font_smoothing = input_style.label_style.smoothing;
-                            text_layout.linebreak = input_style.label_style.line_break;
-                            text_layout.justify = input_style.label_style.justify;
-                        }
-                        
-
-                        if let Ok((mut cursor_color, bind_to)) = text_cursor_query.get_mut(*inner_child) {
-                            if bind_to.0 != ui_id.0 {
-                                continue;
-                            }
-
-                            if cursor_blink_timer.timer.finished() {
-                                cursor_color.0 = input_style.label_style.color;
-                            }
-                        }
-                    }
-                }
-            }
-        }
+    if let Ok(mut state) = query.get_mut(trigger.target) {
+        state.hovered = false;
     }
 }
