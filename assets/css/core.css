@@ -45,7 +45,7 @@ checkbox .mark-box {
   width: 20px;
   height: 20px;
   border-radius: 2px;
-  border: 2px black;
+  border: 2px #303033;
 }
 
 .mark {
@@ -100,9 +100,14 @@ input {
   border-color: rgb(72, 72, 72);
   border-bottom: 2px;
   background: #E6E6E666;
+  color: #303033;
 }
 
 input:hover {
+  border-color: #3b926f;
+}
+
+input:focus {
   border-color: #3b926f;
 }
 
@@ -111,19 +116,36 @@ input .input-label {
   left: 10px;
   top: 19px;
   color: #313131;
-  font-size: 13px;
+  font-size: 14px;
+}
+
+input .in-text-container {
+  height: 100%;
+  width: 95%;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  overflow-y: hidden;
+  overflow-x: scroll;
+  padding-left: 10px;
 }
 
 input:hover .input-label {
   color: #3b926f;
 }
 
+input:focus .input-label {
+  color: #3b926f;
+}
+
 .input-text {
-  font-size: 13px;
+  font-size: 15px;
+  width: 250px;
+  color: #303033;
 }
 
 .input-cursor {
   width: 2px;
   height: 20px;
-  background: black;
+  background: #303033;
 }

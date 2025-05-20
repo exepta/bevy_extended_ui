@@ -15,6 +15,8 @@ static CSS_CACHE: Lazy<RwLock<HashMap<String, HashMap<String, Style>>>> = Lazy::
 pub struct WidgetStyle {
     pub css_path: String,
     pub styles: HashMap<String, Style>,
+    /// This is only for reading styles! Don't mut them!
+    pub active_style: Option<Style>,
 }
 
 impl WidgetStyle {
@@ -23,6 +25,7 @@ impl WidgetStyle {
             return Self {
                 css_path: path.to_string(),
                 styles: cached,
+                active_style: None,
             };
         }
 
@@ -35,6 +38,7 @@ impl WidgetStyle {
         Self {
             css_path: path.to_string(),
             styles,
+            active_style: None,
         }
     }
 
@@ -98,6 +102,7 @@ impl WidgetStyle {
         Self {
             css_path: self.css_path.clone(),
             styles: filtered,
+            active_style: None,
         }
     }
 

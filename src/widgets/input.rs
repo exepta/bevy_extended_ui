@@ -4,7 +4,7 @@ use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use crate::styling::convert::{CssClass, CssSource, TagName};
 use crate::{BindToID, CurrentWidgetState, ExtendedUiConfiguration, UIGenID, UIWidgetState};
-use crate::styling::FontVal;
+use crate::styling::{Background, FontVal};
 use crate::styling::paint::Colored;
 use crate::styling::system::WidgetStyle;
 use crate::utils::keycode_to_char;
@@ -147,7 +147,7 @@ fn internal_node_creation_system(
                 BorderRadius::default(),
                 UIWidgetState::default(),
                 css_source.clone(),
-                CssClass(vec!["input-label".to_string()]),
+                CssClass(vec!["in-text-container".to_string()]),
                 Pickable::IGNORE,
                 RenderLayers::layer(*layer),
                 InputContainer,
@@ -200,13 +200,13 @@ fn internal_node_creation_system(
 fn update_cursor_visibility(
     time: Res<Time>,
     mut cursor_blink_timer: ResMut<CursorBlinkTimer>,
-    mut cursor_query: Query<(&mut Visibility, &mut BackgroundColor, &BindToID), With<InputCursor>>,
+    mut cursor_query: Query<(&mut Visibility, &mut BackgroundColor, &mut WidgetStyle, &BindToID), With<InputCursor>>,
     mut input_field_query: Query<(&InputField, &mut UIWidgetState, &UIGenID), With<InputFieldBase>>, // Assuming Focus component indicates if field is focused
     mut text_query: Query<(&mut Text, &BindToID), With<InputFieldText>>,
 ) {
     cursor_blink_timer.timer.tick(time.delta());
 
-    for (mut visibility, mut background, bind_cursor_id) in cursor_query.iter_mut() {
+    for (mut visibility, mut background, mut styles, bind_cursor_id) in cursor_query.iter_mut() {
         for (in_field, state, ui_id) in input_field_query.iter_mut() {
             if bind_cursor_id.0 != ui_id.0 {
                 continue;
@@ -215,6 +215,10 @@ fn update_cursor_visibility(
             if state.focused {
                 let alpha = (cursor_blink_timer.timer.elapsed_secs() * 2.0 * std::f32::consts::PI).sin() * 0.5 + 0.5;
                 background.0.set_alpha(alpha);
+
+                for (_, style)  in styles.styles.iter_mut() {
+                    style.background = Some(Background { color: background.0, ..default() });
+                }
 
                 if !visibility.eq(&Visibility::Visible) {
 
@@ -259,16 +263,17 @@ fn update_cursor_visibility(
 
 fn update_cursor_position(
     mut key_repeat: ResMut<KeyRepeatTimers>,
-    mut cursor_query: Query<(&mut Node, &BindToID), With<InputCursor>>,
-    mut text_field_query: Query<(&mut InputField, &WidgetStyle, &UIGenID)>,
+    mut cursor_query: Query<(&mut Node, &mut WidgetStyle, &BindToID), With<InputCursor>>,
+    mut text_field_query: Query<(&mut InputField, &UIGenID), (With<InputField>, Without<InputCursor>)>,
+    text_query: Query<(&TextFont, &BindToID), (With<InputFieldText>, Without<InputCursor>)>,
     keyboard_input: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
 ) {
     let initial_delay = 0.3;
     let repeat_rate = 0.07;
 
-    for (mut cursor_node, bind_id) in cursor_query.iter_mut() {
-        for (mut text_field, _, ui_id) in text_field_query.iter_mut() {
+    for (mut cursor_node, mut styles, bind_id) in cursor_query.iter_mut() {
+        for (mut text_field, ui_id) in text_field_query.iter_mut() {
             if bind_id.0 != ui_id.0 {
                 continue;
             }
@@ -312,8 +317,19 @@ fn update_cursor_position(
                 }
             }
 
-            let cursor_x_position = calculate_cursor_x_position(&text_field, text_field.cursor_position, &TextFont { font_size: 13., ..default() }); // Todo: get correct size
+            let Some((text_font, _)) = text_query
+                .iter()
+                .find(|(_, bind_id)| bind_id.0 == ui_id.0)
+            else {
+                continue;
+            };
+
+            let cursor_x_position = calculate_cursor_x_position(&text_field, text_field.cursor_position, text_font);
             cursor_node.left = Val::Px(cursor_x_position);
+
+            for (_, style) in styles.styles.iter_mut() {
+                style.left = Some(cursor_node.left);
+            }
         }
     }
 
@@ -335,7 +351,7 @@ fn handle_input_horizontal_scroll(
         if !state.focused {
             continue;
         }
-        
+
         let Some((text_node, _, text_font)) = text_node_query
             .iter()
             .find(|(_, bind_id, _)| bind_id.0 == ui_id.0)
@@ -387,7 +403,7 @@ fn handle_typing(
     let initial_delay = 0.3;
     let repeat_rate = 0.07;
 
-    for (mut in_field, mut state, _style, ui_id) in query.iter_mut() {
+    for (mut in_field, mut state, style, ui_id) in query.iter_mut() {
         if state.focused {
             for (mut text, mut text_color, computed_node, bind_id) in text_query.iter_mut() {
                 if bind_id.0 == ui_id.0 {
@@ -414,7 +430,7 @@ fn handle_typing(
                             }
                         }
                         if text.0.is_empty() {
-                            text_color.0 = Color::default(); //Todo: get placeholder_color
+                            text_color.0 = get_active_text_color(style);
                             text.0 = in_field.placeholder.clone();
                         }
                         key_repeat.timers.insert(
@@ -440,7 +456,11 @@ fn handle_typing(
                                 }
 
                                 if in_field.cap_text_at.eq(&InputCap::CapAtNodeSize) {
-                                    let allowed_char_len = (computed_node.size().x / (13.0)).round() as usize; //Todo: get current fontsize
+                                    let allowed_char_len = (computed_node.size().x / (
+                                        if let Some(active_style) = style.active_style.clone() { 
+                                            active_style.font_size.unwrap_or(FontVal::Px(13.)).get(None) 
+                                        } else { 13. }
+                                        )).round() as usize;
                                     if pos >= allowed_char_len {
                                         return;
                                     }
@@ -456,7 +476,7 @@ fn handle_typing(
                                     in_field.cursor_position += 1;
                                     text.0 = in_field.text.clone();
                                 }
-                                text_color.0 = Color::BLACK; // Todo: Get current color
+                                text_color.0 = get_active_text_color(style);
                                 key_repeat.timers.insert(
                                     *key,
                                     Timer::from_seconds(initial_delay, TimerMode::Once),
@@ -529,7 +549,7 @@ fn handle_overlay_label(
                         text_font.font_size = 13.;
                     }
                 }
-                
+
                 for (_, style) in styles.styles.iter_mut() {
                     style.top = Some(node.top);
                     style.font_size = Some(FontVal::Px(text_font.font_size));
@@ -561,8 +581,15 @@ fn calculate_cursor_x_position(text_field: &InputField, cursor_pos: usize, style
 
 fn calculate_text_width(text: &str, style: &TextFont) -> f32 {
     // Calculate text width based on font size
-    let font_size = style.font_size; // Default font size if none is provided
-    text.len() as f32 * font_size * 0.6 // Adjust factor based on font characteristics
+    text.len() as f32 * style.font_size * 0.6 // Adjust factor based on font characteristics
+}
+
+fn get_active_text_color(style: &WidgetStyle) -> Color {
+    style
+        .active_style
+        .as_ref()
+        .and_then(|s| s.color)
+        .unwrap_or(Color::BLACK)
 }
 
 // ===============================================

@@ -18,7 +18,7 @@ fn update_widget_styles_system(
     mut query: Query<(
         Entity,
         Option<&UIWidgetState>,
-        &WidgetStyle,
+        &mut WidgetStyle,
     ), Or<(Changed<WidgetStyle>, Changed<UIWidgetState>)>>,
     mut style_query: Query<(
         Option<&mut Node>,
@@ -32,7 +32,7 @@ fn update_widget_styles_system(
         Option<&mut ImageNode>
     )>,
 ) {
-    for (entity, state_opt, widget_style) in query.iter_mut() {
+    for (entity, state_opt, mut widget_style) in query.iter_mut() {
         let state = state_opt.cloned().unwrap_or_default();
         
         let mut applicable: Vec<(&String, u32)> = widget_style
@@ -53,6 +53,8 @@ fn update_widget_styles_system(
         for (sel, _) in applicable {
             final_style.merge(&widget_style.styles[sel]);
         }
+        
+        widget_style.active_style = Some(final_style.clone());
         
         if let Ok((node, background, border_color, 
                       border_radius, box_shadow, text_color, 

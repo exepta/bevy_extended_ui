@@ -83,6 +83,7 @@ fn update_css_conventions(
         let final_style = WidgetStyle {
             styles: merged_styles,
             css_path: css_path.to_string(),
+            active_style: None,
         };
 
         match widget_query.get_mut(entity) {

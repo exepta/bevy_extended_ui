@@ -186,6 +186,21 @@ pub fn load_css(path: &str) -> Result<HashMap<String, Style>, String> {
                     "box-shadow" => {
                         style.box_shadow = convert_to_bevy_box_shadow(value.clone());
                     },
+                    "overflow" => {
+                        style.overflow = convert_overflow(value.clone(), "all");
+                    },
+                    "overflow-y" => {
+                        let val = convert_overflow(value.clone(), "y");
+                        let mut overflow = style.overflow.unwrap_or_default();
+                        overflow.y = val.unwrap_or(Overflow::default()).y;
+                        style.overflow = Some(overflow);
+                    },
+                    "overflow-x" => {
+                        let val = convert_overflow(value.clone(), "x");
+                        let mut overflow = style.overflow.unwrap_or_default();
+                        overflow.x = val.unwrap_or(Overflow::default()).x;
+                        style.overflow = Some(overflow);
+                    },
                     _ => {}
                 }
             }
@@ -466,6 +481,27 @@ pub fn convert_to_bevy_flex_direction(value: String) -> Option<FlexDirection> {
         "row-reverse" => { Some(FlexDirection::RowReverse) },
         "column-reverse" => { Some(FlexDirection::ColumnReverse) },
         _ => { Some(FlexDirection::default()) }
+    }
+}
+
+pub fn convert_overflow(value: String, which: &str) -> Option<Overflow> {
+    let trimmed = value.trim();
+    let overflow_axis = match trimmed {
+        "hidden" => { OverflowAxis::Hidden },
+        "scroll" => { OverflowAxis::Scroll },
+        "clip" => { OverflowAxis::Clip },
+        "visible" => { OverflowAxis::Visible },
+        _ => { OverflowAxis::default() }
+    };
+    
+    if which == "*" || which == "all" || which == "both" {
+        Some(Overflow { x: overflow_axis, y: overflow_axis })
+    } else if which == "y" {
+        Some(Overflow { y: overflow_axis, ..default() })
+    } else if which == "x" {
+        Some(Overflow { x: overflow_axis, ..default() })
+    } else {
+        return None;
     }
 }
 
