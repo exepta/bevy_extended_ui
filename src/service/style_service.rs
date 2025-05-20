@@ -155,6 +155,7 @@ fn apply_style_to_node(style: &Style, node: Option<Mut<Node>>) {
         node.border = style.border.unwrap_or_default();
         node.justify_content = style.justify_content.unwrap_or_default();
         node.align_items = style.align_items.unwrap_or_default();
+        node.overflow = style.overflow.unwrap_or_default();
 
         node.flex_direction = style.flex_direction.unwrap_or(FlexDirection::Row);
         match node.flex_direction {

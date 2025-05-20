@@ -344,7 +344,7 @@ fn handle_input_horizontal_scroll(
         &UIGenID,
         &UIWidgetState
     ), With<InputFieldBase>>,
-    mut scroll_query: Query<(&mut ScrollPosition, &BindToID), With<BindToID>>,
+    mut scroll_query: Query<(&mut ScrollPosition, &BindToID), With<InputContainer>>,
     text_node_query: Query<(&ComputedNode, &BindToID, &TextFont), With<InputFieldText>>
 ) {
     for (input_field, ui_id, state) in &mut query {
