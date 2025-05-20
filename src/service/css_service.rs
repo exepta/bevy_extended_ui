@@ -61,11 +61,11 @@ fn update_css_conventions(
                 2 => {
                     // Parent > Child selector
                     if let Some(parent) = parent_opt {
-                        if let Ok((pid_opt, pclass_opt, ptag)) = parent_query.get(parent.parent()) {
+                        if let Ok((pid_opt, p_class_opt, p_tag)) = parent_query.get(parent.parent()) {
                             let parent_sel = parts[0];
                             let child_sel = parts[1];
 
-                            let parent_matches = matches_selector(parent_sel, pid_opt, pclass_opt, Some(ptag));
+                            let parent_matches = matches_selector(parent_sel, pid_opt, p_class_opt, Some(p_tag));
                             let child_matches = matches_selector(child_sel, id_opt, class_opt, tag_opt);
 
                             if parent_matches && child_matches {

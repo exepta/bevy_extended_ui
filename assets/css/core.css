@@ -144,6 +144,10 @@ input:focus .input-label {
   color: #303033;
 }
 
+input .in-text-container .input-text {
+  color: #ff926a;
+}
+
 .input-cursor {
   width: 2px;
   height: 20px;
