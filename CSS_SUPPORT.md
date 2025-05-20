@@ -256,3 +256,41 @@ div {
     box-shadow: 2px 2px 10px 20px black;
 }
 ```
+
+#### Overflow
+```css
+div {
+    overflow: hidden;
+}
+```
+
+This hide the x and y overflow of the current object
+
+#### Overflow-x
+```css
+div {
+    overflow-x: visible;
+}
+```
+
+#### Overflow-y
+```css
+div {
+    overflow-y: scroll;
+}
+```
+
+#### Text-Wrap
+```css
+div {
+    text-wrap: nowrap;
+}
+```
+
+Supported for Bevy node:
+- nowrap - LineBreak::NoWrap
+- wrap - LineBreak::WordOrCharacter
+- stable - LineBreak::WordOrCharacter
+- pretty - LineBreak::WordBoundary
+- balance - LineBreak::WordBoundary
+- unset - LineBreak::AnyCharacter

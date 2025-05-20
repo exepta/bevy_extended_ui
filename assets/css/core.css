@@ -48,7 +48,7 @@ checkbox .mark-box {
   border: 2px #303033;
 }
 
-.mark {
+checkbox .mark-box .mark {
   color: #fff;
 }
 
@@ -138,18 +138,14 @@ input:focus .input-label {
   color: #3b926f;
 }
 
-.input-text {
+input .in-text-container .input-text {
   font-size: 15px;
   width: 100%;
   color: #303033;
   text-wrap: nowrap;
 }
 
-input .in-text-container .input-text {
-  color: #ff926a;
-}
-
-.input-cursor {
+input .in-text-container .input-cursor {
   width: 2px;
   height: 20px;
   background: #303033;

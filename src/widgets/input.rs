@@ -395,7 +395,7 @@ fn handle_typing(
     mut key_repeat: ResMut<KeyRepeatTimers>,
     mut query: Query<(&mut InputField, &mut UIWidgetState, &WidgetStyle, &UIGenID)>,
     keyboard: Res<ButtonInput<KeyCode>>,
-    mut text_query: Query<(&mut Text, &mut TextColor, &ComputedNode, &BindToID), (With<InputFieldText>, With<BindToID>)>,
+    mut text_query: Query<(&mut Text, &mut TextColor, &WidgetStyle, &ComputedNode, &BindToID), (With<InputFieldText>, With<BindToID>)>,
 ) {
     let shift = keyboard.pressed(KeyCode::ShiftLeft) || keyboard.pressed(KeyCode::ShiftRight);
     let alt = keyboard.pressed(KeyCode::AltLeft) || keyboard.pressed(KeyCode::AltRight);
@@ -405,7 +405,7 @@ fn handle_typing(
 
     for (mut in_field, mut state, style, ui_id) in query.iter_mut() {
         if state.focused {
-            for (mut text, mut text_color, computed_node, bind_id) in text_query.iter_mut() {
+            for (mut text, mut text_color, widget_style, computed_node, bind_id) in text_query.iter_mut() {
                 if bind_id.0 == ui_id.0 {
                     // ENTER
                     if keyboard.just_pressed(KeyCode::Enter) {
@@ -430,7 +430,7 @@ fn handle_typing(
                             }
                         }
                         if text.0.is_empty() {
-                            text_color.0 = get_active_text_color(style);
+                            text_color.0 = get_active_text_color(widget_style);
                             text.0 = in_field.placeholder.clone();
                         }
                         key_repeat.timers.insert(
@@ -476,7 +476,7 @@ fn handle_typing(
                                     in_field.cursor_position += 1;
                                     text.0 = in_field.text.clone();
                                 }
-                                text_color.0 = get_active_text_color(style);
+                                text_color.0 = get_active_text_color(widget_style);
                                 key_repeat.timers.insert(
                                     *key,
                                     Timer::from_seconds(initial_delay, TimerMode::Once),

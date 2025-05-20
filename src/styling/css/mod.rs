@@ -490,10 +490,10 @@ pub fn convert_to_bevy_flex_direction(value: String) -> Option<FlexDirection> {
 pub fn convert_to_bevy_line_break(value: String) -> Option<LineBreak> {
     let trimmed = value.trim();
     match trimmed {
-        "wrap" | "stable" => { Some(LineBreak::AnyCharacter) },
+        "wrap" | "stable" => { Some(LineBreak::WordOrCharacter) },
         "nowrap" => { Some(LineBreak::NoWrap) },
         "pretty" | "balance" => { Some(LineBreak::WordBoundary) },
-        "unset" => { Some(LineBreak::WordOrCharacter) },
+        "unset" => { Some(LineBreak::AnyCharacter) },
         _=> { Some(LineBreak::default()) }
     }
 }

@@ -33,7 +33,8 @@ fn update_css_conventions(
     parent_query: Query<(
         Option<&CssID>,
         Option<&CssClass>,
-        &TagName,
+        Option<&TagName>,
+        Option<&ChildOf>
     )>,
     mut widget_query: Query<Option<&mut WidgetStyle>>,
 ) {
@@ -51,32 +52,8 @@ fn update_css_conventions(
         for (selector, style) in full_style.styles.iter() {
             let parts: Vec<&str> = selector.split_whitespace().collect();
 
-            match parts.len() {
-                1 => {
-                    // Simple selector: match directly
-                    if matches_selector(parts[0], id_opt, class_opt, tag_opt) {
-                        merged_styles.insert(selector.clone(), style.clone());
-                    }
-                }
-                2 => {
-                    // Parent > Child selector
-                    if let Some(parent) = parent_opt {
-                        if let Ok((pid_opt, p_class_opt, p_tag)) = parent_query.get(parent.parent()) {
-                            let parent_sel = parts[0];
-                            let child_sel = parts[1];
-
-                            let parent_matches = matches_selector(parent_sel, pid_opt, p_class_opt, Some(p_tag));
-                            let child_matches = matches_selector(child_sel, id_opt, class_opt, tag_opt);
-
-                            if parent_matches && child_matches {
-                                merged_styles.insert(selector.clone(), style.clone());
-                            }
-                        }
-                    }
-                }
-                _ => {
-                    // Ignore deeply nested selectors for now
-                }
+            if matches_selector_chain(&parts, id_opt, class_opt, tag_opt, parent_opt, &parent_query) {
+                merged_styles.insert(selector.clone(), style.clone());
             }
         }
 
@@ -100,6 +77,42 @@ fn update_css_conventions(
             }
         }
     }
+}
+
+fn matches_selector_chain(
+    selectors: &[&str],
+    id_opt: Option<&CssID>,
+    class_opt: Option<&CssClass>,
+    tag_opt: Option<&TagName>,
+    parent_opt: Option<&ChildOf>,
+    parent_query: &Query<(Option<&CssID>, Option<&CssClass>, Option<&TagName>, Option<&ChildOf>)>,
+) -> bool {
+
+    if selectors.len() > 1 && parent_opt.is_none() {
+        return false;
+    }
+    
+    if selectors.is_empty() {
+        return true;
+    }
+
+    let current_sel = selectors.last().unwrap();
+
+    if !matches_selector(current_sel, id_opt, class_opt, tag_opt) {
+        return false;
+    }
+    
+    if selectors.len() == 1 {
+        return true;
+    }
+
+    if let Some(parent) = parent_opt {
+        if let Ok((pid_opt, p_class_opt, p_tag, p_parent_opt)) = parent_query.get(parent.parent()) {
+            return matches_selector_chain(&selectors[..selectors.len()-1], pid_opt, p_class_opt, p_tag, p_parent_opt, parent_query);
+        }
+    }
+
+    false
 }
 
 /// Matches a single selector against the given ID, class list, or tag name.

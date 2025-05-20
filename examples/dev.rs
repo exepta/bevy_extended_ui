@@ -41,6 +41,7 @@ fn test_button(mut commands: Commands) {
                     cap_text_at: InputCap::NoCap,
                     ..default()
                 },
+                CssID("input-id".to_string()),
             ),
             Button {
                 icon_path: Some(String::from("icons/pass-icon.png")),
