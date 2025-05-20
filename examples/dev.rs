@@ -6,7 +6,7 @@ use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_extended_ui::ExtendedUiPlugin;
 use bevy_extended_ui::styling::convert::{CssClass, CssID, CssSource};
 use bevy_extended_ui::styling::IconPlace;
-use bevy_extended_ui::widgets::{Button, CheckBox, Div, Slider};
+use bevy_extended_ui::widgets::{Button, CheckBox, Div, InputField, Slider};
 
 fn main() {
     let _ = App::new()
@@ -35,6 +35,9 @@ fn test_button(mut commands: Commands) {
         CssClass(vec!["div-test".to_string(), "div-override".to_string()]),
         CssID("container".to_string()),
         children![
+            (
+                InputField::default(),
+            ),
             Button {
                 icon_path: Some(String::from("icons/pass-icon.png")),
                 icon_place: IconPlace::Left,

@@ -4,7 +4,6 @@ use bevy::prelude::*;
 use crate::styling::convert::{CssClass, CssID, CssSource, ExistingCssIDs, TagName};
 use crate::styling::Style;
 use crate::styling::system::WidgetStyle;
-use crate::widgets::Widget;
 
 pub struct CssService;
 
@@ -35,7 +34,7 @@ fn update_css_conventions(
         Option<&CssID>,
         Option<&CssClass>,
         &TagName,
-    ), With<Widget>>,
+    )>,
     mut widget_query: Query<Option<&mut WidgetStyle>>,
 ) {
     for (entity, file, id_opt, class_opt, tag_opt, parent_opt) in query.iter() {

@@ -24,7 +24,7 @@ impl Plugin for SliderWidget {
     fn build(&self, app: &mut App) {
         app.register_type::<SliderThumb>();
         app.add_systems(Update, (
-            internal_node_creation_system, 
+            internal_node_creation_system,
             detect_change_slider_values
         ));
     }
@@ -62,7 +62,7 @@ fn internal_node_creation_system(
             .observe(on_internal_cursor_entered)
             .observe(on_internal_cursor_leave)
             .with_children(|builder| {
-                
+
                 // Slider Track child
                 builder.spawn((
                     Name::new(format!("Slider-Track-{}", slider.w_count)),

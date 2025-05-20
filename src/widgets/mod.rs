@@ -2,6 +2,7 @@ mod button;
 mod div;
 mod check_box;
 mod slider;
+mod input;
 
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
@@ -11,12 +12,14 @@ use crate::styling::IconPlace;
 use crate::widgets::button::ButtonWidget;
 use crate::widgets::check_box::CheckBoxWidget;
 use crate::widgets::div::DivWidget;
+use crate::widgets::input::InputWidget;
 use crate::widgets::slider::SliderWidget;
 
 static BUTTON_COUNT: AtomicUsize = AtomicUsize::new(1);
 static CHECK_BOX_COUNT: AtomicUsize = AtomicUsize::new(1);
 static DIV_COUNT: AtomicUsize = AtomicUsize::new(1);
 static SLIDER_COUNT: AtomicUsize = AtomicUsize::new(1);
+static INPUT_COUNT: AtomicUsize = AtomicUsize::new(1);
 
 #[derive(Component, Default)]
 pub struct Widget;
@@ -111,6 +114,76 @@ impl Default for Slider {
     }
 }
 
+// ===============================================
+//                       InputField
+// ===============================================
+
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+#[require(UIGenID, UIWidgetState, Widget)]
+pub struct InputField {
+    pub w_count: usize,
+    pub text: String,
+    pub label: String,
+    pub placeholder: String,
+    pub cursor_position: usize,
+    pub clear_after_focus_lost: bool,
+    pub icon_path: Option<String>,
+    pub input_type: InputType,
+    pub cap_text_at: InputCap
+}
+
+impl Default for InputField {
+    fn default() -> Self {
+        Self {
+            w_count: INPUT_COUNT.fetch_add(1, Relaxed),
+            text: String::from(""),
+            label: String::from("Label"),
+            placeholder: String::from(""),
+            clear_after_focus_lost: false,
+            cursor_position: 0,
+            icon_path: None,
+            cap_text_at: InputCap::default(),
+            input_type: InputType::default(),
+        }
+    }
+}
+
+#[derive(Reflect, Default, Debug, Clone, Eq, PartialEq)]
+pub enum InputType {
+    #[default]
+    Text,
+    Password,
+    Number
+}
+
+impl InputType {
+    pub fn is_valid_char(&self, c: char) -> bool {
+        match self {
+            InputType::Text | InputType::Password => true,
+            InputType::Number => c.is_ascii_digit() || "+-*/() ".contains(c),
+        }
+    }
+}
+
+#[derive(Reflect, Default, Debug, Clone, Eq, PartialEq)]
+pub enum InputCap {
+    #[default]
+    NoCap,
+    CapAtNodeSize,
+    CapAt(usize), // 0 means no cap!
+}
+
+impl InputCap {
+    pub fn get_value(&self) -> usize {
+        match self {
+            Self::CapAt(value) => *value,
+            Self::NoCap => 0,
+            Self::CapAtNodeSize => 0
+        }
+    }
+}
+
 pub struct WidgetPlugin;
 
 impl Plugin for WidgetPlugin {
@@ -119,11 +192,13 @@ impl Plugin for WidgetPlugin {
         app.register_type::<Button>();
         app.register_type::<CheckBox>();
         app.register_type::<Slider>();
+        app.register_type::<InputField>();
         app.add_plugins((
             DivWidget, 
             ButtonWidget,
             CheckBoxWidget,
-            SliderWidget
+            SliderWidget,
+            InputWidget
         ));
     }
 }
