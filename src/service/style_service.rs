@@ -58,7 +58,7 @@ fn update_widget_styles_system(
         
         if let Ok((node, background, border_color, 
                       border_radius, box_shadow, text_color, 
-                      text_font, _, image_node)) =
+                      text_font, text_layout, image_node)) =
             style_query.get_mut(entity)
         {
             apply_style_to_node(&final_style, node);
@@ -95,6 +95,13 @@ fn update_widget_styles_system(
                     tf.font_size = font_size.get(None);
                 }
             }
+            
+            if let Some(mut text_layout) = text_layout {
+                if let Some(text_wrap) = final_style.text_wrap {
+                    text_layout.linebreak = text_wrap;
+                }
+            }
+            
             if let Some(mut bs) = box_shadow {
                 bs.0 = final_style.box_shadow.unwrap_or_default().0;
             }

@@ -201,6 +201,9 @@ pub fn load_css(path: &str) -> Result<HashMap<String, Style>, String> {
                         overflow.x = val.unwrap_or(Overflow::default()).x;
                         style.overflow = Some(overflow);
                     },
+                    "text-wrap" => {
+                        style.text_wrap = convert_to_bevy_line_break(value.clone());
+                    }
                     _ => {}
                 }
             }
@@ -481,6 +484,17 @@ pub fn convert_to_bevy_flex_direction(value: String) -> Option<FlexDirection> {
         "row-reverse" => { Some(FlexDirection::RowReverse) },
         "column-reverse" => { Some(FlexDirection::ColumnReverse) },
         _ => { Some(FlexDirection::default()) }
+    }
+}
+
+pub fn convert_to_bevy_line_break(value: String) -> Option<LineBreak> {
+    let trimmed = value.trim();
+    match trimmed {
+        "wrap" | "stable" => { Some(LineBreak::AnyCharacter) },
+        "nowrap" => { Some(LineBreak::NoWrap) },
+        "pretty" | "balance" => { Some(LineBreak::WordBoundary) },
+        "unset" => { Some(LineBreak::WordOrCharacter) },
+        _=> { Some(LineBreak::default()) }
     }
 }
 

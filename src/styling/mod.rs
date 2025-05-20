@@ -127,6 +127,7 @@ pub struct Style {
     pub align_self: Option<AlignSelf>,
     pub flex_direction: Option<FlexDirection>,
     pub gap: Option<Val>,
+    pub text_wrap: Option<LineBreak>,
 }
 
 impl Style {
@@ -162,6 +163,7 @@ impl Style {
         if other.align_self.is_some()        { self.align_self = other.align_self.clone(); }
         if other.flex_direction.is_some()    { self.flex_direction = other.flex_direction.clone(); }
         if other.gap.is_some()               { self.gap = other.gap.clone(); }
+        if other.text_wrap.is_some()         { self.text_wrap = other.text_wrap.clone(); }
     }
 }
 

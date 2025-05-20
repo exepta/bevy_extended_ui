@@ -140,8 +140,9 @@ input:focus .input-label {
 
 .input-text {
   font-size: 15px;
-  width: 250px;
+  width: 100%;
   color: #303033;
+  text-wrap: nowrap;
 }
 
 input .in-text-container .input-text {
