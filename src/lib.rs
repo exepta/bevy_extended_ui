@@ -8,9 +8,8 @@ use crate::widgets::WidgetPlugin;
 
 pub mod widgets;
 pub mod styling;
-
 pub mod prelude;
-
+pub mod utils;
 mod service;
 
 static UI_ID_GENERATE: AtomicUsize = AtomicUsize::new(1);

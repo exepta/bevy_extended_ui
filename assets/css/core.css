@@ -71,14 +71,14 @@ slider {
   width: 150px;
   height: 8px;
   box-shadow: 0 0 3px 3px #303033;
-  background: #fff;
+  background: #5eb694;
   border-radius: 8px;
 }
 
 slider .track {
   width: 0;
   height: 100%;
-  background: #00ff8c;
+  background: #5bcd96;
   border-radius: 8px;
 }
 
@@ -88,7 +88,7 @@ slider .thumb {
   height: 16px;
   border-radius: 50%;
   box-shadow: 0 0 3px 3px #303033;
-  background: #00ff8c;
+  background: #5bcd96;
 }
 
 /* Input */
@@ -102,10 +102,28 @@ input {
   background: #E6E6E666;
 }
 
+input:hover {
+  border-color: #3b926f;
+}
+
 input .input-label {
   position: absolute;
   left: 10px;
   top: 19px;
-  color: #b82828;
+  color: #313131;
   font-size: 13px;
+}
+
+input:hover .input-label {
+  color: #3b926f;
+}
+
+.input-text {
+  font-size: 13px;
+}
+
+.input-cursor {
+  width: 2px;
+  height: 20px;
+  background: black;
 }
