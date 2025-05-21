@@ -4,6 +4,7 @@ use bevy::prelude::*;
 use lightningcss::rules::CssRule;
 use lightningcss::stylesheet::{ParserOptions, PrinterOptions, StyleSheet};
 use lightningcss::traits::ToCss;
+use regex::Regex;
 use crate::styling::paint::Colored;
 use crate::styling::{Background, FontVal, Radius, Style};
 
@@ -203,6 +204,9 @@ pub fn load_css(path: &str) -> Result<HashMap<String, Style>, String> {
                     },
                     "text-wrap" => {
                         style.text_wrap = convert_to_bevy_line_break(value.clone());
+                    },
+                    "z-index" => {
+                        style.z_index = convert_to_i32(value.clone());
                     }
                     _ => {}
                 }
@@ -226,6 +230,18 @@ pub fn convert_to_val(value: String) -> Option<Val> {
         val = Some(Val::Percent(count));
     }
     val
+}
+
+pub fn convert_to_i32(value: String) -> Option<i32> {
+    let trimmed = value.trim();
+    
+    let re = Regex::new(r"^-?\d+$").unwrap();
+
+    if re.is_match(trimmed) {
+        trimmed.parse::<i32>().ok()
+    } else {
+        None
+    }
 }
 
 pub fn convert_to_font_size(value: String) -> Option<FontVal> {

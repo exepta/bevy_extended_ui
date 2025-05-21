@@ -150,3 +150,26 @@ input .in-text-container .input-cursor {
   height: 20px;
   background: #303033;
 }
+
+/* ChoiceBox */
+
+choice-box {
+  width: 300px;
+  height: 55px;
+  border-radius: 5px 0;
+  border-color: rgb(72, 72, 72);
+  border-bottom: 2px;
+  background: #E6E6E666;
+  color: #303033;
+  z-index: 1;
+}
+
+choice-box .choice-content-box {
+  position: absolute;
+  width: 300px;
+  height: 150px;
+  top: 55px;
+  box-shadow: 0 0 3px 3px #303033;
+  border-radius: 0 5px;
+  background: white;
+}

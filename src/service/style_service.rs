@@ -29,7 +29,8 @@ fn update_widget_styles_system(
         Option<&mut TextColor>,
         Option<&mut TextFont>,
         Option<&mut TextLayout>,
-        Option<&mut ImageNode>
+        Option<&mut ImageNode>,
+        Option<&mut ZIndex>
     )>,
 ) {
     for (entity, state_opt, mut widget_style) in query.iter_mut() {
@@ -58,7 +59,7 @@ fn update_widget_styles_system(
         
         if let Ok((node, background, border_color, 
                       border_radius, box_shadow, text_color, 
-                      text_font, text_layout, image_node)) =
+                      text_font, text_layout, image_node, z_index)) =
             style_query.get_mut(entity)
         {
             apply_style_to_node(&final_style, node);
@@ -104,6 +105,10 @@ fn update_widget_styles_system(
             
             if let Some(mut bs) = box_shadow {
                 bs.0 = final_style.box_shadow.unwrap_or_default().0;
+            }
+            
+            if let Some(mut index) = z_index {
+                index.0 = final_style.z_index.unwrap_or(0);
             }
         }
     }

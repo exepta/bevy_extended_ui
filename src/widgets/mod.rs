@@ -3,6 +3,7 @@ mod div;
 mod check_box;
 mod slider;
 mod input;
+mod choice_box;
 
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
@@ -11,6 +12,7 @@ use crate::{UIGenID, UIWidgetState};
 use crate::styling::IconPlace;
 use crate::widgets::button::ButtonWidget;
 use crate::widgets::check_box::CheckBoxWidget;
+use crate::widgets::choice_box::ChoiceBoxWidget;
 use crate::widgets::div::DivWidget;
 use crate::widgets::input::InputWidget;
 use crate::widgets::slider::SliderWidget;
@@ -20,6 +22,7 @@ static CHECK_BOX_COUNT: AtomicUsize = AtomicUsize::new(1);
 static DIV_COUNT: AtomicUsize = AtomicUsize::new(1);
 static SLIDER_COUNT: AtomicUsize = AtomicUsize::new(1);
 static INPUT_COUNT: AtomicUsize = AtomicUsize::new(1);
+static CHOICE_BOX_COUNT: AtomicUsize = AtomicUsize::new(1);
 
 #[derive(Component, Default)]
 pub struct Widget;
@@ -40,7 +43,7 @@ impl Default for Div {
 }
 
 // ===============================================
-//                       Button
+//                     Button
 // ===============================================
 
 #[derive(Component, Reflect, Debug, Clone)]
@@ -65,7 +68,7 @@ impl Default for Button {
 }
 
 // ===============================================
-//                       CheckBox
+//                     CheckBox
 // ===============================================
 
 #[derive(Component, Reflect, Debug, Clone)]
@@ -88,7 +91,7 @@ impl Default for CheckBox {
 }
 
 // ===============================================
-//                       Slider
+//                      Slider
 // ===============================================
 
 #[derive(Component, Reflect, Debug, Clone)]
@@ -115,7 +118,7 @@ impl Default for Slider {
 }
 
 // ===============================================
-//                       InputField
+//                   InputField
 // ===============================================
 
 #[derive(Component, Reflect, Debug, Clone)]
@@ -184,6 +187,56 @@ impl InputCap {
     }
 }
 
+// ===============================================
+//                   ChoiceBox
+// ===============================================
+
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+#[require(UIGenID, UIWidgetState, Widget)]
+pub struct ChoiceBox {
+    pub w_count: usize,
+    pub value: ChoiceOption,
+    pub options: Vec<ChoiceOption>
+}
+
+impl Default for ChoiceBox {
+    fn default() -> Self {
+        Self {
+            w_count: CHOICE_BOX_COUNT.fetch_add(1, Relaxed),
+            value: ChoiceOption::default(),
+            options: vec![ChoiceOption::default()]
+        }
+    }
+}
+
+#[derive(Reflect, Debug, Clone, PartialEq, Eq)]
+pub struct ChoiceOption {
+    pub text: String,
+    pub internal_value: String,
+    pub icon_path: Option<String>,
+}
+
+impl Default for ChoiceOption {
+    fn default() -> Self {
+        Self {
+            text: String::from("Please Select"),
+            internal_value: String::from("default"),
+            icon_path: None,
+        }
+    }
+}
+
+impl ChoiceOption {
+    pub fn new(text: &str) -> Self {
+        Self {
+            text: text.to_string(),
+            internal_value: text.trim().to_string(),
+            icon_path: None,
+        }
+    }
+}
+
 pub struct WidgetPlugin;
 
 impl Plugin for WidgetPlugin {
@@ -193,12 +246,14 @@ impl Plugin for WidgetPlugin {
         app.register_type::<CheckBox>();
         app.register_type::<Slider>();
         app.register_type::<InputField>();
+        app.register_type::<ChoiceBox>();
         app.add_plugins((
             DivWidget, 
             ButtonWidget,
             CheckBoxWidget,
             SliderWidget,
-            InputWidget
+            InputWidget,
+            ChoiceBoxWidget
         ));
     }
 }

@@ -694,6 +694,7 @@ dependencies = [
  "bevy-inspector-egui",
  "lightningcss",
  "once_cell",
+ "regex",
 ]
 
 [[package]]
