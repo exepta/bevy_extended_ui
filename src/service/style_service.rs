@@ -106,7 +106,7 @@ fn update_widget_styles_system(
             if let Some(mut bs) = box_shadow {
                 bs.0 = final_style.box_shadow.unwrap_or_default().0;
             }
-            
+
             if let Some(mut index) = z_index {
                 index.0 = final_style.z_index.unwrap_or(0);
             }
@@ -115,16 +115,17 @@ fn update_widget_styles_system(
 }
 
 fn selector_matches_state(selector: &str, state: &UIWidgetState) -> bool {
-    let first = selector.split_whitespace().next().unwrap_or(selector);
-    let parts: Vec<&str> = first.split(':').collect();
-    for pseudo in &parts[1..] {
-        match *pseudo {
-            "read-only" if !state.readonly => return false,
-            "disabled" if !state.disabled => return false,
-            "checked" if !state.checked => return false,
-            "focus" if !state.focused => return false,
-            "hover" if !state.hovered => return false,
-            _ => {}
+    for part in selector.split_whitespace() {
+        let segments: Vec<&str> = part.split(':').collect();
+        for pseudo in &segments[1..] {
+            match *pseudo {
+                "read-only" if !state.readonly => return false,
+                "disabled" if !state.disabled => return false,
+                "checked" if !state.checked => return false,
+                "focus" if !state.focused => return false,
+                "hover" if !state.hovered => return false,
+                _ => {}
+            }
         }
     }
     true
@@ -133,9 +134,9 @@ fn selector_matches_state(selector: &str, state: &UIWidgetState) -> bool {
 fn selector_specificity(selector: &str) -> u32 {
     let mut spec = 0;
     for part in selector.split_whitespace() {
-        let secs: Vec<&str> = part.split(':').collect();
-        // Basis
-        let base = secs[0];
+        let segments: Vec<&str> = part.split(':').collect();
+        let base = segments[0];
+
         spec += if base.starts_with('#') {
             100
         } else if base.starts_with('.') {
@@ -143,11 +144,11 @@ fn selector_specificity(selector: &str) -> u32 {
         } else {
             1
         };
-        spec += (secs.len() as u32).saturating_sub(1);
+
+        spec += segments.len().saturating_sub(1) as u32;
     }
     spec
 }
-
 fn apply_style_to_node(style: &Style, node: Option<Mut<Node>>) {
     if let Some(mut node) = node {
         node.width = style.width.unwrap_or_default();

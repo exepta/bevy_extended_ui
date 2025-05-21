@@ -210,7 +210,7 @@ impl Default for ChoiceBox {
     }
 }
 
-#[derive(Reflect, Debug, Clone, PartialEq, Eq)]
+#[derive(Component, Reflect, Debug, Clone, PartialEq, Eq)]
 pub struct ChoiceOption {
     pub text: String,
     pub internal_value: String,

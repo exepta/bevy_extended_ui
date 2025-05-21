@@ -294,3 +294,12 @@ Supported for Bevy node:
 - pretty - LineBreak::WordBoundary
 - balance - LineBreak::WordBoundary
 - unset - LineBreak::AnyCharacter
+
+#### Z-Index
+```css
+div {
+    z-index: 999;
+}
+```
+
+this value can be negative too!

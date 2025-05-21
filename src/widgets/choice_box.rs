@@ -22,7 +22,7 @@ pub struct ChoiceBoxWidget;
 impl Plugin for ChoiceBoxWidget {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, (
-            update_content_box_visibility,
+            // update_content_box_visibility,
             internal_node_creation_system,
         ).chain());
     }
@@ -70,10 +70,45 @@ fn internal_node_creation_system(
                     css_source.clone(),
                     CssClass(vec![String::from("choice-content-box")]),
                     RenderLayers::layer(*layer),
-                    Visibility::Hidden,
+                    Visibility::Visible,
                     ChoiceLayoutBoxBase,
                     BindToID(id.0)
-                ));
+                )).with_children(|builder| {
+                    for option in choice_box.options.iter() {
+                        builder.spawn((
+                            Name::new(format!("Option-{}", choice_box.w_count)),
+                            Node::default(),
+                            BackgroundColor::default(),
+                            BorderColor::default(),
+                            BorderRadius::default(),
+                            ZIndex::default(),
+                            UIWidgetState::default(),
+                            IgnoreParentState,
+                            option.clone(),
+                            css_source.clone(),
+                            CssClass(vec![String::from("choice-option")]),
+                            RenderLayers::layer(*layer),
+                            ChoiceOptionBase,
+                            BindToID(id.0)
+                        )).with_children(|builder| {
+                            builder.spawn((
+                                Name::new(format!("Option-Text-{}", choice_box.w_count)),
+                                Text::new(option.text.clone()),
+                                TextColor::default(),
+                                TextFont::default(),
+                                TextLayout::default(),
+                                ZIndex::default(),
+                                UIWidgetState::default(),
+                                IgnoreParentState,
+                                css_source.clone(),
+                                CssClass(vec![String::from("option-text")]),
+                                Pickable::IGNORE,
+                                RenderLayers::layer(*layer),
+                                BindToID(id.0)
+                            ));
+                        });
+                    }
+                });
 
         });
     }
@@ -83,7 +118,7 @@ fn internal_node_creation_system(
 //             Intern Functions
 // ===============================================
 
-fn update_content_box_visibility(
+/*fn update_content_box_visibility(
     mut query: Query<(&mut UIWidgetState, &UIGenID), (With<ChoiceBox>, Changed<UIWidgetState>)>,
     mut content_query: Query<(&mut Visibility, &BindToID), With<ChoiceLayoutBoxBase>>,
 ) {
@@ -92,11 +127,11 @@ fn update_content_box_visibility(
             if bind_to_id.0 != gen_id.0 {
                 continue;
             }
-            
+
             if !state.focused {
                 state.open = false;
             }
-            
+
             if state.open {
                 *visibility = Visibility::Visible;
             } else {
@@ -104,7 +139,7 @@ fn update_content_box_visibility(
             }
         }
     }
-}
+}*/
 
 // ===============================================
 //                   Intern Events
