@@ -29,7 +29,7 @@ impl Radius {
 }
 
 
-#[derive(Reflect, Debug, Clone)]
+#[derive(Reflect, Debug, Clone, PartialEq)]
 pub struct Background {
     pub color: Color,
     pub image: Option<String>,
@@ -73,7 +73,7 @@ impl Default for IconPlace {
 }
 
 
-#[derive(Reflect, Debug, Clone)]
+#[derive(Reflect, Debug, Clone, PartialEq)]
 pub enum FontVal {
     Px(f32),
     Rem(f32)
@@ -94,7 +94,7 @@ impl FontVal {
     }
 }
 
-#[derive(Reflect, Default, Debug, Clone)]
+#[derive(Reflect, Default, Debug, Clone, PartialEq)]
 pub struct Style {
     pub display: Option<Display>,
     pub position_type: Option<PositionType>,

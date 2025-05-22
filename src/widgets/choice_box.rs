@@ -1,9 +1,10 @@
+use bevy::ecs::relationship::RelatedSpawnerCommands;
 use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use crate::styling::convert::{CssClass, CssSource, TagName};
 use crate::{BindToID, CurrentWidgetState, ExtendedUiConfiguration, IgnoreParentState, UIGenID, UIWidgetState};
 use crate::styling::paint::Colored;
-use crate::widgets::ChoiceBox;
+use crate::widgets::{ChoiceBox};
 
 #[derive(Component)]
 struct ChoiceBase;
@@ -22,7 +23,7 @@ pub struct ChoiceBoxWidget;
 impl Plugin for ChoiceBoxWidget {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, (
-            // update_content_box_visibility,
+            update_content_box_visibility,
             internal_node_creation_system,
         ).chain());
     }
@@ -57,6 +58,8 @@ fn internal_node_creation_system(
             .observe(on_internal_cursor_leave)
             .with_children(|builder| {
 
+                generate_child_selected_option(builder, &css_source.clone(), choice_box, layer, &id.0);
+                
                 builder.spawn((
                     Name::new(format!("Choice-Content-{}", choice_box.w_count)),
                     Node::default(),
@@ -66,11 +69,10 @@ fn internal_node_creation_system(
                     BoxShadow::new(Colored::TRANSPARENT, Val::Px(0.), Val::Px(0.), Val::Px(0.), Val::Px(0.)),
                     ZIndex::default(),
                     UIWidgetState::default(),
-                    IgnoreParentState,
                     css_source.clone(),
                     CssClass(vec![String::from("choice-content-box")]),
                     RenderLayers::layer(*layer),
-                    Visibility::Visible,
+                    Visibility::Hidden,
                     ChoiceLayoutBoxBase,
                     BindToID(id.0)
                 )).with_children(|builder| {
@@ -90,7 +92,10 @@ fn internal_node_creation_system(
                             RenderLayers::layer(*layer),
                             ChoiceOptionBase,
                             BindToID(id.0)
-                        )).with_children(|builder| {
+                        ))
+                            .observe(on_internal_option_cursor_entered)
+                            .observe(on_internal_option_cursor_leave)
+                            .with_children(|builder| {
                             builder.spawn((
                                 Name::new(format!("Option-Text-{}", choice_box.w_count)),
                                 Text::new(option.text.clone()),
@@ -118,7 +123,7 @@ fn internal_node_creation_system(
 //             Intern Functions
 // ===============================================
 
-/*fn update_content_box_visibility(
+fn update_content_box_visibility(
     mut query: Query<(&mut UIWidgetState, &UIGenID), (With<ChoiceBox>, Changed<UIWidgetState>)>,
     mut content_query: Query<(&mut Visibility, &BindToID), With<ChoiceLayoutBoxBase>>,
 ) {
@@ -139,11 +144,13 @@ fn internal_node_creation_system(
             }
         }
     }
-}*/
+}
 
 // ===============================================
 //                   Intern Events
 // ===============================================
+
+// Main Component
 
 fn on_internal_click(
     trigger: Trigger<Pointer<Click>>,
@@ -173,4 +180,80 @@ fn on_internal_cursor_leave(
     if let Ok(mut state) = query.get_mut(trigger.target) {
         state.hovered = false;
     }
+}
+
+// Option Component
+
+
+fn on_internal_option_cursor_entered(
+    trigger: Trigger<Pointer<Over>>,
+    mut query: Query<(&mut UIWidgetState, &Children), With<ChoiceOptionBase>>,
+    mut inner_query: Query<&mut UIWidgetState, Without<ChoiceOptionBase>>,
+) {
+    if let Ok((mut state, children)) = query.get_mut(trigger.target) {
+        state.hovered = true;
+        
+        for child in children.iter() {
+            if let Ok(mut inner_state) = inner_query.get_mut(child) {
+                inner_state.hovered = true;
+            }
+        }
+    }
+}
+
+fn on_internal_option_cursor_leave(
+    trigger: Trigger<Pointer<Out>>,
+    mut query: Query<(&mut UIWidgetState, &Children), With<ChoiceOptionBase>>,
+    mut inner_query: Query<&mut UIWidgetState, Without<ChoiceOptionBase>>,
+) {
+    if let Ok((mut state, children)) = query.get_mut(trigger.target) {
+        state.hovered = false;
+
+        for child in children.iter() {
+            if let Ok(mut inner_state) = inner_query.get_mut(child) {
+                inner_state.hovered = false;
+            }
+        }
+    }
+}
+
+// ===============================================
+//                   Child Builder
+// ===============================================
+
+fn generate_child_selected_option(builder: &mut RelatedSpawnerCommands<ChildOf>, css_source: &CssSource, choice_box: &ChoiceBox, layer: &usize, id: &usize) {
+    
+    // Selected Container
+    builder.spawn((
+        Name::new(format!("Option-Selected-{}", choice_box.w_count)),
+        Node::default(),
+        BackgroundColor::default(),
+        BorderColor::default(),
+        BorderRadius::default(),
+        UIWidgetState::default(),
+        css_source.clone(),
+        CssClass(vec![String::from("option-selected")]),
+        RenderLayers::layer(*layer),
+        Pickable::IGNORE,
+        BindToID(*id),
+        SelectedOptionBase
+    )).with_children(|builder| {
+        
+        // Selected Text
+        builder.spawn((
+            Name::new(format!("Option-Sel-Text-{}", choice_box.w_count)),
+            Text::new(choice_box.value.text.clone()),
+            TextColor::default(),
+            TextFont::default(),
+            TextLayout::default(),
+            ZIndex::default(),
+            UIWidgetState::default(),
+            IgnoreParentState,
+            css_source.clone(),
+            CssClass(vec![String::from("option-sel-text")]),
+            Pickable::IGNORE,
+            RenderLayers::layer(*layer),
+            BindToID(*id)
+        ));
+    });
 }

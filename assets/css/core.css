@@ -164,6 +164,23 @@ choice-box {
   z-index: 1;
 }
 
+choice-box .option-selected {
+  width: 100%;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  flex-direction: row;
+  gap: 10px;
+  padding-left: 15px;
+  flex-grow: 1;
+  border-radius: 5px 0;
+}
+
+choice-box .option-selected .option-sel-text {
+  color: #303033;
+  font-size: 14px;
+}
+
 choice-box .choice-content-box {
   position: absolute;
   width: 300px;
@@ -197,10 +214,18 @@ choice-box .choice-content-box .choice-option .option-text {
   font-size: 14px;
 }
 
-.choice-option:hover {
-  background: #6a00ff;
+choice-box .choice-content-box .choice-option:hover {
+  background: #52d29c;
 }
 
-.option-text:hover {
+choice-box .choice-content-box .choice-option .option-text:hover {
+  color: white;
+}
+
+choice-box .choice-content-box .choice-option:checked {
+  background: #6affc1;
+}
+
+choice-box .choice-content-box .choice-option .option-text:checked {
   color: white;
 }
