@@ -186,42 +186,39 @@ fn on_internal_cursor_leave(
 
 fn on_internal_option_click(
     trigger: Trigger<Pointer<Click>>,
-    mut commands: Commands,
     mut query: Query<(Entity, &mut UIWidgetState, &ChoiceOption, &BindToID), (With<ChoiceOptionBase>, Without<ChoiceBox>)>,
-    mut parent_query: Query<(Entity, &mut UIWidgetState, &UIGenID, &mut ChoiceBox, &CssSource, &Children), (With<ChoiceBox>, Without<ChoiceOptionBase>)>,
-    selected: Query<Entity, With<SelectedOptionBase>>,
-    config: Res<ExtendedUiConfiguration>
+    mut parent_query: Query<(Entity, &mut UIWidgetState, &UIGenID, &mut ChoiceBox), (With<ChoiceBox>, Without<ChoiceOptionBase>)>,
+    mut selected_query: Query<(&BindToID, &Children), With<SelectedOptionBase>>,
+    mut text_query: Query<&mut Text>,
 ) {
-    let layer = config.render_layers.first().unwrap_or(&1);
     let clicked_entity = trigger.target;
-    
+
     let (clicked_parent_id, clicked_option) = if let Ok((_, _, option, bind_id)) = query.get_mut(clicked_entity) {
         (bind_id.0.clone(), option.clone())
     } else {
         return;
     };
-    
+
     for (entity, mut state, _, bind_id) in query.iter_mut() {
         if bind_id.0 == clicked_parent_id {
             state.checked = entity == clicked_entity;
         }
     }
-    
-    for (parent, mut parent_state, id, mut choice_box, css_source, children) in parent_query.iter_mut() {
+
+    for (_, mut parent_state, id, mut choice_box) in parent_query.iter_mut() {
         if id.0 == clicked_parent_id {
             choice_box.value = clicked_option.clone();
+            parent_state.open = false;
             
-            for child in children.iter() {
-                if let Ok(entity) = selected.get(child) {
-                    commands.entity(entity).despawn();
+            for (bind_id, selected_children) in selected_query.iter_mut() {
+                if bind_id.0 == clicked_parent_id {
+                    for child in selected_children.iter() {
+                        if let Ok(mut text) = text_query.get_mut(child) {
+                            text.0 = clicked_option.text.clone();
+                        }
+                    }
                 }
             }
-            
-            commands.entity(parent).with_children(|builder| {
-                generate_child_selected_option(builder, &css_source.clone(), &choice_box, layer, &id.0);
-            });
-
-            parent_state.open = false;
         }
     }
 }
