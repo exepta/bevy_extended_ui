@@ -1,32 +1,18 @@
 button {
-    width: 300px;
+    width: 50px;
     height: 50px;
     background: #ff926a;
     display: flex;
     justify-content: center;
     align-items: center;
+    border-radius: 50%;
 }
 
-.button-text {
-    color: #303033;
-}
-
-.button-text:hover {
-    color: #FFFFFF;
+button .button-text {
+    font-size: 20px;
+    color: #ffffff;
 }
 
 button:hover {
-    background: #ffb59a;
-}
-
-#example-id-2:hover .button-text {
-    color: #ff006a;
-}
-
-button:hover .button-text {
-    color: #00ff8c;
-}
-
-#example-id:hover .button-text {
-    color: #6a00ff;
+    background: #ff6336;
 }

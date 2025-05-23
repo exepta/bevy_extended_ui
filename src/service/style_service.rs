@@ -29,97 +29,115 @@ fn update_widget_styles_system(
         Option<&mut TextColor>,
         Option<&mut TextFont>,
         Option<&mut TextLayout>,
-        Option<&mut ImageNode>
+        Option<&mut ImageNode>,
+        Option<&mut ZIndex>
     )>,
 ) {
     for (entity, state_opt, mut widget_style) in query.iter_mut() {
         let state = state_opt.cloned().unwrap_or_default();
+
+        let mut base_styles: Vec<(&String, u32)> = vec![];
+        let mut pseudo_styles: Vec<(&String, u32)> = vec![];
         
-        let mut applicable: Vec<(&String, u32)> = widget_style
-            .styles
-            .keys()
-            .filter_map(|sel| {
-                if selector_matches_state(sel, &state) {
-                    Some((sel, selector_specificity(sel)))
+        for sel in widget_style.styles.keys() {
+            if selector_matches_state(sel, &state) {
+                let specificity = selector_specificity(sel);
+                if sel.contains(":") {
+                    pseudo_styles.push((sel, specificity));
                 } else {
-                    None
+                    base_styles.push((sel, specificity));
                 }
-            })
-            .collect();
-        
-        applicable.sort_by_key(|&(_, spec)| spec);
-        
-        let mut final_style = Style::default();
-        for (sel, _) in applicable {
-            final_style.merge(&widget_style.styles[sel]);
+            }
         }
         
-        widget_style.active_style = Some(final_style.clone());
+        base_styles.sort_by_key(|&(_, spec)| spec);
+        pseudo_styles.sort_by_key(|&(_, spec)| spec);
+
+        let mut final_style = Style::default();
         
-        if let Ok((node, background, border_color, 
-                      border_radius, box_shadow, text_color, 
-                      text_font, text_layout, image_node)) =
-            style_query.get_mut(entity)
+        for (sel, _) in &base_styles {
+            final_style.merge(&widget_style.styles[*sel]);
+        }
+        
+        for (sel, _) in &pseudo_styles {
+            final_style.merge(&widget_style.styles[*sel]);
+        }
+
+        if widget_style.active_style.as_ref() != Some(&final_style) {
+            widget_style.active_style = Some(final_style.clone());
+        }
+        
+        if let Ok((
+                      node, background, border_color, border_radius, box_shadow,
+                      text_color, text_font, text_layout, image_node, z_index
+                  )) = style_query.get_mut(entity)
         {
             apply_style_to_node(&final_style, node);
+
             if let Some(mut bg) = background {
                 bg.0 = final_style.background.map(|b| b.color).unwrap_or(Color::NONE);
             }
 
-            if let Some(mut border_radius) = border_radius {
+            if let Some(mut br) = border_radius {
                 if let Some(radius) = final_style.border_radius.clone() {
-                    border_radius.top_left = radius.top_left;
-                    border_radius.top_right = radius.top_right;
-                    border_radius.bottom_left = radius.bottom_left;
-                    border_radius.bottom_right = radius.bottom_right;
+                    br.top_left = radius.top_left;
+                    br.top_right = radius.top_right;
+                    br.bottom_left = radius.bottom_left;
+                    br.bottom_right = radius.bottom_right;
                 } else {
-                    border_radius.top_left = Val::ZERO;
-                    border_radius.top_right = Val::ZERO;
-                    border_radius.bottom_left = Val::ZERO;
-                    border_radius.bottom_right = Val::ZERO;
+                    br.top_left = Val::ZERO;
+                    br.top_right = Val::ZERO;
+                    br.bottom_left = Val::ZERO;
+                    br.bottom_right = Val::ZERO;
                 }
             }
+
             if let Some(mut bc) = border_color {
                 bc.0 = final_style.border_color.unwrap_or(Color::NONE);
             }
+
             if let Some(mut tc) = text_color {
                 tc.0 = final_style.color.unwrap_or(Color::WHITE);
             }
-            
+
             if let Some(mut image_node) = image_node {
                 image_node.color = final_style.color.unwrap_or(Color::WHITE);
             }
-            
+
             if let Some(mut tf) = text_font {
                 if let Some(font_size) = final_style.font_size.clone() {
                     tf.font_size = font_size.get(None);
                 }
             }
-            
+
             if let Some(mut text_layout) = text_layout {
                 if let Some(text_wrap) = final_style.text_wrap {
                     text_layout.linebreak = text_wrap;
                 }
             }
-            
+
             if let Some(mut bs) = box_shadow {
                 bs.0 = final_style.box_shadow.unwrap_or_default().0;
+            }
+
+            if let Some(mut index) = z_index {
+                index.0 = final_style.z_index.unwrap_or(0);
             }
         }
     }
 }
-
 fn selector_matches_state(selector: &str, state: &UIWidgetState) -> bool {
-    let first = selector.split_whitespace().next().unwrap_or(selector);
-    let parts: Vec<&str> = first.split(':').collect();
-    for pseudo in &parts[1..] {
-        match *pseudo {
-            "read-only" if !state.readonly => return false,
-            "disabled" if !state.disabled => return false,
-            "checked" if !state.checked => return false,
-            "focus" if !state.focused => return false,
-            "hover" if !state.hovered => return false,
-            _ => {}
+    for part in selector.split_whitespace() {
+        let segments: Vec<&str> = part.split(':').collect();
+        for pseudo in &segments[1..] {
+            match *pseudo {
+                "read-only" if !state.readonly => return false,
+                "disabled" if !state.disabled => return false,
+                "checked" if !state.checked => return false,
+                "focus" if !state.focused => return false,
+                "hover" if !state.hovered => return false,
+                _ => {}
+            }
         }
     }
     true
@@ -128,9 +146,9 @@ fn selector_matches_state(selector: &str, state: &UIWidgetState) -> bool {
 fn selector_specificity(selector: &str) -> u32 {
     let mut spec = 0;
     for part in selector.split_whitespace() {
-        let secs: Vec<&str> = part.split(':').collect();
-        // Basis
-        let base = secs[0];
+        let segments: Vec<&str> = part.split(':').collect();
+        let base = segments[0];
+
         spec += if base.starts_with('#') {
             100
         } else if base.starts_with('.') {
@@ -138,7 +156,8 @@ fn selector_specificity(selector: &str) -> u32 {
         } else {
             1
         };
-        spec += (secs.len() as u32).saturating_sub(1);
+
+        spec += segments.len().saturating_sub(1) as u32;
     }
     spec
 }
@@ -175,6 +194,9 @@ fn apply_style_to_node(style: &Style, node: Option<Mut<Node>>) {
                 node.column_gap = Val::Auto;
             }
         }
+        
+        
+        node.flex_grow = style.flex_grow.unwrap_or_default();
     }
 }
 

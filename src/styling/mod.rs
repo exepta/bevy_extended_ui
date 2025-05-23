@@ -29,7 +29,7 @@ impl Radius {
 }
 
 
-#[derive(Reflect, Debug, Clone)]
+#[derive(Reflect, Debug, Clone, PartialEq)]
 pub struct Background {
     pub color: Color,
     pub image: Option<String>,
@@ -73,7 +73,7 @@ impl Default for IconPlace {
 }
 
 
-#[derive(Reflect, Debug, Clone)]
+#[derive(Reflect, Debug, Clone, PartialEq)]
 pub enum FontVal {
     Px(f32),
     Rem(f32)
@@ -94,7 +94,7 @@ impl FontVal {
     }
 }
 
-#[derive(Reflect, Default, Debug, Clone)]
+#[derive(Reflect, Default, Debug, Clone, PartialEq)]
 pub struct Style {
     pub display: Option<Display>,
     pub position_type: Option<PositionType>,
@@ -126,8 +126,10 @@ pub struct Style {
     pub align_items: Option<AlignItems>,
     pub align_self: Option<AlignSelf>,
     pub flex_direction: Option<FlexDirection>,
+    pub flex_grow: Option<f32>,
     pub gap: Option<Val>,
     pub text_wrap: Option<LineBreak>,
+    pub z_index: Option<i32>,
 }
 
 impl Style {
@@ -162,8 +164,10 @@ impl Style {
         if other.align_items.is_some()       { self.align_items = other.align_items.clone(); }
         if other.align_self.is_some()        { self.align_self = other.align_self.clone(); }
         if other.flex_direction.is_some()    { self.flex_direction = other.flex_direction.clone(); }
+        if other.flex_grow.is_some()         { self.flex_grow = other.flex_grow.clone(); }
         if other.gap.is_some()               { self.gap = other.gap.clone(); }
         if other.text_wrap.is_some()         { self.text_wrap = other.text_wrap.clone(); }
+        if other.z_index.is_some()           { self.z_index = other.z_index.clone(); }
     }
 }
 

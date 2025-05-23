@@ -49,6 +49,9 @@ impl Default for CurrentWidgetState {
 #[derive(Component)]
 struct UiCamera;
 
+#[derive(Component)]
+pub struct IgnoreParentState;
+
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
 pub struct UIGenID(usize);
@@ -71,15 +74,7 @@ pub struct UIWidgetState {
     pub disabled: bool,
     pub readonly: bool,
     pub checked: bool,
-}
-
-#[derive(Component, Default, Clone, PartialEq, Eq, Debug)]
-pub struct LastWidgetState {
-    pub hovered: bool,
-    pub disabled: bool,
-    pub readonly: bool,
-    pub focused: bool,
-    pub checked: bool,
+    pub open: bool,
 }
 
 pub struct ExtendedUiPlugin;

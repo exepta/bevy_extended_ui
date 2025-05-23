@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
-use crate::{ExtendedUiConfiguration, UIWidgetState};
+use crate::{CurrentWidgetState, ExtendedUiConfiguration, UIGenID, UIWidgetState};
 use crate::styling::convert::{CssSource, TagName};
 use crate::styling::paint::Colored;
 use crate::widgets::Div;
@@ -35,12 +35,25 @@ fn internal_node_creation_system(
             BorderColor::default(),
             BorderRadius::default(),
             BoxShadow::new(Colored::TRANSPARENT, Val::Px(0.), Val::Px(0.), Val::Px(0.), Val::Px(0.)),
+            ZIndex::default(),
             css_source,
             TagName("div".to_string()),
             RenderLayers::layer(*layer),
             DivBase
-        )).observe(on_internal_cursor_entered)
+        )).observe(on_internal_click)
+            .observe(on_internal_cursor_entered)
             .observe(on_internal_cursor_leave);
+    }
+}
+
+fn on_internal_click(
+    trigger: Trigger<Pointer<Click>>,
+    mut query: Query<(&mut UIWidgetState, &UIGenID), With<Div>>,
+    mut current_widget_state: ResMut<CurrentWidgetState>
+) {
+    if let Ok((mut state, gen_id)) = query.get_mut(trigger.target) {
+        state.focused = true;
+        current_widget_state.widget_id = gen_id.0;
     }
 }
 

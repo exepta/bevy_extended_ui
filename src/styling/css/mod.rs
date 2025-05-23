@@ -4,6 +4,7 @@ use bevy::prelude::*;
 use lightningcss::rules::CssRule;
 use lightningcss::stylesheet::{ParserOptions, PrinterOptions, StyleSheet};
 use lightningcss::traits::ToCss;
+use regex::Regex;
 use crate::styling::paint::Colored;
 use crate::styling::{Background, FontVal, Radius, Style};
 
@@ -49,19 +50,19 @@ pub fn load_css(path: &str) -> Result<HashMap<String, Style>, String> {
                     "width" => {
                         style.width = convert_to_val(value.clone());
                     },
-                    "min_width" => {
+                    "min-width" => {
                         style.min_width = convert_to_val(value.clone());
                     },
-                    "max_width" => {
+                    "max-width" => {
                         style.max_width = convert_to_val(value.clone());
                     },
                     "height" => {
                         style.height = convert_to_val(value.clone());
                     },
-                    "min_height" => {
+                    "min-height" => {
                         style.min_height = convert_to_val(value.clone());
                     },
-                    "max_height" => {
+                    "max-height" => {
                         style.max_height = convert_to_val(value.clone());
                     },
                     "padding" => {
@@ -135,6 +136,10 @@ pub fn load_css(path: &str) -> Result<HashMap<String, Style>, String> {
                     "flex-direction" => {
                         style.flex_direction = convert_to_bevy_flex_direction(value.clone());
                     },
+                    "flex-grow" => {
+                        let trimmed = value.trim();
+                        style.flex_grow = trimmed.parse::<f32>().ok();
+                    },
                     "background" | "background-color" => {
                         style.background = Some(Background {
                             color: convert_to_color(value.clone()).unwrap_or_else(|| Color::WHITE),
@@ -203,6 +208,9 @@ pub fn load_css(path: &str) -> Result<HashMap<String, Style>, String> {
                     },
                     "text-wrap" => {
                         style.text_wrap = convert_to_bevy_line_break(value.clone());
+                    },
+                    "z-index" => {
+                        style.z_index = convert_to_i32(value.clone());
                     }
                     _ => {}
                 }
@@ -226,6 +234,18 @@ pub fn convert_to_val(value: String) -> Option<Val> {
         val = Some(Val::Percent(count));
     }
     val
+}
+
+pub fn convert_to_i32(value: String) -> Option<i32> {
+    let trimmed = value.trim();
+    
+    let re = Regex::new(r"^-?\d+$").unwrap();
+
+    if re.is_match(trimmed) {
+        trimmed.parse::<i32>().ok()
+    } else {
+        None
+    }
 }
 
 pub fn convert_to_font_size(value: String) -> Option<FontVal> {

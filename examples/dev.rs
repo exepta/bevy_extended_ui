@@ -6,7 +6,7 @@ use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_extended_ui::ExtendedUiPlugin;
 use bevy_extended_ui::styling::convert::{CssClass, CssID, CssSource};
 use bevy_extended_ui::styling::IconPlace;
-use bevy_extended_ui::widgets::{Button, CheckBox, Div, InputCap, InputField, InputType, Slider};
+use bevy_extended_ui::widgets::{Button, CheckBox, ChoiceBox, ChoiceOption, Div, InputCap, InputField, InputType, Slider};
 
 fn main() {
     let _ = App::new()
@@ -43,6 +43,9 @@ fn test_button(mut commands: Commands) {
                 },
                 CssID("input-id".to_string()),
             ),
+            (
+                ChoiceBox::default(),
+            ),
             Button {
                 icon_path: Some(String::from("icons/pass-icon.png")),
                 icon_place: IconPlace::Left,
@@ -50,14 +53,32 @@ fn test_button(mut commands: Commands) {
             },
                 // This generates a normal button without any custom styling
             (
-                Button::default(),
+                Button {
+                     icon_path: Some("icons/user-icon.png".to_string()),
+                     text: String::from(""),
+                     ..default()
+                },
+                CssSource("examples/css/button.css".to_string()),
             ),
             (
                 CheckBox::default(),
             ),
             (
                 Slider::default(),
-            )
+            ),
+            (
+                ChoiceBox {
+                    options: vec![
+                        ChoiceOption::default(),
+                        ChoiceOption::new("Test 2"),
+                        ChoiceOption::new("Test 3"), 
+                        ChoiceOption::new("Test 4"), 
+                        ChoiceOption::new("Test 5"),
+                        ChoiceOption::new("Test 6")
+                    ],
+                    ..default()
+                },
+            ),
         ]
     ));
 }

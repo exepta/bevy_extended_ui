@@ -150,3 +150,86 @@ input .in-text-container .input-cursor {
   height: 20px;
   background: #303033;
 }
+
+/* ChoiceBox */
+
+choice-box {
+  width: 300px;
+  height: 55px;
+  border-radius: 5px 0;
+  border-color: rgb(72, 72, 72);
+  border-bottom: 2px;
+  background: #E6E6E666;
+  color: #303033;
+  z-index: 1;
+}
+
+choice-box .option-selected {
+  width: 100%;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  flex-direction: row;
+  gap: 10px;
+  padding-left: 15px;
+  flex-grow: 1;
+  border-radius: 5px 0;
+}
+
+choice-box .option-selected .option-sel-text {
+  color: #303033;
+  font-size: 14px;
+}
+
+choice-box .choice-content-box {
+  position: absolute;
+  width: 100%;
+  min-height: 50px;
+  max-height: 150px;
+  top: 55px;
+  box-shadow: 0 0 3px 3px #303033;
+  border-radius: 0 5px;
+  background: white;
+  display: flex;
+  justify-content: flex-start;
+  align-items: flex-start;
+  flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: scroll;
+}
+
+choice-box .choice-content-box .choice-option {
+  width: 100%;
+  height: 50px;
+  min-height: 50px;
+  max-height: 50px;
+  padding-left: 15px;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  flex-direction: row;
+  gap: 10px;
+  flex-grow: 1;
+  background: white;
+}
+
+choice-box .choice-content-box .choice-option .option-text {
+  color: #303033;
+  font-size: 14px;
+}
+
+choice-box .choice-content-box .choice-option:hover {
+  background: #52d29c;
+}
+
+choice-box .choice-content-box .choice-option .option-text:hover {
+  color: white;
+}
+
+choice-box .choice-content-box .choice-option:checked {
+  background: #6affc1;
+}
+
+choice-box .choice-content-box .choice-option .option-text:checked {
+  color: white;
+}

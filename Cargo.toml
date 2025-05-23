@@ -42,3 +42,5 @@ version = "1.0.0-alpha.65"
 
 [dependencies.once_cell]
 version = "1.21.3"
+[dependencies]
+regex = "1.11.1"

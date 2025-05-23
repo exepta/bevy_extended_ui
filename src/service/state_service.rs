@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use crate::{BindToID, CurrentWidgetState, UIGenID, UIWidgetState};
+use crate::{BindToID, CurrentWidgetState, IgnoreParentState, UIGenID, UIWidgetState};
 
 pub struct StateService;
 
@@ -12,7 +12,7 @@ impl Plugin for StateService {
 
 pub fn update_widget_states(
     main_query: Query<(&UIGenID, &UIWidgetState), (Changed<UIWidgetState>, With<UIGenID>)>,
-    mut inner_query: Query<(&BindToID, &mut UIWidgetState), Without<UIGenID>>,
+    mut inner_query: Query<(&BindToID, &mut UIWidgetState), (Without<UIGenID>, Without<IgnoreParentState>)>,
 ) {
     for (id, state) in main_query.iter() {
         for (bind_to, mut inner_state) in inner_query.iter_mut() {
