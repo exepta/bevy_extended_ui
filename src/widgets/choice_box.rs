@@ -1,9 +1,11 @@
 use bevy::ecs::relationship::RelatedSpawnerCommands;
+use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
 use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use crate::styling::convert::{CssClass, CssSource, TagName};
 use crate::{BindToID, CurrentWidgetState, ExtendedUiConfiguration, IgnoreParentState, UIGenID, UIWidgetState};
 use crate::styling::paint::Colored;
+use crate::styling::system::WidgetStyle;
 use crate::widgets::{ChoiceBox, ChoiceOption};
 
 #[derive(Component)]
@@ -25,6 +27,7 @@ impl Plugin for ChoiceBoxWidget {
         app.add_systems(Update, (
             update_content_box_visibility,
             internal_node_creation_system,
+            handle_scroll_events
         ).chain());
     }
 }
@@ -141,6 +144,58 @@ fn update_content_box_visibility(
                 *visibility = Visibility::Visible;
             } else {
                 *visibility = Visibility::Hidden;
+            }
+        }
+    }
+}
+
+fn handle_scroll_events(
+    mut scroll_events: EventReader<MouseWheel>,
+    mut layout_query: Query<(Entity, &Visibility, &Children), With<ChoiceLayoutBoxBase>>,
+    mut option_query: Query<(&mut Node, &mut WidgetStyle, &ChildOf), With<ChoiceOptionBase>>,
+    time: Res<Time>,
+) {
+    let mut max_scroll = -0.0;
+    let min_scroll = 0.0;
+
+    let smooth_factor = 30.;
+
+    for event in scroll_events.read() {
+        for (layout_entity, visibility, children) in layout_query.iter_mut() {
+            if *visibility != Visibility::Visible {
+                continue;
+            }
+
+            if children.len() > 3 {
+                max_scroll = -50.0 * (children.len() - 3) as f32;
+            }
+
+            let scroll_amount = match event.unit {
+                MouseScrollUnit::Line => event.y * 25.0,
+                MouseScrollUnit::Pixel => event.y,
+            };
+
+            let inverted_scroll_amount = scroll_amount;
+
+            for (mut style, mut widget_style, parent) in option_query.iter_mut() {
+                if parent.parent() != layout_entity {
+                    continue;
+                }
+
+                let current_offset = match style.top {
+                    Val::Px(val) => val,
+                    _ => 0.0,
+                };
+
+                let target_offset = (current_offset + inverted_scroll_amount)
+                    .clamp(max_scroll, min_scroll);
+
+                let smoothed_offset = current_offset + (target_offset - current_offset) * smooth_factor * time.delta_secs();
+
+                style.top = Val::Px(smoothed_offset);
+                for (_, styles) in widget_style.styles.iter_mut() {
+                    styles.top = Some(Val::Px(smoothed_offset));
+                }
             }
         }
     }

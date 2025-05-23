@@ -63,7 +63,14 @@ fn test_button(mut commands: Commands) {
             ),
             (
                 ChoiceBox {
-                    options: vec![ChoiceOption::default(), ChoiceOption::new("Test 2"), ChoiceOption::new("Test 3")],
+                    options: vec![
+                        ChoiceOption::default(),
+                        ChoiceOption::new("Test 2"),
+                        ChoiceOption::new("Test 3"), 
+                        ChoiceOption::new("Test 4"), 
+                        ChoiceOption::new("Test 5"),
+                        ChoiceOption::new("Test 6")
+                    ],
                     ..default()
                 },
             ),

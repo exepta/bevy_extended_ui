@@ -50,19 +50,19 @@ pub fn load_css(path: &str) -> Result<HashMap<String, Style>, String> {
                     "width" => {
                         style.width = convert_to_val(value.clone());
                     },
-                    "min_width" => {
+                    "min-width" => {
                         style.min_width = convert_to_val(value.clone());
                     },
-                    "max_width" => {
+                    "max-width" => {
                         style.max_width = convert_to_val(value.clone());
                     },
                     "height" => {
                         style.height = convert_to_val(value.clone());
                     },
-                    "min_height" => {
+                    "min-height" => {
                         style.min_height = convert_to_val(value.clone());
                     },
-                    "max_height" => {
+                    "max-height" => {
                         style.max_height = convert_to_val(value.clone());
                     },
                     "padding" => {
@@ -135,6 +135,10 @@ pub fn load_css(path: &str) -> Result<HashMap<String, Style>, String> {
                     },
                     "flex-direction" => {
                         style.flex_direction = convert_to_bevy_flex_direction(value.clone());
+                    },
+                    "flex-grow" => {
+                        let trimmed = value.trim();
+                        style.flex_grow = trimmed.parse::<f32>().ok();
                     },
                     "background" | "background-color" => {
                         style.background = Some(Background {

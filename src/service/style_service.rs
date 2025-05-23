@@ -194,6 +194,9 @@ fn apply_style_to_node(style: &Style, node: Option<Mut<Node>>) {
                 node.column_gap = Val::Auto;
             }
         }
+        
+        
+        node.flex_grow = style.flex_grow.unwrap_or_default();
     }
 }
 
