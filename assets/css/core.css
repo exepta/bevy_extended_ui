@@ -184,8 +184,7 @@ choice-box .option-selected .option-sel-text {
 choice-box .choice-content-box {
   position: absolute;
   width: 100%;
-  height: 150px;
-  min-height: 100px;
+  min-height: 50px;
   max-height: 150px;
   top: 55px;
   box-shadow: 0 0 3px 3px #303033;
@@ -203,6 +202,7 @@ choice-box .choice-content-box .choice-option {
   width: 100%;
   height: 50px;
   min-height: 50px;
+  max-height: 50px;
   padding-left: 15px;
   display: flex;
   justify-content: flex-start;
