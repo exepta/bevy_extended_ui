@@ -53,7 +53,12 @@ fn test_button(mut commands: Commands) {
             },
                 // This generates a normal button without any custom styling
             (
-                Button::default(),
+                Button {
+                     icon_path: Some("icons/user-icon.png".to_string()),
+                     text: String::from(""),
+                     ..default()
+                },
+                CssSource("examples/css/button.css".to_string()),
             ),
             (
                 CheckBox::default(),

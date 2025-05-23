@@ -43,6 +43,7 @@ fn update_css_conventions(
         let css_path = file.0.as_str();
 
         if !Path::new(css_path).exists() {
+            error!("CSS File not found {}", css_path);
             continue;
         }
         
