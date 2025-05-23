@@ -4,7 +4,7 @@ use bevy::render::view::RenderLayers;
 use crate::styling::convert::{CssClass, CssSource, TagName};
 use crate::{BindToID, CurrentWidgetState, ExtendedUiConfiguration, IgnoreParentState, UIGenID, UIWidgetState};
 use crate::styling::paint::Colored;
-use crate::widgets::{ChoiceBox};
+use crate::widgets::{ChoiceBox, ChoiceOption};
 
 #[derive(Component)]
 struct ChoiceBase;
@@ -92,7 +92,7 @@ fn internal_node_creation_system(
                             RenderLayers::layer(*layer),
                             ChoiceOptionBase,
                             BindToID(id.0)
-                        ))
+                        )).observe(on_internal_option_click)
                             .observe(on_internal_option_cursor_entered)
                             .observe(on_internal_option_cursor_leave)
                             .with_children(|builder| {
@@ -184,6 +184,47 @@ fn on_internal_cursor_leave(
 
 // Option Component
 
+fn on_internal_option_click(
+    trigger: Trigger<Pointer<Click>>,
+    mut commands: Commands,
+    mut query: Query<(Entity, &mut UIWidgetState, &ChoiceOption, &BindToID), (With<ChoiceOptionBase>, Without<ChoiceBox>)>,
+    mut parent_query: Query<(Entity, &mut UIWidgetState, &UIGenID, &mut ChoiceBox, &CssSource, &Children), (With<ChoiceBox>, Without<ChoiceOptionBase>)>,
+    selected: Query<Entity, With<SelectedOptionBase>>,
+    config: Res<ExtendedUiConfiguration>
+) {
+    let layer = config.render_layers.first().unwrap_or(&1);
+    let clicked_entity = trigger.target;
+    
+    let (clicked_parent_id, clicked_option) = if let Ok((_, _, option, bind_id)) = query.get_mut(clicked_entity) {
+        (bind_id.0.clone(), option.clone())
+    } else {
+        return;
+    };
+    
+    for (entity, mut state, _, bind_id) in query.iter_mut() {
+        if bind_id.0 == clicked_parent_id {
+            state.checked = entity == clicked_entity;
+        }
+    }
+    
+    for (parent, mut parent_state, id, mut choice_box, css_source, children) in parent_query.iter_mut() {
+        if id.0 == clicked_parent_id {
+            choice_box.value = clicked_option.clone();
+            
+            for child in children.iter() {
+                if let Ok(entity) = selected.get(child) {
+                    commands.entity(entity).despawn();
+                }
+            }
+            
+            commands.entity(parent).with_children(|builder| {
+                generate_child_selected_option(builder, &css_source.clone(), &choice_box, layer, &id.0);
+            });
+
+            parent_state.open = false;
+        }
+    }
+}
 
 fn on_internal_option_cursor_entered(
     trigger: Trigger<Pointer<Over>>,
