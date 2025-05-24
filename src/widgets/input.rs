@@ -3,7 +3,7 @@ use std::time::Duration;
 use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use crate::styling::convert::{CssClass, CssSource, TagName};
-use crate::{BindToID, CurrentWidgetState, ExtendedUiConfiguration, UIGenID, UIWidgetState};
+use crate::{BindToID, CurrentWidgetState, ExtendedUiConfiguration, ImageCache, UIGenID, UIWidgetState};
 use crate::styling::{Background, FontVal};
 use crate::styling::paint::Colored;
 use crate::styling::system::WidgetStyle;
@@ -68,6 +68,7 @@ fn internal_node_creation_system(
     query: Query<(Entity, &UIGenID, &InputField, Option<&CssSource>), (With<InputField>, Without<InputFieldBase>)>,
     config: Res<ExtendedUiConfiguration>,
     asset_server: Res<AssetServer>,
+    mut image_cache: ResMut<ImageCache>
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
     for (entity, id, field, source_opt) in query.iter() {
@@ -90,6 +91,10 @@ fn internal_node_creation_system(
             InputFieldBase
         )).with_children(|builder| {
             if let Some(icon_path) = field.icon_path.clone() {
+                let handle = image_cache.map.entry(icon_path.clone())
+                    .or_insert_with(|| asset_server.load(icon_path.as_str()))
+                    .clone();
+
                 // Icon left
                 builder.spawn((
                     Name::new(format!("Input-Icon-{}", field.w_count)),
@@ -109,7 +114,7 @@ fn internal_node_creation_system(
                         (
                             Name::new(format!("Icon-{}", field.w_count)),
                             ImageNode {
-                                image: asset_server.load(icon_path),
+                                image: handle,
                                 ..default()
                             },
                             ZIndex::default(),
@@ -539,6 +544,7 @@ fn handle_typing(
 fn handle_overlay_label(
     query: Query<(&UIWidgetState, &UIGenID, &InputField, &Children), With<InputField>>,
     mut label_query: Query<(&BindToID, &mut Node, &mut TextFont, &mut WidgetStyle), With<OverlayLabel>>,
+    icon_container_query: Query<(&WidgetStyle, &BindToID), (With<InputFieldIcon>, Without<OverlayLabel>)>,
 ) {
     for (state, gen_id, in_field, children) in query.iter() {
         for child in children.iter() {
@@ -553,12 +559,29 @@ fn handle_overlay_label(
                 } else {
                     if in_field.text.is_empty() {
                         node.top = Val::Px(19.5);
-                        text_font.font_size = 13.;
+                        text_font.font_size = 14.;
+                    }
+                }
+
+                if let Some((icon_style, _)) = icon_container_query.iter().find(|(_, icon_bind_to)| icon_bind_to.0 == gen_id.0) {
+                    if let Some(active_style) = icon_style.active_style.clone() {
+                        if let Some(Val::Px(new_width)) = active_style.width {
+                            let left_now = match node.left {
+                                Val::Px(px) => px,
+                                _ => 10.,
+                            };
+                            
+                            let expected_left = 5.0 + new_width;
+                            if (left_now - expected_left).abs() > f32::EPSILON {
+                                node.left = Val::Px(expected_left);
+                            }
+                        }
                     }
                 }
 
                 for (_, style) in styles.styles.iter_mut() {
                     style.top = Some(node.top);
+                    style.left = Some(node.left);
                     style.font_size = Some(FontVal::Px(text_font.font_size));
                 }
             }
