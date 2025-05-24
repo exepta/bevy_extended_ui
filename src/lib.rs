@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
 use bevy::prelude::*;
@@ -13,6 +14,11 @@ pub mod utils;
 mod service;
 
 static UI_ID_GENERATE: AtomicUsize = AtomicUsize::new(1);
+
+#[derive(Resource, Default)]
+pub struct ImageCache {
+    pub map: HashMap<String, Handle<Image>>,
+}
 
 #[derive(Resource, Debug, Clone)]
 pub struct ExtendedUiConfiguration {
@@ -82,6 +88,7 @@ pub struct ExtendedUiPlugin;
 impl Plugin for ExtendedUiPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ExtendedUiConfiguration>();
+        app.init_resource::<ImageCache>();
         app.init_resource::<CurrentWidgetState>();
         app.register_type::<UIGenID>();
         app.register_type::<BindToID>();

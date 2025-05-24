@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use crate::styling::convert::{CssClass, CssSource, TagName};
-use crate::{BindToID, CurrentWidgetState, ExtendedUiConfiguration, UIGenID, UIWidgetState};
+use crate::{BindToID, CurrentWidgetState, ExtendedUiConfiguration, ImageCache, UIGenID, UIWidgetState};
 use crate::styling::paint::Colored;
 use crate::widgets::CheckBox;
 
@@ -104,7 +104,8 @@ fn on_internal_click(
     inner_query: Query<(Entity, &BindToID, Option<&Children>, &ComputedNode), With<CheckBoxMark>>,
     mut current_widget_state: ResMut<CurrentWidgetState>,
     config: Res<ExtendedUiConfiguration>,
-    asset_server: Res<AssetServer>
+    asset_server: Res<AssetServer>,
+    mut image_cache: ResMut<ImageCache>
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
     if let Ok((mut state, gen_id, checkbox, css_source)) = query.get_mut(trigger.target) {
@@ -141,7 +142,11 @@ fn on_internal_click(
 
                 if let Some(child) = child {
                     if let Some(path) = checkbox.icon_path.clone() {
-                        commands.entity(child).insert(ImageNode::new(asset_server.load(path)));
+                        let handle = image_cache.map.entry(path.clone())
+                            .or_insert_with(|| asset_server.load(path.as_str()))
+                            .clone();
+                        
+                        commands.entity(child).insert(ImageNode::new(handle));
                     }
                 }
             } else {

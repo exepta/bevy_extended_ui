@@ -39,6 +39,7 @@ fn test_button(mut commands: Commands) {
                 InputField {
                     input_type: InputType::Text,
                     cap_text_at: InputCap::NoCap,
+                    icon_path: Some("icons/user-icon.png".into()),
                     ..default()
                 },
                 CssID("input-id".to_string()),

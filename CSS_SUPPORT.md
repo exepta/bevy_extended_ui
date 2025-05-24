@@ -196,6 +196,13 @@ Support:
 - Row-Reverse
 - Column-Reverse
 
+#### Flex-Grow
+```css
+div {
+   flex-grow: 1;
+}
+```
+
 #### Gap
 ```css
 div {

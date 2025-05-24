@@ -119,6 +119,19 @@ input .input-label {
   font-size: 14px;
 }
 
+input .in-icon-container {
+  width: 50px;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.in-icon-container .in-icon {
+  font-size: 16px;
+  color: #303033;
+}
+
 input .in-text-container {
   height: 100%;
   width: 95%;

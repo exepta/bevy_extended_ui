@@ -1,7 +1,7 @@
 use bevy::ecs::relationship::RelatedSpawnerCommands;
 use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
-use crate::{BindToID, CurrentWidgetState, ExtendedUiConfiguration, UIGenID, UIWidgetState};
+use crate::{BindToID, CurrentWidgetState, ExtendedUiConfiguration, ImageCache, UIGenID, UIWidgetState};
 use crate::styling::convert::{CssClass, CssSource, TagName};
 use crate::styling::IconPlace;
 use crate::styling::paint::Colored;
@@ -29,6 +29,7 @@ fn internal_node_creation_system(
     query: Query<(Entity, &UIGenID, &Button, Option<&CssSource>), (With<Button>, Without<ButtonBase>)>,
     config: Res<ExtendedUiConfiguration>,
     asset_server: Res<AssetServer>,
+    mut image_cache: ResMut<ImageCache>,
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
     for (entity, id, button, source_opt) in query.iter() {
@@ -58,7 +59,7 @@ fn internal_node_creation_system(
             ButtonBase
         )).with_children(|builder| {
             if button.icon_place == IconPlace::Left {
-                place_icon(builder, button, &asset_server, id.0, *layer, css_source.clone());
+                place_icon(builder, button, &asset_server, &mut image_cache, id.0, *layer, css_source.clone());
             }
             
             builder.spawn((                    
@@ -78,7 +79,7 @@ fn internal_node_creation_system(
             ));
 
             if button.icon_place == IconPlace::Right {
-                place_icon(builder, button, &asset_server, id.0, *layer, css_source.clone());
+                place_icon(builder, button, &asset_server, &mut image_cache, id.0, *layer, css_source.clone());
             }
         }).observe(on_internal_click)
             .observe(on_internal_cursor_entered)
@@ -116,14 +117,22 @@ fn on_internal_cursor_leave(
 }
 
 fn place_icon(
-    builder: &mut RelatedSpawnerCommands<ChildOf>, btn: &Button, 
-    asset_server: &Res<AssetServer>, id: usize, layer: usize,
+    builder: &mut RelatedSpawnerCommands<ChildOf>, 
+    btn: &Button, 
+    asset_server: &Res<AssetServer>,
+    image_cache: &mut ResMut<ImageCache>,
+    id: usize, 
+    layer: usize,
     css_source: CssSource,
 ) {
     if let Some(icon) = btn.icon_path.clone() {
+        let handle = image_cache.map.entry(icon.clone())
+            .or_insert_with(|| asset_server.load(icon.as_str()))
+            .clone();
+        
         builder.spawn((
             Name::new(format!("Button-Icon-{}", btn.w_count)),
-            ImageNode::new(asset_server.load(icon.as_str())),
+            ImageNode::new(handle),
             RenderLayers::layer(layer),
             Pickable::IGNORE,
             ButtonImage,
