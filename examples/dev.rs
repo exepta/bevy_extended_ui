@@ -47,11 +47,13 @@ fn test_button(mut commands: Commands) {
             (
                 ChoiceBox::default(),
             ),
-            Button {
-                icon_path: Some(String::from("icons/pass-icon.png")),
-                icon_place: IconPlace::Left,
-                ..default()
-            },
+            (
+                Button {
+                    icon_path: Some(String::from("icons/pass-icon.png")),
+                    icon_place: IconPlace::Left,
+                    ..default()
+                },
+            ),
                 // This generates a normal button without any custom styling
             (
                 Button {

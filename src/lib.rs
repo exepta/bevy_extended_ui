@@ -9,6 +9,7 @@ use crate::widgets::WidgetPlugin;
 
 pub mod widgets;
 pub mod styling;
+pub mod html;
 pub mod prelude;
 pub mod utils;
 mod service;

@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use crate::html::HtmlStyle;
 use crate::service::state_service::update_widget_states;
 use crate::styling::Style;
 use crate::styling::system::WidgetStyle;
@@ -18,8 +19,9 @@ fn update_widget_styles_system(
     mut query: Query<(
         Entity,
         Option<&UIWidgetState>,
+        Option<&HtmlStyle>,
         &mut WidgetStyle,
-    ), Or<(Changed<WidgetStyle>, Changed<UIWidgetState>)>>,
+    ), Or<(Changed<WidgetStyle>, Changed<HtmlStyle>, Changed<UIWidgetState>)>>,
     mut style_query: Query<(
         Option<&mut Node>,
         Option<&mut BackgroundColor>,
@@ -33,7 +35,7 @@ fn update_widget_styles_system(
         Option<&mut ZIndex>
     )>,
 ) {
-    for (entity, state_opt, mut widget_style) in query.iter_mut() {
+    for (entity, state_opt, html_style_opt, mut widget_style) in query.iter_mut() {
         let state = state_opt.cloned().unwrap_or_default();
 
         let mut base_styles: Vec<(&String, u32)> = vec![];
@@ -57,6 +59,10 @@ fn update_widget_styles_system(
         
         for (sel, _) in &base_styles {
             final_style.merge(&widget_style.styles[*sel]);
+        }
+
+        if let Some(html_style) = html_style_opt {
+            final_style.merge(&html_style.0);
         }
         
         for (sel, _) in &pseudo_styles {
