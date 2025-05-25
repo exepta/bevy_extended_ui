@@ -45,175 +45,8 @@ pub fn load_css(path: &str) -> Result<HashMap<String, Style>, String> {
                     Ok(value) => value,
                     Err(_) => continue,
                 };
-                
-                match name {
-                    "width" => {
-                        style.width = convert_to_val(value.clone());
-                    },
-                    "min-width" => {
-                        style.min_width = convert_to_val(value.clone());
-                    },
-                    "max-width" => {
-                        style.max_width = convert_to_val(value.clone());
-                    },
-                    "height" => {
-                        style.height = convert_to_val(value.clone());
-                    },
-                    "min-height" => {
-                        style.min_height = convert_to_val(value.clone());
-                    },
-                    "max-height" => {
-                        style.max_height = convert_to_val(value.clone());
-                    },
-                    "padding" => {
-                        style.padding = convert_to_ui_rect(value.clone());
-                    },
-                    "padding-left" => {
-                        let correct_string = format!("{} 0 0 0", value.clone()).to_string();
-                        style.padding = convert_to_ui_rect(correct_string);
-                    },
-                    "padding-right" => {
-                        let correct_string = format!("0 {} 0 0", value.clone()).to_string();
-                        style.padding = convert_to_ui_rect(correct_string);
-                    },
-                    "padding-top" => {
-                        let correct_string = format!("0 0 {} 0", value.clone()).to_string();
-                        style.padding = convert_to_ui_rect(correct_string);
-                    },
-                    "padding-bottom" => {
-                        let correct_string = format!("0 0 0 {}", value.clone()).to_string();
-                        style.padding = convert_to_ui_rect(correct_string);
-                    },
-                    "margin" => {
-                        style.margin = convert_to_ui_rect(value.clone());
-                    },
-                    "margin-left" => {
-                        let correct_string = format!("{} 0 0 0", value.clone()).to_string();
-                        style.margin = convert_to_ui_rect(correct_string);
-                    },
-                    "margin-right" => {
-                        let correct_string = format!("0 {} 0 0", value.clone()).to_string();
-                        style.margin = convert_to_ui_rect(correct_string);
-                    },
-                    "margin-top" => {
-                        let correct_string = format!("0 0 {} 0", value.clone()).to_string();
-                        style.margin = convert_to_ui_rect(correct_string);
-                    },
-                    "margin-bottom" => {
-                        let correct_string = format!("0 0 0 {}", value.clone()).to_string();
-                        style.margin = convert_to_ui_rect(correct_string);
-                    },
-                    "color" => {
-                        style.color = convert_to_color(value.clone());
-                    },
-                    "left" => {
-                        style.left = convert_to_val(value.clone());
-                    },
-                    "right" => {
-                        style.right = convert_to_val(value.clone());
-                    },
-                    "top" => {
-                        style.top = convert_to_val(value.clone());
-                    },
-                    "bottom" => {
-                        style.bottom = convert_to_val(value.clone());
-                    },
-                    "display" => {
-                        style.display = convert_to_display(value.clone());
-                    },
-                    "position" => {
-                        style.position_type = convert_to_position(value.clone());
-                    },
-                    "gap" => {
-                        style.gap = convert_to_val(value.clone());
-                    },
-                    "justify-content" => {
-                        style.justify_content = convert_to_bevy_justify_content(value.clone());
-                    },
-                    "align-items" => {
-                        style.align_items = convert_to_bevy_align_items(value.clone());
-                    },
-                    "flex-direction" => {
-                        style.flex_direction = convert_to_bevy_flex_direction(value.clone());
-                    },
-                    "flex-grow" => {
-                        let trimmed = value.trim();
-                        style.flex_grow = trimmed.parse::<f32>().ok();
-                    },
-                    "background" | "background-color" => {
-                        style.background = Some(Background {
-                            color: convert_to_color(value.clone()).unwrap_or_else(|| Color::WHITE),
-                            ..default()
-                        });
-                    },
-                    "font-size" => {
-                        style.font_size = convert_to_font_size(value.clone());
-                    },
-                    "border" => {
-                        if let Some((rect, color)) = convert_css_border(value.clone()) {
-                            style.border = Some(rect);
-                            style.border_color = Some(color);
-                        }
-                    },
-                    "border-left" => {
-                        let val = convert_to_val(value.clone()).unwrap_or(Val::Px(0.));
-                        let mut border = style.border.unwrap_or_default();
-                        border.left = val;
-                        style.border = Some(border);
-                    },
-                    "border-right" => {
-                        let val = convert_to_val(value.clone()).unwrap_or(Val::Px(0.));
-                        let mut border = style.border.unwrap_or_default();
-                        border.right = val;
-                        style.border = Some(border);
-                    },
-                    "border-top" => {
-                        let val = convert_to_val(value.clone()).unwrap_or(Val::Px(0.));
-                        let mut border = style.border.unwrap_or_default();
-                        border.top = val;
-                        style.border = Some(border);
-                    },
-                    "border-bottom" => {
-                        let val = convert_to_val(value.clone()).unwrap_or(Val::Px(0.));
-                        let mut border = style.border.unwrap_or_default();
-                        border.bottom = val;
-                        style.border = Some(border);
-                    },
-                    "border-radius" => {
-                        style.border_radius = convert_to_radius(value.clone());
-                    },
-                    "border-color" => {
-                        style.border_color = convert_to_color(value.clone());
-                    },
-                    "border-width" => {
-                        style.border = convert_to_ui_rect(value.clone());
-                    },
-                    "box-shadow" => {
-                        style.box_shadow = convert_to_bevy_box_shadow(value.clone());
-                    },
-                    "overflow" => {
-                        style.overflow = convert_overflow(value.clone(), "all");
-                    },
-                    "overflow-y" => {
-                        let val = convert_overflow(value.clone(), "y");
-                        let mut overflow = style.overflow.unwrap_or_default();
-                        overflow.y = val.unwrap_or(Overflow::default()).y;
-                        style.overflow = Some(overflow);
-                    },
-                    "overflow-x" => {
-                        let val = convert_overflow(value.clone(), "x");
-                        let mut overflow = style.overflow.unwrap_or_default();
-                        overflow.x = val.unwrap_or(Overflow::default()).x;
-                        style.overflow = Some(overflow);
-                    },
-                    "text-wrap" => {
-                        style.text_wrap = convert_to_bevy_line_break(value.clone());
-                    },
-                    "z-index" => {
-                        style.z_index = convert_to_i32(value.clone());
-                    }
-                    _ => {}
-                }
+
+                apply_property_to_style(&mut style, name, &value);
             }
             
             style_map.insert(selector, style);
@@ -221,6 +54,109 @@ pub fn load_css(path: &str) -> Result<HashMap<String, Style>, String> {
     }
 
     Ok(style_map)
+}
+
+pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
+    match name {
+        "width" => style.width = convert_to_val(value.to_string()),
+        "min-width" => style.min_width = convert_to_val(value.to_string()),
+        "max-width" => style.max_width = convert_to_val(value.to_string()),
+        "height" => style.height = convert_to_val(value.to_string()),
+        "min-height" => style.min_height = convert_to_val(value.to_string()),
+        "max-height" => style.max_height = convert_to_val(value.to_string()),
+
+        "padding" => style.padding = convert_to_ui_rect(value.to_string()),
+        "padding-left" => style.padding = convert_to_ui_rect(format!("{} 0 0 0", value)),
+        "padding-right" => style.padding = convert_to_ui_rect(format!("0 {} 0 0", value)),
+        "padding-top" => style.padding = convert_to_ui_rect(format!("0 0 {} 0", value)),
+        "padding-bottom" => style.padding = convert_to_ui_rect(format!("0 0 0 {}", value)),
+
+        "margin" => style.margin = convert_to_ui_rect(value.to_string()),
+        "margin-left" => style.margin = convert_to_ui_rect(format!("{} 0 0 0", value)),
+        "margin-right" => style.margin = convert_to_ui_rect(format!("0 {} 0 0", value)),
+        "margin-top" => style.margin = convert_to_ui_rect(format!("0 0 {} 0", value)),
+        "margin-bottom" => style.margin = convert_to_ui_rect(format!("0 0 0 {}", value)),
+
+        "color" => style.color = convert_to_color(value.to_string()),
+
+        "left" => style.left = convert_to_val(value.to_string()),
+        "right" => style.right = convert_to_val(value.to_string()),
+        "top" => style.top = convert_to_val(value.to_string()),
+        "bottom" => style.bottom = convert_to_val(value.to_string()),
+
+        "display" => style.display = convert_to_display(value.to_string()),
+        "position" => style.position_type = convert_to_position(value.to_string()),
+        "gap" => style.gap = convert_to_val(value.to_string()),
+        "justify-content" => style.justify_content = convert_to_bevy_justify_content(value.to_string()),
+        "align-items" => style.align_items = convert_to_bevy_align_items(value.to_string()),
+        "flex-direction" => style.flex_direction = convert_to_bevy_flex_direction(value.to_string()),
+        "flex-grow" => style.flex_grow = value.trim().parse::<f32>().ok(),
+
+        "background" | "background-color" => {
+            info!("value: {}", value);
+            style.background = Some(Background {
+                color: convert_to_color(value.to_string()).unwrap_or(Color::WHITE),
+                ..default()
+            });
+        }
+
+        "font-size" => style.font_size = convert_to_font_size(value.to_string()),
+
+        "border" => {
+            if let Some((rect, color)) = convert_css_border(value.to_string()) {
+                style.border = Some(rect);
+                style.border_color = Some(color);
+            }
+        }
+        "border-left" => {
+            let val = convert_to_val(value.to_string()).unwrap_or(Val::Px(0.));
+            let mut border = style.border.unwrap_or_default();
+            border.left = val;
+            style.border = Some(border);
+        }
+        "border-right" => {
+            let val = convert_to_val(value.to_string()).unwrap_or(Val::Px(0.));
+            let mut border = style.border.unwrap_or_default();
+            border.right = val;
+            style.border = Some(border);
+        }
+        "border-top" => {
+            let val = convert_to_val(value.to_string()).unwrap_or(Val::Px(0.));
+            let mut border = style.border.unwrap_or_default();
+            border.top = val;
+            style.border = Some(border);
+        }
+        "border-bottom" => {
+            let val = convert_to_val(value.to_string()).unwrap_or(Val::Px(0.));
+            let mut border = style.border.unwrap_or_default();
+            border.bottom = val;
+            style.border = Some(border);
+        }
+        "border-radius" => style.border_radius = convert_to_radius(value.to_string()),
+        "border-color" => style.border_color = convert_to_color(value.to_string()),
+        "border-width" => style.border = convert_to_ui_rect(value.to_string()),
+
+        "box-shadow" => style.box_shadow = convert_to_bevy_box_shadow(value.to_string()),
+
+        "overflow" => style.overflow = convert_overflow(value.to_string(), "all"),
+        "overflow-y" => {
+            let val = convert_overflow(value.to_string(), "y");
+            let mut overflow = style.overflow.unwrap_or_default();
+            overflow.y = val.unwrap_or_default().y;
+            style.overflow = Some(overflow);
+        }
+        "overflow-x" => {
+            let val = convert_overflow(value.to_string(), "x");
+            let mut overflow = style.overflow.unwrap_or_default();
+            overflow.x = val.unwrap_or_default().x;
+            style.overflow = Some(overflow);
+        }
+
+        "text-wrap" => style.text_wrap = convert_to_bevy_line_break(value.to_string()),
+        "z-index" => style.z_index = convert_to_i32(value.to_string()),
+
+        _ => {}
+    }
 }
 
 pub fn convert_to_val(value: String) -> Option<Val> {
@@ -293,6 +229,8 @@ pub fn convert_to_color(value: String) -> Option<Color> {
 
             color = Some(Color::srgba_u8(r, g, b, a));
         }
+    } else {
+        color = Colored::named(trimmed);
     }
     
     color
