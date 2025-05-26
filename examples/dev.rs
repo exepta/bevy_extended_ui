@@ -24,11 +24,11 @@ fn main() {
         .add_plugins(EguiPlugin { enable_multipass_for_primary_context: true })
         .add_plugins(WorldInspectorPlugin::default()
             .run_if(input_toggle_active(false, KeyCode::F1)))
-        .add_systems(Startup, test_button)
+        .add_systems(Startup, test_dev)
         .run();
 }
 
-fn test_button(mut commands: Commands) {
+fn test_dev(mut commands: Commands) {
     commands.spawn((
         Div::default(),
         CssSource(String::from("examples/css/dev.css")),

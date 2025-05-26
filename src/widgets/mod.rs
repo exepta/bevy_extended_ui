@@ -167,6 +167,15 @@ impl InputType {
             InputType::Number => c.is_ascii_digit() || "+-*/() ".contains(c),
         }
     }
+    
+    pub fn from_str(value: &str) -> Option<InputType> {
+        match value.to_lowercase().as_str() {
+            "text" => Some(InputType::Text),
+            "password" => Some(InputType::Password),
+            "number" => Some(InputType::Number),
+            _ => None
+        }
+    }
 }
 
 #[derive(Reflect, Default, Debug, Clone, Eq, PartialEq)]
