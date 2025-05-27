@@ -4,7 +4,8 @@ use bevy::prelude::*;
 use kuchiki::NodeRef;
 use kuchiki::traits::TendrilSink;
 use crate::html::{HtmlSource, HtmlMeta, HtmlStructureMap, HtmlWidgetNode};
-use crate::widgets::{Button, CheckBox, Div, HtmlBody, InputField, InputType};
+use crate::styling::IconPlace;
+use crate::widgets::{Button, CheckBox, ChoiceBox, ChoiceOption, Div, HtmlBody, InputCap, InputField, InputType, Slider};
 
 pub struct HtmlConverterSystem;
 
@@ -90,9 +91,30 @@ fn parse_html_node(
 
     match tag.as_str() {
         "button" => {
+            let mut icon_path = None;
+            let mut icon_place = IconPlace::Left;
+            let mut found_text = false;
+
+            for child in node.children() {
+                if let Some(el) = child.as_element() {
+                    if el.name.local.eq("img") {
+                        if let Some(src) = el.attributes.borrow().get("src") {
+                            icon_path = Some(src.to_string());
+                            if found_text {
+                                icon_place = IconPlace::Right;
+                            }
+                        }
+                    }
+                } else if child.as_text().map(|t| !t.borrow().trim().is_empty()).unwrap_or(false) {
+                    found_text = true;
+                }
+            }
+
             let text = node.text_contents().trim().to_string();
             Some(HtmlWidgetNode::Button(Button {
                 text,
+                icon_path,
+                icon_place,
                 ..default()
             }, meta))
         },
@@ -107,21 +129,108 @@ fn parse_html_node(
             let text = attributes.get("value").unwrap_or("").to_string();
             let placeholder = attributes.get("placeholder").unwrap_or("").to_string();
             let input_type = attributes.get("type").unwrap_or("text").to_string();
+            let icon_path = attributes.get("icon").unwrap_or("");
+            let icon: Option<String> = if !icon_path.is_empty() { Some(String::from(icon_path)) } else { None };
+            let cap = match attributes.get("maxlength") {
+                Some(value) if value.trim().eq_ignore_ascii_case("auto") => InputCap::CapAtNodeSize,
+                Some(value) if value.trim().is_empty() => InputCap::NoCap,
+                Some(value) => {
+                    let length = value.trim().parse::<usize>().unwrap_or(0);
+                    InputCap::CapAt(length)
+                }
+                None => InputCap::NoCap,
+            };
 
             Some(HtmlWidgetNode::Input(InputField {
                 label,
                 placeholder,
                 text,
                 input_type: InputType::from_str(&input_type).unwrap_or_default(),
+                icon_path: icon,
+                cap_text_at: cap,
                 ..default()
             }, meta))
         },
         "checkbox" => {
             let label = node.text_contents().trim().to_string();
+            let icon_path = attributes.get("icon").unwrap_or("icons/check-mark.png");
+            let icon = Some(String::from(icon_path));
             Some(HtmlWidgetNode::CheckBox(CheckBox {
                 label,
-                ..default()
+                icon_path: icon,
+                ..default()           
             }, meta))
+        },
+        "select" => {
+            let mut options = Vec::new();
+            let mut selected_value = None;
+
+            for child in node.children() {
+                if let Some(option_el) = child.as_element() {
+                    if option_el.name.local.eq("option") {
+                        let attrs = option_el.attributes.borrow();
+                        let value = attrs.get("value").unwrap_or("").to_string();
+                        let text = child.text_contents().trim().to_string();
+
+                        let option = ChoiceOption {
+                            text: text.clone(),
+                            internal_value: value.clone(),
+                            icon_path: None,
+                        };
+
+                        if attrs.contains("selected") {
+                            selected_value = Some(option.clone());
+                        }
+
+                        options.push(option);
+                    }
+                }
+            }
+            
+            let value = selected_value.unwrap_or_else(|| {
+                options.first().cloned().unwrap_or_default()
+            });
+
+            Some(HtmlWidgetNode::ChoiceBox(
+                ChoiceBox {
+                    value,
+                    options,
+                    ..default()
+                },
+                meta,
+            ))
+        },
+        "slider" => {
+            let min = attributes
+                .get("min")
+                .and_then(|v| v.parse::<i32>().ok())
+                .unwrap_or(0);
+
+            let max = attributes
+                .get("max")
+                .and_then(|v| v.parse::<i32>().ok())
+                .unwrap_or(100);
+
+            let value = attributes
+                .get("value")
+                .and_then(|v| v.parse::<i32>().ok())
+                .unwrap_or(min);
+
+            let step = attributes
+                .get("step")
+                .and_then(|v| v.parse::<i32>().ok())
+                .unwrap_or(1);
+
+            Some(HtmlWidgetNode::Slider(
+                Slider {
+                    value,
+                    min,
+                    max,
+                    step,
+                    ..default()
+                },
+                meta,
+            ))
         },
         "div" => {
             let mut children = Vec::new();

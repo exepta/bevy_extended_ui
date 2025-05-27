@@ -53,7 +53,7 @@ fn internal_node_creation_system(
             BoxShadow::new(Colored::TRANSPARENT, Val::Px(0.), Val::Px(0.), Val::Px(0.), Val::Px(0.)),
             ZIndex::default(),
             css_source.clone(),
-            TagName("choice-box".to_string()),
+            TagName("select".to_string()),
             RenderLayers::layer(*layer),
             ChoiceBase
         )).observe(on_internal_click)

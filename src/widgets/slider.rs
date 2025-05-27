@@ -18,6 +18,9 @@ struct SliderThumb {
     current_x: f32,
 }
 
+#[derive(Component, Deref, DerefMut)]
+struct PreviousSliderValue(i32);
+
 pub struct SliderWidget;
 
 impl Plugin for SliderWidget {
@@ -55,6 +58,7 @@ fn internal_node_creation_system(
             BoxShadow::new(Colored::TRANSPARENT, Val::Px(0.), Val::Px(0.), Val::Px(0.), Val::Px(0.)),
             ZIndex::default(),
             css_source.clone(),
+            PreviousSliderValue(slider.value),
             TagName(String::from("slider")),
             RenderLayers::layer(*layer),
             SliderBase,
@@ -67,11 +71,7 @@ fn internal_node_creation_system(
                 // Slider Track child
                 builder.spawn((
                     Name::new(format!("Slider-Track-{}", slider.w_count)),
-                    Node {
-                        width: Val::Px(0.),
-                        height: Val::Percent(100.),
-                        ..default()
-                    },
+                    Node::default(),
                     BackgroundColor::default(),
                     BorderColor::default(),
                     BorderRadius::default(),
@@ -88,10 +88,7 @@ fn internal_node_creation_system(
                 // Slider Thumb child
                 builder.spawn((
                     Name::new(format!("Slider-Thumb-{}", slider.w_count)),
-                    Node {
-                        position_type: PositionType::Absolute,
-                        ..default()
-                    },
+                    Node::default(),
                     BackgroundColor::default(),
                     BorderColor::default(),
                     BorderRadius::default(),
@@ -101,7 +98,7 @@ fn internal_node_creation_system(
                     RenderLayers::layer(*layer),
                     css_source.clone(),
                     CssClass(vec!["thumb".to_string()]),
-                    SliderThumb { current_x: 0. },
+                    SliderThumb { current_x: 0.0 },
                     BindToID(id.0)
                 )).observe(on_move_thumb);
             });
@@ -232,33 +229,46 @@ fn on_click_track(
 
 fn detect_change_slider_values(
     keyboard: Res<ButtonInput<KeyCode>>,
-    mut query: Query<(&mut Slider, &UIWidgetState, &ComputedNode, &Children, &UIGenID), With<Slider>>,
+    mut query: Query<(
+        Entity,
+        &mut Slider,
+        &UIWidgetState,
+        &ComputedNode,
+        &Children,
+        &UIGenID,
+        &mut PreviousSliderValue
+    ), With<Slider>>,
     mut track_query: Query<(&mut Node, &BindToID, &mut WidgetStyle), (With<SliderTrack>, Without<SliderThumb>)>,
     mut thumb_query: Query<(&mut Node, &mut SliderThumb, &BindToID, &mut WidgetStyle), (With<SliderThumb>, Without<SliderTrack>)>,
     window_query: Query<&Window, With<PrimaryWindow>>
 ) {
     let window = match window_query.single() {
         Ok(window) => window,
-        Err(_) => return
+        Err(_) => return,
     };
+
     let shift = keyboard.pressed(KeyCode::ShiftLeft) || keyboard.pressed(KeyCode::ShiftRight);
-    for (mut slider, state, computed_node, children, ui_id) in query.iter_mut() {
-        // Skip unfocused sliders
-        if !state.focused {
-            continue;
+
+    for (_entity, mut slider, state, computed_node, children, ui_id, mut prev) in query.iter_mut() {
+        let mut changed = false;
+
+        // Handle keyboard change
+        if state.focused {
+            let step = if shift { slider.step * 10 } else { slider.step };
+            if keyboard.just_pressed(KeyCode::ArrowRight) {
+                slider.value = (slider.value + step).min(slider.max);
+            }
+            if keyboard.just_pressed(KeyCode::ArrowLeft) {
+                slider.value = (slider.value - step).max(slider.min);
+            }
         }
 
-        let old_value = slider.value;
-
-        // Value change via arrow keys
-        if keyboard.just_pressed(KeyCode::ArrowRight) {
-            slider.value = (slider.value + if shift {slider.step * 10} else {slider.step}).min(slider.max);
-        }
-        if keyboard.just_pressed(KeyCode::ArrowLeft) {
-            slider.value = (slider.value - if shift {slider.step * 10} else {slider.step}).max(slider.min);
+        if slider.value != **prev {
+            changed = true;
+            **prev = slider.value; // update stored value
         }
 
-        if slider.value != old_value {
+        if changed {
             let slider_width = computed_node.size().x / window.scale_factor();
             let percent = (slider.value - slider.min) as f32 / (slider.max - slider.min) as f32;
             let clamped_x = percent * slider_width;
@@ -270,16 +280,16 @@ fn detect_change_slider_values(
                     }
                     thumb.current_x = clamped_x;
                     thumb_node.left = Val::Px(clamped_x - 8.0);
-
                     for (_, styles) in style.styles.iter_mut() {
                         styles.left = Some(thumb_node.left);
                     }
                 }
-                update_slider_track_width(&mut track_query, &child, &ui_id, clamped_x);
+                update_slider_track_width(&mut track_query, &child, ui_id, clamped_x);
             }
         }
     }
 }
+
 
 fn update_slider_track_width(
     track_query: &mut Query<(&mut Node, &BindToID, &mut WidgetStyle), (With<SliderTrack>, Without<SliderThumb>)>,

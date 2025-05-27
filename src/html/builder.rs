@@ -40,6 +40,12 @@ fn spawn_widget_node(
         HtmlWidgetNode::CheckBox(checkbox, meta) => {
             spawn_with_meta(commands, checkbox.clone(), meta)
         }
+        HtmlWidgetNode::ChoiceBox(choice_box, meta) => {
+            spawn_with_meta(commands, choice_box.clone(), meta)
+        }
+        HtmlWidgetNode::Slider(slider, meta) => {
+            spawn_with_meta(commands, slider.clone(), meta)
+        }
         HtmlWidgetNode::Div(div, meta, children) => {
             let entity = spawn_with_meta(commands, div.clone(), meta);
             for child in children {

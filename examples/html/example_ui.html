@@ -6,18 +6,34 @@
 <body>
     <!-- Login Page -->
     <div id="container" class="div-override">
+        <!-- Input Field with type text and an icon -->
         <label for="username">Username</label>
-        <input id="username" type="text" required />
+        <input id="username" type="text" icon="icons/user-icon.png" />
 
+        <!-- Input Field with type password and an icon -->
         <label for="password">Password</label>
-        <input id="password" type="text" required />
+        <input id="password" type="password" icon="icons/pass-icon.png" />
 
-        <checkbox id="remember" value="false">
+        <!-- A simple Check Box -->
+        <checkbox id="remember">
             Remember Me!
         </checkbox>
 
+        <!-- Button with an icon on the left side -->
         <button class="submit" id="login-btn" onclick="on_login_click">
+            <img src="icons/pass-icon.png"  alt=""/>
             Login
         </button>
+
+        <label for="test-select">Test Choice</label>
+        <select id="test-select">
+            <option selected value="test">Entry 01</option>
+            <option value="test1">Entry 02</option>
+            <option value="test2">Entry 03</option>
+            <option value="test3">Entry 04</option>
+            <option value="test4">Entry 05</option>
+        </select>
+
+        <slider id="test-slider" min="0" max="200" value="50" step="1"></slider>
     </div>
 </body>

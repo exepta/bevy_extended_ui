@@ -183,7 +183,7 @@ input .in-text-container .input-cursor {
 
 /* ChoiceBox */
 
-choice-box {
+select {
     width: 300px;
     height: 55px;
     border-radius: 5px 0;
@@ -194,7 +194,7 @@ choice-box {
     z-index: 1;
 }
 
-choice-box .option-selected {
+select .option-selected {
     width: 100%;
     display: flex;
     justify-content: flex-start;
@@ -206,12 +206,12 @@ choice-box .option-selected {
     border-radius: 5px 0;
 }
 
-choice-box .option-selected .option-sel-text {
+select .option-selected .option-sel-text {
     color: #303033;
     font-size: 14px;
 }
 
-choice-box .choice-content-box {
+select .choice-content-box {
     position: absolute;
     width: 100%;
     min-height: 50px;
@@ -228,7 +228,7 @@ choice-box .choice-content-box {
     overflow-y: scroll;
 }
 
-choice-box .choice-content-box .choice-option {
+select .choice-content-box .choice-option {
     width: 100%;
     height: 50px;
     min-height: 50px;
@@ -243,23 +243,23 @@ choice-box .choice-content-box .choice-option {
     background: white;
 }
 
-choice-box .choice-content-box .choice-option .option-text {
+select .choice-content-box .choice-option .option-text {
     color: #303033;
     font-size: 14px;
 }
 
-choice-box .choice-content-box .choice-option:hover {
+select .choice-content-box .choice-option:hover {
     background: #52d29c;
 }
 
-choice-box .choice-content-box .choice-option .option-text:hover {
+select .choice-content-box .choice-option .option-text:hover {
     color: white;
 }
 
-choice-box .choice-content-box .choice-option:checked {
+select .choice-content-box .choice-option:checked {
     background: #6affc1;
 }
 
-choice-box .choice-content-box .choice-option .option-text:checked {
+select .choice-content-box .choice-option .option-text:checked {
     color: white;
 }
