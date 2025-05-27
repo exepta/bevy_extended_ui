@@ -4,12 +4,15 @@ mod check_box;
 mod slider;
 mod input;
 mod choice_box;
+mod body;
 
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
 use bevy::prelude::*;
 use crate::{UIGenID, UIWidgetState};
+use crate::html::HtmlSource;
 use crate::styling::IconPlace;
+use crate::widgets::body::HtmlBodyWidget;
 use crate::widgets::button::ButtonWidget;
 use crate::widgets::check_box::CheckBoxWidget;
 use crate::widgets::choice_box::ChoiceBoxWidget;
@@ -19,13 +22,37 @@ use crate::widgets::slider::SliderWidget;
 
 static BUTTON_COUNT: AtomicUsize = AtomicUsize::new(1);
 static CHECK_BOX_COUNT: AtomicUsize = AtomicUsize::new(1);
-static DIV_COUNT: AtomicUsize = AtomicUsize::new(1);
-static SLIDER_COUNT: AtomicUsize = AtomicUsize::new(1);
-static INPUT_COUNT: AtomicUsize = AtomicUsize::new(1);
 static CHOICE_BOX_COUNT: AtomicUsize = AtomicUsize::new(1);
+static DIV_COUNT: AtomicUsize = AtomicUsize::new(1);
+static HTML_COUNT: AtomicUsize = AtomicUsize::new(1);
+static INPUT_COUNT: AtomicUsize = AtomicUsize::new(1);
+static SLIDER_COUNT: AtomicUsize = AtomicUsize::new(1);
 
 #[derive(Component, Default)]
 pub struct Widget;
+
+// ===============================================
+//                       Body
+// ===============================================
+
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+#[require(UIGenID, UIWidgetState, GlobalTransform, InheritedVisibility, Widget)]
+pub struct HtmlBody {
+    pub w_count: usize,
+    pub bind_to_html: Option<String>,
+    pub source: Option<HtmlSource>,
+}
+
+impl Default for HtmlBody {
+    fn default() -> Self {
+        Self {
+            w_count: HTML_COUNT.fetch_add(1, Relaxed),
+            bind_to_html: None,
+            source: None
+        }
+    }
+}
 
 // ===============================================
 //                       Div
@@ -250,6 +277,7 @@ pub struct WidgetPlugin;
 
 impl Plugin for WidgetPlugin {
     fn build(&self, app: &mut App) {
+        app.register_type::<HtmlBody>();
         app.register_type::<Div>();
         app.register_type::<Button>();
         app.register_type::<CheckBox>();
@@ -257,6 +285,7 @@ impl Plugin for WidgetPlugin {
         app.register_type::<InputField>();
         app.register_type::<ChoiceBox>();
         app.add_plugins((
+            HtmlBodyWidget,
             DivWidget, 
             ButtonWidget,
             CheckBoxWidget,

@@ -4,7 +4,7 @@ use bevy::window::WindowResolution;
 use bevy_inspector_egui::bevy_egui::EguiPlugin;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_extended_ui::ExtendedUiPlugin;
-use bevy_extended_ui::html::Html;
+use bevy_extended_ui::html::HtmlSource;
 
 fn main() {
     let _ = App::new()
@@ -27,5 +27,5 @@ fn main() {
 }
 
 fn test_html(mut commands: Commands) {
-    commands.spawn(Html(String::from("examples/html/example_ui.html")));
+    commands.spawn(HtmlSource(String::from("examples/html/example_ui.html")));
 }

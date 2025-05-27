@@ -1,15 +1,17 @@
 mod converter;
+mod builder;
 
 use std::collections::HashMap;
 use bevy::prelude::*;
+use crate::html::builder::HtmlBuilderSystem;
 use crate::html::converter::HtmlConverterSystem;
 use crate::styling::css::apply_property_to_style;
 use crate::styling::Style;
-use crate::widgets::{CheckBox, Div, InputField, Button};
+use crate::widgets::{CheckBox, Div, InputField, Button, HtmlBody};
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
-pub struct Html(pub String);
+pub struct HtmlSource(pub String);
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
@@ -56,18 +58,31 @@ pub enum HtmlWidgetNode {
     Input(InputField, HtmlMeta),
     CheckBox(CheckBox, HtmlMeta),
     Div(Div, HtmlMeta, Vec<HtmlWidgetNode>),
+    HtmlBody(HtmlBody, HtmlMeta, Vec<HtmlWidgetNode>),
 }
 
-#[derive(Resource, Default)]
-pub struct HtmlStructureMap(pub HashMap<String, Vec<HtmlWidgetNode>>);
+#[derive(Resource)]
+pub struct HtmlStructureMap {
+    pub html_map: HashMap<String, Vec<HtmlWidgetNode>>,
+    pub active: Option<String>
+}
+
+impl Default for HtmlStructureMap {
+    fn default() -> Self {
+        Self {
+            html_map: HashMap::new(),
+            active: None
+        }
+    }
+}
 
 pub struct HtmlPlugin;
 
 impl Plugin for HtmlPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<HtmlStructureMap>();
-        app.register_type::<Html>();
+        app.register_type::<HtmlSource>();
         app.register_type::<HtmlStyle>();
-        app.add_plugins(HtmlConverterSystem);
+        app.add_plugins((HtmlConverterSystem, HtmlBuilderSystem));
     }
 }
