@@ -3,6 +3,7 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
 use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
+use crate::html::HtmlPlugin;
 use crate::service::ServicePlugin;
 use crate::styling::StylingPlugin;
 use crate::widgets::WidgetPlugin;
@@ -94,7 +95,7 @@ impl Plugin for ExtendedUiPlugin {
         app.register_type::<UIGenID>();
         app.register_type::<BindToID>();
         app.register_type::<UIWidgetState>();
-        app.add_plugins((StylingPlugin, ServicePlugin, WidgetPlugin));
+        app.add_plugins((HtmlPlugin, StylingPlugin, ServicePlugin, WidgetPlugin));
         app.add_systems(Update, load_ui_camera_system
             .run_if(resource_changed::<ExtendedUiConfiguration>));
     }

@@ -65,16 +65,20 @@ impl Plugin for InputWidget {
 
 fn internal_node_creation_system(
     mut commands: Commands,
-    query: Query<(Entity, &UIGenID, &InputField, Option<&CssSource>), (With<InputField>, Without<InputFieldBase>)>,
+    mut query: Query<(Entity, &UIGenID, &mut InputField, Option<&CssSource>), (With<InputField>, Without<InputFieldBase>)>,
     config: Res<ExtendedUiConfiguration>,
     asset_server: Res<AssetServer>,
     mut image_cache: ResMut<ImageCache>
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
-    for (entity, id, field, source_opt) in query.iter() {
+    for (entity, id, mut field, source_opt) in query.iter_mut() {
         let mut css_source = CssSource(String::from("assets/css/core.css"));
         if let Some(source) = source_opt {
             css_source = source.clone();
+        }
+        
+        if !field.text.is_empty() {
+            field.cursor_position = field.text.len();
         }
 
         commands.entity(entity).insert((
@@ -213,7 +217,7 @@ fn update_cursor_visibility(
     time: Res<Time>,
     mut cursor_blink_timer: ResMut<CursorBlinkTimer>,
     mut cursor_query: Query<(&mut Visibility, &mut BackgroundColor, &mut WidgetStyle, &BindToID), With<InputCursor>>,
-    mut input_field_query: Query<(&InputField, &mut UIWidgetState, &UIGenID), With<InputFieldBase>>, // Assuming Focus component indicates if field is focused
+    mut input_field_query: Query<(&InputField, &mut UIWidgetState, &UIGenID), With<InputFieldBase>>,
     mut text_query: Query<(&mut Text, &BindToID), With<InputFieldText>>,
 ) {
     cursor_blink_timer.timer.tick(time.delta());
@@ -560,6 +564,9 @@ fn handle_overlay_label(
                     if in_field.text.is_empty() {
                         node.top = Val::Px(19.5);
                         text_font.font_size = 14.;
+                    } else {
+                        node.top = Val::Px(5.);
+                        text_font.font_size = 10.;
                     }
                 }
 

@@ -93,7 +93,6 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
         "flex-grow" => style.flex_grow = value.trim().parse::<f32>().ok(),
 
         "background" | "background-color" => {
-            info!("value: {}", value);
             style.background = Some(Background {
                 color: convert_to_color(value.to_string()).unwrap_or(Color::WHITE),
                 ..default()

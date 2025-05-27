@@ -9,8 +9,10 @@ pub struct StyleService;
 
 impl Plugin for StyleService {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update,
-            update_widget_styles_system.after(update_widget_states)
+        app.add_systems(PostUpdate,
+            update_widget_styles_system
+                .after(update_widget_states)
+                .after(TransformSystem::TransformPropagate)
         );
     }
 }

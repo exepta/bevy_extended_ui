@@ -8,9 +8,11 @@ authors = ["Daniel Ramke <genshin.exepta@outlook.com>"]
 name = "bevy_extended_ui"
 path = "src/lib.rs"
 
+# Debugger
 [dependencies.bevy-inspector-egui]
 version = "0.31.0"
 
+# Bevy 0.16.0 main library
 [dependencies.bevy]
 version = "0.16.0"
 default-features = false
@@ -37,10 +39,16 @@ features = [
     "bevy_log"
 ]
 
+# Html Converter
+[dependencies.kuchiki]
+version = "0.8.1"
+
+# Css3 Converter
 [dependencies.lightningcss]
 version = "1.0.0-alpha.65"
 
 [dependencies.once_cell]
 version = "1.21.3"
+
 [dependencies]
 regex = "1.11.1"

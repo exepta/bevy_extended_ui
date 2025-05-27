@@ -40,14 +40,7 @@ fn internal_node_creation_system(
         
         commands.entity(entity).insert((
             Name::new(format!("Button-{}", button.w_count)),
-            Node {
-                width: Val::Px(150.0),
-                height: Val::Px(50.0),
-                display: Display::Flex,
-                justify_content: JustifyContent::Center,
-                align_items: AlignItems::Center,
-                ..default()
-            },
+            Node::default(),
             BackgroundColor::default(),
             BorderColor::default(),
             BorderRadius::default(),
