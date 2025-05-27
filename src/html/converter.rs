@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs;
 use bevy::prelude::*;
 use kuchiki::NodeRef;
@@ -11,14 +12,14 @@ pub struct HtmlConverterSystem;
 impl Plugin for HtmlConverterSystem {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, (
-            update_html_ui, 
+            update_html_ui,
             test_place
                 .run_if(resource_changed::<HtmlStructureMap>)
         ).chain());
     }
 }
 
-fn test_place(    
+fn test_place(
     mut commands: Commands,
     structure_map: Res<HtmlStructureMap>,
     asset_server: Res<AssetServer>,
@@ -30,7 +31,7 @@ fn test_place(
     }
 }
 
-fn update_html_ui(   
+fn update_html_ui(
     mut structure_map: ResMut<HtmlStructureMap>,
     query: Query<&Html, Or<(Changed<Html>, Added<Html>)>>
 ) {
@@ -39,7 +40,7 @@ fn update_html_ui(
             warn!("Failed to read html file");
             continue;
         };
-        
+
         let document = kuchiki::parse_html().one(content);
 
         let meta_key = document.select_first("head meta[name]")
@@ -56,12 +57,12 @@ fn update_html_ui(
         };
 
         let css_source = css_link.unwrap_or("assets/css/core.css".to_string());
-        
+
         if let Ok(body) = document.select_first("body") {
             info!("Create UI for id [{:?}]", key);
             let mut root_children = Vec::new();
             for child in body.as_node().children() {
-                if let Some(node) = parse_html_node(&child, &css_source) {
+                if let Some(node) = parse_html_node(&child, &css_source, &collect_labels_by_for(&child)) {
                     root_children.push(node);
                 }
             }
@@ -73,11 +74,15 @@ fn update_html_ui(
     }
 }
 
-fn parse_html_node(node: &NodeRef, css_source: &String) -> Option<HtmlWidgetNode> {
+fn parse_html_node(
+    node: &NodeRef, 
+    css_source: &String, 
+    label_map: &HashMap<String, String>
+) -> Option<HtmlWidgetNode> {
     let element = node.as_element()?;
     let tag = element.name.local.to_string();
     let attributes = element.attributes.borrow();
-    
+
     let meta = HtmlMeta {
         css: css_source.clone(),
         id: attributes.get("id").map(|s| s.to_string()),
@@ -96,8 +101,14 @@ fn parse_html_node(node: &NodeRef, css_source: &String) -> Option<HtmlWidgetNode
             }, meta))
         },
         "input" => {
-            let label = attributes.get("label").unwrap_or("").to_string();
-            let text = attributes.get("text").unwrap_or("").to_string();
+            let id = attributes.get("id").map(|s| s.to_string());
+            let label = id
+                .as_ref()
+                .and_then(|id| label_map.get(id))
+                .cloned()
+                .unwrap_or_default();
+            
+            let text = attributes.get("value").unwrap_or("").to_string();
             let placeholder = attributes.get("placeholder").unwrap_or("").to_string();
             let input_type = attributes.get("type").unwrap_or("text").to_string();
 
@@ -119,7 +130,7 @@ fn parse_html_node(node: &NodeRef, css_source: &String) -> Option<HtmlWidgetNode
         "div" => {
             let mut children = Vec::new();
             for child in node.children() {
-                if let Some(parsed) = parse_html_node(&child, css_source) {
+                if let Some(parsed) = parse_html_node(&child, css_source, label_map) {
                     children.push(parsed);
                 }
             }
@@ -127,6 +138,20 @@ fn parse_html_node(node: &NodeRef, css_source: &String) -> Option<HtmlWidgetNode
         }
         _ => None,
     }
+}
+
+fn collect_labels_by_for(node: &NodeRef) -> HashMap<String, String> {
+    let mut map = HashMap::new();
+
+    for label_node in node.select("label").unwrap() {
+        let element = label_node.as_node().as_element().unwrap();
+        if let Some(for_id) = element.attributes.borrow().get("for") {
+            let label_text = label_node.text_contents().trim().to_string();
+            map.insert(for_id.to_string(), label_text);
+        }
+    }
+
+    map
 }
 
 fn spawn_widget_node(
@@ -139,6 +164,7 @@ fn spawn_widget_node(
         HtmlWidgetNode::Button(button, meta) => {
             commands.spawn((
                 button.clone(),
+                Node::default(),
                 CssSource(meta.css.clone()),
                 CssClass(meta.class.clone().unwrap_or_default()),
                 CssID(meta.id.clone().unwrap_or_default()),
@@ -148,6 +174,7 @@ fn spawn_widget_node(
         HtmlWidgetNode::Input(input, meta) => {
             commands.spawn((
                 input.clone(),
+                Node::default(),
                 CssSource(meta.css.clone()),
                 CssClass(meta.class.clone().unwrap_or_default()),
                 CssID(meta.id.clone().unwrap_or_default()),
@@ -157,6 +184,7 @@ fn spawn_widget_node(
         HtmlWidgetNode::CheckBox(checkbox, meta) => {
             commands.spawn((
                 checkbox.clone(),
+                Node::default(),
                 CssSource(meta.css.clone()),
                 CssClass(meta.class.clone().unwrap_or_default()),
                 CssID(meta.id.clone().unwrap_or_default()),
@@ -166,6 +194,7 @@ fn spawn_widget_node(
         HtmlWidgetNode::Div(div, meta, children) => {
             let div_entity = commands.spawn((
                 div.clone(),
+                Node::default(),
                 CssSource(meta.css.clone()),
                 CssClass(meta.class.clone().unwrap_or_default()),
                 CssID(meta.id.clone().unwrap_or_default()),
