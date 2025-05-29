@@ -3,7 +3,7 @@ use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
 use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use crate::styling::convert::{CssClass, CssSource, TagName};
-use crate::{BindToID, CurrentWidgetState, ExtendedUiConfiguration, IgnoreParentState, UIGenID, UIWidgetState};
+use crate::{BindToID, CurrentWidgetState, ExtendedUiConfiguration, IgnoreParentState, ImageCache, UIGenID, UIWidgetState};
 use crate::styling::paint::Colored;
 use crate::styling::system::WidgetStyle;
 use crate::widgets::{ChoiceBox, ChoiceOption};
@@ -16,6 +16,9 @@ struct ChoiceOptionBase;
 
 #[derive(Component)]
 struct SelectedOptionBase;
+
+#[derive(Component)]
+struct DropBase;
 
 #[derive(Component)]
 struct ChoiceLayoutBoxBase;
@@ -35,7 +38,9 @@ impl Plugin for ChoiceBoxWidget {
 fn internal_node_creation_system(
     mut commands: Commands,
     query: Query<(Entity, &UIGenID, &ChoiceBox, Option<&CssSource>), (With<ChoiceBox>, Without<ChoiceBase>)>,
-    config: Res<ExtendedUiConfiguration>
+    config: Res<ExtendedUiConfiguration>,
+    asset_server: Res<AssetServer>,
+    mut image_cache: ResMut<ImageCache>
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
     for (entity, id, choice_box, source_opt) in query.iter() {
@@ -61,7 +66,7 @@ fn internal_node_creation_system(
             .observe(on_internal_cursor_leave)
             .with_children(|builder| {
 
-                generate_child_selected_option(builder, &css_source.clone(), choice_box, layer, &id.0);
+                generate_child_selected_option(builder, &css_source.clone(), choice_box, layer, &id.0, &mut image_cache, &asset_server);
                 
                 builder.spawn((
                     Name::new(format!("Choice-Content-{}", choice_box.w_count)),
@@ -314,7 +319,14 @@ fn on_internal_option_cursor_leave(
 //                   Child Builder
 // ===============================================
 
-fn generate_child_selected_option(builder: &mut RelatedSpawnerCommands<ChildOf>, css_source: &CssSource, choice_box: &ChoiceBox, layer: &usize, id: &usize) {
+fn generate_child_selected_option(
+    builder: &mut RelatedSpawnerCommands<ChildOf>, 
+    css_source: &CssSource, 
+    choice_box: &ChoiceBox, 
+    layer: &usize, id: &usize,
+    image_cache: &mut ImageCache,
+    asset_server: &Res<AssetServer>,
+) {
     
     // Selected Container
     builder.spawn((
@@ -348,5 +360,41 @@ fn generate_child_selected_option(builder: &mut RelatedSpawnerCommands<ChildOf>,
             RenderLayers::layer(*layer),
             BindToID(*id)
         ));
+    });
+    
+    builder.spawn((
+        Name::new(format!("Arrow-Box-{}", choice_box.w_count)),
+        Node::default(),
+        BackgroundColor::default(),
+        BorderColor::default(),
+        BorderRadius::default(),
+        UIWidgetState::default(),
+        css_source.clone(),
+        CssClass(vec![String::from("option-drop-box")]),
+        RenderLayers::layer(*layer),
+        Pickable::IGNORE,
+        BindToID(*id),
+        DropBase
+    )).with_children(|builder| {
+        if let Some(drop_icon) = choice_box.icon_path.clone() {
+            let handle = image_cache.map.entry(drop_icon.clone())
+                .or_insert_with(|| asset_server.load(drop_icon.as_str()))
+                .clone();
+            
+            builder.spawn((
+                Name::new(format!("Drop-Icon-{}", choice_box.w_count)),
+                ImageNode {
+                    image: handle,
+                    ..default()
+                },
+                ZIndex::default(),
+                UIWidgetState::default(),
+                css_source.clone(),
+                CssClass(vec![String::from("option-drop-icon")]),
+                Pickable::IGNORE,
+                RenderLayers::layer(*layer),
+                BindToID(*id)
+            ));
+        }
     });
 }

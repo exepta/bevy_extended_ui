@@ -20,7 +20,7 @@ div {
 }
 
 .div-override {
-    background: rgb(91, 91, 99);
+    background: rgb(212, 212, 243);
 }
 
 /* Button */
@@ -192,6 +192,36 @@ select {
     background: #E6E6E666;
     color: #303033;
     z-index: 1;
+}
+
+select:hover {
+    border-color: #3b926f;
+}
+
+select:focus {
+    border-color: #3b926f;
+}
+
+select .option-drop-box {
+    width: 50px;
+    min-width: 25px;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+select .option-drop-box .option-drop-icon {
+    color: #303033;
+    font-size: 14px;
+}
+
+.option-drop-box .option-drop-icon:hover {
+    color: #3b926f;
+}
+
+.option-drop-box .option-drop-icon:focus {
+    color: #3b926f;
 }
 
 select .option-selected {
