@@ -68,6 +68,7 @@ fn internal_node_creation_system(
             SliderNeedInit,
             SliderBase,
         )).observe(on_click_track)
+            .observe(on_drag_track)
             .observe(on_internal_click)
             .observe(on_internal_cursor_entered)
             .observe(on_internal_cursor_leave)
@@ -187,47 +188,102 @@ fn on_move_thumb(
 }
 
 fn on_click_track(
+    event: Trigger<Pointer<Click>>,
+    query: Query<(Entity, &mut Slider, &ComputedNode, &UIGenID, &Children), With<Slider>>,
+    track_query: Query<(&mut Node, &BindToID, &mut WidgetStyle), (With<SliderTrack>, Without<SliderThumb>)>,
+    thumb_query: Query<(&mut Node, &mut SliderThumb, &BindToID, &mut WidgetStyle), (With<SliderThumb>, Without<SliderTrack>)>,
+    window_query: Query<&Window, With<PrimaryWindow>>,
+) {
+    if let Ok(window) = window_query.single() {
+        handle_track_event(
+            event.pointer_location.position,
+            event.target,
+            query,
+            track_query,
+            thumb_query,
+            window,
+        );
+    }
+}
+
+fn on_drag_track(
     event: Trigger<Pointer<Drag>>,
+    query: Query<(Entity, &mut Slider, &ComputedNode, &UIGenID, &Children), With<Slider>>,
+    track_query: Query<(&mut Node, &BindToID, &mut WidgetStyle), (With<SliderTrack>, Without<SliderThumb>)>,
+    thumb_query: Query<(&mut Node, &mut SliderThumb, &BindToID, &mut WidgetStyle), (With<SliderThumb>, Without<SliderTrack>)>,
+    window_query: Query<&Window, With<PrimaryWindow>>,
+) {
+    if let Ok(window) = window_query.single() {
+        handle_track_event(
+            event.pointer_location.position,
+            event.target,
+            query,
+            track_query,
+            thumb_query,
+            window,
+        );
+    }
+}
+
+fn handle_track_event(
+    pointer_position: Vec2,
+    target: Entity,
     mut query: Query<(Entity, &mut Slider, &ComputedNode, &UIGenID, &Children), With<Slider>>,
     mut track_query: Query<(&mut Node, &BindToID, &mut WidgetStyle), (With<SliderTrack>, Without<SliderThumb>)>,
     mut thumb_query: Query<(&mut Node, &mut SliderThumb, &BindToID, &mut WidgetStyle), (With<SliderThumb>, Without<SliderTrack>)>,
-    window_query: Query<&Window, With<PrimaryWindow>>,
+    window: &Window,
 ) {
-    let window = match window_query.single() {
-        Ok(window) => window,
-        Err(_) => return
-    };
     for (entity, mut slider, computed_node, ui_id, children) in query.iter_mut() {
-        if event.target.eq(&entity) {
-            let slider_width = computed_node.size().x / window.scale_factor();
-            let track_left = (window.width() - slider_width) / 2.0;
-            let click_x = event.pointer_location.position.x - track_left;
-            let clamped_x = click_x.clamp(0.0, slider_width);
+        if target == entity {
+            track_internal_logic(
+                &pointer_position,
+                &mut slider,
+                computed_node,
+                ui_id,
+                children,
+                &mut track_query,
+                &mut thumb_query,
+                window,
+            );
+        }
+    }
+}
 
-            for child in children.iter() {
-                let next_child = children.iter().next();
-                if let Some(track_child) = next_child {
-                    if let Ok((mut thumb_node, mut slider_thumb, bind_to_thumb, mut style)) = thumb_query.get_mut(child) {
-                        if bind_to_thumb.0 != ui_id.0 {
-                            continue;
-                        }
-                        slider_thumb.current_x = clamped_x;
-                        thumb_node.left = Val::Px(clamped_x - 8.0);
+#[allow(clippy::too_many_arguments)]
+fn track_internal_logic(
+    pointer_position: &Vec2,
+    slider: &mut Slider,
+    computed_node: &ComputedNode,
+    ui_id: &UIGenID,
+    children: &Children,
+    track_query: &mut Query<(&mut Node, &BindToID, &mut WidgetStyle), (With<SliderTrack>, Without<SliderThumb>)>,
+    thumb_query: &mut Query<(&mut Node, &mut SliderThumb, &BindToID, &mut WidgetStyle), (With<SliderThumb>, Without<SliderTrack>)>,
+    window: &Window,
+) {
+    let slider_width = computed_node.size().x / window.scale_factor();
+    let track_left = (window.width() - slider_width) / 2.0;
+    let click_x = pointer_position.x - track_left;
+    let clamped_x = click_x.clamp(0.0, slider_width);
 
-                        for (_, styles) in style.styles.iter_mut() {
-                            styles.left = Some(thumb_node.left);
-                        }
-
-                        update_slider_track_width(&mut track_query, &track_child, &ui_id, clamped_x);
-
-                        let percent = slider_thumb.current_x / slider_width;
-                        let range = (slider.max - slider.min) as f32;
-                        let raw_value = slider.min as f32 + percent * range;
-                        let stepped_value = ((raw_value / slider.step as f32).round() * slider.step as f32) as i32;
-                        slider.value = stepped_value;
-                    }
-                }
+    for child in children.iter() {
+        if let Ok((mut thumb_node, mut slider_thumb, bind_to_thumb, mut thumb_style)) = thumb_query.get_mut(child) {
+            if bind_to_thumb.0 != ui_id.0 {
+                continue;
             }
+
+            slider_thumb.current_x = clamped_x;
+            thumb_node.left = Val::Px(clamped_x - 8.0);
+            for (_, styles) in thumb_style.styles.iter_mut() {
+                styles.left = Some(thumb_node.left);
+            }
+
+            update_slider_track_width(track_query, &child, ui_id, clamped_x);
+
+            let percent = clamped_x / slider_width;
+            let range = (slider.max - slider.min) as f32;
+            let raw_value = slider.min as f32 + percent * range;
+            let stepped_value = ((raw_value / slider.step as f32).round() * slider.step as f32) as i32;
+            slider.value = stepped_value;
         }
     }
 }

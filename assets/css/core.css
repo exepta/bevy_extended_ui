@@ -20,7 +20,7 @@ div {
 }
 
 .div-override {
-  background: rgb(212, 212, 243);
+  background: rgb(46, 47, 49);
 }
 
 /* Button */
@@ -34,16 +34,16 @@ button {
   width: 150px;
   height: 50px;
   border-radius: 5px;
-  background-color: #5bcd96;
+  background-color: #8534f5;
 }
 
 button:hover {
-  background-color: #3b926f;
+  background-color: #732bd6;
 }
 
 .button-text {
   font-size: 15px;
-  color: #303033;;
+  color: #d4d4f3;;
 }
 
 /* CheckBox */
@@ -62,20 +62,20 @@ checkbox .mark-box {
   width: 20px;
   height: 20px;
   border-radius: 2px;
-  border: 2px #303033;
+  border: 2px #d4d4f3;
 }
 
 checkbox .mark-box .mark {
-  color: #fff;
+  color: #d4d4f3;
 }
 
 checkbox:checked .mark-box {
-  border-color: #5bcd96;
-  background: #5bcd96;
+  border-color: #8534f5;
+  background: #8534f5;
 }
 
 checkbox .check-text {
-  color: #303033;
+  color: #d4d4f3;
   font-size: 13px;
 }
 
@@ -85,17 +85,17 @@ slider {
   display: flex;
   justify-content: start;
   align-items: center;
-  width: 150px;
+  width: 300px;
   height: 8px;
   box-shadow: 0 0 3px 3px #303033;
-  background: #5eb694;
+  background: #8534f5;
   border-radius: 8px;
 }
 
 slider .track {
   width: 0;
   height: 100%;
-  background: #5bcd96;
+  background: #a163f9;
   border-radius: 8px;
 }
 
@@ -105,7 +105,7 @@ slider .thumb {
   height: 16px;
   border-radius: 50%;
   box-shadow: 0 0 3px 3px #303033;
-  background: #5bcd96;
+  background: #a163f9;
 }
 
 /* Input */
@@ -114,25 +114,25 @@ input {
   width: 300px;
   height: 55px;
   border-radius: 5px 0;
-  border-color: rgb(72, 72, 72);
+  border-color: #d4d4f3;
   border-bottom: 2px;
-  background: #E6E6E666;
-  color: #303033;
+  background: rgb(50, 52, 54);
+  color: #d4d4f3;
 }
 
 input:hover {
-  border-color: #3b926f;
+  border-color: #732bd6;
 }
 
 input:focus {
-  border-color: #3b926f;
+  border-color: #a163f9;
 }
 
 input .input-label {
   position: absolute;
   left: 10px;
   top: 19px;
-  color: #313131;
+  color: #d4d4f3;
   font-size: 14px;
 }
 
@@ -146,7 +146,7 @@ input .in-icon-container {
 
 .in-icon-container .in-icon {
   font-size: 16px;
-  color: #303033;
+  color: #d4d4f3;
 }
 
 input .in-text-container {
@@ -161,24 +161,24 @@ input .in-text-container {
 }
 
 input:hover .input-label {
-  color: #3b926f;
+  color: #732bd6;
 }
 
 input:focus .input-label {
-  color: #3b926f;
+  color: #a163f9;
 }
 
 input .in-text-container .input-text {
   font-size: 15px;
   width: 100%;
-  color: #303033;
+  color: #d4d4f3;
   text-wrap: nowrap;
 }
 
 input .in-text-container .input-cursor {
   width: 2px;
   height: 20px;
-  background: #303033;
+  background: #d4d4f3;
 }
 
 /* ChoiceBox */
@@ -187,35 +187,35 @@ select {
   width: 300px;
   height: 55px;
   border-radius: 5px 0;
-  border-color: rgb(72, 72, 72);
+  border-color: #d4d4f3;
   border-bottom: 2px;
-  background: #E6E6E666;
-  color: #303033;
+  background: rgb(50, 52, 54);
+  color: #d4d4f3;
   z-index: 1;
 }
 
 select:hover {
-  border-color: #3b926f;
+  border-color: #732bd6;
 }
 
 select:focus {
-  border-color: #3b926f;
+  border-color: #a163f9;
 }
 
 select .select-label {
   position: absolute;
   left: 10px;
   top: 19px;
-  color: #313131;
+  color: #d4d4f3;
   font-size: 14px;
 }
 
 select:hover .select-label {
-  color: #3b926f;
+  color: #732bd6;
 }
 
 select:focus .select-label {
-  color: #3b926f;
+  color: #a163f9;
 }
 
 select .option-drop-box {
@@ -228,16 +228,16 @@ select .option-drop-box {
 }
 
 select .option-drop-box .option-drop-icon {
-  color: #303033;
+  color: #d4d4f3;
   font-size: 14px;
 }
 
 .option-drop-box .option-drop-icon:hover {
-  color: #3b926f;
+  color: #732bd6;
 }
 
 .option-drop-box .option-drop-icon:focus {
-  color: #3b926f;
+  color: #a163f9;
 }
 
 select .option-selected {
@@ -253,7 +253,7 @@ select .option-selected {
 }
 
 select .option-selected .option-sel-text {
-  color: #303033;
+  color: #d4d4f3;
   font-size: 14px;
 }
 
@@ -265,7 +265,7 @@ select .choice-content-box {
   top: 55px;
   box-shadow: 0 0 3px 3px #303033;
   border-radius: 0 5px;
-  background: white;
+  background: rgb(50, 52, 54);
   display: flex;
   justify-content: flex-start;
   align-items: flex-start;
@@ -286,16 +286,16 @@ select .choice-content-box .choice-option {
   flex-direction: row;
   gap: 10px;
   flex-grow: 1;
-  background: white;
+  background: rgb(50, 52, 54);
 }
 
 select .choice-content-box .choice-option .option-text {
-  color: #303033;
+  color: #d4d4f3;
   font-size: 14px;
 }
 
 select .choice-content-box .choice-option:hover {
-  background: #52d29c;
+  background: #732bd6;
 }
 
 select .choice-content-box .choice-option .option-text:hover {
@@ -303,7 +303,7 @@ select .choice-content-box .choice-option .option-text:hover {
 }
 
 select .choice-content-box .choice-option:checked {
-  background: #6affc1;
+  background: #6724bb;
 }
 
 select .choice-content-box .choice-option .option-text:checked {
