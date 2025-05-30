@@ -33,6 +33,9 @@ struct KeyRepeatTimers {
     timers: HashMap<KeyCode, Timer>,
 }
 
+#[derive(Component)]
+struct OriginalWidth(pub f32);
+
 #[derive(Resource)]
 pub struct CursorBlinkTimer {
     pub timer: Timer,
@@ -58,6 +61,7 @@ impl Plugin for InputWidget {
             update_cursor_position,
             handle_typing,
             handle_input_horizontal_scroll,
+            calculate_correct_text_container_width,
             handle_overlay_label
         ));
     }
@@ -163,6 +167,7 @@ fn internal_node_creation_system(
                 css_source.clone(),
                 CssClass(vec!["in-text-container".to_string()]),
                 Pickable::IGNORE,
+                OriginalWidth(-1.),
                 RenderLayers::layer(*layer),
                 InputContainer,
                 BindToID(id.0),
@@ -352,6 +357,43 @@ fn update_cursor_position(
     key_repeat
         .timers
         .retain(|key, _| keyboard_input.pressed(*key));
+}
+
+fn calculate_correct_text_container_width(
+    query: Query<(
+        &InputField,
+        &UIGenID,
+    ), (With<InputFieldBase>, Or<(Added<InputField>, Changed<InputField>)>)>,
+    mut container_query: Query<(&mut WidgetStyle, &mut OriginalWidth, &BindToID), With<InputContainer>>,
+) {
+    for (input_field, ui_id) in query.iter() {
+        for (mut style, mut original_width, bind_id) in container_query.iter_mut() {
+            if bind_id.0 != ui_id.0 {
+                continue;
+            }
+
+            if input_field.icon_path.is_some() {
+                if let Some(active) = style.active_style.clone() {
+                    let current = match active.width.unwrap_or_default() {
+                        Val::Percent(percent) => percent,
+                        _ => 100.,
+                    };
+
+                    if original_width.0 == -1.0 {
+                        original_width.0 = current;
+                    }
+                    
+                    if original_width.0 > current {
+                        continue;
+                    }
+
+                    for (_, value) in style.styles.iter_mut() {
+                        value.width = Some(Val::Percent(current - 15.0));
+                    }
+                }
+            }
+        }
+    }
 }
 
 fn handle_input_horizontal_scroll(

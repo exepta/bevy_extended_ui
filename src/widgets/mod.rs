@@ -232,16 +232,20 @@ impl InputCap {
 #[require(UIGenID, UIWidgetState, Widget)]
 pub struct ChoiceBox {
     pub w_count: usize,
+    pub label: String,
     pub value: ChoiceOption,
-    pub options: Vec<ChoiceOption>
+    pub options: Vec<ChoiceOption>,
+    pub icon_path: Option<String>,
 }
 
 impl Default for ChoiceBox {
     fn default() -> Self {
         Self {
             w_count: CHOICE_BOX_COUNT.fetch_add(1, Relaxed),
+            label: String::from("select"),
             value: ChoiceOption::default(),
-            options: vec![ChoiceOption::default()]
+            options: vec![ChoiceOption::default()],
+            icon_path: Some(String::from("icons/drop-arrow.png")),
         }
     }
 }

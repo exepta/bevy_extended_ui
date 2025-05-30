@@ -12,12 +12,11 @@ impl Plugin for StyleService {
         app.add_systems(PostUpdate,
             update_widget_styles_system
                 .after(update_widget_states)
-                .after(TransformSystem::TransformPropagate)
         );
     }
 }
 
-fn update_widget_styles_system(
+pub fn update_widget_styles_system(
     mut query: Query<(
         Entity,
         Option<&UIWidgetState>,

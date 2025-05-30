@@ -21,6 +21,9 @@ struct SliderThumb {
 #[derive(Component, Deref, DerefMut)]
 struct PreviousSliderValue(i32);
 
+#[derive(Component)]
+struct SliderNeedInit;
+
 pub struct SliderWidget;
 
 impl Plugin for SliderWidget {
@@ -28,8 +31,9 @@ impl Plugin for SliderWidget {
         app.register_type::<SliderThumb>();
         app.add_systems(Update, (
             internal_node_creation_system,
-            detect_change_slider_values
-        ));
+            detect_change_slider_values,
+            initialize_slider_visual_state
+        ).chain());
     }
 }
 
@@ -58,9 +62,10 @@ fn internal_node_creation_system(
             BoxShadow::new(Colored::TRANSPARENT, Val::Px(0.), Val::Px(0.), Val::Px(0.), Val::Px(0.)),
             ZIndex::default(),
             css_source.clone(),
-            PreviousSliderValue(slider.value),
+            PreviousSliderValue(0),
             TagName(String::from("slider")),
             RenderLayers::layer(*layer),
+            SliderNeedInit,
             SliderBase,
         )).observe(on_click_track)
             .observe(on_internal_click)
@@ -182,7 +187,7 @@ fn on_move_thumb(
 }
 
 fn on_click_track(
-    event: Trigger<Pointer<Click>>,
+    event: Trigger<Pointer<Drag>>,
     mut query: Query<(Entity, &mut Slider, &ComputedNode, &UIGenID, &Children), With<Slider>>,
     mut track_query: Query<(&mut Node, &BindToID, &mut WidgetStyle), (With<SliderTrack>, Without<SliderThumb>)>,
     mut thumb_query: Query<(&mut Node, &mut SliderThumb, &BindToID, &mut WidgetStyle), (With<SliderThumb>, Without<SliderTrack>)>,
@@ -230,7 +235,6 @@ fn on_click_track(
 fn detect_change_slider_values(
     keyboard: Res<ButtonInput<KeyCode>>,
     mut query: Query<(
-        Entity,
         &mut Slider,
         &UIWidgetState,
         &ComputedNode,
@@ -249,7 +253,7 @@ fn detect_change_slider_values(
 
     let shift = keyboard.pressed(KeyCode::ShiftLeft) || keyboard.pressed(KeyCode::ShiftRight);
 
-    for (_entity, mut slider, state, computed_node, children, ui_id, mut prev) in query.iter_mut() {
+    for (mut slider, state, computed_node, children, ui_id, mut prev) in query.iter_mut() {
         let mut changed = false;
 
         // Handle keyboard change
@@ -265,7 +269,7 @@ fn detect_change_slider_values(
 
         if slider.value != **prev {
             changed = true;
-            **prev = slider.value; // update stored value
+            **prev = slider.value;
         }
 
         if changed {
@@ -287,6 +291,65 @@ fn detect_change_slider_values(
                 update_slider_track_width(&mut track_query, &child, ui_id, clamped_x);
             }
         }
+    }
+}
+
+fn initialize_slider_visual_state(
+    mut commands: Commands,
+    mut query: Query<(
+        Entity,
+        &Slider,
+        &ComputedNode,
+        &Children,
+        &UIGenID,
+        Option<&SliderNeedInit>,
+    )>,
+    mut track_query: Query<(&mut Node, &mut WidgetStyle, &BindToID), (With<SliderTrack>, Without<SliderThumb>)>,
+    mut thumb_query: Query<(&mut Node, &mut SliderThumb, &mut WidgetStyle, &BindToID), (With<SliderThumb>, Without<SliderTrack>)>,
+    window_query: Query<&Window, With<PrimaryWindow>>,
+) {
+    let Ok(window) = window_query.single() else { return };
+
+    for (entity, slider, computed_node, children, ui_id, needs_init) in query.iter_mut() {
+        if needs_init.is_none() {
+            continue;
+        }
+
+        let slider_width = computed_node.size().x / window.scale_factor();
+        if slider_width <= 1.0 {
+            continue;
+        }
+
+        let percent = (slider.value - slider.min) as f32 / (slider.max - slider.min) as f32;
+        let clamped_x = percent * slider_width;
+
+        for child in children.iter() {
+            if let Ok((mut thumb_node, mut thumb, mut style, bind_to)) = thumb_query.get_mut(child) {
+                if bind_to.0 != ui_id.0 {
+                    continue;
+                }
+
+                thumb.current_x = clamped_x;
+                thumb_node.left = Val::Px(clamped_x - 8.0);
+
+                for (_, styles) in style.styles.iter_mut() {
+                    styles.left = Some(thumb_node.left);
+                }
+            }
+
+            if let Ok((mut track_node, mut style, bind_to)) = track_query.get_mut(child) {
+                if bind_to.0 != ui_id.0 {
+                    continue;
+                }
+
+                track_node.width = Val::Px(clamped_x);
+                for (_, styles) in style.styles.iter_mut() {
+                    styles.width = Some(track_node.width);
+                }
+            }
+        }
+
+        commands.entity(entity).remove::<SliderNeedInit>();
     }
 }
 
