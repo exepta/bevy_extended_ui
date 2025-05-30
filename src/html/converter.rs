@@ -170,12 +170,20 @@ fn parse_html_node(
                     if option_el.name.local.eq("option") {
                         let attrs = option_el.attributes.borrow();
                         let value = attrs.get("value").unwrap_or("").to_string();
+                        let icon = attrs.get("icon").unwrap_or("").to_string();
                         let text = child.text_contents().trim().to_string();
 
+                        let icon_path;
+                        if icon.trim().is_empty() {
+                            icon_path = None;
+                        } else {
+                            icon_path = Some(icon);
+                        }
+                        
                         let option = ChoiceOption {
                             text: text.clone(),
                             internal_value: value.clone(),
-                            icon_path: None,
+                            icon_path,
                         };
 
                         if attrs.contains("selected") {
@@ -190,6 +198,7 @@ fn parse_html_node(
             let value = selected_value.unwrap_or_else(|| {
                 options.first().cloned().unwrap_or_default()
             });
+            
 
             Some(HtmlWidgetNode::ChoiceBox(
                 ChoiceBox {

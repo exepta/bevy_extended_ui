@@ -202,6 +202,22 @@ select:focus {
     border-color: #3b926f;
 }
 
+select .select-label {
+    position: absolute;
+    left: 10px;
+    top: 19px;
+    color: #313131;
+    font-size: 14px;
+}
+
+select:hover .select-label {
+    color: #3b926f;
+}
+
+select:focus .select-label {
+    color: #3b926f;
+}
+
 select .option-drop-box {
     width: 50px;
     min-width: 25px;
