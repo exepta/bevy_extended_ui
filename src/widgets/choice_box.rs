@@ -140,7 +140,6 @@ fn internal_node_creation_system(
                             .with_children(|builder| {
                                 
                                 if let Some(icon) = option.icon_path.clone() {
-                                    info!("1");
                                     let handle = image_cache.map.entry(icon.clone())
                                         .or_insert_with(|| asset_server.load(icon.as_str()))
                                         .clone();
