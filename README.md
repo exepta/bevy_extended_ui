@@ -78,6 +78,17 @@ button:hover .button-text {
 }
 ```
 
+## Examples
+
+For more examples, look at the example package. If you need help with CSS rules, look at CSS_SUPPORT.md in the same folder!
+The crate supports many CSS things, the list below shows the future support:
+- CSS variables
+- CSS Animations @keyframes
+- CSS media queries
+- HTML function like javascript
+- & ~ > Operators
+- SCSS support
+
 | `Bevy` version | `bevy_extended_ui` version |
 |----------------|----------------------------|
 | 0.16.0         | 0.1.0                      |

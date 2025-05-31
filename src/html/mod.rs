@@ -7,7 +7,7 @@ use crate::html::builder::HtmlBuilderSystem;
 use crate::html::converter::HtmlConverterSystem;
 use crate::styling::css::apply_property_to_style;
 use crate::styling::Style;
-use crate::widgets::{CheckBox, Div, InputField, Button, HtmlBody, ChoiceBox, Slider};
+use crate::widgets::{CheckBox, Div, InputField, Button, HtmlBody, ChoiceBox, Slider, Headline};
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
@@ -58,6 +58,7 @@ pub enum HtmlWidgetNode {
     Input(InputField, HtmlMeta),
     CheckBox(CheckBox, HtmlMeta),
     ChoiceBox(ChoiceBox, HtmlMeta),
+    Headline(Headline, HtmlMeta),
     Slider(Slider, HtmlMeta),
     Div(Div, HtmlMeta, Vec<HtmlWidgetNode>),
     HtmlBody(HtmlBody, HtmlMeta, Vec<HtmlWidgetNode>),

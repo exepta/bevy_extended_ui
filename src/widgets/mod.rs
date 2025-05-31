@@ -5,7 +5,9 @@ mod slider;
 mod input;
 mod choice_box;
 mod body;
+mod headline;
 
+use std::fmt;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
 use bevy::prelude::*;
@@ -17,6 +19,7 @@ use crate::widgets::button::ButtonWidget;
 use crate::widgets::check_box::CheckBoxWidget;
 use crate::widgets::choice_box::ChoiceBoxWidget;
 use crate::widgets::div::DivWidget;
+use crate::widgets::headline::HeadlineWidget;
 use crate::widgets::input::InputWidget;
 use crate::widgets::slider::SliderWidget;
 
@@ -24,6 +27,7 @@ static BUTTON_COUNT: AtomicUsize = AtomicUsize::new(1);
 static CHECK_BOX_COUNT: AtomicUsize = AtomicUsize::new(1);
 static CHOICE_BOX_COUNT: AtomicUsize = AtomicUsize::new(1);
 static DIV_COUNT: AtomicUsize = AtomicUsize::new(1);
+static HEADLINE_COUNT: AtomicUsize = AtomicUsize::new(1);
 static HTML_COUNT: AtomicUsize = AtomicUsize::new(1);
 static INPUT_COUNT: AtomicUsize = AtomicUsize::new(1);
 static SLIDER_COUNT: AtomicUsize = AtomicUsize::new(1);
@@ -66,6 +70,54 @@ pub struct Div(usize);
 impl Default for Div {
     fn default() -> Self {
         Self(DIV_COUNT.fetch_add(1, Relaxed))
+    }
+}
+
+// ===============================================
+//                       Headline
+// ===============================================
+
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+#[require(UIGenID, UIWidgetState, Widget)]
+pub struct Headline {
+    pub w_count: usize,
+    pub text: String,
+    pub h_type: HeadlineType
+}
+
+impl Default for Headline {
+    fn default() -> Self {
+        Self {
+            w_count: HEADLINE_COUNT.fetch_add(1, Relaxed),
+            text: String::from("Headline"),
+            h_type: HeadlineType::H3
+        }
+    }
+}
+
+#[derive(Reflect, Default, Debug, Clone, Eq, PartialEq)]
+pub enum HeadlineType {
+    #[default]
+    H1,
+    H2,
+    H3,
+    H4,
+    H5,
+    H6,
+}
+
+impl fmt::Display for HeadlineType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            HeadlineType::H1 => "h1",
+            HeadlineType::H2 => "h2",
+            HeadlineType::H3 => "h3",
+            HeadlineType::H4 => "h4",
+            HeadlineType::H5 => "h5",
+            HeadlineType::H6 => "h6",
+        };
+        write!(f, "{}", s)
     }
 }
 
@@ -288,9 +340,11 @@ impl Plugin for WidgetPlugin {
         app.register_type::<Slider>();
         app.register_type::<InputField>();
         app.register_type::<ChoiceBox>();
+        app.register_type::<Headline>();
         app.add_plugins((
             HtmlBodyWidget,
-            DivWidget, 
+            DivWidget,
+            HeadlineWidget,
             ButtonWidget,
             CheckBoxWidget,
             SliderWidget,
