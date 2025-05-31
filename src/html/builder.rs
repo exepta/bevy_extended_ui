@@ -37,6 +37,9 @@ fn spawn_widget_node(
         HtmlWidgetNode::Input(input, meta) => {
             spawn_with_meta(commands, input.clone(), meta)
         }
+        HtmlWidgetNode::Headline(headline, meta) => {
+            spawn_with_meta(commands, headline.clone(), meta)
+        }
         HtmlWidgetNode::CheckBox(checkbox, meta) => {
             spawn_with_meta(commands, checkbox.clone(), meta)
         }

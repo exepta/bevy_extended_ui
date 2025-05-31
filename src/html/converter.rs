@@ -5,7 +5,7 @@ use kuchiki::NodeRef;
 use kuchiki::traits::TendrilSink;
 use crate::html::{HtmlSource, HtmlMeta, HtmlStructureMap, HtmlWidgetNode};
 use crate::styling::IconPlace;
-use crate::widgets::{Button, CheckBox, ChoiceBox, ChoiceOption, Div, HtmlBody, InputCap, InputField, InputType, Slider};
+use crate::widgets::{Button, CheckBox, ChoiceBox, ChoiceOption, Div, Headline, HeadlineType, HtmlBody, InputCap, InputField, InputType, Slider};
 
 pub struct HtmlConverterSystem;
 
@@ -236,6 +236,28 @@ fn parse_html_node(
                     min,
                     max,
                     step,
+                    ..default()
+                },
+                meta,
+            ))
+        },
+        "h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
+            let h_type = match tag.as_str() {
+                "h1" => HeadlineType::H1,
+                "h2" => HeadlineType::H2,
+                "h3" => HeadlineType::H3,
+                "h4" => HeadlineType::H4,
+                "h5" => HeadlineType::H5,
+                "h6" => HeadlineType::H6,
+                _ => HeadlineType::H3,
+            };
+
+            let text = node.text_contents().trim().to_string();
+
+            Some(HtmlWidgetNode::Headline(
+                Headline {
+                    text,
+                    h_type,
                     ..default()
                 },
                 meta,
