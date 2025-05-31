@@ -43,6 +43,15 @@ h2 {
     color: #444749;
 }
 
+p {
+    font-size: 12px;
+    color: #444749;
+}
+
+p:hover {
+    color: #732bd6;
+}
+
 /* Input Fields */
 
 input {
