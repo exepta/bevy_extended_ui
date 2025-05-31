@@ -6,6 +6,7 @@ mod input;
 mod choice_box;
 mod body;
 mod headline;
+mod paragraph;
 
 use std::fmt;
 use std::sync::atomic::AtomicUsize;
@@ -21,6 +22,7 @@ use crate::widgets::choice_box::ChoiceBoxWidget;
 use crate::widgets::div::DivWidget;
 use crate::widgets::headline::HeadlineWidget;
 use crate::widgets::input::InputWidget;
+use crate::widgets::paragraph::ParagraphWidget;
 use crate::widgets::slider::SliderWidget;
 
 static BUTTON_COUNT: AtomicUsize = AtomicUsize::new(1);
@@ -30,6 +32,7 @@ static DIV_COUNT: AtomicUsize = AtomicUsize::new(1);
 static HEADLINE_COUNT: AtomicUsize = AtomicUsize::new(1);
 static HTML_COUNT: AtomicUsize = AtomicUsize::new(1);
 static INPUT_COUNT: AtomicUsize = AtomicUsize::new(1);
+static PARAGRAPH_COUNT: AtomicUsize = AtomicUsize::new(1);
 static SLIDER_COUNT: AtomicUsize = AtomicUsize::new(1);
 
 #[derive(Component, Default)]
@@ -118,6 +121,27 @@ impl fmt::Display for HeadlineType {
             HeadlineType::H6 => "h6",
         };
         write!(f, "{}", s)
+    }
+}
+
+// ===============================================
+//                     Paragraph
+// ===============================================
+
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+#[require(UIGenID, UIWidgetState, Widget)]
+pub struct Paragraph {
+    pub w_count: usize,
+    pub text: String,
+}
+
+impl Default for Paragraph {
+    fn default() -> Self {
+        Self {
+            w_count: PARAGRAPH_COUNT.fetch_add(1, Relaxed),
+            text: String::from(""),
+        }
     }
 }
 
@@ -341,10 +365,12 @@ impl Plugin for WidgetPlugin {
         app.register_type::<InputField>();
         app.register_type::<ChoiceBox>();
         app.register_type::<Headline>();
+        app.register_type::<Paragraph>();
         app.add_plugins((
             HtmlBodyWidget,
             DivWidget,
             HeadlineWidget,
+            ParagraphWidget,
             ButtonWidget,
             CheckBoxWidget,
             SliderWidget,
