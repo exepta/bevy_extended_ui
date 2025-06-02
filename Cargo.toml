@@ -8,13 +8,9 @@ authors = ["Daniel Ramke <genshin.exepta@outlook.com>"]
 name = "bevy_extended_ui"
 path = "src/lib.rs"
 
-# Debugger
-[dependencies.bevy-inspector-egui]
-version = "0.31.0"
-
 # Bevy 0.16.0 main library
 [dependencies.bevy]
-version = "0.16.0"
+version = "0.16.1"
 default-features = false
 features = [
     "bevy_asset",
