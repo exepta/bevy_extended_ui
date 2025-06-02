@@ -2,12 +2,15 @@ name: Build
 
 on:
   push:
+    tags:
+      - '*'
+    branches:
+      - '*'
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  # Run unit test which ar in Rust code
   test:
     name: Unit Test
     runs-on: ubuntu-latest
@@ -15,6 +18,7 @@ jobs:
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
+
       - name: Cache
         uses: actions/cache@v4
         with:
@@ -24,11 +28,13 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.toml') }}${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.toml') }}
+          key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.toml') }}
+
       - name: Install Nightly toolchain
         uses: dtolnay/rust-toolchain@nightly
+
       - name: Install Dependencies
-        run: sudo apt-get update; sudo apt-get install --no-install-recommends libasound2-dev libudev-dev
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends libasound2-dev libudev-dev
 
       - name: Install coverage tool if not installed
         run: |
@@ -45,3 +51,20 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+
+  publish:
+    name: Publish to crates.io
+    runs-on: ubuntu-latest
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Publish to crates.io
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish --no-verify
