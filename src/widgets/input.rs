@@ -604,7 +604,7 @@ fn handle_overlay_label(
                         Val::Px(px) => px,
                         _ => 55.,
                     };
-                    
+
                     let center = (height / 2.0) - text_font.font_size / 1.5;
                     let on_top = text_font.font_size / 2.0;
 
