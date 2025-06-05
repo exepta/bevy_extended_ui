@@ -363,8 +363,8 @@ fn calculate_correct_text_container_width(
     query: Query<(
         &InputField,
         &UIGenID,
-    ), (With<InputFieldBase>, Or<(Added<InputField>, Changed<InputField>)>)>,
-    mut container_query: Query<(&mut WidgetStyle, &mut OriginalWidth, &BindToID), With<InputContainer>>,
+    ), (With<InputField>, Without<InputContainer>, Or<(Added<InputField>, Changed<WidgetStyle>, Changed<InputField>)>)>,
+    mut container_query: Query<(&mut WidgetStyle, &mut OriginalWidth, &BindToID), (With<InputContainer>, Without<InputField>)>,
 ) {
     for (input_field, ui_id) in query.iter() {
         for (mut style, mut original_width, bind_id) in container_query.iter_mut() {
@@ -588,50 +588,60 @@ fn handle_typing(
 }
 
 fn handle_overlay_label(
-    query: Query<(&UIWidgetState, &UIGenID, &InputField, &Children), With<InputField>>,
-    mut label_query: Query<(&BindToID, &mut Node, &mut TextFont, &mut WidgetStyle), With<OverlayLabel>>,
+    query: Query<(&UIWidgetState, &UIGenID, &InputField, &WidgetStyle, &Children), (With<InputField>, Without<OverlayLabel>)>,
+    mut label_query: Query<(&BindToID, &mut Node, &mut TextFont, &mut WidgetStyle), (With<OverlayLabel>, Without<InputField>)>,
     icon_container_query: Query<(&WidgetStyle, &BindToID), (With<InputFieldIcon>, Without<OverlayLabel>)>,
 ) {
-    for (state, gen_id, in_field, children) in query.iter() {
+    for (state, gen_id, in_field, in_style, children) in query.iter() {
         for child in children.iter() {
             if let Ok((bind_to, mut node, mut text_font, mut styles)) = label_query.get_mut(child) {
                 if bind_to.0 != gen_id.0 {
                     continue;
                 }
 
-                if state.focused {
-                    node.top = Val::Px(5.);
-                    text_font.font_size = 10.;
-                } else {
-                    if in_field.text.is_empty() {
-                        node.top = Val::Px(19.5);
-                        text_font.font_size = 14.;
-                    } else {
-                        node.top = Val::Px(5.);
-                        text_font.font_size = 10.;
-                    }
-                }
+                if let Some(active_style) = in_style.active_style.clone() {
+                    let height = match active_style.height.unwrap_or_default() {
+                        Val::Px(px) => px,
+                        _ => 55.,
+                    };
 
-                if let Some((icon_style, _)) = icon_container_query.iter().find(|(_, icon_bind_to)| icon_bind_to.0 == gen_id.0) {
-                    if let Some(active_style) = icon_style.active_style.clone() {
-                        if let Some(Val::Px(new_width)) = active_style.width {
-                            let left_now = match node.left {
-                                Val::Px(px) => px,
-                                _ => 10.,
-                            };
-                            
-                            let expected_left = 5.0 + new_width;
-                            if (left_now - expected_left).abs() > f32::EPSILON {
-                                node.left = Val::Px(expected_left);
+                    let center = (height / 2.0) - text_font.font_size / 1.5;
+                    let on_top = text_font.font_size / 2.0;
+
+                    if state.focused {
+                        node.top = Val::Px(on_top);
+                        text_font.font_size = 10.;
+                    } else {
+                        if in_field.text.is_empty() {
+                            node.top = Val::Px(center);
+                            text_font.font_size = 14.;
+                        } else {
+                            node.top = Val::Px(on_top);
+                            text_font.font_size = 10.;
+                        }
+                    }
+
+                    if let Some((icon_style, _)) = icon_container_query.iter().find(|(_, icon_bind_to)| icon_bind_to.0 == gen_id.0) {
+                        if let Some(active_style) = icon_style.active_style.clone() {
+                            if let Some(Val::Px(new_width)) = active_style.width {
+                                let left_now = match node.left {
+                                    Val::Px(px) => px,
+                                    _ => 10.,
+                                };
+
+                                let expected_left = 5.0 + new_width;
+                                if (left_now - expected_left).abs() > f32::EPSILON {
+                                    node.left = Val::Px(expected_left);
+                                }
                             }
                         }
                     }
-                }
 
-                for (_, style) in styles.styles.iter_mut() {
-                    style.top = Some(node.top);
-                    style.left = Some(node.left);
-                    style.font_size = Some(FontVal::Px(text_font.font_size));
+                    for (_, style) in styles.styles.iter_mut() {
+                        style.top = Some(node.top);
+                        style.left = Some(node.left);
+                        style.font_size = Some(FontVal::Px(text_font.font_size));
+                    }
                 }
             }
         }
