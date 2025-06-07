@@ -202,8 +202,18 @@ fn apply_style_to_node(style: &Style, node: Option<Mut<Node>>) {
             }
         }
         
-        
         node.flex_grow = style.flex_grow.unwrap_or_default();
+        node.flex_basis = style.flex_basis.unwrap_or_default();
+        node.flex_shrink = style.flex_shrink.unwrap_or_default();
+        node.flex_wrap = style.flex_wrap.unwrap_or_default();
+        
+        node.grid_row = style.grid_row.unwrap_or_default();
+        node.grid_column = style.grid_column.unwrap_or_default();
+        node.grid_auto_flow = style.grid_auto_flow.unwrap_or_default();
+        node.grid_template_rows = style.grid_template_rows.clone().unwrap_or_default();
+        node.grid_template_columns = style.grid_template_columns.clone().unwrap_or_default();
+        node.grid_auto_columns = style.grid_auto_columns.clone().unwrap_or_default();
+        node.grid_auto_rows = style.grid_auto_rows.clone().unwrap_or_default();
     }
 }
 
