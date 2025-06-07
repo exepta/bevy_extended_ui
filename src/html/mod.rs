@@ -9,16 +9,26 @@ use crate::styling::css::apply_property_to_style;
 use crate::styling::Style;
 use crate::widgets::{CheckBox, Div, InputField, Button, HtmlBody, ChoiceBox, Slider, Headline, Paragraph};
 
+/// A component that stores the raw HTML source as a string.
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
 pub struct HtmlSource(pub String);
 
+/// A component that stores parsed CSS style data using Bevy's `Style` struct.
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
 pub struct HtmlStyle(pub Style);
 
 impl HtmlStyle {
-
+    /// Parses a raw CSS style string and converts it into an `HtmlStyle`.
+    ///
+    /// The input string should be a semicolon-separated list of CSS properties.
+    ///
+    /// # Example
+    /// ```rust
+    /// use bevy_extended_ui::html::HtmlStyle;
+    /// let style = HtmlStyle::from_str("display: flex; justify-content: center;");
+    /// ```
     pub fn from_str(style_code: &str) -> HtmlStyle {
         let mut style = Style::default();
 
@@ -41,48 +51,69 @@ impl HtmlStyle {
 
         HtmlStyle(style)
     }
-    
 }
 
+/// Metadata attached to HTML elements, such as class, id, inline styles, or embedded CSS.
 #[derive(Debug, Clone, Default)]
 pub struct HtmlMeta {
+    /// Embedded `<style>` or global CSS rules.
     pub css: String,
+    /// Value of the `id` attribute.
     pub id: Option<String>,
+    /// Value(s) of the `class` attribute.
     pub class: Option<Vec<String>>,
+    /// Inline CSS from the `style` attribute.
     pub style: Option<String>,
 }
 
+/// An enum representing a node in the HTML DOM hierarchy,
+/// mapped to Bevy UI components.
 #[derive(Debug, Clone)]
 pub enum HtmlWidgetNode {
+    /// A `<button>` element.
     Button(Button, HtmlMeta),
+    /// An `<input type="text">` field.
     Input(InputField, HtmlMeta),
+    /// A checkbox `<input type="checkbox">`.
     CheckBox(CheckBox, HtmlMeta),
+    /// A dropdown or select box.
     ChoiceBox(ChoiceBox, HtmlMeta),
+    /// A heading element (`<h1>`-`<h6>`).
     Headline(Headline, HtmlMeta),
+    /// A paragraph `<p>`.
     Paragraph(Paragraph, HtmlMeta),
+    /// A slider input (range).
     Slider(Slider, HtmlMeta),
+    /// A `<div>` container element with nested child nodes.
     Div(Div, HtmlMeta, Vec<HtmlWidgetNode>),
+    /// The root `<body>` element of the HTML structure.
     HtmlBody(HtmlBody, HtmlMeta, Vec<HtmlWidgetNode>),
 }
 
+/// A resource that holds all parsed HTML structures keyed by identifier.
+/// One entry can be marked as currently active.
 #[derive(Resource)]
 pub struct HtmlStructureMap {
+    /// Map of structure names (e.g., file or document names) to their HTML node trees.
     pub html_map: HashMap<String, Vec<HtmlWidgetNode>>,
-    pub active: Option<String>
+    /// Currently active structure identifier, if any.
+    pub active: Option<String>,
 }
 
 impl Default for HtmlStructureMap {
     fn default() -> Self {
         Self {
             html_map: HashMap::new(),
-            active: None
+            active: None,
         }
     }
 }
 
+/// The main plugin that registers all HTML UI systems and resources.
 pub struct HtmlPlugin;
 
 impl Plugin for HtmlPlugin {
+    /// Configures the app to support HTML parsing and UI construction.
     fn build(&self, app: &mut App) {
         app.init_resource::<HtmlStructureMap>();
         app.register_type::<HtmlSource>();

@@ -2,14 +2,20 @@ use bevy::prelude::*;
 use crate::html::{HtmlMeta, HtmlStructureMap, HtmlWidgetNode};
 use crate::styling::convert::{CssClass, CssID, CssSource};
 
+/// A plugin that spawns Bevy UI entities from parsed HTML node structures.
 pub struct HtmlBuilderSystem;
 
 impl Plugin for HtmlBuilderSystem {
+    /// Registers the HTML builder system to run whenever the HTML structure map resource changes.
     fn build(&self, app: &mut App) {
         app.add_systems(Update, build_html_source.run_if(resource_changed::<HtmlStructureMap>));
     }
 }
 
+/// System that builds the active HTML structure into Bevy UI entities.
+///
+/// This system is triggered when the [`HtmlStructureMap`] resource changes.
+/// It looks up the active structure and recursively spawns UI entities for each node.
 fn build_html_source(
     mut commands: Commands,
     structure_map: Res<HtmlStructureMap>,
@@ -24,6 +30,11 @@ fn build_html_source(
     }
 }
 
+/// Recursively spawns Bevy entities for a given [`HtmlWidgetNode`] and its children.
+///
+/// Each entity is assigned UI components as well as metadata components like `CssClass` and `CssID`.
+///
+/// If a parent entity is provided, the new entity is added as a child of that parent.
 fn spawn_widget_node(
     commands: &mut Commands,
     node: &HtmlWidgetNode,
@@ -77,6 +88,13 @@ fn spawn_widget_node(
     entity
 }
 
+/// Spawns a single UI entity with metadata components based on the provided [`HtmlMeta`].
+///
+/// The entity will include a [`Node`] component, as well as any CSS metadata like `class`, `id`,
+/// and raw CSS source.
+///
+/// # Type Parameters
+/// - `T`: A Bevy component representing a UI element (e.g., `Button`, `Div`, etc.).
 fn spawn_with_meta<T: Component>(
     commands: &mut Commands,
     component: T,
