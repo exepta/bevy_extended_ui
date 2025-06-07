@@ -91,6 +91,33 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
         "align-items" => style.align_items = convert_to_bevy_align_items(value.to_string()),
         "flex-direction" => style.flex_direction = convert_to_bevy_flex_direction(value.to_string()),
         "flex-grow" => style.flex_grow = value.trim().parse::<f32>().ok(),
+        "flex-shrink" => style.flex_shrink = value.trim().parse::<f32>().ok(),
+        "flex-basis" => style.flex_basis = convert_to_val(value.to_string()),
+        "flex-wrap" => {
+            style.flex_wrap = convert_to_bevy_flex_wrap(value.to_string());
+        },
+        
+        "grid-row" => {
+            style.grid_row = convert_to_bevy_grid_placement(value.to_string());
+        },
+        "grid-column" => {
+            style.grid_column = convert_to_bevy_grid_placement(value.to_string());
+        },
+        "grid-auto-flow" => {
+            style.grid_auto_flow = convert_to_bevy_grid_flow(value.to_string());
+        },
+        "grid-template-rows" => {
+            style.grid_template_rows = convert_to_bevy_grid_template(value.to_string());
+        },
+        "grid-template-columns" => {
+            style.grid_template_columns = convert_to_bevy_grid_template(value.to_string());
+        },
+        "grid-auto-rows" => {
+            style.grid_auto_rows = convert_to_bevy_grid_track(value.to_string());
+        },
+        "grid-auto-columns" => {
+            style.grid_auto_columns = convert_to_bevy_grid_track(value.to_string());
+        },
 
         "background" | "background-color" => {
             style.background = Some(Background {
@@ -444,6 +471,16 @@ pub fn convert_to_bevy_flex_direction(value: String) -> Option<FlexDirection> {
     }
 }
 
+pub fn convert_to_bevy_flex_wrap(value: String) -> Option<FlexWrap> {
+    let trimmed = value.trim();
+    match trimmed {
+        "wrap" => { Some(FlexWrap::Wrap) },
+        "nowrap" => { Some(FlexWrap::NoWrap) },
+        "wrap-reverse" => { Some(FlexWrap::WrapReverse) },
+        _ => { Some(FlexWrap::default()) }
+    }
+}
+
 pub fn convert_to_bevy_line_break(value: String) -> Option<LineBreak> {
     let trimmed = value.trim();
     match trimmed {
@@ -452,6 +489,156 @@ pub fn convert_to_bevy_line_break(value: String) -> Option<LineBreak> {
         "pretty" | "balance" => { Some(LineBreak::WordBoundary) },
         "unset" => { Some(LineBreak::AnyCharacter) },
         _=> { Some(LineBreak::default()) }
+    }
+}
+
+pub fn convert_to_bevy_grid_flow(value: String) -> Option<GridAutoFlow> {
+    let trimmed = value.trim();
+    match trimmed {
+        "row" => { Some(GridAutoFlow::Row) }
+        "column" => { Some(GridAutoFlow::Column) }
+        "row-dense" => { Some(GridAutoFlow::RowDense) }
+        "column-dense" => { Some(GridAutoFlow::ColumnDense) }
+        _ => { Some(GridAutoFlow::default()) }
+    }
+}
+
+pub fn convert_to_bevy_grid_placement(value: String) -> Option<GridPlacement> {
+    let trimmed = value.trim();
+    
+    if let Some(span_str) = trimmed.strip_prefix("span ") {
+        if let Ok(span) = span_str.trim().parse::<u16>() {
+            if span > 0 {
+                return Some(GridPlacement::span(span));
+            }
+        }
+    }
+
+    if trimmed.contains('/') {
+        let parts: Vec<&str> = trimmed.split('/').map(str::trim).collect();
+        if parts.len() == 2 {
+            let start = parts[0].parse::<i16>().ok()?;
+            let end = parts[1].parse::<i16>().ok()?;
+            if start > 0 && end > 0 {
+                return Some(GridPlacement::start_end(start, end));
+            }
+        }
+    }
+    
+    if let Ok(start) = trimmed.parse::<i16>() {
+        if start > 0 {
+            return Some(GridPlacement::start(start));
+        }
+    }
+    
+    None
+}
+
+// ==============================================================================
+//                              Only Grid Tracks
+// ==============================================================================
+
+pub fn convert_to_bevy_grid_track(value: String) -> Option<Vec<GridTrack>> {
+    value
+        .split_whitespace()
+        .map(|part| parse_single_grid_track(part))
+        .collect()
+}
+
+// ==============================================================================
+//                               Grid Template
+// ==============================================================================
+
+pub fn convert_to_bevy_grid_template(value: String) -> Option<Vec<RepeatedGridTrack>> {
+    let input = value.trim();
+    let mut result = Vec::new();
+
+    if let Some(content) = input.strip_prefix("repeat(").and_then(|s| s.strip_suffix(')')) {
+        let mut parts = content.splitn(2, ',').map(str::trim);
+        let count = parts.next()?.parse::<u16>().ok()?;
+        let track_def = parts.next()?;
+
+        let track = parse_single_grid_track(track_def)?;
+        result.push(RepeatedGridTrack::repeat_many(
+            GridTrackRepetition::Count(count),
+            vec![track],
+        ));
+        return Some(result);
+    }
+    
+    for token in input.split_whitespace() {
+        if let Some(track) = parse_single_grid_track(token) {
+            result.push(RepeatedGridTrack::repeat_many(GridTrackRepetition::Count(1), vec![track]));
+        } else {
+            return None;
+        }
+    }
+
+    Some(result)
+}
+
+fn parse_single_grid_track(input: &str) -> Option<GridTrack> {
+    let input = input.trim();
+    match input {
+        "auto" => Some(GridTrack::auto()),
+        "min-content" => Some(GridTrack::min_content()),
+        "max-content" => Some(GridTrack::max_content()),
+        _ if input.starts_with("minmax(") && input.ends_with(')') => {
+            let inner = &input[7..input.len() - 1];
+            let mut parts = inner.split(',').map(str::trim);
+            let min = parse_min_sizing(parts.next()?)?;
+            let max = parse_max_sizing(parts.next()?)?;
+            Some(GridTrack::minmax(min, max))
+        }
+        _ if input.ends_with("px") => input
+            .strip_suffix("px")?
+            .parse::<f32>()
+            .ok()
+            .map(GridTrack::px),
+        _ if input.ends_with('%') => input
+            .strip_suffix('%')?
+            .parse::<f32>()
+            .ok()
+            .map(GridTrack::percent),
+        _ if input.ends_with("fr") => input
+            .strip_suffix("fr")?
+            .parse::<f32>()
+            .ok()
+            .map(GridTrack::fr),
+        _ => None,
+    }
+}
+
+fn parse_min_sizing(input: &str) -> Option<MinTrackSizingFunction> {
+    match input {
+        "auto" => Some(MinTrackSizingFunction::Auto),
+        "min-content" => Some(MinTrackSizingFunction::MinContent),
+        "max-content" => Some(MinTrackSizingFunction::MaxContent),
+        _ if input.ends_with("px") => input
+            .strip_suffix("px")?
+            .parse::<f32>()
+            .ok()
+            .map(MinTrackSizingFunction::Px),
+        _ => None,
+    }
+}
+
+fn parse_max_sizing(input: &str) -> Option<MaxTrackSizingFunction> {
+    match input {
+        "auto" => Some(MaxTrackSizingFunction::Auto),
+        "min-content" => Some(MaxTrackSizingFunction::MinContent),
+        "max-content" => Some(MaxTrackSizingFunction::MaxContent),
+        _ if input.ends_with("px") => input
+            .strip_suffix("px")?
+            .parse::<f32>()
+            .ok()
+            .map(MaxTrackSizingFunction::Px),
+        _ if input.ends_with("fr") => input
+            .strip_suffix("fr")?
+            .parse::<f32>()
+            .ok()
+            .map(MaxTrackSizingFunction::Fraction),
+        _ => None,
     }
 }
 
