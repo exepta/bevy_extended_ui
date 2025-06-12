@@ -50,6 +50,62 @@ In the end it should look like this:
 
 ![Result Example](docs/example_readme.png)
 
+HTML works now with bevy_extended_ui. You can show the html from your website in bevy!
+But currently these widgets ar supported:
+- Button
+- Div
+- Body
+- H1 - H6
+- Paragraph
+- Slider
+- Select
+- Input type:`number`, `text` and `password`
+```rust
+    commands.spawn(HtmlSource(String::from("examples/html/login-ui.html")));
+```
+The html file needed a `head` element which contains a `<meta name="test">` tag, this is used
+for identify the correct ui which you currently need.
+
+For implement css styling use `<link href="css/example.css" ref="text/css">`. At the moment only one css
+at the same time is supported!
+Here is an example html:
+```html
+<head>
+    <meta name="login-example" />
+    <link rel="stylesheet" href="examples/css/login-ui.css" />
+    <title>Page Title</title>
+</head>
+
+<body>
+<!-- Login Page -->
+<div id="container">
+    <!-- Login headline -->
+    <h2>Login</h2>
+
+    <!-- Input Field with type text and an icon -->
+    <label for="username">Username</label>
+    <input id="username" type="text" icon="icons/user-icon.png" />
+
+    <!-- Input Field with type password and an icon -->
+    <label for="password">Password</label>
+    <input id="password" type="password" icon="icons/pass-icon.png" />
+
+    <!-- Remember me -->
+    <checkbox id="remember-me">Remember me</checkbox>
+
+    <!-- Forgot password -->
+    <p>Forgot password?</p>
+
+    <!-- Login container -->
+    <div class="button-container">
+        <button id="login">
+            Login
+        </button>
+    </div>
+</div>
+</body>
+```
+
 All Widgets support CSS3 and can apply many of the default css rules. Note that the current system working with css but
 not perfect yet! Let me explain it:
 

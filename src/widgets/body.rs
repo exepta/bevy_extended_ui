@@ -31,6 +31,7 @@ fn internal_node_creation_system(
             Name::new(format!("Body-{}", body.w_count)),
             Node::default(),
             BackgroundColor::default(),
+            ImageNode::default(),
             ZIndex::default(),
             css_source,
             TagName("body".to_string()),

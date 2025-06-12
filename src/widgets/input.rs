@@ -89,6 +89,7 @@ fn internal_node_creation_system(
             Name::new(format!("Input-{}", field.w_count)),
             Node::default(),
             BackgroundColor::default(),
+            ImageNode::default(),
             BorderColor::default(),
             BorderRadius::default(),
             BoxShadow::new(Colored::TRANSPARENT, Val::Px(0.), Val::Px(0.), Val::Px(0.), Val::Px(0.)),
@@ -108,6 +109,7 @@ fn internal_node_creation_system(
                     Name::new(format!("Input-Icon-{}", field.w_count)),
                     Node::default(),
                     BackgroundColor::default(),
+                    ImageNode::default(),
                     BorderColor::default(),
                     BorderRadius::default(),
                     ZIndex::default(),
@@ -177,6 +179,7 @@ fn internal_node_creation_system(
                         Name::new(format!("Cursor-{}", field.w_count)),
                         Node::default(),
                         BackgroundColor::default(),
+                        ImageNode::default(),
                         BorderColor::default(),
                         BorderRadius::default(),
                         ZIndex::default(),
@@ -207,7 +210,7 @@ fn internal_node_creation_system(
                         BindToID(id.0),
                     )
                 ]
-            ));
+            )).insert(ImageNode::default());
         }).observe(on_internal_click)
             .observe(on_internal_cursor_entered)
             .observe(on_internal_cursor_leave);

@@ -31,6 +31,7 @@ fn internal_node_creation_system(
         commands.entity(entity).insert((
             Name::new(format!("Div-{}", div.0)),
             Node::default(),
+            ImageNode::default(),
             BackgroundColor::default(),
             BorderColor::default(),
             BorderRadius::default(),
