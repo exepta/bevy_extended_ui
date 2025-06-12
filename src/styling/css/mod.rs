@@ -119,12 +119,18 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
             style.grid_auto_columns = convert_to_bevy_grid_track(value.to_string());
         },
 
-        "background" | "background-color" => {
+        "background-color" => {
             style.background = Some(Background {
                 color: convert_to_color(value.to_string()).unwrap_or(Color::WHITE),
                 ..default()
             });
-        }
+        },
+        "background" => {
+            style.background = convert_to_background(value.to_string(), true);
+        },
+        "background-image" => {
+            style.background = convert_to_background(value.to_string(), false);
+        },
 
         "font-size" => style.font_size = convert_to_font_size(value.to_string()),
 
@@ -260,6 +266,22 @@ pub fn convert_to_color(value: String) -> Option<Color> {
     }
     
     color
+}
+
+pub fn convert_to_background(value: String, all_types: bool) -> Option<Background> {
+    let trimmed = value.trim();
+
+    if trimmed.starts_with("url(") {
+        let url = trimmed.trim_start_matches("url(").trim_end_matches(")");
+        Some(Background { image: Some(url.to_string().replace("\"", "")), ..default() })
+    } else {
+        if all_types {
+            let color = convert_to_color(value.to_string()).unwrap_or_default();
+            return Some(Background { color, ..default() })
+        }
+        
+        None
+    }
 }
 
 pub fn convert_to_display(value: String) -> Option<Display> {

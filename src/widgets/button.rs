@@ -42,6 +42,7 @@ fn internal_node_creation_system(
             Name::new(format!("Button-{}", button.w_count)),
             Node::default(),
             BackgroundColor::default(),
+            ImageNode::default(),
             BorderColor::default(),
             BorderRadius::default(),
             BoxShadow::new(Colored::TRANSPARENT, Val::Px(0.), Val::Px(0.), Val::Px(0.), Val::Px(0.)),

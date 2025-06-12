@@ -247,6 +247,17 @@ Color Supports:
 - `hex (e.g. #ffffff)`
 - `named (CSS standard color names)`
 
+#### Background-Image
+```css
+div {
+   background-image: url("images/test-bg.png");
+}
+```
+
+Note that bevy use as default the assets folder in your project! Don't write the
+complete path. If you wish to change the folder path than make sure that your AssetServer
+have this path set!
+
 #### Background
 ```css
 div {
@@ -254,7 +265,8 @@ div {
 }
 ```
 
-Currently, the same as `background-color`, image support is coming soon!
+the same as `background-color`
+plus it can take images like `background-image`
 
 #### Box-Shadow
 ```css

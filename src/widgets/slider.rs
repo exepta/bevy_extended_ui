@@ -57,6 +57,7 @@ fn internal_node_creation_system(
                 ..default()
             },
             BackgroundColor::default(),
+            ImageNode::default(),
             BorderColor::default(),
             BorderRadius::default(),
             BoxShadow::new(Colored::TRANSPARENT, Val::Px(0.), Val::Px(0.), Val::Px(0.), Val::Px(0.)),
@@ -79,6 +80,7 @@ fn internal_node_creation_system(
                     Name::new(format!("Slider-Track-{}", slider.w_count)),
                     Node::default(),
                     BackgroundColor::default(),
+                    ImageNode::default(),
                     BorderColor::default(),
                     BorderRadius::default(),
                     ZIndex::default(),
@@ -96,6 +98,7 @@ fn internal_node_creation_system(
                     Name::new(format!("Slider-Thumb-{}", slider.w_count)),
                     Node::default(),
                     BackgroundColor::default(),
+                    ImageNode::default(),
                     BorderColor::default(),
                     BorderRadius::default(),
                     UIWidgetState::default(),

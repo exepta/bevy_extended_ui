@@ -3,7 +3,7 @@ use crate::html::HtmlStyle;
 use crate::service::state_service::update_widget_states;
 use crate::styling::Style;
 use crate::styling::system::WidgetStyle;
-use crate::UIWidgetState;
+use crate::{ImageCache, UIWidgetState};
 
 pub struct StyleService;
 
@@ -35,6 +35,8 @@ pub fn update_widget_styles_system(
         Option<&mut ImageNode>,
         Option<&mut ZIndex>
     )>,
+    asset_server: Res<AssetServer>,
+    mut image_cache: ResMut<ImageCache>
 ) {
     for (entity, state_opt, html_style_opt, mut widget_style) in query.iter_mut() {
         let state = state_opt.cloned().unwrap_or_default();
@@ -82,7 +84,7 @@ pub fn update_widget_styles_system(
             apply_style_to_node(&final_style, node);
 
             if let Some(mut bg) = background {
-                bg.0 = final_style.background.map(|b| b.color).unwrap_or(Color::NONE);
+                bg.0 = final_style.background.clone().map(|b| b.color).unwrap_or(Color::NONE);
             }
 
             if let Some(mut br) = border_radius {
@@ -109,6 +111,16 @@ pub fn update_widget_styles_system(
 
             if let Some(mut image_node) = image_node {
                 image_node.color = final_style.color.unwrap_or(Color::WHITE);
+                if let Some(background) = final_style.background.clone() {
+                    if let Some(path) = background.image {
+
+                        let handle = image_cache.map.entry(path.clone())
+                            .or_insert_with(|| asset_server.load(path.as_str()))
+                            .clone();
+                        
+                        image_node.image = handle;
+                    }
+                }
             }
 
             if let Some(mut tf) = text_font {
