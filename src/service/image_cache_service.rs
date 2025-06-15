@@ -37,8 +37,6 @@ pub fn get_or_load_image(
         return existing.clone();
     }
 
-    info!("Loading {}, {}", path, DEFAULT_CHECK_MARK_KEY);
-    
     let handle = if path == DEFAULT_CHECK_MARK_KEY {
         let image = Image::from_buffer(
             DEFAULT_CHECK_MARK_ICON,
@@ -47,12 +45,26 @@ pub fn get_or_load_image(
             true,
             ImageSampler::default(),
             RenderAssetUsages::MAIN_WORLD,
-        )
-            .expect("Failed to decode embedded check-mark icon");
-        
+        ).expect("Failed to decode embedded check-mark icon");
+
         images.add(image)
     } else {
-        asset_server.load(path)
+        let asset_path = std::path::Path::new("assets").join(path);
+        if asset_path.exists() {
+            asset_server.load(path)
+        } else {
+            warn!("Image not found at '{}', using embedded fallback.", path);
+            let image = Image::from_buffer(
+                DEFAULT_CHECK_MARK_ICON,
+                ImageType::Extension("png"),
+                CompressedImageFormats::all(),
+                true,
+                ImageSampler::default(),
+                RenderAssetUsages::MAIN_WORLD,
+            ).expect("Failed to decode embedded check-mark icon");
+
+            images.add(image)
+        }
     };
 
     image_cache.map.insert(path.to_string(), handle.clone());
