@@ -182,7 +182,7 @@ fn parse_html_node(
         "checkbox" => {
             // Checkbox with label and optional icon
             let label = node.text_contents().trim().to_string();
-            let icon_path = attributes.get("icon").unwrap_or("icons/check-mark.png");
+            let icon_path = attributes.get("icon").unwrap_or("extended_ui/icons/check-mark.png");
             let icon = Some(String::from(icon_path));
             Some(HtmlWidgetNode::CheckBox(CheckBox {
                 label,

@@ -22,7 +22,7 @@ fn internal_node_creation_system(
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
     for (entity, headline, source_opt) in query.iter() {
-        let mut css_source = CssSource(String::from("assets/css/core.css"));
+        let mut css_source = CssSource::default();
         if let Some(source) = source_opt {
             css_source = source.clone();
         }

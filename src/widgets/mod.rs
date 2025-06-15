@@ -188,7 +188,7 @@ impl Default for CheckBox {
         Self {
             w_count: CHECK_BOX_COUNT.fetch_add(1, Relaxed),
             label: String::from("label"),
-            icon_path: Some(String::from("icons/check-mark.png")),
+            icon_path: Some(String::from("extended_ui/icons/check-mark.png")),
         }
     }
 }
@@ -321,7 +321,7 @@ impl Default for ChoiceBox {
             label: String::from("select"),
             value: ChoiceOption::default(),
             options: vec![ChoiceOption::default()],
-            icon_path: Some(String::from("icons/drop-arrow.png")),
+            icon_path: Some(String::from("extended_ui/icons/drop-arrow.png")),
         }
     }
 }
