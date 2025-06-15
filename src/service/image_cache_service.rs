@@ -2,8 +2,8 @@ use bevy::asset::RenderAssetUsages;
 use bevy::image::{CompressedImageFormats, ImageSampler, ImageType};
 use bevy::prelude::*;
 use crate::ImageCache;
-pub const DEFAULT_CHECK_MARK_KEY: &str = "__embedded/bevy_extended_ui/check-mark.png";
-pub const DEFAULT_CHOICE_BOX_KEY: &str = "__embedded/bevy_extended_ui/drop-arrow.png";
+pub const DEFAULT_CHECK_MARK_KEY: &str = "icons/check-mark.png";
+pub const DEFAULT_CHOICE_BOX_KEY: &str = "icons/drop-arrow.png";
 
 pub struct ImageCacheService;
 
