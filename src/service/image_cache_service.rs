@@ -2,8 +2,8 @@ use bevy::asset::RenderAssetUsages;
 use bevy::image::{CompressedImageFormats, ImageSampler, ImageType};
 use bevy::prelude::*;
 use crate::ImageCache;
-pub const DEFAULT_CHECK_MARK_KEY: &str = "icons/check-mark.png";
-pub const DEFAULT_CHOICE_BOX_KEY: &str = "icons/drop-arrow.png";
+pub const DEFAULT_CHECK_MARK_KEY: &str = "extended_ui/icons/check-mark.png";
+pub const DEFAULT_CHOICE_BOX_KEY: &str = "extended_ui/icons/drop-arrow.png";
 
 pub struct ImageCacheService;
 
@@ -41,7 +41,7 @@ pub fn get_or_load_image(
     if handle.path().is_none() {
         warn!("Image not found at '{}', using embedded fallback.", path);
 
-        let embedded_png = include_bytes!("../../assets/icons/check-mark.png");
+        let embedded_png = include_bytes!("../../assets/extended_ui/icons/check-mark.png");
         let image = Image::from_buffer(
             embedded_png,
             ImageType::Extension("png"),

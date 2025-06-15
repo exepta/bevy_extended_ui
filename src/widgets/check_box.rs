@@ -152,7 +152,6 @@ fn on_internal_click(
                         &asset_server,
                     );
                     
-                    info!("Handle: {:?}", handle);
                     commands.entity(child).insert(ImageNode::new(handle.clone()));
                 }
             } else {
