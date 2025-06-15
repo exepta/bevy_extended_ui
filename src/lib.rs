@@ -15,7 +15,7 @@ pub mod prelude;
 pub mod utils;
 mod service;
 
-pub const LIB_CORE_CSS_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/css/core.css");
+pub const LIB_CORE_CSS_PATH: &str = include_str!("../assets/css/core.css");
 
 static UI_ID_GENERATE: AtomicUsize = AtomicUsize::new(1);
 
