@@ -62,7 +62,7 @@ pub fn get_or_load_image(
                 ImageSampler::default(),
                 RenderAssetUsages::MAIN_WORLD,
             ).expect("Failed to decode embedded check-mark icon");
-
+            
             images.add(image)
         }
     };

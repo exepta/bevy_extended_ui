@@ -151,8 +151,9 @@ fn on_internal_click(
                         &mut images,
                         &asset_server,
                     );
-
-                    commands.entity(child).insert(ImageNode::new(handle));
+                    
+                    info!("Handle: {:?}", handle);
+                    commands.entity(child).insert(ImageNode::new(handle.clone()));
                 }
             } else {
                 if let Some(children) = children_opt {
