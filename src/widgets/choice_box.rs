@@ -4,7 +4,7 @@ use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use crate::styling::convert::{CssClass, CssSource, TagName};
 use crate::{BindToID, CurrentWidgetState, ExtendedUiConfiguration, IgnoreParentState, ImageCache, UIGenID, UIWidgetState};
-use crate::service::image_cache_service::{get_or_load_image, DEFAULT_CHECK_MARK_KEY};
+use crate::service::image_cache_service::{get_or_load_image, DEFAULT_CHOICE_BOX_KEY};
 use crate::styling::FontVal;
 use crate::styling::paint::Colored;
 use crate::styling::system::WidgetStyle;
@@ -145,7 +145,7 @@ fn internal_node_creation_system(
                             .with_children(|builder| {
 
                                 let handle = get_or_load_image(
-                                    option.icon_path.as_deref().unwrap_or(DEFAULT_CHECK_MARK_KEY),
+                                    option.icon_path.as_deref().unwrap_or(DEFAULT_CHOICE_BOX_KEY),
                                     &mut image_cache,
                                     &mut images,
                                     &asset_server,

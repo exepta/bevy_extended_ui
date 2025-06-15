@@ -2,9 +2,8 @@ use bevy::asset::RenderAssetUsages;
 use bevy::image::{CompressedImageFormats, ImageSampler, ImageType};
 use bevy::prelude::*;
 use crate::ImageCache;
-
-pub const DEFAULT_CHECK_MARK_ICON: &[u8] = include_bytes!("../../assets/icons/check-mark.png");
 pub const DEFAULT_CHECK_MARK_KEY: &str = "__embedded/bevy_extended_ui/check-mark.png";
+pub const DEFAULT_CHOICE_BOX_KEY: &str = "__embedded/bevy_extended_ui/drop-arrow.png";
 
 pub struct ImageCacheService;
 
@@ -33,39 +32,29 @@ pub fn get_or_load_image(
     images: &mut ResMut<Assets<Image>>,
     asset_server: &Res<AssetServer>,
 ) -> Handle<Image> {
-    if let Some(existing) = image_cache.map.get(path) {
-        return existing.clone();
+    if let Some(handle) = image_cache.map.get(path) {
+        return handle.clone();
     }
+    
+    let handle: Handle<Image> = asset_server.load(path);
+    
+    if handle.path().is_none() {
+        warn!("Image not found at '{}', using embedded fallback.", path);
 
-    let handle = if path == DEFAULT_CHECK_MARK_KEY {
+        let embedded_png = include_bytes!("../../assets/icons/check-mark.png");
         let image = Image::from_buffer(
-            DEFAULT_CHECK_MARK_ICON,
+            embedded_png,
             ImageType::Extension("png"),
-            CompressedImageFormats::all(),
+            CompressedImageFormats::empty(),
             true,
             ImageSampler::default(),
             RenderAssetUsages::MAIN_WORLD,
-        ).expect("Failed to decode embedded check-mark icon");
+        ).expect("Failed to create image from embedded PNG");
 
-        images.add(image)
-    } else {
-        let asset_path = std::path::Path::new("assets").join(path);
-        if asset_path.exists() {
-            asset_server.load(path)
-        } else {
-            warn!("Image not found at '{}', using embedded fallback.", path);
-            let image = Image::from_buffer(
-                DEFAULT_CHECK_MARK_ICON,
-                ImageType::Extension("png"),
-                CompressedImageFormats::all(),
-                true,
-                ImageSampler::default(),
-                RenderAssetUsages::MAIN_WORLD,
-            ).expect("Failed to decode embedded check-mark icon");
-            
-            images.add(image)
-        }
-    };
+        let fallback_handle = images.add(image);
+        image_cache.map.insert(path.to_string(), fallback_handle.clone());
+        return fallback_handle;
+    }
 
     image_cache.map.insert(path.to_string(), handle.clone());
     handle
