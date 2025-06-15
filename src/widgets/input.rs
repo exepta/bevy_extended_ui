@@ -3,7 +3,7 @@ use std::time::Duration;
 use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use crate::styling::convert::{CssClass, CssSource, TagName};
-use crate::{BindToID, CurrentWidgetState, ExtendedUiConfiguration, ImageCache, UIGenID, UIWidgetState};
+use crate::{BindToID, CurrentWidgetState, ExtendedUiConfiguration, ImageCache, UIGenID, UIWidgetState, LIB_CORE_CSS_PATH};
 use crate::styling::{Background, FontVal};
 use crate::styling::paint::Colored;
 use crate::styling::system::WidgetStyle;
@@ -76,7 +76,7 @@ fn internal_node_creation_system(
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
     for (entity, id, mut field, source_opt) in query.iter_mut() {
-        let mut css_source = CssSource(String::from("assets/css/core.css"));
+        let mut css_source = CssSource(LIB_CORE_CSS_PATH.to_string());
         if let Some(source) = source_opt {
             css_source = source.clone();
         }
@@ -673,7 +673,7 @@ fn calculate_cursor_x_position(text_field: &InputField, cursor_pos: usize, style
 
 fn calculate_text_width(text: &str, style: &TextFont) -> f32 {
     // Calculate text width based on font size
-    text.len() as f32 * style.font_size * 0.6 // Adjust factor based on font characteristics
+    text.len() as f32 * style.font_size * 0.6 // Adjust a factor based on font characteristics
 }
 
 fn get_active_text_color(style: &WidgetStyle) -> Color {
@@ -681,7 +681,7 @@ fn get_active_text_color(style: &WidgetStyle) -> Color {
         .active_style
         .as_ref()
         .and_then(|s| s.color)
-        .unwrap_or(Color::BLACK)
+        .unwrap_or(Color::WHITE)
 }
 
 // ===============================================

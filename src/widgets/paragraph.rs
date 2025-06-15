@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
-use crate::{CurrentWidgetState, ExtendedUiConfiguration, UIGenID, UIWidgetState};
+use crate::{CurrentWidgetState, ExtendedUiConfiguration, UIGenID, UIWidgetState, LIB_CORE_CSS_PATH};
 use crate::styling::convert::{CssSource, TagName};
 use crate::widgets::Paragraph;
 
@@ -22,7 +22,7 @@ fn internal_node_creation_system(
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
     for (entity, paragraph, source_opt) in query.iter() {
-        let mut css_source = CssSource(String::from("assets/css/core.css"));
+        let mut css_source = CssSource(LIB_CORE_CSS_PATH.to_string());
         if let Some(source) = source_opt {
             css_source = source.clone();
         }
