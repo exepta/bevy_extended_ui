@@ -48,6 +48,7 @@ pub fn get_or_load_image(
         )
             .expect("Failed to decode embedded check-mark icon");
 
+        info!("Internal Loading image {}", path);
         images.add(image)
     } else {
         asset_server.load(path)
