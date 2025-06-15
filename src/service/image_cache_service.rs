@@ -37,6 +37,8 @@ pub fn get_or_load_image(
         return existing.clone();
     }
 
+    info!("Loading {}, {}", path, DEFAULT_CHECK_MARK_KEY);
+    
     let handle = if path == DEFAULT_CHECK_MARK_KEY {
         let image = Image::from_buffer(
             DEFAULT_CHECK_MARK_ICON,
@@ -47,8 +49,7 @@ pub fn get_or_load_image(
             RenderAssetUsages::MAIN_WORLD,
         )
             .expect("Failed to decode embedded check-mark icon");
-
-        info!("Internal Loading image {}", path);
+        
         images.add(image)
     } else {
         asset_server.load(path)
