@@ -12,7 +12,7 @@ pub struct ExistingCssIDs(pub HashSet<String>);
 #[reflect(Component)]
 pub struct TagName(pub String);
 
-#[derive(Component, Reflect, Debug, Clone)]
+#[derive(Component, Reflect, Debug, Clone, Default)]
 #[reflect(Component)]
 pub struct CssSource(pub String);
 

@@ -1,9 +1,12 @@
 use std::collections::HashMap;
+use std::fs;
 use std::path::Path;
 use bevy::prelude::*;
 use crate::styling::convert::{CssClass, CssID, CssSource, ExistingCssIDs, TagName};
 use crate::styling::Style;
 use crate::styling::system::WidgetStyle;
+
+pub const DEFAULT_CORE_CSS: &str = include_str!("../../assets/css/core.css");
 
 pub struct CssService;
 
@@ -36,14 +39,14 @@ fn update_css_conventions(
 ) {
     for (entity, file, id_opt, class_opt, tag_opt, parent_opt) in query.iter() {
 
-        let css_path = file.0.as_str();
+        let css_path = resolve_css_path(file.0.as_str());
 
-        if !Path::new(css_path).exists() {
+        if !Path::new(&css_path).exists() {
             error!("CSS File not found {}", css_path);
             continue;
         }
         
-        let full_style = WidgetStyle::load_from_file(css_path);
+        let full_style = WidgetStyle::load_from_file(&*css_path);
         let mut merged_styles: HashMap<String, Style> = HashMap::new();
 
         for (selector, style) in full_style.styles.iter() {
@@ -142,4 +145,17 @@ fn matches_selector(
     }
 
     false
+}
+
+
+fn resolve_css_path(original: &str) -> String {
+    if Path::new(original).exists() {
+        original.to_string()
+    } else if original == "assets/css/core.css" {
+        let tmp_path = std::env::temp_dir().join("bevy_extended_ui_core.css");
+        let _ = fs::write(&tmp_path, DEFAULT_CORE_CSS);
+        tmp_path.to_string_lossy().to_string()
+    } else {
+        original.to_string()
+    }
 }

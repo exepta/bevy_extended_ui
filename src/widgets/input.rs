@@ -3,7 +3,7 @@ use std::time::Duration;
 use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use crate::styling::convert::{CssClass, CssSource, TagName};
-use crate::{BindToID, CurrentWidgetState, ExtendedUiConfiguration, ImageCache, UIGenID, UIWidgetState, LIB_CORE_CSS_PATH};
+use crate::{BindToID, CurrentWidgetState, ExtendedUiConfiguration, ImageCache, UIGenID, UIWidgetState};
 use crate::styling::{Background, FontVal};
 use crate::styling::paint::Colored;
 use crate::styling::system::WidgetStyle;
@@ -76,7 +76,7 @@ fn internal_node_creation_system(
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
     for (entity, id, mut field, source_opt) in query.iter_mut() {
-        let mut css_source = CssSource(LIB_CORE_CSS_PATH.to_string());
+        let mut css_source = CssSource::default();
         if let Some(source) = source_opt {
             css_source = source.clone();
         }

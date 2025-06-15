@@ -15,8 +15,6 @@ pub mod prelude;
 pub mod utils;
 mod service;
 
-pub const LIB_CORE_CSS_PATH: &str = include_str!("../assets/css/core.css");
-
 static UI_ID_GENERATE: AtomicUsize = AtomicUsize::new(1);
 
 #[derive(Resource, Default)]

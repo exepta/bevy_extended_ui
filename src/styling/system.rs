@@ -20,6 +20,7 @@ pub struct WidgetStyle {
 }
 
 impl WidgetStyle {
+
     pub fn load_from_file(path: &str) -> Self {
         if let Some(cached) = CSS_CACHE.read().ok().and_then(|cache| cache.get(path).cloned()) {
             return Self {
