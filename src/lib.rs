@@ -13,7 +13,7 @@ pub mod styling;
 pub mod html;
 pub mod prelude;
 pub mod utils;
-mod service;
+pub mod service;
 
 static UI_ID_GENERATE: AtomicUsize = AtomicUsize::new(1);
 
