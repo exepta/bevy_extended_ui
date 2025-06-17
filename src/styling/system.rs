@@ -10,17 +10,29 @@ static CSS_CACHE: Lazy<RwLock<HashMap<String, HashMap<String, Style>>>> = Lazy::
     RwLock::new(HashMap::new())
 });
 
+/// Component representing style information loaded from a CSS file.
+///
+/// This struct holds the path to a CSS file, a map of selector strings to [`Style`] objects,
+/// and an optional currently active style. It can filter styles by ID, class, or tag name.
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
 pub struct WidgetStyle {
     pub css_path: String,
     pub styles: HashMap<String, Style>,
-    /// This is only for reading styles! Don't mut them!
     pub active_style: Option<Style>,
 }
 
 impl WidgetStyle {
 
+    /// Loads styles from a CSS file and constructs a [`WidgetStyle`] instance.
+    ///
+    /// Uses a global cache to avoid reparsing already loaded CSS files.
+    ///
+    /// # Arguments
+    /// * `path` - Path to the CSS file.
+    ///
+    /// # Returns
+    /// A new `WidgetStyle` containing the parsed styles.
     pub fn load_from_file(path: &str) -> Self {
         if let Some(cached) = CSS_CACHE.read().ok().and_then(|cache| cache.get(path).cloned()) {
             return Self {
@@ -43,6 +55,18 @@ impl WidgetStyle {
         }
     }
 
+    /// Filters the styles based on the given ID, class, and tag name.
+    ///
+    /// Applies priority in the order: ID (highest), Class, Tag (lowest).
+    /// Pseudo-classes like `:hover`, `:focus`, etc., are also considered.
+    ///
+    /// # Arguments
+    /// * `id` - Optional CSS ID component.
+    /// * `classes` - Optional CSS classes component.
+    /// * `tag` - Optional tag name component.
+    ///
+    /// # Returns
+    /// A new `WidgetStyle` with only the matching filtered styles.
     pub fn filtered_clone(
         &self,
         id: Option<&CssID>,
@@ -106,11 +130,19 @@ impl WidgetStyle {
             active_style: None,
         }
     }
-
+    
+    /// Reloads the CSS file and updates the internal style map and cache.
     pub fn reload(&mut self) {
         *self = Self::load_from_file(&self.css_path);
     }
 
+    /// Ensures that a given class selector is loaded in the style map.
+    ///
+    /// If the class is not found, the method attempts to reload the CSS file
+    /// and merge any new styles into the existing map and cache.
+    ///
+    /// # Arguments
+    /// * `class` - Name of the CSS class to ensure it is available.
     pub fn ensure_class_loaded(&mut self, class: &str) {
         if self.styles.keys().any(|k| k.contains(class)) {
             return;

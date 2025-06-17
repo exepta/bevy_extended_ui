@@ -16,6 +16,30 @@ impl Plugin for StyleService {
     }
 }
 
+/// Updates the visual style of UI widgets based on their current state and associated CSS rules.
+///
+/// This system:
+/// - Applies base and pseudo-class CSS styles from [`WidgetStyle`] depending on the widget's current [`UIWidgetState`].
+/// - Merges in additional styles from [`HtmlStyle`] if available.
+/// - Resolves final styles and writes them into standard Bevy UI components (`Node`, `TextColor`, `ZIndex`, etc.).
+/// - Supports dynamic background images via an `ImageCache` and the `AssetServer`.
+///
+/// # Parameters
+/// - `query`: Entities with [`WidgetStyle`], and optionally [`UIWidgetState`] and [`HtmlStyle`], filtered by changes.
+/// - `style_query`: Applies final styles to corresponding Bevy UI components if they exist on the entity.
+/// - `asset_server`: Loads new image handles when needed for background images.
+/// - `image_cache`: Avoids reloading the same image by caching handles.
+///
+/// # Behavior
+/// Styles are applied in this order:
+/// 1. Base selectors (e.g. `.button`, `#login`)
+/// 2. Inline [`HtmlStyle`] if present
+/// 3. Pseudo-class selectors (e.g. `:hover`, `:focus`)
+///
+/// Only styles that match the current widget state will be applied.
+///
+/// # Performance
+/// Skips updates if the resolved [`Style`] is identical to the previously applied one (`active_style`).
 pub fn update_widget_styles_system(
     mut query: Query<(
         Entity,
@@ -145,6 +169,23 @@ pub fn update_widget_styles_system(
         }
     }
 }
+
+/// Checks whether a CSS selector matches the widget's current UI state.
+///
+/// # Parameters
+/// - `selector`: The full selector string, including pseudo-classes (e.g. `.btn:hover:focus`).
+/// - `state`: The current UI state of the widget.
+///
+/// # Returns
+/// - `true` if the state satisfies all pseudo-classes in the selector.
+/// - `false` if any pseudo-class does not match.
+///
+/// # Supported Pseudo-Classes
+/// - `:read-only`
+/// - `:disabled`
+/// - `:checked`
+/// - `:focus`
+/// - `:hover`
 fn selector_matches_state(selector: &str, state: &UIWidgetState) -> bool {
     for part in selector.split_whitespace() {
         let segments: Vec<&str> = part.split(':').collect();
@@ -162,6 +203,22 @@ fn selector_matches_state(selector: &str, state: &UIWidgetState) -> bool {
     true
 }
 
+/// Calculates the specificity of a CSS selector for sorting style precedence.
+///
+/// # Parameters
+/// - `selector`: The full selector string (e.g. `#login:hover`, `.button`, `input:focus`).
+///
+/// # Returns
+/// A numeric specificity score:
+/// - ID selectors: +100
+/// - Class selectors: +10
+/// - Tag selectors: +1
+/// - Pseudo-classes: +1 per occurrence
+///
+/// # Example
+/// - `#main` => 100
+/// - `.btn:focus` => 11
+/// - `input` => 1
 fn selector_specificity(selector: &str) -> u32 {
     let mut spec = 0;
     for part in selector.split_whitespace() {
@@ -181,6 +238,15 @@ fn selector_specificity(selector: &str) -> u32 {
     spec
 }
 
+/// Applies the resolved [`Style`] to a Bevy [`Node`] UI component.
+///
+/// # Parameters
+/// - `style`: The computed widget style.
+/// - `node`: A mutable reference to the Bevy [`Node`] component (if it exists).
+///
+/// # Behavior
+/// - Transfers values like width, height, margin, padding, flex/grid properties, etc.
+/// - Handles direction-aware gap logic (column/row).
 fn apply_style_to_node(style: &Style, node: Option<Mut<Node>>) {
     if let Some(mut node) = node {
         node.width = style.width.unwrap_or_default();

@@ -1,5 +1,35 @@
 use bevy::prelude::*;
 
+/// Converts a `KeyCode` into a corresponding character, taking into account
+/// modifier keys like Shift and Alt.
+///
+/// This function maps keyboard keys to characters, optionally modifying the output
+/// if `shift` or `alt` is pressed. For example, letters will be uppercase if `shift` is true,
+/// and certain keys may produce alternative symbols if `alt` is pressed.
+///
+/// # Parameters
+///
+/// - `key`: The `KeyCode` representing the key pressed.
+/// - `shift`: `true` if the Shift key is held down.
+/// - `alt`: `true` if the Alt key is held down.
+///
+/// # Returns
+///
+/// - `Some(char)` representing the character corresponding to the key and modifier keys.
+/// - `None` if the key does not correspond to a character (e.g., function keys).
+///
+/// # Examples
+///
+/// ```
+/// use bevy::prelude::KeyCode;
+/// use bevy_extended_ui::utils::keycode_to_char;
+/// assert_eq!(keycode_to_char(KeyCode::KeyA, false, false), Some('a'));
+/// assert_eq!(keycode_to_char(KeyCode::KeyA, true, false), Some('A'));
+/// assert_eq!(keycode_to_char(KeyCode::Digit1, true, false), Some('!'));
+/// assert_eq!(keycode_to_char(KeyCode::Space, false, false), Some(' '));
+/// assert_eq!(keycode_to_char(KeyCode::F1, false, false), None);
+/// ```
+///
 pub fn keycode_to_char(key: KeyCode, shift: bool, alt: bool) -> Option<char> {
     match key {
         KeyCode::KeyA => Some(if shift { 'A' } else { 'a' }),

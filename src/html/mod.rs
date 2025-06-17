@@ -7,7 +7,7 @@ use crate::html::builder::HtmlBuilderSystem;
 use crate::html::converter::HtmlConverterSystem;
 use crate::styling::css::apply_property_to_style;
 use crate::styling::Style;
-use crate::widgets::{CheckBox, Div, InputField, Button, HtmlBody, ChoiceBox, Slider, Headline, Paragraph};
+use crate::widgets::{CheckBox, Div, InputField, Button, HtmlBody, ChoiceBox, Slider, Headline, Paragraph, Img};
 
 /// A component that stores the raw HTML source as a string.
 #[derive(Component, Reflect, Debug, Clone)]
@@ -78,6 +78,8 @@ pub enum HtmlWidgetNode {
     CheckBox(CheckBox, HtmlMeta),
     /// A dropdown or select box.
     ChoiceBox(ChoiceBox, HtmlMeta),
+    /// A img element (`<img>`).
+    Img(Img, HtmlMeta),
     /// A heading element (`<h1>`-`<h6>`).
     Headline(Headline, HtmlMeta),
     /// A paragraph `<p>`.

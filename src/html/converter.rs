@@ -5,7 +5,7 @@ use kuchiki::NodeRef;
 use kuchiki::traits::TendrilSink;
 use crate::html::{HtmlSource, HtmlMeta, HtmlStructureMap, HtmlWidgetNode};
 use crate::styling::IconPlace;
-use crate::widgets::{Button, CheckBox, ChoiceBox, ChoiceOption, Div, Headline, HeadlineType, HtmlBody, InputCap, InputField, InputType, Paragraph, Slider};
+use crate::widgets::{Button, CheckBox, ChoiceBox, ChoiceOption, Div, Headline, HeadlineType, HtmlBody, Img, InputCap, InputField, InputType, Paragraph, Slider};
 
 /// Plugin that adds a system to convert raw HTML files into Bevy UI entity trees.
 pub struct HtmlConverterSystem;
@@ -21,7 +21,7 @@ impl Plugin for HtmlConverterSystem {
 /// parses the corresponding HTML file, and converts it into UI widget nodes.
 ///
 /// It extracts metadata, CSS references, and builds a hierarchical
-/// [`HtmlWidgetNode`] tree that is inserted into the global [`HtmlStructureMap`].
+/// [`HtmlWidgetNode`] tree inserted into the global [`HtmlStructureMap`].
 fn update_html_ui(
     mut structure_map: ResMut<HtmlStructureMap>,
     query: Query<&HtmlSource, Or<(Changed<HtmlSource>, Added<HtmlSource>)>>,
@@ -124,7 +124,7 @@ fn parse_html_node(
 
             for child in node.children() {
                 if let Some(el) = child.as_element() {
-                    if el.name.local.eq("img") {
+                    if el.name.local.eq("icon") {
                         if let Some(src) = el.attributes.borrow().get("src") {
                             icon_path = Some(src.to_string());
                             if found_text {
@@ -295,6 +295,19 @@ fn parse_html_node(
             Some(HtmlWidgetNode::Paragraph(
                 Paragraph {
                     text,
+                    ..default()
+                },
+                meta
+            ))
+        },
+        "img" => {
+            let src = attributes.get("src").unwrap_or("").to_string();
+            let alt = attributes.get("alt").unwrap_or("").to_string();
+            
+            Some(HtmlWidgetNode::Img(
+                Img {
+                    src: if src.is_empty() { None } else { Some(String::from(src)) },
+                    alt,
                     ..default()
                 },
                 meta

@@ -15,6 +15,28 @@ impl Plugin for HeadlineWidget {
     }
 }
 
+/// Initializes internal UI nodes for all [`Headline`] components not yet marked with [`HeadlineBase`].
+///
+/// This system transforms semantic headline elements (like `<h1>`, `<h2>`, etc.)
+/// into Bevy `Text` UI nodes. It sets up font styling, text layout, rendering order,
+/// and default CSS styling.
+///
+/// The entity will be tagged with:
+/// - [`HeadlineBase`] to prevent duplicate initialization
+/// - [`Text`], [`TextFont`], [`TextColor`], [`TextLayout`] for rendering
+/// - [`CssSource`] (either provided or default)
+/// - [`RenderLayers`] for controlling UI rendering layer
+/// - [`TagName`] for semantic tagging (`"h1"`, `"h2"`, etc.)
+///
+/// Pointer event handlers are also attached:
+/// - [`on_internal_click`] → sets the node as focused
+/// - [`on_internal_cursor_entered`] → sets hover state to true
+/// - [`on_internal_cursor_leave`] → sets hover state to false
+///
+/// # Parameters
+/// - `commands`: Command buffer for inserting components
+/// - `query`: Finds [`Headline`] nodes not yet initialized
+/// - `config`: UI render configuration for layering
 fn internal_node_creation_system(
     mut commands: Commands,
     query: Query<(Entity, &Headline, Option<&CssSource>), (With<Headline>, Without<HeadlineBase>)>,
@@ -45,6 +67,17 @@ fn internal_node_creation_system(
     }
 }
 
+/// Handles pointer click events on a [`Headline`] node.
+///
+/// Focuses the clicked widget and stores its ID in the global [`CurrentWidgetState`].
+/// This can be used to support keyboard input focus or highlight states.
+///
+/// # Triggered By:
+/// - `Trigger<Pointer<Click>>`
+///
+/// # Affects:
+/// - `UIWidgetState::focused`
+/// - `CurrentWidgetState::widget_id`
 fn on_internal_click(
     trigger: Trigger<Pointer<Click>>,
     mut query: Query<(&mut UIWidgetState, &UIGenID), With<Headline>>,
@@ -56,6 +89,15 @@ fn on_internal_click(
     }
 }
 
+/// Sets the hover state to `true` when the cursor enters a [`Headline`] node's bounds.
+///
+/// This is used for visual hover feedback, e.g., style highlighting.
+///
+/// # Triggered By:
+/// - `Trigger<Pointer<Over>>`
+///
+/// # Affects:
+/// - `UIWidgetState::hovered`
 fn on_internal_cursor_entered(
     trigger: Trigger<Pointer<Over>>,
     mut query: Query<&mut UIWidgetState, With<Headline>>,
@@ -65,6 +107,15 @@ fn on_internal_cursor_entered(
     }
 }
 
+/// Sets the hover state to `false` when the cursor leaves a [`Headline`] node's bounds.
+///
+/// Used to remove hover effects from the node.
+///
+/// # Triggered By:
+/// - `Trigger<Pointer<Out>>`
+///
+/// # Affects:
+/// - `UIWidgetState::hovered`
 fn on_internal_cursor_leave(
     trigger: Trigger<Pointer<Out>>,
     mut query: Query<&mut UIWidgetState, With<Headline>>,

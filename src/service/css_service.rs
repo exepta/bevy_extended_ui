@@ -19,6 +19,43 @@ impl Plugin for CssService {
     }
 }
 
+/// Applies CSS styles to entities based on their CSS selector metadata and updates their [`WidgetStyle`].
+///
+/// This system reacts to changes or additions to the [`CssSource`] component. It loads the CSS file,
+/// evaluates selectors, and assigns matching styles to entities based on their ID, class, tag name,
+/// and optionally their parent hierarchy. The result is stored in the entity’s [`WidgetStyle`] component.
+///
+/// # Parameters
+/// - `commands`: Bevy's command buffer for inserting updated styles.
+/// - `query`: Entities that changed or received a [`CssSource`], along with optional metadata like
+///   [`CssID`], [`CssClass`], [`TagName`], and [`ChildOf`] for CSS matching.
+/// - `parent_query`: A query to allow recursive resolution of parent styles during selector matching.
+/// - `widget_query`: Access to current [`WidgetStyle`] components on target entities.
+///
+/// # CSS Matching
+/// - Simple selectors (`#id`, `.class`, `tag`) are supported.
+/// - Selector chains (e.g., `div .button`) are resolved recursively using [`ChildOf`] relationships.
+/// - Pseudo-classes (e.g., `:hover`) are ignored during base matching but preserved in style data.
+///
+/// # Behavior
+/// - If a matching style is found, it replaces or inserts a [`WidgetStyle`] on the entity.
+/// - CSS is only reloaded and applied if the file path changed or on new addition.
+///
+/// # Errors
+/// Logs an error if the CSS file doesn't exist or is unreadable.
+///
+/// # Example
+/// ```css
+/// .button {
+///     width: 100px;
+/// }
+///
+/// div .button {
+///     color: red;
+/// }
+/// ```
+///
+/// Will match `.button` and also `.button` inside a `div`, based on entity hierarchy.
 fn update_css_conventions(
     mut commands: Commands,
     query: Query<(
@@ -79,6 +116,22 @@ fn update_css_conventions(
     }
 }
 
+/// Recursively matches a list of CSS selectors against an entity and its ancestry.
+///
+/// Supports compound selectors like `div .button` by walking up the hierarchy using [`ChildOf`].
+/// Each selector is matched in reverse order (the last selector is the current entity,
+/// previous ones are parents).
+///
+/// # Parameters
+/// - `selectors`: Slice of selector strings (e.g., `["div", ".button"]`)
+/// - `id_opt`: Optional CSS ID of the current entity.
+/// - `class_opt`: Optional CSS class list of the current entity.
+/// - `tag_opt`: Optional tag name of the current entity.
+/// - `parent_opt`: Optional parent reference (`ChildOf`) of the current entity.
+/// - `parent_query`: A query used to walk up the entity tree.
+///
+/// # Returns
+/// `true` if the full selector chain matches; otherwise `false`.
 fn matches_selector_chain(
     selectors: &[&str],
     id_opt: Option<&CssID>,
@@ -115,7 +168,18 @@ fn matches_selector_chain(
     false
 }
 
-/// Matches a single selector against the given ID, class list, or tag name.
+/// Matches a single CSS selector (e.g., `.class`, `#id`, or `tag`) against an entity's metadata.
+///
+/// Ignores any pseudo-classes (e.g., `:hover`) in the selector.
+///
+/// # Parameters
+/// - `selector`: The raw selector string.
+/// - `id_opt`: Optional ID of the entity.
+/// - `class_opt`: Optional class list of the entity.
+/// - `tag_opt`: Optional tag name of the entity.
+///
+/// # Returns
+/// `true` if the selector matches one of the metadata fields; otherwise `false`.
 fn matches_selector(
     selector: &str,
     id_opt: Option<&CssID>,
@@ -147,7 +211,16 @@ fn matches_selector(
     false
 }
 
-
+/// Resolves a CSS file path to a valid file on disk.
+///
+/// If the path is `"assets/css/core.css"` and it doesn’t exist, it writes a fallback to
+/// the system temp directory and returns that path instead.
+///
+/// # Parameters
+/// - `original`: The original string path.
+///
+/// # Returns
+/// A path guaranteed to point to a valid file.
 fn resolve_css_path(original: &str) -> String {
     if Path::new(original).exists() {
         original.to_string()

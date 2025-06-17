@@ -247,8 +247,7 @@ select .choice-content-box .choice-option {
   flex-direction: row;
   gap: 10px;
   flex-grow: 1;
-  background: white
-;
+  background: white;
 }
 
 select .choice-content-box .choice-option .option-text {

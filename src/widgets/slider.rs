@@ -37,6 +37,18 @@ impl Plugin for SliderWidget {
     }
 }
 
+/// Creates and initializes UI nodes for slider entities that have not yet been initialized.
+///
+/// This system queries all entities with a `Slider` component but without a `SliderBase` component.
+/// For each such entity, it inserts necessary UI components including the main slider node,
+/// background, border, box shadow, and associates CSS sources.
+/// It also creates child nodes for the slider track and the slider thumb, each with their own components
+/// and event observers.
+///
+/// # Parameters
+/// - `commands`: ECS commands used to insert components and spawn children entities.
+/// - `query`: Query fetching entities with `Slider` and `UIGenID` but without `SliderBase`, optionally with a `CssSource`.
+/// - `config`: Shared UI configuration resource, providing render layer information.
 fn internal_node_creation_system(
     mut commands: Commands,
     query: Query<(Entity, &UIGenID, &Slider, Option<&CssSource>), (With<Slider>, Without<SliderBase>)>,
@@ -114,6 +126,14 @@ fn internal_node_creation_system(
     }
 }
 
+/// Event handler for click events on slider entities.
+///
+/// Marks the clicked slider as focused and updates the global currently focused widget ID.
+///
+/// # Parameters
+/// - `trigger`: The pointer click event trigger containing the target entity.
+/// - `query`: Query to access and mutate UI widget state and generation ID for sliders.
+/// - `current_widget_state`: Mutable resource tracking the currently focused widget.
 fn on_internal_click(
     trigger: Trigger<Pointer<Click>>,
     mut query: Query<(&mut UIWidgetState, &UIGenID), With<Slider>>,
@@ -125,6 +145,13 @@ fn on_internal_click(
     }
 }
 
+/// Event handler for pointer cursor entering slider entities.
+///
+/// Sets the hovered state of the slider to true.
+///
+/// # Parameters
+/// - `trigger`: The pointer over event trigger containing the target entity.
+/// - `query`: Query to mutate UI widget state for sliders.
 fn on_internal_cursor_entered(
     trigger: Trigger<Pointer<Over>>,
     mut query: Query<&mut UIWidgetState, With<Slider>>,
@@ -134,6 +161,13 @@ fn on_internal_cursor_entered(
     }
 }
 
+/// Event handler for pointer cursor leaving slider entities.
+///
+/// Sets the hovered state of the slider to false.
+///
+/// # Parameters
+/// - `trigger`: The pointer out event trigger containing the target entity.
+/// - `query`: Query to mutate UI widget state for sliders.
 fn on_internal_cursor_leave(
     trigger: Trigger<Pointer<Out>>,
     mut query: Query<&mut UIWidgetState, With<Slider>>,
@@ -143,6 +177,20 @@ fn on_internal_cursor_leave(
     }
 }
 
+/// Handles dragging of the slider thumb, updating its position and the slider value.
+///
+/// This system responds to `Pointer<Drag>` events targeting the slider thumb.
+/// It calculates the new thumb position relative to the slider width,
+/// clamps it within valid bounds, updates the thumb's UI node position,
+/// adjusts the track width accordingly, and calculates the corresponding slider value
+/// based on the slider's min, max, and step values.
+///
+/// # Parameters
+/// - `event`: The drag event containing the pointer movement delta and target entity.
+/// - `query`: Query for sliders along with their computed node and children entities.
+/// - `track_query`: Query to mutate the slider track node and style.
+/// - `thumb_query`: Query to mutate the slider thumb node, component, and style.
+/// - `window_query`: Query to access the primary window for a scale factor.
 fn on_move_thumb(
     event: Trigger<Pointer<Drag>>,
     mut query: Query<(&mut Slider, &ComputedNode, &Children), With<Slider>>,
@@ -190,6 +238,18 @@ fn on_move_thumb(
     }
 }
 
+/// Handles click events on the slider track to update the slider's value and UI.
+///
+/// This system listens for `Pointer<Click>` events on slider tracks.
+/// When triggered, it delegates the logic to `handle_track_event` to update
+/// the slider value and the UI accordingly.
+///
+/// # Parameters
+/// - `event`: The click event containing pointer location and target entity.
+/// - `query`: Query for sliders and their children.
+/// - `track_query`: Query for slider track nodes and styles.
+/// - `thumb_query`: Query for slider thumb nodes, components, and styles.
+/// - `window_query`: Query for the primary window to get a scale factor.
 fn on_click_track(
     event: Trigger<Pointer<Click>>,
     query: Query<(Entity, &mut Slider, &ComputedNode, &UIGenID, &Children), With<Slider>>,
@@ -209,6 +269,18 @@ fn on_click_track(
     }
 }
 
+/// Handles drag events on the slider track to update the slider's value and UI.
+///
+/// This system listens for `Pointer<Drag>` events on slider tracks.
+/// When triggered, it delegates the logic to `handle_track_event` to update
+/// the slider value and the UI accordingly.
+///
+/// # Parameters
+/// - `event`: The drag event containing pointer location and target entity.
+/// - `query`: Query for sliders and their children.
+/// - `track_query`: Query for slider track nodes and styles.
+/// - `thumb_query`: Query for slider thumb nodes, components, and styles.
+/// - `window_query`: Query for the primary window to get a scale factor.
 fn on_drag_track(
     event: Trigger<Pointer<Drag>>,
     query: Query<(Entity, &mut Slider, &ComputedNode, &UIGenID, &Children), With<Slider>>,
@@ -228,6 +300,19 @@ fn on_drag_track(
     }
 }
 
+/// Internal helper that applies the pointer position to update the slider's thumb and track UI,
+/// and calculates the new slider value.
+///
+/// This function finds the slider entity matching the given target,
+/// then updates the thumb's position, track width, and slider value accordingly.
+///
+/// # Parameters
+/// - `pointer_position`: The current pointer position in window coordinates.
+/// - `target`: The entity which received the pointer event.
+/// - `query`: Query for sliders, their computed nodes, UI IDs, and children.
+/// - `track_query`: Mutable query for slider track nodes, binding IDs, and styles.
+/// - `thumb_query`: Mutable query for slider thumb nodes, components, binding IDs, and styles.
+/// - `window`: Reference to the primary window for scale factor and coordinate conversion.
 fn handle_track_event(
     pointer_position: Vec2,
     target: Entity,
@@ -252,6 +337,22 @@ fn handle_track_event(
     }
 }
 
+/// Internal logic to update slider UI and value based on pointer position.
+///
+/// This function updates the slider thumb's horizontal position, the slider track's width,
+/// and calculates the corresponding slider value based on the pointer position relative to
+/// the slider's visual width. It also clamps values to valid ranges and respects the slider's
+/// min, max, and step values.
+///
+/// # Arguments
+/// - `pointer_position`: The pointer (mouse or touch) position in window coordinates.
+/// - `slider`: Mutable reference to the slider component to update its value.
+/// - `computed_node`: The computed layout node of the slider, used to get its size.
+/// - `ui_id`: Unique UI identifier for binding slider parts.
+/// - `children`: Child entities of the slider, typically including thumb and track entities.
+/// - `track_query`: Query to access and mutate slider track nodes and styles.
+/// - `thumb_query`: Query to access and mutate slider thumb nodes, components, and styles.
+/// - `window`: Reference to the primary window for coordinate and scale factor calculations.
 #[allow(clippy::too_many_arguments)]
 fn track_internal_logic(
     pointer_position: &Vec2,
@@ -291,6 +392,18 @@ fn track_internal_logic(
     }
 }
 
+/// Detects keyboard input to adjust slider values and updates the slider UI accordingly.
+///
+/// This system listens for left/right arrow key presses to increment or decrement in the slider's value.
+/// Holding Shift increases the step size by a factor of 10 for faster adjustment.
+/// After updating the slider's value, the system updates the thumb's position and tracks width visually.
+///
+/// # Parameters
+/// - `keyboard`: Resource providing current keyboard input state.
+/// - `query`: Query for sliders along with UI state, computed layout, children, UI ID, and previous value.
+/// - `track_query`: Query to mutate slider track nodes and styles.
+/// - `thumb_query`: Query to mutate slider thumb nodes, components, and styles.
+/// - `window_query`: Query to access the primary window for scaling.
 fn detect_change_slider_values(
     keyboard: Res<ButtonInput<KeyCode>>,
     mut query: Query<(
@@ -353,6 +466,19 @@ fn detect_change_slider_values(
     }
 }
 
+/// Initializes the visual state of sliders that require setup.
+///
+/// This system runs once for sliders marked with `SliderNeedInit`.
+/// It calculates the initial position of the thumb and the width of the track
+/// based on the slider's current value and removes the initialization marker.
+/// Ensures the slider UI matches the slider value on startup.
+///
+/// # Parameters
+/// - `commands`: Commands to remove the initialization marker component.
+/// - `query`: Query for sliders, their computed layout, children, UI ID, and initialization marker.
+/// - `track_query`: Query to mutate slider track nodes, styles, and binding IDs.
+/// - `thumb_query`: Query to mutate slider thumb nodes, components, styles, and binding IDs.
+/// - `window_query`: Query to access the primary window for a scale factor and dimensions.
 fn initialize_slider_visual_state(
     mut commands: Commands,
     mut query: Query<(
@@ -412,7 +538,16 @@ fn initialize_slider_visual_state(
     }
 }
 
-
+/// Helper function to update the width of the slider track visually.
+///
+/// This function finds the track entity associated with the slider UI ID and sets its width
+/// to match the current position of the slider thumb.
+///
+/// # Parameters
+/// - `track_query`: Mutable query to access and modify slider track nodes and styles.
+/// - `track_child`: The child entity representing the slider track.
+/// - `ui_id`: The unique UI ID for identifying the correct slider components.
+/// - `clamped_x`: The horizontal position to set the track width to.
 fn update_slider_track_width(
     track_query: &mut Query<(&mut Node, &BindToID, &mut WidgetStyle), (With<SliderTrack>, Without<SliderThumb>)>,
     track_child: &Entity,

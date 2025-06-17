@@ -13,6 +13,22 @@ impl Plugin for StateService {
     }
 }
 
+/// Synchronizes the widget state from parent UI elements to child elements linked via [`BindToID`].
+///
+/// This system propagates UI states such as `hovered`, `focused`, `readonly`, `disabled`, and `checked`
+/// from widgets that have a [`UIGenID`] to other UI elements bound to the same ID.
+///
+/// # Parameters
+/// - `main_query`: Retrieves all UI widgets with a [`UIGenID`] whose [`UIWidgetState`] has changed.
+/// - `inner_query`: Finds all UI elements that are bound via [`BindToID`], excluding those with their
+///   own `UIGenID` or an explicit [`IgnoreParentState`].
+///
+/// # Purpose
+/// Enables state propagation for compound widgets like checkbox containers, input groups, or radio button groups.
+///
+/// # Example
+/// If a container with ID `#group` is focused, and an internal widget is bound to it, the inner widget
+/// will also be marked as focused.
 pub fn update_widget_states(
     main_query: Query<(&UIGenID, &UIWidgetState), (Changed<UIWidgetState>, With<UIGenID>)>,
     mut inner_query: Query<(&BindToID, &mut UIWidgetState), (Without<UIGenID>, Without<IgnoreParentState>)>,
@@ -32,6 +48,18 @@ pub fn update_widget_states(
     }
 }
 
+/// Clears the `focused` state from all widgets except the currently focused one.
+///
+/// Ensures that only a single UI widget is marked as focused at any given time.
+/// The focused widget ID is tracked in the [`CurrentWidgetState`] resource.
+///
+/// # Parameters
+/// - `current_state_element`: The current global widget focus state.
+/// - `query`: All UI widgets with a [`UIGenID`] and a mutable [`UIWidgetState`].
+///
+/// # Behavior
+/// If the current widget ID is `0` (none), the system does nothing.
+/// Otherwise, it clears `focused = false` on all widgets except the one with the matching ID.
 fn internal_state_check(
     current_state_element: Res<CurrentWidgetState>,
     mut query: Query<(&mut UIWidgetState, &UIGenID), With<UIGenID>>
@@ -48,6 +76,27 @@ fn internal_state_check(
     }
 }
 
+/// Handles keyboard tab navigation between focusable UI widgets.
+///
+/// This system detects when the Tab key is pressed and moves the focus to the next available widget,
+/// based on sorted [`UIGenID`] values. Shift+Tab navigates in reverse.
+///
+/// # Parameters
+/// - `keys`: The current keyboard input state.
+/// - `mut current_state`: The global [`CurrentWidgetState`] resource tracking focused widget ID.
+/// - `widgets`: A list of all focusable widgets that can receive focus.
+///
+/// # Behavior
+/// - Widgets are sorted by `UIGenID.0`.
+/// - Pressing `Tab` sets focus to the next widget in order.
+/// - Pressing `Shift+Tab` sets focus to the previous widget in order.
+/// - The focus wraps around if reaching the end or beginning.
+///
+/// # Requirements
+/// All focusable widgets must have unique, non-zero `UIGenID` values.
+///
+/// # Example
+/// When the user presses Tab while focused on widget `#2`, focus will move to widget `#3`.
 fn handle_tab_focus(
     mut query: Query<(Entity, &mut UIWidgetState, &UIGenID)>,
     keyboard: Res<ButtonInput<KeyCode>>
