@@ -7,6 +7,7 @@ mod choice_box;
 mod body;
 mod headline;
 mod paragraph;
+mod image;
 
 use std::fmt;
 use std::sync::atomic::AtomicUsize;
@@ -21,6 +22,7 @@ use crate::widgets::check_box::CheckBoxWidget;
 use crate::widgets::choice_box::ChoiceBoxWidget;
 use crate::widgets::div::DivWidget;
 use crate::widgets::headline::HeadlineWidget;
+use crate::widgets::image::ImageWidget;
 use crate::widgets::input::InputWidget;
 use crate::widgets::paragraph::ParagraphWidget;
 use crate::widgets::slider::SliderWidget;
@@ -31,6 +33,7 @@ static CHOICE_BOX_COUNT: AtomicUsize = AtomicUsize::new(1);
 static DIV_COUNT: AtomicUsize = AtomicUsize::new(1);
 static HEADLINE_COUNT: AtomicUsize = AtomicUsize::new(1);
 static HTML_COUNT: AtomicUsize = AtomicUsize::new(1);
+static IMG_COUNT: AtomicUsize = AtomicUsize::new(1);
 static INPUT_COUNT: AtomicUsize = AtomicUsize::new(1);
 static PARAGRAPH_COUNT: AtomicUsize = AtomicUsize::new(1);
 static SLIDER_COUNT: AtomicUsize = AtomicUsize::new(1);
@@ -353,6 +356,29 @@ impl ChoiceOption {
     }
 }
 
+// ===============================================
+//                       Image
+// ===============================================
+
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+#[require(UIGenID, UIWidgetState, GlobalTransform, InheritedVisibility, Widget)]
+pub struct Img {
+    pub w_count: usize,
+    pub src: Option<String>,
+    pub alt: String,
+}
+
+impl Default for Img {
+    fn default() -> Self {
+        Self {
+            w_count: IMG_COUNT.fetch_add(1, Relaxed),
+            src: None,
+            alt: String::from(""),
+        }
+    }
+}
+
 pub struct WidgetPlugin;
 
 impl Plugin for WidgetPlugin {
@@ -366,9 +392,11 @@ impl Plugin for WidgetPlugin {
         app.register_type::<ChoiceBox>();
         app.register_type::<Headline>();
         app.register_type::<Paragraph>();
+        app.register_type::<Img>();
         app.add_plugins((
             HtmlBodyWidget,
             DivWidget,
+            ImageWidget,
             HeadlineWidget,
             ParagraphWidget,
             ButtonWidget,

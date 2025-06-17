@@ -51,6 +51,9 @@ fn spawn_widget_node(
         HtmlWidgetNode::Headline(headline, meta) => {
             spawn_with_meta(commands, headline.clone(), meta)
         }
+        HtmlWidgetNode::Img(img, meta) => {
+            spawn_with_meta(commands, img.clone(), meta)
+        }
         HtmlWidgetNode::Paragraph(paragraph, meta) => {
             spawn_with_meta(commands, paragraph.clone(), meta)
         }

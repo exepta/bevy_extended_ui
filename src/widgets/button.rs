@@ -24,6 +24,28 @@ impl Plugin for ButtonWidget {
     }
 }
 
+/// System that initializes internal UI nodes for [`Button`] components.
+///
+/// This system is responsible for spawning Bevy UI elements for every [`Button`] entity
+/// that hasn't been initialized yet (i.e., does not contain [`ButtonBase`]).
+///
+/// Each button gets:
+/// - A styled node container with a background, border, shadow, etc.
+/// - A text child node
+/// - An optional icon node (on left or right)
+/// - Observers for pointer interaction
+///
+/// # Parameters
+/// - `commands`: Used to insert components and spawn children.
+/// - `query`: Finds all `Button` entities that haven't been initialized.
+/// - `config`: UI configuration including rendering layer setup.
+/// - `asset_server`: Used to load icons for buttons.
+/// - `image_cache`: Caches icon handles to avoid reloading assets.
+///
+/// # Inserted Components
+/// - [`Node`], [`ImageNode`], [`BackgroundColor`], [`BorderColor`], [`BorderRadius`], [`BoxShadow`]
+/// - [`CssSource`], [`TagName`], [`CssClass`], [`RenderLayers`], [`ZIndex`], [`ButtonBase`]
+/// - Observers for click and hover events
 fn internal_node_creation_system(
     mut commands: Commands,
     query: Query<(Entity, &UIGenID, &Button, Option<&CssSource>), (With<Button>, Without<ButtonBase>)>,
@@ -81,6 +103,19 @@ fn internal_node_creation_system(
     }
 }
 
+/// Helper function that spawns an icon image as a child of a button node.
+///
+/// This is used by `internal_node_creation_system` to place the button's icon on
+/// the left or right, depending on the configuration.
+///
+/// # Parameters
+/// - `builder`: The Bevy child spawner.
+/// - `btn`: The button component, providing an icon path and other data.
+/// - `asset_server`: Asset loader for image paths.
+/// - `image_cache`: Cache to avoid reloading the same asset multiple times.
+/// - `id`: The UI generation ID of the parent button.
+/// - `layer`: The render layer.
+/// - `css_source`: Used to apply class-based styling to the icon node.
 fn on_internal_click(
     trigger: Trigger<Pointer<Click>>,
     mut query: Query<(&mut UIWidgetState, &UIGenID), With<Button>>,
@@ -92,6 +127,10 @@ fn on_internal_click(
     }
 }
 
+/// Handles click events for [`Button`] components.
+///
+/// Sets the `focused` state to true and updates the global `CurrentWidgetState`
+/// to track the focused widget's ID.
 fn on_internal_cursor_entered(
     trigger: Trigger<Pointer<Over>>,
     mut query: Query<&mut UIWidgetState, With<Button>>,
@@ -101,6 +140,9 @@ fn on_internal_cursor_entered(
     }
 }
 
+/// Handle pointer hover enters events for [`Button`] components.
+///
+/// Sets the `hovered` flag on the widget's UI state.
 fn on_internal_cursor_leave(
     trigger: Trigger<Pointer<Out>>,
     mut query: Query<&mut UIWidgetState, With<Button>>,
@@ -110,6 +152,9 @@ fn on_internal_cursor_leave(
     }
 }
 
+/// Handle pointer hover leave events for [`Button`] components.
+///
+/// Clears the `hovered` flag on the widget's UI state.
 fn place_icon(
     builder: &mut RelatedSpawnerCommands<ChildOf>, 
     btn: &Button, 

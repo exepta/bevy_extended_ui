@@ -17,11 +17,17 @@ pub mod service;
 
 static UI_ID_GENERATE: AtomicUsize = AtomicUsize::new(1);
 
+/// A cache mapping image paths to their loaded handles,
+/// preventing duplicate loads and allowing cleanup of unused images.
 #[derive(Resource, Default)]
 pub struct ImageCache {
     pub map: HashMap<String, Handle<Image>>,
 }
 
+/// Global UI configuration resource.
+///
+/// Controls UI camera order, HDR support, whether the default UI camera is enabled,
+/// and which render layers to use.
 #[derive(Resource, Debug, Clone)]
 pub struct ExtendedUiConfiguration {
     pub order: isize,
@@ -31,6 +37,12 @@ pub struct ExtendedUiConfiguration {
 }
 
 impl Default for ExtendedUiConfiguration {
+
+    /// Returns a default `ExtendedUiConfiguration` with:
+    /// - `order` = 2
+    /// - `hdr_support` enabled
+    /// - `enable_default_camera` enabled
+    /// - `render_layers` set to layers 1 and 2
     fn default() -> Self {
         Self {
             order: 2,
@@ -41,12 +53,18 @@ impl Default for ExtendedUiConfiguration {
     }
 }
 
+/// Tracks the currently focused or active widget by its ID.
+///
+/// This resource holds the ID of the widget that currently has focus.
 #[derive(Resource, Debug, Clone)]
 pub struct CurrentWidgetState {
     pub widget_id: usize,
 }
 
 impl Default for CurrentWidgetState {
+
+    /// Returns a default `CurrentWidgetState` with `widget_id` set to 0
+    /// (meaning no widget currently focused).
     fn default() -> Self {
         Self {
             widget_id: 0,
@@ -54,26 +72,43 @@ impl Default for CurrentWidgetState {
     }
 }
 
+/// Marker component for the UI camera entity.
+///
+/// This component tags the camera entity used for rendering the UI.
 #[derive(Component)]
 struct UiCamera;
 
+/// Marker component for UI elements that should ignore the parent widget state.
+///
+/// Used to mark UI nodes that do not inherit state like `focused`, `hovered`, etc.
 #[derive(Component)]
 pub struct IgnoreParentState;
 
+/// Unique identifier for UI elements.
+///
+/// Each UI element should have a unique `UIGenID` generated atomically.
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
 pub struct UIGenID(usize);
 
 impl Default for UIGenID {
+
+    /// Generates a new unique `UIGenID` using a global atomic counter.
     fn default() -> Self {
         Self(UI_ID_GENERATE.fetch_add(1, Relaxed))
     }
 }
 
+/// Associates a UI child entity with a parent widget by ID.
+///
+/// Used for binding UI components to their logical parent.
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
 pub struct BindToID(pub usize);
 
+/// Stores the interaction and UI state flags for a widget.
+///
+/// Contains boolean flags for common widget states such as focused, hovered, disabled, etc.
 #[derive(Component, Reflect, Default, PartialEq, Eq, Debug, Clone)]
 #[reflect(Component)]
 pub struct UIWidgetState {
@@ -101,6 +136,18 @@ impl Plugin for ExtendedUiPlugin {
     }
 }
 
+/// System that manages the lifecycle and configuration of the UI camera.
+///
+/// This system checks the `ExtendedUiConfiguration` resource to determine whether
+/// a default UI camera should be enabled. If enabled, it either updates an existing
+/// UI camera's settings or spawns a new one with the configured parameters.
+///
+/// If the configuration disables the default UI camera, it despawns any existing UI cameras.
+///
+/// # Parameters
+/// - `commands`: To spawn or despawn entities.
+/// - `configuration`: Resource containing UI camera settings.
+/// - `query`: Query to find existing UI cameras for update or removal.
 fn load_ui_camera_system(
     mut commands: Commands,
     configuration: Res<ExtendedUiConfiguration>,

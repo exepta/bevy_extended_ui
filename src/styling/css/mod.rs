@@ -8,6 +8,31 @@ use regex::Regex;
 use crate::styling::paint::Colored;
 use crate::styling::{Background, FontVal, Radius, Style};
 
+/// Loads a CSS file and parses it into a [`HashMap`] of selectors to [`Style`] structs.
+///
+/// This function reads a `.css` file from disk, parses its rules, and converts each supported
+/// CSS property into a Bevy-compatible [`Style`] representation. These styles can later be applied
+/// to UI nodes.
+///
+/// # Parameters
+/// - `path`: A path to the CSS file. If empty, falls back to the default path `"assets/internal.css"`.
+///
+/// # Returns
+/// - `Ok(HashMap<selector, Style>)` on success, where each key is a full CSS selector (e.g. `#login:hover`)
+/// - `Ok(empty map)` if the file cannot be read or parsed, but no panic occurs
+/// - `Err(...)` is reserved for future use (currently always returns `Ok(...)`)
+///
+/// # Example
+/// ```rust
+/// use bevy_extended_ui::styling::css::load_css;
+/// let styles = load_css("assets/theme.css").unwrap();
+/// let button_style = styles.get(".button:hover");
+/// ```
+///
+/// # Notes
+/// - This uses [`grass_compiler::StyleSheet`] to parse the file.
+/// - Supports standard properties like `width`, `height`, `padding`, `color`, `background`, `font-size`, `z-index`, etc.
+/// - Ignores unsupported or malformed declarations silently.
 pub fn load_css(path: &str) -> Result<HashMap<String, Style>, String> {
     let mut internal_path = "assets/internal.css";
     if !path.is_empty() {
@@ -56,6 +81,35 @@ pub fn load_css(path: &str) -> Result<HashMap<String, Style>, String> {
     Ok(style_map)
 }
 
+/// Applies a single CSS property to a mutable [`Style`] object.
+///
+/// Converts CSS property names and values into Bevy UI values where possible. Also supports
+/// compound properties like `padding`, `background`, `border`, `overflow`, and flex/grid layouts.
+///
+/// # Parameters
+/// - `style`: The [`Style`] object to mutate.
+/// - `name`: The CSS property name (e.g. `"width"`, `"background-color"`).
+/// - `value`: The CSS value as a string (e.g. `"100px"`, `"red"`, `"center"`).
+///
+/// # Supported Properties
+/// - Box model: `width`, `height`, `padding`, `margin`, `border`, `border-radius`
+/// - Colors: `color`, `background-color`, `border-color`
+/// - Flex/grid layout: `display`, `position`, `flex-grow`, `flex-direction`, `grid-template-columns`, etc.
+/// - Visuals: `background`, `background-image`, `box-shadow`, `z-index`, `overflow`, etc.
+/// - Typography: `font-size`, `text-wrap`
+///
+/// # Behavior
+/// - If a property or value is unsupported or invalid, it is silently ignored.
+/// - Some shorthand values (e.g. `padding-left`) are expanded into full [`UiRect`]s or `Val`s.
+///
+/// # Example
+/// ```rust
+/// use bevy_extended_ui::styling::css::apply_property_to_style;
+/// use bevy_extended_ui::styling::Style;
+/// let mut style = Style::default();
+/// apply_property_to_style(&mut style, "padding", "10px 20px");
+/// apply_property_to_style(&mut style, "color", "white");
+/// ```
 pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
     match name {
         "width" => style.width = convert_to_val(value.to_string()),
@@ -191,6 +245,26 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
     }
 }
 
+/// Converts a string representation of a CSS value into a Bevy [`Val`].
+///
+/// # Supported Formats
+/// - `"100px"` → `Val::Px(100.0)`
+/// - `"75%"` → `Val::Percent(75.0)`
+///
+/// # Parameters
+/// - `value`: A [`String`] representing a dimension value (e.g. `"20px"`, `"50%"`).
+///
+/// # Returns
+/// - `Some(Val)` if parsing succeeds.
+/// - `None` if the format is invalid or cannot be parsed.
+///
+/// # Example
+/// ```
+/// use bevy::prelude::Val;
+/// use bevy_extended_ui::styling::css::convert_to_val;
+/// assert_eq!(convert_to_val("42px".to_string()), Some(Val::Px(42.0)));
+/// assert_eq!(convert_to_val("80%".to_string()), Some(Val::Percent(80.0)));
+/// ```
 pub fn convert_to_val(value: String) -> Option<Val> {
     let mut val = None;
     let trimmed = value.trim();
@@ -204,6 +278,21 @@ pub fn convert_to_val(value: String) -> Option<Val> {
     val
 }
 
+/// Converts a numeric string into an [`i32`], if the format is valid.
+///
+/// # Parameters
+/// - `value`: A [`String`] containing an integer, optionally negative (e.g. `"42"`, `"-10"`).
+///
+/// # Returns
+/// - `Some(i32)` if parsing succeeds and the string is a valid integer.
+/// - `None` if the input is non-numeric or contains invalid characters.
+///
+/// # Example
+/// ```
+/// use bevy_extended_ui::styling::css::convert_to_i32;
+/// assert_eq!(convert_to_i32("123".to_string()), Some(123));
+/// assert_eq!(convert_to_i32("abc".to_string()), None);
+/// ```
 pub fn convert_to_i32(value: String) -> Option<i32> {
     let trimmed = value.trim();
     
@@ -216,6 +305,26 @@ pub fn convert_to_i32(value: String) -> Option<i32> {
     }
 }
 
+/// Converts a CSS font-size string into a [`FontVal`] (custom type).
+///
+/// # Supported Units
+/// - `"px"` → `FontVal::Px(f32)`
+/// - `"rem"` → `FontVal::Rem(f32)`
+///
+/// # Parameters
+/// - `value`: A [`String`] containing a font size (e.g. `"16px"`, `"1.2rem"`).
+///
+/// # Returns
+/// - `Some(FontVal)` if the value can be parsed.
+/// - `None` if the value is malformed or unsupported.
+///
+/// # Example
+/// ```
+/// use bevy_extended_ui::styling::css::convert_to_font_size;
+/// use bevy_extended_ui::styling::FontVal;
+/// assert_eq!(convert_to_font_size("14px".to_string()), Some(FontVal::Px(14.0)));
+/// assert_eq!(convert_to_font_size("1.5rem".to_string()), Some(FontVal::Rem(1.5)));
+/// ```
 pub fn convert_to_font_size(value: String) -> Option<FontVal> {
     let mut val = None;
     let trimmed = value.trim();
@@ -229,15 +338,42 @@ pub fn convert_to_font_size(value: String) -> Option<FontVal> {
     val
 }
 
+/// Converts a CSS color string into a Bevy [`Color`].
+///
+/// # Supported Formats
+/// - Named colors (e.g. `"red"`, `"white"`, `"transparent"`)
+/// - Hex colors (e.g. `"#ff00ff"`, `"#00000000"` for transparent)
+/// - RGB: `"rgb(255, 0, 0)"`
+/// - RGBA: `"rgba(255, 0, 0, 128)"`
+///
+/// # Parameters
+/// - `value`: A [`String`] representing a color in any CSS-compatible format.
+///
+/// # Returns
+/// - `Some(Color)` if parsing succeeds.
+/// - `None` if the format is invalid or unsupported.
+///
+/// # Example
+/// ```
+/// use bevy::prelude::Color;
+/// use bevy_extended_ui::styling::css::convert_to_color;
+/// assert_eq!(convert_to_color("red".to_string()), Some(Color::WHITE));
+/// assert_eq!(convert_to_color("rgba(0,0,0,0)".to_string()), Some(Color::NONE));
+/// assert!(convert_to_color("#123456".to_string()).is_some());
+/// ```
 pub fn convert_to_color(value: String) -> Option<Color> {
     let mut color = None;
     let trimmed = value.trim();
-    if trimmed.eq_ignore_ascii_case("transparent") {
-        return Some(Colored::TRANSPARENT);
+    if trimmed.eq_ignore_ascii_case("transparent") || trimmed.eq_ignore_ascii_case("none") {
+        return Some(Color::NONE);
     }
 
     if trimmed.starts_with("#") {
-        color = Some(Colored::hex_to_color(trimmed));
+        if trimmed.eq("#00000000") {
+            color = Some(Color::NONE);
+        } else {
+            color = Some(Colored::hex_to_color(trimmed));
+        }
     } else if trimmed.starts_with("rgb(") {
         let correct = trimmed.trim_start_matches("rgb(").trim_end_matches(")");
         let parts: Vec<_> = correct.split(',').map(str::trim).collect();
@@ -250,16 +386,20 @@ pub fn convert_to_color(value: String) -> Option<Color> {
             color = Some(Color::srgb_u8(r, g, b));
         }
     } else if trimmed.starts_with("rgba(") {
-        let correct = trimmed.trim_start_matches("rgba(").trim_end_matches(")");
-        let parts: Vec<_> = correct.split(',').map(str::trim).collect();
+        if trimmed.eq("rgba(0, 0, 0, 0)") {
+            color = Some(Color::NONE);
+        } else {
+            let correct = trimmed.trim_start_matches("rgba(").trim_end_matches(")");
+            let parts: Vec<_> = correct.split(',').map(str::trim).collect();
 
-        if parts.len() == 4 {
-            let r = parts[0].parse::<u8>().ok()?;
-            let g = parts[1].parse::<u8>().ok()?;
-            let b = parts[2].parse::<u8>().ok()?;
-            let a = parts[3].parse::<u8>().ok()?;
+            if parts.len() == 4 {
+                let r = parts[0].parse::<u8>().ok()?;
+                let g = parts[1].parse::<u8>().ok()?;
+                let b = parts[2].parse::<u8>().ok()?;
+                let a = parts[3].parse::<u8>().ok()?;
 
-            color = Some(Color::srgba_u8(r, g, b, a));
+                color = Some(Color::srgba_u8(r, g, b, a));
+            }
         }
     } else {
         color = Colored::named(trimmed);
@@ -268,6 +408,25 @@ pub fn convert_to_color(value: String) -> Option<Color> {
     color
 }
 
+/// Converts a CSS `background` value into a [`Background`] struct.
+///
+/// Supports both `url(...)` image backgrounds and color values.
+/// If `all_types` is true, also attempts to interpret the value as a color (e.g. `"red"`, `"#ffcc00"`).
+///
+/// # Parameters
+/// - `value`: The CSS `background` value as a [`String`] (e.g. `"url(\"image.png\")"` or `"blue"`).
+/// - `all_types`: Whether to allow color parsing in addition to `url(...)`.
+///
+/// # Returns
+/// - `Some(Background)` if a valid image URL or color is parsed.
+/// - `None` if parsing fails or `all_types` is false and the value is not a `url(...)`.
+///
+/// # Example
+/// ```
+/// use bevy_extended_ui::styling::css::convert_to_background;
+/// convert_to_background("url(\"icon.png\")".to_string(), false);
+/// convert_to_background("red".to_string(), true);
+/// ```
 pub fn convert_to_background(value: String, all_types: bool) -> Option<Background> {
     let trimmed = value.trim();
 
@@ -284,6 +443,29 @@ pub fn convert_to_background(value: String, all_types: bool) -> Option<Backgroun
     }
 }
 
+/// Converts a CSS `display` value into a Bevy [`Display`] enum.
+///
+/// Supported values include:
+/// - `"flex"` → `Display::Flex`
+/// - `"grid"` → `Display::Grid`
+/// - `"block"` → `Display::Block`
+/// - `"none"` → `Display::None`
+///
+/// If the input is unrecognized, defaults to `Display::Block`.
+///
+/// # Parameters
+/// - `value`: A [`String`] containing the CSS `display` value.
+///
+/// # Returns
+/// - `Some(Display)` with a best-effort fallback.
+///
+/// # Example
+/// ```
+/// use bevy::prelude::Display;
+/// use bevy_extended_ui::styling::css::convert_to_display;
+/// assert_eq!(convert_to_display("flex".to_string()), Some(Display::Flex));
+/// assert_eq!(convert_to_display("unknown".to_string()), Some(Display::Block));
+/// ```
 pub fn convert_to_display(value: String) -> Option<Display> {
     let trimmed = value.trim();
     match trimmed {
@@ -295,6 +477,26 @@ pub fn convert_to_display(value: String) -> Option<Display> {
     }
 }
 
+/// Converts a CSS `position` value into a Bevy [`PositionType`] enum.
+///
+/// Supported values:
+/// - `"relative"` → `PositionType::Relative`
+/// - `"absolute"` → `PositionType::Absolute`
+///
+/// Any unrecognized value defaults to `PositionType::Relative`.
+///
+/// # Parameters
+/// - `value`: A [`String`] containing the CSS `position` value.
+///
+/// # Returns
+/// - `Some(PositionType)`
+///
+/// # Example
+/// ```
+/// use bevy::prelude::PositionType;
+/// use bevy_extended_ui::styling::css::convert_to_position;
+/// assert_eq!(convert_to_position("absolute".to_string()), Some(PositionType::Absolute));
+/// ```
 pub fn convert_to_position(value: String) -> Option<PositionType> {
     let trimmed = value.trim();
     match trimmed {
@@ -304,6 +506,27 @@ pub fn convert_to_position(value: String) -> Option<PositionType> {
     }
 }
 
+///
+/// Accepts 1–4 values (e.g. `"10px"`, `"10px 20px"`, etc.), similar to CSS shorthand.
+/// Uses the same order as CSS:
+/// - 1 value → all corners
+/// - 2 values → top-left & top-right / bottom-right & bottom-left
+/// - 3 values → top-left / top-right / bottom-left (bottom-right = 0)
+/// - 4 values → top-left / top-right / bottom-right / bottom-left
+///
+/// # Parameters
+/// - `value`: A [`String`] containing the CSS `border-radius` values.
+///
+/// # Returns
+/// - `Some(Radius)` if parsing succeeds.
+/// - `None` if the input format is invalid.
+///
+/// # Example
+/// ```
+/// use bevy_extended_ui::styling::css::convert_to_radius;
+/// convert_to_radius("10px".to_string());
+/// convert_to_radius("10px 20px 30px 40px".to_string());
+/// ```
 pub fn convert_to_radius(value: String) -> Option<Radius> {
     let vals = parse_radius_values(&value)?;
 
@@ -338,6 +561,27 @@ pub fn convert_to_radius(value: String) -> Option<Radius> {
     })
 }
 
+/// Converts a CSS shorthand (e.g. `margin`, `padding`) into a Bevy [`UiRect`].
+///
+/// Accepts 1–4 values:
+/// - 1 value → all sides
+/// - 2 values → top & bottom / left & right
+/// - 3 values → left / right / top (bottom = 0)
+/// - 4 values → left / right / top / bottom
+///
+/// # Parameters
+/// - `value`: A [`String`] like `"10px"`, `"10px 20px"`, etc.
+///
+/// # Returns
+/// - `Some(UiRect)` if parsing succeeds.
+/// - `None` if the value format is invalid.
+///
+/// # Example
+/// ```
+/// use bevy_extended_ui::styling::css::convert_to_ui_rect;
+/// convert_to_ui_rect("10px".to_string());
+/// convert_to_ui_rect("10px 20px 5px 15px".to_string());
+/// ```
 pub fn convert_to_ui_rect(value: String) -> Option<UiRect> {
     let vals = parse_radius_values(&value)?;
 
@@ -372,6 +616,32 @@ pub fn convert_to_ui_rect(value: String) -> Option<UiRect> {
     })
 }
 
+/// Converts a CSS-like box-shadow string into a Bevy [`BoxShadow`] struct.
+///
+/// Parses shadow offset (x, y), blur radius, spread radius, and color from the input string.
+/// Supports values in pixels (e.g., `"10px"`), percentages (e.g., `"50%"`), or CSS color formats
+/// (`"#rrggbb"`, `"rgb(...)"`, `"rgba(...)"`).
+///
+/// The number of numeric values determines which parts are set:
+/// - 1 value: x, y, blur, and spread all set to the same value.
+/// - 2 values: x and y set; blur and spread default to 0.
+/// - 3 values: x, y, blur set; spread defaults to 0.
+/// - 4 values: x, y, blur, and spread all set.
+///
+/// If the input is malformed or missing required parts, returns `None`.
+///
+/// # Parameters
+/// - `value`: The CSS box-shadow string (e.g., `"5px 10px 15px #000000"`).
+///
+/// # Returns
+/// - `Some(BoxShadow)` if parsing succeeds.
+/// - `None` on failure.
+///
+/// # Example
+/// ```
+/// use bevy_extended_ui::styling::css::convert_to_bevy_box_shadow;
+/// convert_to_bevy_box_shadow("5px 10px 15px 3px rgba(0,0,0,0.5)".to_string());
+/// ```
 pub fn convert_to_bevy_box_shadow(value: String) -> Option<BoxShadow> {
     let parts: Vec<&str> = value.split_whitespace().collect();
     let mut vals = vec![];
@@ -422,6 +692,27 @@ pub fn convert_to_bevy_box_shadow(value: String) -> Option<BoxShadow> {
     ))
 }
 
+/// Parses a CSS border shorthand string into a [`UiRect`] for border widths and a [`Color`].
+///
+/// The input string is expected to be in the form `"WIDTH COLOR"` where:
+/// - WIDTH is a length value (e.g. `"5px"`, `"10%"`, or `"0"`).
+/// - COLOR is an optional CSS color string (e.g. `"#ff0000"`, `"rgba(255,0,0,1)"`).
+///
+/// If the color is missing, defaults to transparent.
+///
+/// # Parameters
+/// - `value`: CSS border shorthand string.
+///
+/// # Returns
+/// - `Some((UiRect, Color))` on successful parsing, where `UiRect` sets all borders to the given width.
+/// - `None` if the width is missing or cannot be parsed.
+///
+/// # Example
+/// ```
+/// use bevy_extended_ui::styling::css::convert_css_border;
+/// convert_css_border("5px #ff0000".to_string());
+/// convert_css_border("0".to_string()); // transparent border
+/// ```
 pub fn convert_css_border(value: String) -> Option<(UiRect, Color)> {
     fn parse_val(input: &str) -> Option<Val> {
         if input.ends_with("px") {
@@ -452,6 +743,15 @@ pub fn convert_css_border(value: String) -> Option<(UiRect, Color)> {
     Some((rect, color))
 }
 
+/**
+ * Converts a string into a `JustifyContent` enum value.
+ *
+ * Recognized values include: "start", "flex-start", "end", "flex-end", "center",
+ * "space-between", "space-around", "space-evenly", and "stretch".
+ *
+ * @param value The CSS justify-content value as a string slice.
+ * @return Some(JustifyContent) if the value is recognized, None otherwise.
+ */
 pub fn convert_to_bevy_justify_content(value: String) -> Option<JustifyContent> {
     let trimmed = value.trim();
     match trimmed { 
@@ -468,6 +768,15 @@ pub fn convert_to_bevy_justify_content(value: String) -> Option<JustifyContent> 
     }
 }
 
+/**
+ * Converts a string into an `AlignItems` enum value.
+ *
+ * Recognized values include: "start", "flex-start", "end", "flex-end", "center",
+ * "baseline", and "stretch".
+ *
+ * @param value The CSS align-items value as a string slice.
+ * @return Some(AlignItems) if the value is recognized, None otherwise.
+ */
 pub fn convert_to_bevy_align_items(value: String) -> Option<AlignItems> {
     let trimmed = value.trim();
     match trimmed {
@@ -482,6 +791,14 @@ pub fn convert_to_bevy_align_items(value: String) -> Option<AlignItems> {
     }
 }
 
+/**
+ * Converts a string into a `FlexDirection` enum value.
+ *
+ * Recognized values include: "row", "column", "row-reverse", and "column-reverse".
+ *
+ * @param value The CSS flex-direction value as a string slice.
+ * @return Some(FlexDirection) if the value is recognized, None otherwise.
+ */
 pub fn convert_to_bevy_flex_direction(value: String) -> Option<FlexDirection> {
     let trimmed = value.trim();
     match trimmed {
@@ -493,6 +810,14 @@ pub fn convert_to_bevy_flex_direction(value: String) -> Option<FlexDirection> {
     }
 }
 
+/**
+ * Converts a string into a `FlexWrap` enum value.
+ *
+ * Recognized values include: "wrap", "nowrap", and "wrap-reverse".
+ *
+ * @param value The CSS flex-wrap value as a string slice.
+ * @return Some(FlexWrap) if the value is recognized, None otherwise.
+ */
 pub fn convert_to_bevy_flex_wrap(value: String) -> Option<FlexWrap> {
     let trimmed = value.trim();
     match trimmed {
@@ -503,6 +828,14 @@ pub fn convert_to_bevy_flex_wrap(value: String) -> Option<FlexWrap> {
     }
 }
 
+/**
+ * Converts a string into a `LineBreak` enum value.
+ *
+ * Recognized values include: "wrap", "stable", "nowrap", "pretty", "balance", and "unset".
+ *
+ * @param value The CSS line-break value as a string slice.
+ * @return Some(LineBreak) if the value is recognized, None otherwise.
+ */
 pub fn convert_to_bevy_line_break(value: String) -> Option<LineBreak> {
     let trimmed = value.trim();
     match trimmed {
@@ -514,6 +847,14 @@ pub fn convert_to_bevy_line_break(value: String) -> Option<LineBreak> {
     }
 }
 
+/**
+ * Converts a string into a `GridAutoFlow` enum value.
+ *
+ * Recognized values include: "row", "column", "row-dense", and "column-dense".
+ *
+ * @param value The CSS grid-auto-flow value as a string slice.
+ * @return Some(GridAutoFlow) if the value is recognized, None otherwise.
+ */
 pub fn convert_to_bevy_grid_flow(value: String) -> Option<GridAutoFlow> {
     let trimmed = value.trim();
     match trimmed {
@@ -525,6 +866,17 @@ pub fn convert_to_bevy_grid_flow(value: String) -> Option<GridAutoFlow> {
     }
 }
 
+/**
+ * Converts a CSS grid placement string into a `GridPlacement` enum.
+ *
+ * Supports values such as:
+ * - "span N" (where N is a positive integer),
+ * - "start/end" (two positive integers separated by a slash),
+ * - or a single positive integer (start).
+ *
+ * @param value The CSS grid placement string as a string slice.
+ * @return Some(GridPlacement) if the value is valid and parsed, None otherwise.
+ */
 pub fn convert_to_bevy_grid_placement(value: String) -> Option<GridPlacement> {
     let trimmed = value.trim();
     
@@ -560,6 +912,14 @@ pub fn convert_to_bevy_grid_placement(value: String) -> Option<GridPlacement> {
 //                              Only Grid Tracks
 // ==============================================================================
 
+/**
+ * Converts a whitespace-separated string into a vector of `GridTrack` values.
+ *
+ * Each part of the input string is parsed individually by `parse_single_grid_track`.
+ *
+ * @param value The CSS grid track definition as a string.
+ * @return Some(Vec<GridTrack>) if all parts are successfully parsed; None otherwise.
+ */
 pub fn convert_to_bevy_grid_track(value: String) -> Option<Vec<GridTrack>> {
     value
         .split_whitespace()
@@ -571,6 +931,17 @@ pub fn convert_to_bevy_grid_track(value: String) -> Option<Vec<GridTrack>> {
 //                               Grid Template
 // ==============================================================================
 
+/**
+ * Converts a CSS grid-template string into a vector of `RepeatedGridTrack`.
+ *
+ * Supports the `repeat(count, track)` syntax as well as space-separated single tracks.
+ * Examples:
+ * - "repeat(3, 100px)"
+ * - "100px auto min-content"
+ *
+ * @param value The CSS grid-template string.
+ * @return Some(Vec<RepeatedGridTrack>) if parsing succeeds, None otherwise.
+ */
 pub fn convert_to_bevy_grid_template(value: String) -> Option<Vec<RepeatedGridTrack>> {
     let input = value.trim();
     let mut result = Vec::new();
@@ -599,6 +970,19 @@ pub fn convert_to_bevy_grid_template(value: String) -> Option<Vec<RepeatedGridTr
     Some(result)
 }
 
+/**
+ * Parses a single CSS grid track definition into a `GridTrack`.
+ *
+ * Supports values like:
+ * - "auto"
+ * - "min-content"
+ * - "max-content"
+ * - "minmax(min, max)"
+ * - fixed sizes with units: "100px", "50%", "1fr"
+ *
+ * @param input The CSS grid track string.
+ * @return Some(GridTrack) if parsing succeeds, None otherwise.
+ */
 fn parse_single_grid_track(input: &str) -> Option<GridTrack> {
     let input = input.trim();
     match input {
@@ -631,6 +1015,18 @@ fn parse_single_grid_track(input: &str) -> Option<GridTrack> {
     }
 }
 
+/**
+ * Parses a CSS min track sizing function from a string.
+ *
+ * Recognized values:
+ * - "auto"
+ * - "min-content"
+ * - "max-content"
+ * - fixed size in px, e.g. "100px"
+ *
+ * @param input The CSS min track sizing string.
+ * @return Some(MinTrackSizingFunction) if parsing succeeds, None otherwise.
+ */
 fn parse_min_sizing(input: &str) -> Option<MinTrackSizingFunction> {
     match input {
         "auto" => Some(MinTrackSizingFunction::Auto),
@@ -645,6 +1041,19 @@ fn parse_min_sizing(input: &str) -> Option<MinTrackSizingFunction> {
     }
 }
 
+/**
+ * Parses a CSS max track sizing function from a string.
+ *
+ * Recognized values:
+ * - "auto"
+ * - "min-content"
+ * - "max-content"
+ * - fixed size in px, e.g. "100px"
+ * - fractional units, e.g. "1fr"
+ *
+ * @param input The CSS max track sizing string.
+ * @return Some(MaxTrackSizingFunction) if parsing succeeds, None otherwise.
+ */
 fn parse_max_sizing(input: &str) -> Option<MaxTrackSizingFunction> {
     match input {
         "auto" => Some(MaxTrackSizingFunction::Auto),
@@ -664,6 +1073,24 @@ fn parse_max_sizing(input: &str) -> Option<MaxTrackSizingFunction> {
     }
 }
 
+/**
+ * Converts a CSS overflow string into an `Overflow` struct for the given axis.
+ *
+ * Recognized overflow values:
+ * - "hidden"
+ * - "scroll"
+ * - "clip"
+ * - "visible"
+ *
+ * The `which` parameter controls which axis is affected:
+ * - "*" | "all" | "both" applies to both axes.
+ * - "x" applies only to the horizontal axis.
+ * - "y" applies only to the vertical axis.
+ *
+ * @param value The CSS overflow value string.
+ * @param which The axis specifier ("x", "y", "all", etc.).
+ * @return Some(Overflow) if valid input, None otherwise.
+ */
 pub fn convert_overflow(value: String, which: &str) -> Option<Overflow> {
     let trimmed = value.trim();
     let overflow_axis = match trimmed {
@@ -685,6 +1112,17 @@ pub fn convert_overflow(value: String, which: &str) -> Option<Overflow> {
     }
 }
 
+/**
+ * Parses a string containing 1 to 4 CSS radius values into a vector of `Val`.
+ *
+ * Supported units:
+ * - px (pixels), e.g. "10px"
+ * - percent (%), e.g. "50%"
+ * - zero ("0") without unit
+ *
+ * @param value The CSS radius string.
+ * @return Some(Vec<Val>) if parsing succeeds, None otherwise.
+ */
 fn parse_radius_values(value: &str) -> Option<Vec<Val>> {
     let mut vals = Vec::new();
     for part in value.split_whitespace() {

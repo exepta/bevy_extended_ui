@@ -15,6 +15,15 @@ impl Plugin for ParagraphWidget {
     }
 }
 
+/// Creates UI nodes for paragraphs that don't have a `ParagraphBase` yet.
+///
+/// For each `Paragraph` entity without a `ParagraphBase`, this system inserts necessary UI parts,
+/// sets the render layer from the configuration, applies CSS source if available, and attaches event observers.
+///
+/// # Parameters
+/// - `commands`: Commands to modify the ECS world.
+/// - `query`: Query for entities with `Paragraph` but without `ParagraphBase`, optionally with a `CssSource`.
+/// - `config`: UI configuration resource containing render layers.
 fn internal_node_creation_system(
     mut commands: Commands,
     query: Query<(Entity, &Paragraph, Option<&CssSource>), (With<Paragraph>, Without<ParagraphBase>)>,
@@ -45,6 +54,14 @@ fn internal_node_creation_system(
     }
 }
 
+/// Handles click events on paragraph nodes.
+///
+/// Sets the focused state of the paragraph to `true` and updates the globally tracked current widget ID.
+///
+/// # Parameters
+/// - `trigger`: The pointer click trigger containing the target entity.
+/// - `query`: Query to access mutable UI widget state and generation ID of paragraphs.
+/// - `current_widget_state`: Mutable resource tracking the currently focused widget ID.
 fn on_internal_click(
     trigger: Trigger<Pointer<Click>>,
     mut query: Query<(&mut UIWidgetState, &UIGenID), With<Paragraph>>,
@@ -56,6 +73,13 @@ fn on_internal_click(
     }
 }
 
+/// Handles the pointer cursor entering paragraph nodes.
+///
+/// Sets the hovered state of the paragraph to `true`.
+///
+/// # Parameters
+/// - `trigger`: The pointer over trigger containing the target entity.
+/// - `query`: Query to access mutable UI widget state of paragraphs.
 fn on_internal_cursor_entered(
     trigger: Trigger<Pointer<Over>>,
     mut query: Query<&mut UIWidgetState, With<Paragraph>>,
@@ -65,6 +89,13 @@ fn on_internal_cursor_entered(
     }
 }
 
+/// Handles pointer cursor leaving paragraph nodes.
+///
+/// Sets the hovered state of the paragraph to `false`.
+///
+/// # Parameters
+/// - `trigger`: The pointer out trigger containing the target entity.
+/// - `query`: Query to access mutable UI widget state of paragraphs.
 fn on_internal_cursor_leave(
     trigger: Trigger<Pointer<Out>>,
     mut query: Query<&mut UIWidgetState, With<Paragraph>>,

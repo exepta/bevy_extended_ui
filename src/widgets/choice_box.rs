@@ -41,6 +41,39 @@ impl Plugin for ChoiceBoxWidget {
     }
 }
 
+/// System that initializes internal UI nodes for [`ChoiceBox`] components (select/dropdown widgets).
+///
+/// This system constructs the full visual structure of a dropdown menu, including
+/// - Main select box
+/// - Overlay label
+/// - Currently selected option node (icon + text)
+/// - Dropdown content container with all selectable options
+///
+/// Each `ChoiceBox` entity that hasn't yet been initialized (i.e., is missing [`ChoiceBase`])
+/// gets the following structure:
+///
+/// ```text
+/// ChoiceBox (Tag: <select>)
+/// ├── SelectLabel (optional static label)
+/// ├── SelectedOption (currently selected visual representation)
+/// └── ContentBox (dropdown menu, hidden by default)
+///     ├── Option 1 (with optional icon and text)
+///     ├── Option 2 ...
+///     └── ...
+/// ```
+///
+/// # Behavior
+/// - Observers are attached to the main box and each option to respond to hover and click.
+/// - Styling is inherited from [`CssSource`] and modified using classes like `choice-content-box`, `choice-option`, etc.
+/// - The dropdown menu is hidden by default and must be revealed through UI interaction.
+///
+/// # Parameters
+/// - `commands`: Used to build entities and assign components.
+/// - `query`: Selects uninitialized `ChoiceBox` widgets.
+/// - `config`: UI configuration including rendering layers.
+/// - `asset_server`: Loads icon images if used in options.
+/// - `image_cache`: Prevents redundant image loading.
+/// - `images`: Asset container for Bevy `Image`s.
 fn internal_node_creation_system(
     mut commands: Commands,
     query: Query<(Entity, &UIGenID, &ChoiceBox, Option<&CssSource>), (With<ChoiceBox>, Without<ChoiceBase>)>,
@@ -92,7 +125,7 @@ fn internal_node_creation_system(
                     BindToID(id.0)
                 ));
                 
-                generate_child_selected_option(builder, &css_source.clone(), choice_box, layer, &id.0, &mut image_cache, &asset_server);
+                generate_child_selected_option(builder, &css_source.clone(), choice_box, layer, &id.0, &mut *image_cache, &mut images, &asset_server);
                 
                 builder.spawn((
                     Name::new(format!("Choice-Content-{}", choice_box.w_count)),
@@ -143,29 +176,31 @@ fn internal_node_creation_system(
                             .observe(on_internal_option_cursor_entered)
                             .observe(on_internal_option_cursor_leave)
                             .with_children(|builder| {
+                                
+                                if let Some(icon_path) = option.icon_path.as_deref() {
+                                    let handle = get_or_load_image(
+                                        icon_path,
+                                        &mut image_cache,
+                                        &mut images,
+                                        &asset_server,
+                                    );
 
-                                let handle = get_or_load_image(
-                                    option.icon_path.as_deref().unwrap_or(DEFAULT_CHOICE_BOX_KEY),
-                                    &mut image_cache,
-                                    &mut images,
-                                    &asset_server,
-                                );
-
-                                builder.spawn((
-                                    Name::new(format!("Option-Icon-{}", choice_box.w_count)),
-                                    ImageNode {
-                                        image: handle,
-                                        ..default()
-                                    },
-                                    ZIndex::default(),
-                                    UIWidgetState::default(),
-                                    IgnoreParentState,
-                                    css_source.clone(),
-                                    CssClass(vec![String::from("option-icon"), String::from("option-text")]),
-                                    Pickable::IGNORE,
-                                    RenderLayers::layer(*layer),
-                                    BindToID(id.0)
-                                ));
+                                    builder.spawn((
+                                        Name::new(format!("Option-Icon-{}", choice_box.w_count)),
+                                        ImageNode {
+                                            image: handle,
+                                            ..default()
+                                        },
+                                        ZIndex::default(),
+                                        UIWidgetState::default(),
+                                        IgnoreParentState,
+                                        css_source.clone(),
+                                        CssClass(vec![String::from("option-icon"), String::from("option-text")]),
+                                        Pickable::IGNORE,
+                                        RenderLayers::layer(*layer),
+                                        BindToID(id.0)
+                                    ));
+                                }
                                 
                                 let text;
                                 if option.text.trim().is_empty() {
@@ -201,6 +236,23 @@ fn internal_node_creation_system(
 //             Intern Functions
 // ===============================================
 
+/// Adjusts the position and size of the overlay label in a [`ChoiceBox`] widget.
+///
+/// This system runs for all `ChoiceBox` components and finds their associated
+/// overlay labels (nodes marked with [`OverlayLabel`] and [`BindToID`]).
+///
+/// - If the `ChoiceBox` is focused or has a selected value/icon, the label moves up
+///   and shrinks (floating label style).
+/// - Otherwise, the label remains in its original position (centered).
+///
+/// This system synchronizes both the `Node::top` and the corresponding [`WidgetStyle`] values
+/// for runtime CSS-based animation consistency.
+///
+/// # Affects:
+/// - `Node::top`
+/// - `TextFont::font_size`
+/// - `WidgetStyle::top`
+/// - `WidgetStyle::font_size`
 fn handle_overlay_label(
     query: Query<(&UIWidgetState, &UIGenID, &ChoiceBox, &Children), With<ChoiceBox>>,
     mut label_query: Query<(&BindToID, &mut Node, &mut TextFont, &mut WidgetStyle), With<OverlayLabel>>,
@@ -234,6 +286,19 @@ fn handle_overlay_label(
     }
 }
 
+/// Controls the visibility of the dropdown menu (`ChoiceLayoutBoxBase`) for each [`ChoiceBox`].
+///
+/// If a `ChoiceBox` loses focus, its menu is automatically closed (`open = false`).
+/// This system synchronizes the `UIWidgetState::open` field with the actual visibility
+/// of the child content box.
+///
+/// # Behavior:
+/// - Sets `Visibility::Visible` if `UIWidgetState::open` is true.
+/// - Otherwise, hides the dropdown menu.
+///
+/// # Affects:
+/// - `UIWidgetState::open`
+/// - `Visibility`
 fn update_content_box_visibility(
     mut query: Query<(&mut UIWidgetState, &UIGenID), (With<ChoiceBox>, Changed<UIWidgetState>)>,
     mut content_query: Query<(&mut Visibility, &BindToID), With<ChoiceLayoutBoxBase>>,
@@ -257,6 +322,24 @@ fn update_content_box_visibility(
     }
 }
 
+/// Enables mouse wheel scrolling for the options inside a [`ChoiceBox`] dropdown.
+///
+/// This system reads [`MouseWheel`] input and scrolls the child options inside
+/// the visible [`ChoiceLayoutBoxBase`]. It applies clamped and smoothed scrolling
+/// to maintain a fluid UI experience.
+///
+/// # Logic:
+/// - Only applies scrolling to dropdowns that are currently visible.
+/// - Computes scroll offset per frame using an exponential smoothing function.
+/// - Applies the offset to each `Node::top` and updates the matching [`WidgetStyle`] styles.
+///
+/// # Assumptions:
+/// - A visible dropdown has at least 3 items; otherwise, scrolling isn't necessary.
+/// - Each option is placed vertically with a fixed height (e.g., 50px).
+///
+/// # Affects:
+/// - `Node::top` on [`ChoiceOptionBase`] children
+/// - `WidgetStyle::top`
 fn handle_scroll_events(
     mut scroll_events: EventReader<MouseWheel>,
     mut layout_query: Query<(Entity, &Visibility, &Children), With<ChoiceLayoutBoxBase>>,
@@ -315,6 +398,20 @@ fn handle_scroll_events(
 
 // Main Component
 
+/// Handles click events on the [`ChoiceBox`] base widget.
+///
+/// When the user clicks the widget:
+/// - It toggles the open/closed state of the dropdown.
+/// - Sets the widget as focused.
+/// - Updates [`CurrentWidgetState`] to reflect the focused widget's ID.
+///
+/// # Triggered By:
+/// - `Trigger<Pointer<Click>>`
+///
+/// # Affects:
+/// - `UIWidgetState::focused`
+/// - `UIWidgetState::open`
+/// - `CurrentWidgetState::widget_id`
 fn on_internal_click(
     trigger: Trigger<Pointer<Click>>,
     mut query: Query<(&mut UIWidgetState, &UIGenID), With<ChoiceBox>>,
@@ -327,6 +424,15 @@ fn on_internal_click(
     }
 }
 
+/// Sets `hovered = true` on a [`ChoiceBox`] when the cursor enters its area.
+///
+/// This system is used to update visual states or styles that react to hovering.
+///
+/// # Triggered By:
+/// - `Trigger<Pointer<Over>>`
+///
+/// # Affects:
+/// - `UIWidgetState::hovered`
 fn on_internal_cursor_entered(
     trigger: Trigger<Pointer<Over>>,
     mut query: Query<&mut UIWidgetState, With<ChoiceBox>>,
@@ -336,6 +442,13 @@ fn on_internal_cursor_entered(
     }
 }
 
+/// Sets `hovered = false` on a [`ChoiceBox`] when the cursor exits its area.
+///
+/// # Triggered By:
+/// - `Trigger<Pointer<Out>>`
+///
+/// # Affects:
+/// - `UIWidgetState::hovered`
 fn on_internal_cursor_leave(
     trigger: Trigger<Pointer<Out>>,
     mut query: Query<&mut UIWidgetState, With<ChoiceBox>>,
@@ -347,6 +460,24 @@ fn on_internal_cursor_leave(
 
 // Option Component
 
+/// Handles selection logic when a [`ChoiceOptionBase`] is clicked.
+///
+/// This system:
+/// - Updates the selected state across all sibling options (only one is `checked = true`).
+/// - Updates the parent [`ChoiceBox`] value with the clicked option's text/icon.
+/// - Closes the dropdown (`open = false`).
+/// - Updates any [`SelectedOptionBase`] display widgets with the new value.
+/// - Optionally removes focus from the clicked option if no value was selected.
+///
+/// # Triggered By:
+/// - `Trigger<Pointer<Click>>` on a `ChoiceOptionBase`
+///
+/// # Affects:
+/// - `UIWidgetState::checked` on options
+/// - `ChoiceBox::value`
+/// - `UIWidgetState::open`
+/// - `Text` in `SelectedOptionBase`
+/// - Optional: `UIWidgetState::focused`
 fn on_internal_option_click(
     trigger: Trigger<Pointer<Click>>,
     mut option_query: Query<(Entity, &mut UIWidgetState, &ChoiceOption, &BindToID), (With<ChoiceOptionBase>, Without<ChoiceBox>)>,
@@ -396,6 +527,15 @@ fn on_internal_option_click(
     }
 }
 
+/// Sets `hovered = true` on a [`ChoiceOptionBase`] and its visual children when hovered.
+///
+/// Used for hover effects like highlighting or animations.
+///
+/// # Triggered By:
+/// - `Trigger<Pointer<Over>>`
+///
+/// # Affects:
+/// - `UIWidgetState::hovered` on option and visual children
 fn on_internal_option_cursor_entered(
     trigger: Trigger<Pointer<Over>>,
     mut query: Query<(&mut UIWidgetState, &Children), With<ChoiceOptionBase>>,
@@ -412,6 +552,13 @@ fn on_internal_option_cursor_entered(
     }
 }
 
+/// Sets `hovered = false` on a [`ChoiceOptionBase`] and its visual children when unhovered.
+///
+/// # Triggered By:
+/// - `Trigger<Pointer<Out>>`
+///
+/// # Affects:
+/// - `UIWidgetState::hovered` on option and visual children
 fn on_internal_option_cursor_leave(
     trigger: Trigger<Pointer<Out>>,
     mut query: Query<(&mut UIWidgetState, &Children), With<ChoiceOptionBase>>,
@@ -432,12 +579,45 @@ fn on_internal_option_cursor_leave(
 //                   Child Builder
 // ===============================================
 
+/// Spawns the visible child UI elements that represent the currently selected option
+/// inside a [`ChoiceBox`] widget.
+///
+/// This function creates two primary child nodes:
+/// 1. **SelectedOptionBase**: A container displaying the selected text.
+/// 2. **DropBase**: A container holding the dropdown arrow icon.
+///
+/// These nodes are styled via CSS classes (`"option-selected"`, `"option-sel-text"`, and `"option-drop-box"`)
+/// and tied to the owning widget via [`BindToID`]. They are rendered on the same [`RenderLayers`] level
+/// as the parent `ChoiceBox` and ignore pointer interaction via [`Pickable::IGNORE`].
+///
+/// # Parameters
+/// - `builder`: The [`RelatedSpawnerCommands`] to create children in the current entity hierarchy.
+/// - `css_source`: A [`CssSource`] reference for applying consistent widget styling.
+/// - `choice_box`: The [`ChoiceBox`] from which to derive current selected value and icon.
+/// - `layer`: The render layer index for correct UI layering.
+/// - `id`: The widget ID used to bind the children to their parent.
+/// - `image_cache`: A local image cache to avoid redundant asset loading.
+/// - `images`: The global Bevy [`Assets<Image>`] map for dynamically managed textures.
+/// - `asset_server`: The [`AssetServer`] for loading icon assets as needed.
+///
+/// # Spawns:
+/// - `SelectedOptionBase`:
+///   - Text displaying the selected value (`choice_box.value.text`)
+///
+/// - `DropBase`:
+///   - Icon image from `choice_box.icon_path` or a default fallback
+///
+/// # Components Added:
+/// - [`Name`], [`Node`], [`BackgroundColor`], [`ImageNode`], [`BorderColor`], [`BorderRadius`]
+/// - [`UIWidgetState`], [`CssSource`], [`CssClass`], [`RenderLayers`], [`Pickable`], [`BindToID`]
+/// - Marker: [`SelectedOptionBase`], [`DropBase`]
 fn generate_child_selected_option(
-    builder: &mut RelatedSpawnerCommands<ChildOf>, 
-    css_source: &CssSource, 
-    choice_box: &ChoiceBox, 
+    builder: &mut RelatedSpawnerCommands<ChildOf>,
+    css_source: &CssSource,
+    choice_box: &ChoiceBox,
     layer: &usize, id: &usize,
     image_cache: &mut ImageCache,
+    images: &mut ResMut<Assets<Image>>,
     asset_server: &Res<AssetServer>,
 ) {
     
@@ -458,7 +638,6 @@ fn generate_child_selected_option(
         SelectedOptionBase
     )).with_children(|builder| {
         
-
             // Selected Text
             builder.spawn((
                 Name::new(format!("Option-Sel-Text-{}", choice_box.w_count)),
@@ -492,10 +671,13 @@ fn generate_child_selected_option(
         BindToID(*id),
         DropBase
     )).with_children(|builder| {
-        if let Some(drop_icon) = choice_box.icon_path.clone() {
-            let handle = image_cache.map.entry(drop_icon.clone())
-                .or_insert_with(|| asset_server.load(drop_icon.as_str()))
-                .clone();
+
+        let handle = get_or_load_image(
+            choice_box.icon_path.as_deref().unwrap_or(DEFAULT_CHOICE_BOX_KEY),
+            image_cache,
+            images,
+            &asset_server,
+        );
             
             builder.spawn((
                 Name::new(format!("Drop-Icon-{}", choice_box.w_count)),
@@ -511,6 +693,6 @@ fn generate_child_selected_option(
                 RenderLayers::layer(*layer),
                 BindToID(*id)
             ));
-        }
+        
     });
 }

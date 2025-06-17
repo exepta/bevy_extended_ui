@@ -1,6 +1,5 @@
 use std::cmp::PartialEq;
 use bevy::prelude::*;
-use crate::styling::paint::Colored;
 use crate::styling::convert::{CssClass, CssSource, CssID};
 use crate::styling::system::WidgetStyle;
 
@@ -9,6 +8,7 @@ pub mod paint;
 pub mod convert;
 pub mod system;
 
+/// Represents the border-radius of a rectangle with individual corner values.
 #[derive(Reflect, Default, Clone, PartialEq, Debug)]
 pub struct Radius {
     pub top_left: Val,
@@ -18,6 +18,13 @@ pub struct Radius {
 }
 
 impl Radius {
+
+    /**
+    * Creates a `Radius` where all corners have the same radius value.
+    *
+    * @param val The radius value to use for all four corners.
+    * @return A new `Radius` with uniform corner radii.
+    */
     pub fn all(val: Val) -> Self {
         Self {
             top_left: val,
@@ -28,7 +35,7 @@ impl Radius {
     }
 }
 
-
+/// Defines the background style including color and optional image.
 #[derive(Reflect, Debug, Clone, PartialEq)]
 pub struct Background {
     pub color: Color,
@@ -36,15 +43,19 @@ pub struct Background {
 }
 
 impl Default for Background {
+
+    /**
+    * Creates a default `Background` with transparent color and no image.
+    */
     fn default() -> Self {
         Self {
-            color: Colored::WHITE,
+            color: Color::NONE,
             image: None,
         }
     }
 }
 
-
+/// Constants for common font weight values.
 #[derive(Reflect, Debug, Clone)]
 pub struct FontWeight;
 
@@ -60,6 +71,7 @@ impl FontWeight {
     pub const BLACK: u16 = 900;
 }
 
+/// Placement of an icon relative to text.
 #[derive(Reflect, Debug, Clone, PartialEq)]
 pub enum IconPlace {
     Left,
@@ -67,12 +79,16 @@ pub enum IconPlace {
 }
 
 impl Default for IconPlace {
+
+    /**
+    * Returns the default icon placement (`Right`).
+    */
     fn default() -> Self {
         IconPlace::Right
     }
 }
 
-
+/// Represents a font size value, either in pixels or rem units.
 #[derive(Reflect, Debug, Clone, PartialEq)]
 pub enum FontVal {
     Px(f32),
@@ -80,12 +96,23 @@ pub enum FontVal {
 }
 
 impl Default for FontVal {
+
+    /**
+    * Returns the default font size of 12 pixels.
+    */
     fn default() -> Self {
         FontVal::Px(12.0)
     }
 }
 
 impl FontVal {
+
+    /**
+    * Computes the absolute font size in pixels, resolving rem units using a base size.
+    *
+    * @param base Optional base font size in pixels for rem calculations. Defaults to 1.0 if not provided.
+    * @return The computed font size in pixels.
+    */
     pub fn get(&self, base: Option<f32>) -> f32 {
         match self { 
             FontVal::Px(x) => x.clone(),
@@ -94,6 +121,7 @@ impl FontVal {
     }
 }
 
+/// Comprehensive style properties for UI elements.
 #[derive(Reflect, Default, Debug, Clone, PartialEq)]
 pub struct Style {
     pub display: Option<Display>,
@@ -143,6 +171,13 @@ pub struct Style {
 }
 
 impl Style {
+
+    /**
+    * Merges another `Style` into this one.
+    * For each field, if the other style has a value set (`Some`), it overwrites this style's value.
+    *
+    * @param other The other style to merge from.
+    */
     pub fn merge(&mut self, other: &Style) {
         if other.display.is_some()               { self.display = other.display.clone(); }
         if other.position_type.is_some()         { self.position_type = other.position_type.clone(); }
