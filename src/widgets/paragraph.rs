@@ -11,7 +11,7 @@ pub struct ParagraphWidget;
 
 impl Plugin for ParagraphWidget {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, internal_node_creation_system);
+        app.add_systems(Update, (internal_node_creation_system, update_text));
     }
 }
 
@@ -51,6 +51,12 @@ fn internal_node_creation_system(
         )).observe(on_internal_click)
             .observe(on_internal_cursor_entered)
             .observe(on_internal_cursor_leave);
+    }
+}
+
+fn update_text(mut query: Query<(&mut Text, &Paragraph), With<Paragraph>>) {
+    for (mut text, p) in query.iter_mut() {
+        text.0 = p.text.clone();
     }
 }
 
