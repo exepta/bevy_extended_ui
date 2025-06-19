@@ -1,5 +1,7 @@
 # bevy_extended_ui
 ___
+[![Crates.io](https://img.shields.io/crates/v/bevy_extended_ui.svg)](https://crates.io/crates/bevy_extended_ui)
+[![Downloads](https://img.shields.io/crates/d/bevy_extended_ui.svg)](https://crates.io/crates/bevy_extended_ui)
 [![license](https://img.shields.io/badge/license-Apache-blue.svg)](./LICENSE)
 [![Build](https://github.com/exepta/bevy_extended_ui/actions/workflows/build.yml/badge.svg)](https://github.com/exepta/bevy_extended_ui/actions/workflows/build.yml)
 
@@ -147,5 +149,5 @@ The crate supports many CSS things, the list below shows the future support:
 
 | `Bevy` version | `bevy_extended_ui` version |
 |----------------|----------------------------|
-| 0.16.1         | 0.1.1                      |
-| 0.16.0         | 0.1.1                      |
+| 0.16.1         | 0.1.0 - 0.1.2              |
+| 0.16.0         | 0.1.0 - 0.1.2              |

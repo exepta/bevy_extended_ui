@@ -54,6 +54,20 @@ fn internal_node_creation_system(
     }
 }
 
+/// Updates the `Text` components of all entities with a `Paragraph` component.
+///
+/// This system iterates over all entities that have both a `Text` and `Paragraph` component,
+/// and sets the content of the `Text` to match the `text` field of the `Paragraph`.
+///
+/// # Parameters
+/// - `query`: A mutable query for entities that have both `Text` and `Paragraph` components.
+///
+/// # Behavior
+/// The system clones the `Paragraph::text` value into the corresponding `Text` component,
+/// effectively synchronizing the displayed text with the paragraph content.
+///
+/// # Example
+/// If a `Paragraph` contains `"Hello, world!"`, the associated `Text` will be updated to show it.
 fn update_text(mut query: Query<(&mut Text, &Paragraph), With<Paragraph>>) {
     for (mut text, p) in query.iter_mut() {
         text.0 = p.text.clone();

@@ -11,7 +11,7 @@ pub struct HeadlineWidget;
 
 impl Plugin for HeadlineWidget {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, internal_node_creation_system);
+        app.add_systems(Update, (internal_node_creation_system, update_text));
     }
 }
 
@@ -67,6 +67,26 @@ fn internal_node_creation_system(
     }
 }
 
+/// Synchronizes the `Text` component of entities with their `Headline` component.
+///
+/// This system runs on all entities that have both a `Text` and a `Headline` component.
+/// It updates the `Text` to reflect the current value of the `Headline::text` field.
+///
+/// # Parameters
+/// - `query`: A mutable query that fetches entities with both `Text` and `Headline` components.
+///
+/// # Behavior
+/// For each matching entity, the system copies the headline's text into the `Text` component,
+/// ensuring that the UI displays the latest headline content.
+///
+/// # Example
+/// If a `Headline` contains `"Breaking News!"`, the associated `Text` will be updated to show `"Breaking News!"`.
+fn update_text(mut query: Query<(&mut Text, &Headline), With<Headline>>) {
+    for (mut text, headline) in query.iter_mut() {
+        text.0 = headline.text.clone();
+    }
+}
+
 /// Handles pointer click events on a [`Headline`] node.
 ///
 /// Focuses the clicked widget and stores its ID in the global [`CurrentWidgetState`].
@@ -89,7 +109,7 @@ fn on_internal_click(
     }
 }
 
-/// Sets the hover state to `true` when the cursor enters a [`Headline`] node's bounds.
+/// Sets the hover state to `true` when the cursor enters a [`Headline`] node's bound.
 ///
 /// This is used for visual hover feedback, e.g., style highlighting.
 ///
@@ -107,7 +127,7 @@ fn on_internal_cursor_entered(
     }
 }
 
-/// Sets the hover state to `false` when the cursor leaves a [`Headline`] node's bounds.
+/// Sets the hover state to `false` when the cursor leaves a [`Headline`] node's bound.
 ///
 /// Used to remove hover effects from the node.
 ///
