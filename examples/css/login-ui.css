@@ -184,3 +184,17 @@ checkbox .check-text {
     color: #323436;
     font-size: 13px;
 }
+
+progressbar {
+    width: 90%;
+    height: 10px;
+    background: rgba(106, 0, 255, 0.2);
+    border-radius: 5px;
+}
+
+progressbar .progress {
+    width: 20%;
+    height: 100%;
+    background: #6a00ff;
+    border-radius: 5px;
+}

@@ -54,6 +54,9 @@ fn spawn_widget_node(
         HtmlWidgetNode::Img(img, meta, functions) => {
             spawn_with_meta(commands, img.clone(), meta, functions)
         }
+        HtmlWidgetNode::ProgressBar(progress_bar, meta, functions) => {
+            spawn_with_meta(commands, progress_bar.clone(), meta, functions)
+        }
         HtmlWidgetNode::Paragraph(paragraph, meta, functions) => {
             spawn_with_meta(commands, paragraph.clone(), meta, functions)
         }

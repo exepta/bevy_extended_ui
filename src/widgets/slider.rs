@@ -19,7 +19,7 @@ struct SliderThumb {
 }
 
 #[derive(Component, Deref, DerefMut)]
-struct PreviousSliderValue(i32);
+struct PreviousSliderValue(f32);
 
 #[derive(Component)]
 struct SliderNeedInit;
@@ -40,7 +40,7 @@ impl Plugin for SliderWidget {
 /// Creates and initializes UI nodes for slider entities that have not yet been initialized.
 ///
 /// This system queries all entities with a `Slider` component but without a `SliderBase` component.
-/// For each such entity, it inserts necessary UI components including the main slider node,
+/// For each such entity, it inserts necessary UI parts including the main slider node,
 /// background, border, box shadow, and associates CSS sources.
 /// It also creates child nodes for the slider track and the slider thumb, each with their own components
 /// and event observers.
@@ -79,7 +79,7 @@ fn internal_node_creation_system(
             BoxShadow::new(Colored::TRANSPARENT, Val::Px(0.), Val::Px(0.), Val::Px(0.), Val::Px(0.)),
             ZIndex::default(),
             css_source.clone(),
-            PreviousSliderValue(0),
+            PreviousSliderValue(0.0),
             TagName(String::from("slider")),
             RenderLayers::layer(*layer),
             SliderNeedInit,
@@ -232,9 +232,9 @@ fn on_move_thumb(
                     }
 
                     let percent = slider_thumb.current_x / slider_width;
-                    let range = (slider.max - slider.min) as f32;
-                    let raw_value = slider.min as f32 + percent * range;
-                    let stepped_value = ((raw_value / slider.step as f32).round() * slider.step as f32) as i32;
+                    let range = slider.max - slider.min;
+                    let raw_value = slider.min + percent * range;
+                    let stepped_value = (raw_value / slider.step).round() * slider.step;
                     slider.value = stepped_value;
                 }
             }
@@ -304,7 +304,7 @@ fn on_drag_track(
     }
 }
 
-/// Internal helper that applies the pointer position to update the slider's thumb and track UI,
+/// Internal helper that applies the pointer position to update the slider's thumb and track UI 
 /// and calculates the new slider value.
 ///
 /// This function finds the slider entity matching the given target,
@@ -388,9 +388,9 @@ fn track_internal_logic(
             update_slider_track_width(track_query, &child, ui_id, clamped_x);
 
             let percent = clamped_x / slider_width;
-            let range = (slider.max - slider.min) as f32;
-            let raw_value = slider.min as f32 + percent * range;
-            let stepped_value = ((raw_value / slider.step as f32).round() * slider.step as f32) as i32;
+            let range = slider.max - slider.min;
+            let raw_value = slider.min + percent * range;
+            let stepped_value = (raw_value / slider.step).round() * slider.step;
             slider.value = stepped_value;
         }
     }
@@ -434,7 +434,7 @@ fn detect_change_slider_values(
 
         // Handle keyboard change
         if state.focused {
-            let step = if shift { slider.step * 10 } else { slider.step };
+            let step = if shift { slider.step * 10.0 } else { slider.step };
             if keyboard.just_pressed(KeyCode::ArrowRight) {
                 slider.value = (slider.value + step).min(slider.max);
             }
@@ -450,7 +450,7 @@ fn detect_change_slider_values(
 
         if changed {
             let slider_width = computed_node.size().x / window.scale_factor();
-            let percent = (slider.value - slider.min) as f32 / (slider.max - slider.min) as f32;
+            let percent = (slider.value - slider.min) / (slider.max - slider.min);
             let clamped_x = percent * slider_width;
 
             for child in children.iter() {
@@ -509,7 +509,7 @@ fn initialize_slider_visual_state(
             continue;
         }
 
-        let percent = (slider.value - slider.min) as f32 / (slider.max - slider.min) as f32;
+        let percent = (slider.value - slider.min) / (slider.max - slider.min);
         let clamped_x = percent * slider_width;
 
         for child in children.iter() {

@@ -5,7 +5,7 @@ use kuchiki::NodeRef;
 use kuchiki::traits::TendrilSink;
 use crate::html::{HtmlSource, HtmlMeta, HtmlStructureMap, HtmlWidgetNode, HtmlEventBindings};
 use crate::styling::IconPlace;
-use crate::widgets::{Button, CheckBox, ChoiceBox, ChoiceOption, Div, Headline, HeadlineType, HtmlBody, Img, InputCap, InputField, InputType, Paragraph, Slider};
+use crate::widgets::{Button, CheckBox, ChoiceBox, ChoiceOption, Div, Headline, HeadlineType, HtmlBody, Img, InputCap, InputField, InputType, Paragraph, ProgressBar, Slider};
 
 /// Plugin that adds a system to convert raw HTML files into Bevy UI entity trees.
 pub struct HtmlConverterSystem;
@@ -134,6 +134,7 @@ fn parse_html_node(
         onclick: attributes.get("onclick").map(|s| s.to_string()),
         onmouseenter: attributes.get("onmouseenter").map(|s| s.to_string()),
         onmouseleave: attributes.get("onmouseleave").map(|s| s.to_string()),
+        onupdate: attributes.get("onupdate").map(|s| s.to_string()),
     };
 
     match tag.as_str() {
@@ -257,23 +258,23 @@ fn parse_html_node(
             // Parse slider attributes: min, max, value, step
             let min = attributes
                 .get("min")
-                .and_then(|v| v.parse::<i32>().ok())
-                .unwrap_or(0);
+                .and_then(|v| v.parse::<f32>().ok())
+                .unwrap_or(0.0);
 
             let max = attributes
                 .get("max")
-                .and_then(|v| v.parse::<i32>().ok())
-                .unwrap_or(100);
+                .and_then(|v| v.parse::<f32>().ok())
+                .unwrap_or(100.0);
 
             let value = attributes
                 .get("value")
-                .and_then(|v| v.parse::<i32>().ok())
+                .and_then(|v| v.parse::<f32>().ok())
                 .unwrap_or(min);
 
             let step = attributes
                 .get("step")
-                .and_then(|v| v.parse::<i32>().ok())
-                .unwrap_or(1);
+                .and_then(|v| v.parse::<f32>().ok())
+                .unwrap_or(1.0);
 
             Some(HtmlWidgetNode::Slider(
                 Slider {
@@ -284,6 +285,31 @@ fn parse_html_node(
                     ..default()
                 },
                 meta, functions))
+        },
+        "progressbar" => {
+            // Parse slider attributes: min, max, value
+            let min = attributes
+                .get("min")
+                .and_then(|v| v.parse::<f32>().ok())
+                .unwrap_or(0.0);
+
+            let max = attributes
+                .get("max")
+                .and_then(|v| v.parse::<f32>().ok())
+                .unwrap_or(100.0);
+
+            let value = attributes
+                .get("value")
+                .and_then(|v| v.parse::<f32>().ok())
+                .unwrap_or(min);
+            
+            Some(HtmlWidgetNode::ProgressBar(
+                ProgressBar {
+                    value,
+                    min,
+                    max,
+                    ..default()
+                }, meta, functions))
         },
         "h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
             // Map HTML heading tags to Headline widget with correct level

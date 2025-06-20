@@ -23,6 +23,8 @@ pub static SELECT_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool:
 pub static SLIDER_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
 /// A global thread-safe pool of IDs for the "image" widget.
 pub static IMG_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
+/// A global thread-safe pool of IDs for the "progressbar" widget.
+pub static PROGRESS_BAR_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
 /// A global thread-safe pool of IDs for the "check box" widget.
 pub static CHECK_BOX_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
 
@@ -312,6 +314,7 @@ fn despawn_widget_ids(
                 WidgetKind::InputField => INPUT_ID_POOL.lock().unwrap().release(widget_id.id),
                 WidgetKind::ChoiceBox => SELECT_ID_POOL.lock().unwrap().release(widget_id.id),
                 WidgetKind::Img => IMG_ID_POOL.lock().unwrap().release(widget_id.id),
+                WidgetKind::ProgressBar => PROGRESS_BAR_ID_POOL.lock().unwrap().release(widget_id.id),
             }
         }
     }
