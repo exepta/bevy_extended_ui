@@ -19,9 +19,9 @@ fn register_functions(mut functions: ResMut<HtmlFunctionRegistry>) {
     functions.over.insert("hover".to_string(), hover);
 }
 
-fn login(event: Trigger<Pointer<Click>>, mut _commands: Commands) {
+fn login(event: Trigger<Pointer<Click>>, mut commands: Commands) {
     info!("Clicked {:?}", event.target);
-    _commands.queue(|command: &mut World| {
+    commands.queue(|command: &mut World| {
         let info = command.resource::<HtmlFunctionRegistry>().click.len();
         info!("Info: {}", info);
 
