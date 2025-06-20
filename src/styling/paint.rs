@@ -151,18 +151,23 @@ impl Colored {
         let hex = hex.trim_start_matches('#');
 
         // Ensure the hex string is either 3, 6, or 8 characters long
-        if hex.len() != 3 && hex.len() != 6 && hex.len() != 8 {
+        if hex.len() != 3 && hex.len() != 4 && hex.len() != 6 && hex.len() != 8 {
             panic!("Invalid hex string length: {}", hex);
         }
 
         // If the length is 3, expand it to 6 (e.g. "fff" -> "ffffff")
-        let hex = if hex.len() == 3 {
-            format!("{}{}{}{}{}{}",
-                    &hex[0..1], &hex[0..1],
-                    &hex[1..2], &hex[1..2],
-                    &hex[2..3], &hex[2..3])
-        } else {
-            hex.to_string()
+        let hex = match hex.len() {
+            3 => format!("{}{}{}{}{}{}",
+                         &hex[0..1], &hex[0..1],
+                         &hex[1..2], &hex[1..2],
+                         &hex[2..3], &hex[2..3]),
+            4 => format!("{}{}{}{}{}{}{}{}",
+                         &hex[0..1], &hex[0..1],
+                         &hex[1..2], &hex[1..2],
+                         &hex[2..3], &hex[2..3],
+                         &hex[3..4], &hex[3..4]),
+            6 | 8 => hex.to_string(),
+            _ => unreachable!(),
         };
 
         // Parse the hex string into the RGBA components (values between 0 and 255)
@@ -176,7 +181,7 @@ impl Colored {
         } else {
             255 // Default to fully opaque if no alpha is provided
         };
-
+        
         // Convert the RGBA components to the [0.0, 1.0] range and return a Color
         Color::Srgba(Srgba {
             red: r as f32 / 255.0,

@@ -62,18 +62,24 @@ But currently these widgets ar supported:
 - Slider
 - Select
 - Input type:`number`, `text` and `password`
+- ProgressBar
 ```rust
-    commands.spawn(HtmlSource(String::from("examples/html/login-ui.html")));
+    commands.spawn(HtmlSource::from_file_path("examples/html/login-ui.html"));
 ```
 The html file needed a `head` element which contains a `<meta name="test">` tag, this is used
 for identify the correct ui which you currently need.
 
+### New HTML Controller Support
+You can now use controller for handle functions from html like `onclick` or `onmouseennter` for interact with the html file.
+See a full example at the `examples/` package!
+ 
 For implement css styling use `<link href="css/example.css" ref="text/css">`. At the moment only one css
 at the same time is supported!
 Here is an example html:
 ```html
 <head>
     <meta name="login-example" />
+    <meta controller="controller/login_controller.rs" />
     <link rel="stylesheet" href="examples/css/login-ui.css" />
     <title>Page Title</title>
 </head>
@@ -143,7 +149,6 @@ The crate supports many CSS things, the list below shows the future support:
 - CSS variables
 - CSS Animations @keyframes
 - CSS media queries
-- HTML function like javascript
 - & ~ > Operators
 - SCSS support
 
