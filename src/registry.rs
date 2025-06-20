@@ -104,6 +104,45 @@ impl UiRegistry {
         self.use_ui(&name);
     }
 
+    /// Removes a UI source from the registry by its name.
+    ///
+    /// If the currently active UI (`current`) matches the given name,
+    /// it will also be cleared.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The identifier of the UI to remove from the registry.
+    pub fn remove(&mut self, name: &str) {
+        if let Some(current) = self.current.clone() {
+            if current.eq(&name.to_string()) {
+                self.current = None;
+            }
+        }
+        self.collection.remove(name);
+    }
+
+    /// Removes a UI source and immediately switches to another one.
+    ///
+    /// This is useful when replacing a currently loaded UI with a new one.
+    /// If the removed UI is currently active, it switches to `to_switch`.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The name of the UI to be removed.
+    /// * `to_switch` - The name of the UI to activate after removal.
+    pub fn remove_and_use(&mut self, name: &str, to_switch: &str) {
+        self.remove(name);
+        self.use_ui(to_switch);
+    }
+
+    /// Removes all UI sources from the registry and clears the current UI.
+    ///
+    /// This is typically used during global resets or cleanup operations.
+    pub fn remove_all(&mut self) {
+        self.collection.clear();
+        self.current = None;
+    }
+    
     /// Retrieves a UI source by name.
     ///
     /// # Arguments
@@ -117,18 +156,26 @@ impl UiRegistry {
         self.collection.get(name)
     }
 
-    /// Sets the currently active UI by name.
+    /// Sets the currently active UI by name if it exists in the registry.
     ///
-    /// Logs an error if the UI name is not found.
+    /// If the UI with the given name exists in the internal collection, it will be marked
+    /// as the currently active UI by setting the `current` field. If it does not exist,
+    /// a warning will be logged and the current UI will be set to `None`.
     ///
     /// # Arguments
     ///
-    /// * `name` - The UI name to activate.
+    /// * `name` - The name of the UI to activate.
+    ///
+    /// # Behavior
+    ///
+    /// - If the named UI exists: `self.current` will be set to `Some(name.to_string())`.
+    /// - If the named UI does not exist: `self.current` will be set to `None`, and a warning is logged.
     pub fn use_ui(&mut self, name: &str) {
         if self.get(name).is_some() {
             self.current = Some(name.to_string());
         } else {
-            error!("Ui {} not found", name);
+            warn!("Ui was empty and will removed now!");
+            self.current = None;
         }
     }
 }
@@ -188,6 +235,15 @@ fn update_que(
 
             spawn_ui_source(&mut commands, &name, &ui_registry);
 
+            // Despawn outdated UI entity
+            commands.entity(entity).despawn();
+        }
+    } else {
+        for (entity, _) in query.iter() {
+            // Despawn old body entities before spawning a new UI
+            for body_entity in body_query.iter() {
+                commands.entity(body_entity).despawn();
+            }
             // Despawn outdated UI entity
             commands.entity(entity).despawn();
         }

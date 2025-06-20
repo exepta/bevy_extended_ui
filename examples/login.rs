@@ -31,5 +31,5 @@ fn main() {
 
 
 fn test_html(mut ui_registry: ResMut<UiRegistry>) {
-    ui_registry.add_and_use(String::from("login-example"), HtmlSource { source: String::from("examples/html/login-ui.html"), ..default() });
+    ui_registry.add_and_use(String::from("login-example"), HtmlSource::from_file_path("examples/html/login-ui.html"));
 }

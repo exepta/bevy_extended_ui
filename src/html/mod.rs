@@ -47,6 +47,36 @@ pub struct HtmlSource {
     pub source_id: String,
 }
 
+impl HtmlSource {
+
+    /// Creates a new `HtmlSource` from a file path.
+    ///
+    /// This constructor initializes the `source` field with the given path string
+    /// and uses the default values for all other fields.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - A string slice representing the file path to the HTML source.
+    ///
+    /// # Returns
+    ///
+    /// A new instance of `HtmlSource` with the specified path.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use bevy_extended_ui::html::HtmlSource;
+    /// let html_source = HtmlSource::from_file_path("assets/ui/main.html");
+    /// ```
+    pub fn from_file_path(path: &str) -> HtmlSource {
+        HtmlSource {
+            source: path.to_string(),
+            ..default()
+        }
+    }
+    
+}
+
 /// A component that stores parsed CSS style data using Bevy's `Style` struct.
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
