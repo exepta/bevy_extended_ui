@@ -71,25 +71,25 @@ pub struct HtmlMeta {
 #[derive(Debug, Clone)]
 pub enum HtmlWidgetNode {
     /// A `<button>` element.
-    Button(Button, HtmlMeta),
+    Button(Button, HtmlMeta, HtmlEventBindings),
     /// An `<input type="text">` field.
-    Input(InputField, HtmlMeta),
+    Input(InputField, HtmlMeta, HtmlEventBindings),
     /// A checkbox `<input type="checkbox">`.
-    CheckBox(CheckBox, HtmlMeta),
+    CheckBox(CheckBox, HtmlMeta, HtmlEventBindings),
     /// A dropdown or select box.
-    ChoiceBox(ChoiceBox, HtmlMeta),
+    ChoiceBox(ChoiceBox, HtmlMeta, HtmlEventBindings),
     /// A img element (`<img>`).
-    Img(Img, HtmlMeta),
+    Img(Img, HtmlMeta, HtmlEventBindings),
     /// A heading element (`<h1>`-`<h6>`).
-    Headline(Headline, HtmlMeta),
+    Headline(Headline, HtmlMeta, HtmlEventBindings),
     /// A paragraph `<p>`.
-    Paragraph(Paragraph, HtmlMeta),
+    Paragraph(Paragraph, HtmlMeta, HtmlEventBindings),
     /// A slider input (range).
-    Slider(Slider, HtmlMeta),
+    Slider(Slider, HtmlMeta, HtmlEventBindings),
     /// A `<div>` container element with nested child nodes.
-    Div(Div, HtmlMeta, Vec<HtmlWidgetNode>),
+    Div(Div, HtmlMeta, Vec<HtmlWidgetNode>, HtmlEventBindings),
     /// The root `<body>` element of the HTML structure.
-    HtmlBody(HtmlBody, HtmlMeta, Vec<HtmlWidgetNode>),
+    HtmlBody(HtmlBody, HtmlMeta, Vec<HtmlWidgetNode>, HtmlEventBindings),
 }
 
 /// A resource that holds all parsed HTML structures keyed by identifier.
@@ -111,6 +111,25 @@ impl Default for HtmlStructureMap {
     }
 }
 
+type ClickObserverFn = fn(Trigger<Pointer<Click>>, Commands);
+type OverObserverFn = fn(Trigger<Pointer<Over>>, Commands);
+type OutObserverFn = fn(Trigger<Pointer<Out>>, Commands);
+
+#[derive(Default, Resource)]
+pub struct HtmlFunctionRegistry {
+    pub click: HashMap<String, ClickObserverFn>,
+    pub over: HashMap<String, OverObserverFn>,
+    pub out: HashMap<String, OutObserverFn>,
+}
+
+#[derive(Component, Reflect, Default, Clone, Debug)]
+#[reflect(Component)]
+pub struct HtmlEventBindings {
+    pub onclick: Option<String>,
+    pub onmouseenter: Option<String>,
+    pub onmouseleave: Option<String>,
+}
+
 /// The main plugin that registers all HTML UI systems and resources.
 pub struct HtmlPlugin;
 
@@ -118,6 +137,8 @@ impl Plugin for HtmlPlugin {
     /// Configures the app to support HTML parsing and UI construction.
     fn build(&self, app: &mut App) {
         app.init_resource::<HtmlStructureMap>();
+        app.init_resource::<HtmlFunctionRegistry>();
+        app.register_type::<HtmlEventBindings>();
         app.register_type::<HtmlSource>();
         app.register_type::<HtmlStyle>();
         app.add_plugins((HtmlConverterSystem, HtmlBuilderSystem));

@@ -1,5 +1,6 @@
 <head>
     <meta name="login-example" />
+    <meta controller="controller/login_controller.rs" />
     <!-- <link rel="stylesheet" href="examples/css/login-ui.css" /> -->
     <title>Page Title</title>
 </head>
@@ -11,7 +12,7 @@
 
         <!-- Input Field with type text and an icon -->
         <label for="username">Username</label>
-        <input id="username" type="text" icon="extended_ui/icons/check-mark.png"/>
+        <input id="username" onclick="username" type="text" icon="extended_ui/icons/check-mark.png"/>
 
         <!-- Input Field with type password and an icon -->
         <label for="password">Password</label>
@@ -25,7 +26,7 @@
 
         <!-- Login container -->
         <div class="button-container">
-            <button id="login">
+            <button id="login" onclick="login" onmouseenter="hover" onmouseleave="">
                 <icon src="extended_ui/icons/check-mark.png"></icon>
                 Login
             </button>
