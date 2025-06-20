@@ -4,6 +4,7 @@ use crate::service::state_service::update_widget_states;
 use crate::styling::Style;
 use crate::styling::system::WidgetStyle;
 use crate::{ImageCache, UIWidgetState};
+use crate::service::image_cache_service::get_or_load_image;
 
 pub struct StyleService;
 
@@ -60,7 +61,8 @@ pub fn update_widget_styles_system(
         Option<&mut ZIndex>
     )>,
     asset_server: Res<AssetServer>,
-    mut image_cache: ResMut<ImageCache>
+    mut image_cache: ResMut<ImageCache>,
+    mut images: ResMut<Assets<Image>>,
 ) {
     for (entity, state_opt, html_style_opt, mut widget_style) in query.iter_mut() {
         let state = state_opt.cloned().unwrap_or_default();
@@ -138,9 +140,12 @@ pub fn update_widget_styles_system(
                 if let Some(background) = final_style.background.clone() {
                     if let Some(path) = background.image {
 
-                        let handle = image_cache.map.entry(path.clone())
-                            .or_insert_with(|| asset_server.load(path.as_str()))
-                            .clone();
+                        let handle = get_or_load_image(
+                            path.as_str(),
+                            &mut image_cache,
+                            &mut images,
+                            &asset_server,
+                        );
                         
                         image_node.image = handle;
                     }

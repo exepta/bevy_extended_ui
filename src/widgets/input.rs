@@ -8,7 +8,7 @@ use crate::styling::{Background, FontVal};
 use crate::styling::paint::Colored;
 use crate::styling::system::WidgetStyle;
 use crate::utils::keycode_to_char;
-use crate::widgets::{InputCap, InputField, InputType};
+use crate::widgets::{InputCap, InputField, InputType, WidgetId, WidgetKind};
 
 #[derive(Component)]
 struct InputFieldBase;
@@ -114,6 +114,10 @@ fn internal_node_creation_system(
         commands.entity(entity).insert((
             Name::new(format!("Input-{}", field.w_count)),
             Node::default(),
+            WidgetId {
+                id: field.w_count,
+                kind: WidgetKind::InputField
+            },
             BackgroundColor::default(),
             ImageNode::default(),
             BorderColor::default(),

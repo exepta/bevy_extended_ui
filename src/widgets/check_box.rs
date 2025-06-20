@@ -4,7 +4,7 @@ use crate::styling::convert::{CssClass, CssSource, TagName};
 use crate::{BindToID, CurrentWidgetState, ExtendedUiConfiguration, ImageCache, UIGenID, UIWidgetState};
 use crate::service::image_cache_service::{get_or_load_image, DEFAULT_CHECK_MARK_KEY};
 use crate::styling::paint::Colored;
-use crate::widgets::CheckBox;
+use crate::widgets::{CheckBox, WidgetId, WidgetKind};
 
 #[derive(Component)]
 struct CheckBoxBase;
@@ -66,6 +66,10 @@ fn internal_node_creation_system(
                 justify_content: JustifyContent::Start,
                 align_items: AlignItems::Start,
                 ..default()
+            },
+            WidgetId {
+                id: checkbox.w_count,
+                kind: WidgetKind::CheckBox
             },
             BackgroundColor::default(),
             ImageNode::default(),

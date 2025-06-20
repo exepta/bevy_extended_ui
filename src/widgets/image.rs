@@ -4,7 +4,7 @@ use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache, UIGenID, UI
 use crate::service::image_cache_service::get_or_load_image;
 use crate::styling::convert::{CssSource, TagName};
 use crate::styling::paint::Colored;
-use crate::widgets::Img;
+use crate::widgets::{Img, WidgetId, WidgetKind};
 
 #[derive(Component)]
 struct ImageBase;
@@ -75,6 +75,10 @@ fn internal_node_creation_system(
         commands.entity(entity).insert((
             Name::new(format!("Img-{}", img.w_count)),
             Node::default(),
+            WidgetId {
+                id: img.w_count,
+                kind: WidgetKind::Img
+            },
             image,
             BackgroundColor::default(),
             BorderColor::default(),

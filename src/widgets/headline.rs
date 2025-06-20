@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use crate::{CurrentWidgetState, ExtendedUiConfiguration, UIGenID, UIWidgetState};
 use crate::styling::convert::{CssSource, TagName};
-use crate::widgets::Headline;
+use crate::widgets::{Headline, WidgetId, WidgetKind};
 
 #[derive(Component)]
 struct HeadlineBase;
@@ -52,6 +52,10 @@ fn internal_node_creation_system(
         commands.entity(entity).insert((
             Name::new(format!("{}-{}", headline.h_type.to_string().to_uppercase(), headline.w_count)),
             Node::default(),
+            WidgetId {
+                id: headline.w_count,
+                kind: WidgetKind::Headline
+            },
             Text::new(headline.text.clone()),
             TextColor::default(),
             TextFont::default(),

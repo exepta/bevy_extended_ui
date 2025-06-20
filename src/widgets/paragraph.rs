@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use crate::{CurrentWidgetState, ExtendedUiConfiguration, UIGenID, UIWidgetState};
 use crate::styling::convert::{CssSource, TagName};
-use crate::widgets::Paragraph;
+use crate::widgets::{Paragraph, WidgetId, WidgetKind};
 
 #[derive(Component)]
 struct ParagraphBase;
@@ -39,6 +39,10 @@ fn internal_node_creation_system(
         commands.entity(entity).insert((
             Name::new(format!("Paragraph-{}", paragraph.w_count)),
             Node::default(),
+            WidgetId {
+                id: paragraph.w_count,
+                kind: WidgetKind::Paragraph
+            },
             Text::new(paragraph.text.clone()),
             TextColor::default(),
             TextFont::default(),

@@ -5,7 +5,7 @@ use crate::styling::convert::{CssClass, CssSource, TagName};
 use crate::{BindToID, CurrentWidgetState, ExtendedUiConfiguration, UIGenID, UIWidgetState};
 use crate::styling::paint::Colored;
 use crate::styling::system::WidgetStyle;
-use crate::widgets::Slider;
+use crate::widgets::{Slider, WidgetId, WidgetKind};
 
 #[derive(Component)]
 struct SliderBase;
@@ -67,6 +67,10 @@ fn internal_node_creation_system(
                 width: Val::Px(150.),
                 height: Val::Px(8.),
                 ..default()
+            },
+            WidgetId {
+                id: slider.w_count,
+                kind: WidgetKind::Slider
             },
             BackgroundColor::default(),
             ImageNode::default(),
