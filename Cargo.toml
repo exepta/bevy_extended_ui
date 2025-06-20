@@ -54,3 +54,6 @@ version = "1.21.3"
 
 [dependencies]
 regex = "1.11.1"
+
+[dependencies.bevy-inspector-egui]
+version = "0.31.0"

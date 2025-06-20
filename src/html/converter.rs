@@ -3,7 +3,7 @@ use std::fs;
 use bevy::prelude::*;
 use kuchiki::NodeRef;
 use kuchiki::traits::TendrilSink;
-use crate::html::{HtmlSource, HtmlMeta, HtmlStructureMap, HtmlWidgetNode};
+use crate::html::{HtmlSource, HtmlMeta, HtmlStructureMap, HtmlWidgetNode, HtmlEventBindings};
 use crate::styling::IconPlace;
 use crate::widgets::{Button, CheckBox, ChoiceBox, ChoiceOption, Div, Headline, HeadlineType, HtmlBody, Img, InputCap, InputField, InputType, Paragraph, Slider};
 
@@ -43,6 +43,15 @@ fn update_html_ui(
             error!("Missing <meta name=...> tag in <head>");
             continue;
         };
+        
+        let Some(meta_controller) = document
+            .select_first("head meta[controller")
+            .ok()
+            .and_then(|m| m.attributes.borrow().get("controller").map(|s| s.to_string()))
+        else {
+            error!("Missing <meta name=controller> tag in <head>");
+            continue;       
+        };
 
         // Extract CSS source URL from <link href="..."> in <head>, fallback to default
         let css_source = document
@@ -60,6 +69,7 @@ fn update_html_ui(
         };
 
         info!("Create UI for HTML with key [{:?}]", meta_key);
+        info!("UI controller [{:?}] try to use...", meta_controller);
 
         // Collect <label for="..."> mappings for input field labels
         let label_map = collect_labels_by_for(body_node.as_node());
@@ -70,6 +80,7 @@ fn update_html_ui(
             &css_source,
             &label_map,
             &meta_key,
+            &meta_controller,
             &html,
         ) {
             structure_map
@@ -99,6 +110,7 @@ fn parse_html_node(
     css_source: &String,
     label_map: &HashMap<String, String>,
     key: &String,
+    controller: &String,
     html: &HtmlSource,
 ) -> Option<HtmlWidgetNode> {
     let element = node.as_element()?;
@@ -113,6 +125,12 @@ fn parse_html_node(
             .get("class")
             .map(|s| s.split_whitespace().map(str::to_string).collect()),
         style: attributes.get("style").map(|s| s.to_string()),
+    };
+    
+    let functions = HtmlEventBindings {
+        onclick: attributes.get("onclick").map(|s| s.to_string()),
+        onmouseenter: attributes.get("onmouseenter").map(|s| s.to_string()),
+        onmouseleave: attributes.get("onmouseleave").map(|s| s.to_string()),
     };
 
     match tag.as_str() {
@@ -143,7 +161,7 @@ fn parse_html_node(
                 icon_path,
                 icon_place,
                 ..default()
-            }, meta))
+            }, meta, functions))
         },
         "input" => {
             // Map <input> to InputField with associated label and attributes
@@ -177,7 +195,7 @@ fn parse_html_node(
                 icon_path: icon,
                 cap_text_at: cap,
                 ..default()
-            }, meta))
+            }, meta, functions))
         },
         "checkbox" => {
             // Checkbox with label and optional icon
@@ -188,7 +206,7 @@ fn parse_html_node(
                 label,
                 icon_path: icon,
                 ..default()
-            }, meta))
+            }, meta, functions))
         },
         "select" => {
             // Parse dropdown options and selected value
@@ -230,8 +248,7 @@ fn parse_html_node(
                     options,
                     ..default()
                 },
-                meta,
-            ))
+                meta, functions))
         },
         "slider" => {
             // Parse slider attributes: min, max, value, step
@@ -263,8 +280,7 @@ fn parse_html_node(
                     step,
                     ..default()
                 },
-                meta,
-            ))
+                meta, functions))
         },
         "h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
             // Map HTML heading tags to Headline widget with correct level
@@ -286,8 +302,7 @@ fn parse_html_node(
                     h_type,
                     ..default()
                 },
-                meta,
-            ))
+                meta, functions))
         },
         "p" => {
             // Paragraph with text content
@@ -297,8 +312,7 @@ fn parse_html_node(
                     text,
                     ..default()
                 },
-                meta
-            ))
+                meta, functions))
         },
         "img" => {
             let src = attributes.get("src").unwrap_or("").to_string();
@@ -310,30 +324,30 @@ fn parse_html_node(
                     alt,
                     ..default()
                 },
-                meta
-            ))
+                meta, functions))
         },
         "div" => {
             // Parse children recursively, build Div container
             let mut children = Vec::new();
             for child in node.children() {
-                if let Some(parsed) = parse_html_node(&child, css_source, label_map, key, html) {
+                if let Some(parsed) = parse_html_node(&child, css_source, label_map, key, controller, html) {
                     children.push(parsed);
                 }
             }
-            Some(HtmlWidgetNode::Div(Div::default(), meta, children))
+            Some(HtmlWidgetNode::Div(Div::default(), meta, children, functions))
         },
         "body" => {
             // Top-level HtmlBody node with all children parsed
             let children = node.children()
-                .filter_map(|child| parse_html_node(&child, css_source, label_map, key, html))
+                .filter_map(|child| parse_html_node(&child, css_source, label_map, key, controller, html))
                 .collect();
 
             Some(HtmlWidgetNode::HtmlBody(HtmlBody {
                 bind_to_html: Some(key.clone()),
+                fn_controller: Some(controller.clone()),
                 source: Some(html.clone()),
                 ..default()
-            }, meta, children))
+            }, meta, children, functions))
         }
         // Unsupported or unhandled tags return None
         _ => None,

@@ -14,7 +14,7 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
 use bevy::prelude::*;
 use crate::{UIGenID, UIWidgetState};
-use crate::html::HtmlSource;
+use crate::html::{HtmlSource, HtmlEventBindings};
 use crate::styling::IconPlace;
 use crate::widgets::body::HtmlBodyWidget;
 use crate::widgets::button::ButtonWidget;
@@ -47,10 +47,11 @@ pub struct Widget;
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
-#[require(UIGenID, UIWidgetState, GlobalTransform, InheritedVisibility, Widget)]
+#[require(UIGenID, UIWidgetState, GlobalTransform, InheritedVisibility, Widget, HtmlEventBindings)]
 pub struct HtmlBody {
     pub w_count: usize,
     pub bind_to_html: Option<String>,
+    pub fn_controller: Option<String>,
     pub source: Option<HtmlSource>,
 }
 
@@ -59,6 +60,7 @@ impl Default for HtmlBody {
         Self {
             w_count: HTML_COUNT.fetch_add(1, Relaxed),
             bind_to_html: None,
+            fn_controller: None,
             source: None
         }
     }
@@ -70,7 +72,7 @@ impl Default for HtmlBody {
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
-#[require(UIGenID, UIWidgetState, GlobalTransform, InheritedVisibility, Widget)]
+#[require(UIGenID, UIWidgetState, GlobalTransform, InheritedVisibility, Widget, HtmlEventBindings)]
 pub struct Div(usize);
 
 impl Default for Div {
@@ -85,7 +87,7 @@ impl Default for Div {
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
-#[require(UIGenID, UIWidgetState, Widget)]
+#[require(UIGenID, UIWidgetState, Widget, HtmlEventBindings)]
 pub struct Headline {
     pub w_count: usize,
     pub text: String,
@@ -133,7 +135,7 @@ impl fmt::Display for HeadlineType {
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
-#[require(UIGenID, UIWidgetState, Widget)]
+#[require(UIGenID, UIWidgetState, Widget, HtmlEventBindings)]
 pub struct Paragraph {
     pub w_count: usize,
     pub text: String,
@@ -154,7 +156,7 @@ impl Default for Paragraph {
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
-#[require(UIGenID, UIWidgetState, Widget)]
+#[require(UIGenID, UIWidgetState, Widget, HtmlEventBindings)]
 pub struct Button {
     pub w_count: usize,
     pub text: String,
@@ -179,7 +181,7 @@ impl Default for Button {
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
-#[require(UIGenID, UIWidgetState, Widget)]
+#[require(UIGenID, UIWidgetState, Widget, HtmlEventBindings)]
 pub struct CheckBox {
     pub w_count: usize,
     pub label: String,
@@ -202,7 +204,7 @@ impl Default for CheckBox {
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
-#[require(UIGenID, UIWidgetState, Widget)]
+#[require(UIGenID, UIWidgetState, Widget, HtmlEventBindings)]
 pub struct Slider {
     pub w_count: usize,
     pub value: i32,
@@ -229,7 +231,7 @@ impl Default for Slider {
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
-#[require(UIGenID, UIWidgetState, Widget)]
+#[require(UIGenID, UIWidgetState, Widget, HtmlEventBindings)]
 pub struct InputField {
     pub w_count: usize,
     pub text: String,
@@ -308,7 +310,7 @@ impl InputCap {
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
-#[require(UIGenID, UIWidgetState, Widget)]
+#[require(UIGenID, UIWidgetState, Widget, HtmlEventBindings)]
 pub struct ChoiceBox {
     pub w_count: usize,
     pub label: String,
@@ -362,7 +364,7 @@ impl ChoiceOption {
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
-#[require(UIGenID, UIWidgetState, GlobalTransform, InheritedVisibility, Widget)]
+#[require(UIGenID, UIWidgetState, GlobalTransform, InheritedVisibility, Widget, HtmlEventBindings)]
 pub struct Img {
     pub w_count: usize,
     pub src: Option<String>,
