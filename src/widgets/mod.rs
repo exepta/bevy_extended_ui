@@ -8,6 +8,7 @@ mod body;
 mod headline;
 mod paragraph;
 mod image;
+mod progress_bar;
 
 use std::fmt;
 use bevy::prelude::*;
@@ -24,12 +25,13 @@ use crate::widgets::headline::HeadlineWidget;
 use crate::widgets::image::ImageWidget;
 use crate::widgets::input::InputWidget;
 use crate::widgets::paragraph::ParagraphWidget;
+use crate::widgets::progress_bar::ProgressBarWidget;
 use crate::widgets::slider::SliderWidget;
 
 #[derive(Component, Default)]
 pub struct Widget;
 
-#[derive(Component)]
+#[derive(Component, Clone, Copy, Debug)]
 pub struct WidgetId {
     pub id: usize,
     pub kind: WidgetKind,
@@ -47,6 +49,7 @@ pub enum WidgetKind {
     InputField,
     ChoiceBox,
     Img,
+    ProgressBar,
 }
 
 // ===============================================
@@ -66,7 +69,7 @@ pub struct HtmlBody {
 impl Default for HtmlBody {
     fn default() -> Self {
         let w_count = BODY_ID_POOL.lock().unwrap().acquire();
-        
+
         Self {
             w_count,
             bind_to_html: None,
@@ -106,7 +109,7 @@ pub struct Headline {
 }
 
 impl Default for Headline {
-    
+
     fn default() -> Self {
         let w_count = HEADLINE_ID_POOL.lock().unwrap().acquire();
         Self {
@@ -157,7 +160,7 @@ pub struct Paragraph {
 impl Default for Paragraph {
     fn default() -> Self {
         let w_count = PARAGRAPH_ID_POOL.lock().unwrap().acquire();
-        
+
         Self {
             w_count,
             text: String::from(""),
@@ -182,7 +185,7 @@ pub struct Button {
 impl Default for Button {
     fn default() -> Self {
         let w_count = BUTTON_ID_POOL.lock().unwrap().acquire();
-        
+
         Self {
             w_count,
             text: String::from("Button"),
@@ -208,7 +211,7 @@ pub struct CheckBox {
 impl Default for CheckBox {
     fn default() -> Self {
         let w_count = CHECK_BOX_ID_POOL.lock().unwrap().acquire();
-        
+
         Self {
             w_count,
             label: String::from("label"),
@@ -226,22 +229,22 @@ impl Default for CheckBox {
 #[require(UIGenID, UIWidgetState, Widget, HtmlEventBindings)]
 pub struct Slider {
     pub w_count: usize,
-    pub value: i32,
-    pub step: i32,
-    pub min: i32,
-    pub max: i32
+    pub value: f32,
+    pub step: f32,
+    pub min: f32,
+    pub max: f32
 }
 
 impl Default for Slider {
     fn default() -> Self {
         let w_count = SLIDER_ID_POOL.lock().unwrap().acquire();
-        
+
         Self {
             w_count,
-            value: 0,
-            step: 1,
-            min: 0,
-            max: 100,
+            value: 0.0,
+            step: 1.0,
+            min: 0.0,
+            max: 100.0,
         }
     }
 }
@@ -268,7 +271,7 @@ pub struct InputField {
 impl Default for InputField {
     fn default() -> Self {
         let w_count = INPUT_ID_POOL.lock().unwrap().acquire();
-        
+
         Self {
             w_count,
             text: String::from(""),
@@ -345,7 +348,7 @@ pub struct ChoiceBox {
 impl Default for ChoiceBox {
     fn default() -> Self {
         let w_count = SELECT_ID_POOL.lock().unwrap().acquire();
-        
+
         Self {
             w_count,
             label: String::from("select"),
@@ -399,11 +402,38 @@ pub struct Img {
 impl Default for Img {
     fn default() -> Self {
         let w_count = IMG_ID_POOL.lock().unwrap().acquire();
-        
+
         Self {
             w_count,
             src: None,
             alt: String::from(""),
+        }
+    }
+}
+
+// ===============================================
+//                   ProgressBar
+// ===============================================
+
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+#[require(UIGenID, UIWidgetState, GlobalTransform, InheritedVisibility, Widget, HtmlEventBindings)]
+pub struct ProgressBar {
+    pub w_count: usize,
+    pub value: f32,
+    pub max: f32,
+    pub min: f32
+}
+
+impl Default for ProgressBar {
+    fn default() -> Self {
+        let w_count = PROGRESS_BAR_ID_POOL.lock().unwrap().acquire();
+
+        Self {
+            w_count,
+            value: 0.0,
+            max: 100.0,
+            min: 0.0,
         }
     }
 }
@@ -417,6 +447,7 @@ impl Plugin for WidgetPlugin {
         app.register_type::<Button>();
         app.register_type::<CheckBox>();
         app.register_type::<Slider>();
+        app.register_type::<ProgressBar>();
         app.register_type::<InputField>();
         app.register_type::<ChoiceBox>();
         app.register_type::<Headline>();
@@ -431,6 +462,7 @@ impl Plugin for WidgetPlugin {
             ButtonWidget,
             CheckBoxWidget,
             SliderWidget,
+            ProgressBarWidget,
             InputWidget,
             ChoiceBoxWidget
         ));

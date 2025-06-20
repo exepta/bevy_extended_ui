@@ -26,17 +26,21 @@
 
         <!-- Login container -->
         <div class="button-container">
-            <button id="login" onclick="login" onmouseenter="hover" onmouseleave="">
+            <button id="login" onclick="login" onmouseenter="hover">
                 <icon src="extended_ui/icons/check-mark.png"></icon>
                 Login
             </button>
         </div>
 
-        <label for="sel"></label>
-        <select id="sel">
-            <option value="test">Test</option>
-            <option value="test-2">Test 2</option>
-            <option value="test-3">Test 3</option>
-        </select>
+        <progressbar value="0.0"
+                     min="0.0"
+                     max="100.0"
+                     onupdate="progress">
+        </progressbar>
+
+        <progressbar value="80.0"
+                     min="0.0"
+                     max="100.0">
+        </progressbar>
     </div>
 </body>

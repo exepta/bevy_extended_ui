@@ -9,6 +9,17 @@ impl Plugin for HtmlBindingService {
     }
 }
 
+/// Fetches and attaches observer systems to entities based on their HTML event bindings.
+///
+/// This system queries for entities that have newly added `HtmlEventBindings` components.
+/// For each binding (like `onclick`, `onmouseenter`, `onmouseleave`, `onupdate`),
+/// it looks up the corresponding system in the `HtmlFunctionRegistry` and attaches
+/// it as an observer to the entity if found.
+///
+/// # Parameters
+/// - `query`: Query for entities with newly added `HtmlEventBindings`.
+/// - `registry`: Resource containing mappings from event names to system functions.
+/// - `commands`: Commands to add observers to entities.
 fn fetch_observers(
     query: Query<(Entity, &HtmlEventBindings), Added<HtmlEventBindings>>,
     registry: Res<HtmlFunctionRegistry>,
@@ -29,6 +40,12 @@ fn fetch_observers(
 
         if let Some(name) = &bindings.onmouseleave {
             if let Some(system) = registry.out.get(name) {
+                commands.entity(entity).observe(system.clone());
+            }
+        }
+        
+        if let Some(name) = &bindings.onupdate {
+            if let Some(system) = registry.update.get(name) {
                 commands.entity(entity).observe(system.clone());
             }
         }

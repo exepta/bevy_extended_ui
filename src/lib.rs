@@ -4,6 +4,7 @@ use std::sync::atomic::Ordering::Relaxed;
 use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use crate::html::HtmlPlugin;
+use crate::observer::ObserverRegistryPlugin;
 use crate::registry::{RegistryPlugin, UiRegistry};
 use crate::service::ServicePlugin;
 use crate::styling::StylingPlugin;
@@ -15,6 +16,7 @@ pub mod html;
 pub mod registry;
 pub mod utils;
 pub mod service;
+pub mod observer;
 
 static UI_ID_GENERATE: AtomicUsize = AtomicUsize::new(1);
 
@@ -134,7 +136,7 @@ impl Plugin for ExtendedUiPlugin {
         app.register_type::<UIGenID>();
         app.register_type::<BindToID>();
         app.register_type::<UIWidgetState>();
-        app.add_plugins((RegistryPlugin, HtmlPlugin, StylingPlugin, ServicePlugin, WidgetPlugin));
+        app.add_plugins((RegistryPlugin, ObserverRegistryPlugin, HtmlPlugin, StylingPlugin, ServicePlugin, WidgetPlugin));
         app.add_systems(Update, load_ui_camera_system
             .run_if(resource_changed::<ExtendedUiConfiguration>));
     }

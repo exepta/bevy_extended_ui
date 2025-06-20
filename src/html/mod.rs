@@ -5,9 +5,10 @@ use std::collections::HashMap;
 use bevy::prelude::*;
 use crate::html::builder::HtmlBuilderSystem;
 use crate::html::converter::HtmlConverterSystem;
+use crate::observer::time_tick_trigger::TimeTick;
 use crate::styling::css::apply_property_to_style;
 use crate::styling::Style;
-use crate::widgets::{CheckBox, Div, InputField, Button, HtmlBody, ChoiceBox, Slider, Headline, Paragraph, Img};
+use crate::widgets::{CheckBox, Div, InputField, Button, HtmlBody, ChoiceBox, Slider, Headline, Paragraph, Img, ProgressBar};
 
 /// Represents a chunk of HTML source code along with its unique identifier.
 ///
@@ -143,6 +144,8 @@ pub enum HtmlWidgetNode {
     ChoiceBox(ChoiceBox, HtmlMeta, HtmlEventBindings),
     /// A img element (`<img>`).
     Img(Img, HtmlMeta, HtmlEventBindings),
+    /// A img element (`<img>`).
+    ProgressBar(ProgressBar, HtmlMeta, HtmlEventBindings),
     /// A heading element (`<h1>`-`<h6>`).
     Headline(Headline, HtmlMeta, HtmlEventBindings),
     /// A paragraph `<p>`.
@@ -174,23 +177,72 @@ impl Default for HtmlStructureMap {
     }
 }
 
+/// Function pointer type for click event observers.
+///
+/// These functions are called when a `Trigger` event for a pointer click occurs,
+/// receiving the event trigger and a `Commands` object to issue commands.
 type ClickObserverFn = fn(Trigger<Pointer<Click>>, Commands);
+
+/// Function pointer type for mouse over event observers.
+///
+/// These functions are called when a `Trigger` event for a pointer over occurs,
+/// receiving the event trigger and a `Commands` object.
 type OverObserverFn = fn(Trigger<Pointer<Over>>, Commands);
+
+/// Function pointer type for mouse out event observers.
+///
+/// These functions are called when a `Trigger` event for a pointer out occurs,
+/// receiving the event trigger and a `Commands` object.
 type OutObserverFn = fn(Trigger<Pointer<Out>>, Commands);
 
+/// Function pointer type for update event observers.
+///
+/// These functions are invoked whenever a `TimeTick` event is triggered,
+/// which typically occurs on every system update tick.
+///
+/// They receive the event trigger and a `Commands` object for issuing commands.
+/// Due to the frequency of these events, observers should be designed for efficient execution.
+type UpdateObserverFn = fn(Trigger<TimeTick>, Commands);
+
+/// Registry resource that maps event handler names to their observer functions.
+///
+/// Holds hash maps for click, mouse over, mouse out, and update events.
+/// Used to look up the observer system functions by name for attaching to entities.
 #[derive(Default, Resource)]
 pub struct HtmlFunctionRegistry {
+    /// Map of function names to click event observer functions.
     pub click: HashMap<String, ClickObserverFn>,
+
+    /// Map of function names to mouse over event observer functions.
     pub over: HashMap<String, OverObserverFn>,
+
+    /// Map of function names to mouse out event observer functions.
     pub out: HashMap<String, OutObserverFn>,
+
+    /// Map of function names to update event observer functions.
+    pub update: HashMap<String, UpdateObserverFn>,
 }
 
+/// Component representing HTML event bindings on an entity.
+///
+/// Each optional field corresponds to the name of a registered observer function
+/// that will be called on the respective event.
+///
+/// Reflect is derived for use with Bevy reflection and editing tools.
 #[derive(Component, Reflect, Default, Clone, Debug)]
 #[reflect(Component)]
 pub struct HtmlEventBindings {
+    /// Optional function name to call on a click event.
     pub onclick: Option<String>,
+
+    /// Optional function name to call on mouse enter event.
     pub onmouseenter: Option<String>,
+
+    /// Optional function name to call on mouse leave event.
     pub onmouseleave: Option<String>,
+
+    /// Optional function name to call on update event.
+    pub onupdate: Option<String>,
 }
 
 /// The main plugin that registers all HTML UI systems and resources.
