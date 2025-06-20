@@ -37,7 +37,6 @@ features = [
     "custom_cursor",
     "bevy_ui_picking_backend",
     "bevy_winit",
-    "reflect_functions",
     "x11",
     "bevy_log"
 ]
