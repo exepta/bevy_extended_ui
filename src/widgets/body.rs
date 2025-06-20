@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use crate::{CurrentWidgetState, ExtendedUiConfiguration, UIGenID, UIWidgetState};
 use crate::styling::convert::{CssSource, TagName};
-use crate::widgets::HtmlBody;
+use crate::widgets::{HtmlBody, WidgetId, WidgetKind};
 
 #[derive(Component)]
 struct HtmlBodyBase;
@@ -49,6 +49,10 @@ fn internal_node_creation_system(
         commands.entity(entity).insert((
             Name::new(format!("Body-{}", body.w_count)),
             Node::default(),
+            WidgetId {
+                id: body.w_count,
+                kind: WidgetKind::HtmlBody
+            },
             BackgroundColor::default(),
             ImageNode::default(),
             ZIndex::default(),

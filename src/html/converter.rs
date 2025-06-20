@@ -27,8 +27,8 @@ fn update_html_ui(
     query: Query<&HtmlSource, Or<(Changed<HtmlSource>, Added<HtmlSource>)>>,
 ) {
     for html in query.iter() {
-        let Ok(content) = fs::read_to_string(&html.0) else {
-            warn!("Failed to read HTML file: {:?}", html.0);
+        let Ok(content) = fs::read_to_string(&html.source) else {
+            warn!("Failed to read HTML file: {:?}", html.source);
             continue;
         };
 
@@ -43,15 +43,15 @@ fn update_html_ui(
             error!("Missing <meta name=...> tag in <head>");
             continue;
         };
-        
-        let Some(meta_controller) = document
-            .select_first("head meta[controller")
+
+        let meta_controller = document
+            .select_first("head meta[controller]")
             .ok()
             .and_then(|m| m.attributes.borrow().get("controller").map(|s| s.to_string()))
-        else {
-            error!("Missing <meta name=controller> tag in <head>");
-            continue;       
-        };
+            .unwrap_or_else(|| {
+                warn!("Missing <meta controller=...> tag in <head>");
+                String::new()
+            });
 
         // Extract CSS source URL from <link href="..."> in <head>, fallback to default
         let css_source = document
@@ -69,7 +69,10 @@ fn update_html_ui(
         };
 
         info!("Create UI for HTML with key [{:?}]", meta_key);
-        info!("UI controller [{:?}] try to use...", meta_controller);
+        
+        if !meta_controller.is_empty() {
+            info!("UI controller [{:?}]", meta_controller);
+        }
 
         // Collect <label for="..."> mappings for input field labels
         let label_map = collect_labels_by_for(body_node.as_node());

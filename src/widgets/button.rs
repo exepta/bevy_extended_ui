@@ -5,7 +5,7 @@ use crate::{BindToID, CurrentWidgetState, ExtendedUiConfiguration, ImageCache, U
 use crate::styling::convert::{CssClass, CssSource, TagName};
 use crate::styling::IconPlace;
 use crate::styling::paint::Colored;
-use crate::widgets::Button;
+use crate::widgets::{Button, WidgetId, WidgetKind};
 
 #[derive(Component)]
 struct ButtonBase;
@@ -63,6 +63,10 @@ fn internal_node_creation_system(
         commands.entity(entity).insert((
             Name::new(format!("Button-{}", button.w_count)),
             Node::default(),
+            WidgetId {
+                id: button.w_count,
+                kind: WidgetKind::Button
+            },
             BackgroundColor::default(),
             ImageNode::default(),
             BorderColor::default(),

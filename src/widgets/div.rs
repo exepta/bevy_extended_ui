@@ -3,7 +3,7 @@ use bevy::render::view::RenderLayers;
 use crate::{CurrentWidgetState, ExtendedUiConfiguration, UIGenID, UIWidgetState};
 use crate::styling::convert::{CssSource, TagName};
 use crate::styling::paint::Colored;
-use crate::widgets::Div;
+use crate::widgets::{Div, WidgetId, WidgetKind};
 
 #[derive(Component)]
 struct DivBase;
@@ -51,6 +51,10 @@ fn internal_node_creation_system(
         commands.entity(entity).insert((
             Name::new(format!("Div-{}", div.0)),
             Node::default(),
+            WidgetId {
+                id: div.0,
+                kind: WidgetKind::Div
+            },
             ImageNode::default(),
             BackgroundColor::default(),
             BorderColor::default(),

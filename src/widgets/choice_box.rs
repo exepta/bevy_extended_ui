@@ -8,7 +8,7 @@ use crate::service::image_cache_service::{get_or_load_image, DEFAULT_CHOICE_BOX_
 use crate::styling::FontVal;
 use crate::styling::paint::Colored;
 use crate::styling::system::WidgetStyle;
-use crate::widgets::{ChoiceBox, ChoiceOption};
+use crate::widgets::{ChoiceBox, ChoiceOption, WidgetId, WidgetKind};
 
 #[derive(Component)]
 struct ChoiceBase;
@@ -92,6 +92,10 @@ fn internal_node_creation_system(
         commands.entity(entity).insert((
             Name::new(format!("Choice-Box-{}", choice_box.w_count)),
             Node::default(),
+            WidgetId {
+                id: choice_box.w_count,
+                kind: WidgetKind::ChoiceBox
+            },
             BackgroundColor::default(),
             ImageNode::default(),
             BorderColor::default(),

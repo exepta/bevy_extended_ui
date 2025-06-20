@@ -1,7 +1,9 @@
+use std::fs;
+use std::path::Path;
 use bevy::asset::RenderAssetUsages;
 use bevy::image::{CompressedImageFormats, ImageSampler, ImageType};
 use bevy::prelude::*;
-use crate::ImageCache;
+use crate::{ExtendedUiConfiguration, ImageCache};
 pub const DEFAULT_CHECK_MARK_KEY: &str = "extended_ui/icons/check-mark.png";
 pub const DEFAULT_CHOICE_BOX_KEY: &str = "extended_ui/icons/drop-arrow.png";
 
@@ -10,6 +12,7 @@ pub struct ImageCacheService;
 impl Plugin for ImageCacheService {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, cleanup_unused_images_full.run_if(resource_changed::<ImageCache>));
+        app.add_systems(Startup, pre_load_assets);
     }
 }
 
@@ -82,4 +85,40 @@ pub fn get_or_load_image(
     
     image_cache.map.insert(path.to_string(), handle.clone());
     handle
+}
+
+pub fn pre_load_assets(
+    extended_ui_configuration: Res<ExtendedUiConfiguration>,
+    asset_server: Res<AssetServer>,
+    mut image_cache: ResMut<ImageCache>,
+) {
+    let folder = extended_ui_configuration.assets_path.clone();
+    let folder = Path::new(&folder);
+    if !folder.exists() {
+        warn!("pre_load_assets: Folder '{}' does not exist", folder.display());
+        return;
+    }
+
+    let supported_extensions = ["png", "jpg", "jpeg"];
+
+    for entry in fs::read_dir(folder).expect("Failed to read asset folder") {
+        if let Ok(entry) = entry {
+            let path = entry.path();
+
+            if path.is_file() {
+                if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
+                    if supported_extensions.contains(&ext.to_lowercase().as_str()) {
+                        if let Some(asset_path) = path.strip_prefix("assets").ok() {
+                            let asset_str = asset_path.to_str().unwrap_or_default();
+
+                            let handle: Handle<Image> = asset_server.load(asset_str);
+                            image_cache.map.insert(asset_str.to_string(), handle.clone());
+
+                            debug!("Preloaded image: {}", asset_str);
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

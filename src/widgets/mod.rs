@@ -10,11 +10,10 @@ mod paragraph;
 mod image;
 
 use std::fmt;
-use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering::Relaxed;
 use bevy::prelude::*;
 use crate::{UIGenID, UIWidgetState};
 use crate::html::{HtmlSource, HtmlEventBindings};
+use crate::registry::*;
 use crate::styling::IconPlace;
 use crate::widgets::body::HtmlBodyWidget;
 use crate::widgets::button::ButtonWidget;
@@ -27,19 +26,28 @@ use crate::widgets::input::InputWidget;
 use crate::widgets::paragraph::ParagraphWidget;
 use crate::widgets::slider::SliderWidget;
 
-static BUTTON_COUNT: AtomicUsize = AtomicUsize::new(1);
-static CHECK_BOX_COUNT: AtomicUsize = AtomicUsize::new(1);
-static CHOICE_BOX_COUNT: AtomicUsize = AtomicUsize::new(1);
-static DIV_COUNT: AtomicUsize = AtomicUsize::new(1);
-static HEADLINE_COUNT: AtomicUsize = AtomicUsize::new(1);
-static HTML_COUNT: AtomicUsize = AtomicUsize::new(1);
-static IMG_COUNT: AtomicUsize = AtomicUsize::new(1);
-static INPUT_COUNT: AtomicUsize = AtomicUsize::new(1);
-static PARAGRAPH_COUNT: AtomicUsize = AtomicUsize::new(1);
-static SLIDER_COUNT: AtomicUsize = AtomicUsize::new(1);
-
 #[derive(Component, Default)]
 pub struct Widget;
+
+#[derive(Component)]
+pub struct WidgetId {
+    pub id: usize,
+    pub kind: WidgetKind,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum WidgetKind {
+    HtmlBody,
+    Div,
+    Headline,
+    Paragraph,
+    Button,
+    CheckBox,
+    Slider,
+    InputField,
+    ChoiceBox,
+    Img,
+}
 
 // ===============================================
 //                       Body
@@ -57,8 +65,10 @@ pub struct HtmlBody {
 
 impl Default for HtmlBody {
     fn default() -> Self {
+        let w_count = BODY_ID_POOL.lock().unwrap().acquire();
+        
         Self {
-            w_count: HTML_COUNT.fetch_add(1, Relaxed),
+            w_count,
             bind_to_html: None,
             fn_controller: None,
             source: None
@@ -73,11 +83,12 @@ impl Default for HtmlBody {
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, GlobalTransform, InheritedVisibility, Widget, HtmlEventBindings)]
-pub struct Div(usize);
+pub struct Div(pub usize);
 
 impl Default for Div {
     fn default() -> Self {
-        Self(DIV_COUNT.fetch_add(1, Relaxed))
+        let w_count = DIV_ID_POOL.lock().unwrap().acquire();
+        Self(w_count)
     }
 }
 
@@ -95,9 +106,11 @@ pub struct Headline {
 }
 
 impl Default for Headline {
+    
     fn default() -> Self {
+        let w_count = HEADLINE_ID_POOL.lock().unwrap().acquire();
         Self {
-            w_count: HEADLINE_COUNT.fetch_add(1, Relaxed),
+            w_count,
             text: String::from("Headline"),
             h_type: HeadlineType::H3
         }
@@ -143,8 +156,10 @@ pub struct Paragraph {
 
 impl Default for Paragraph {
     fn default() -> Self {
+        let w_count = PARAGRAPH_ID_POOL.lock().unwrap().acquire();
+        
         Self {
-            w_count: PARAGRAPH_COUNT.fetch_add(1, Relaxed),
+            w_count,
             text: String::from(""),
         }
     }
@@ -166,8 +181,10 @@ pub struct Button {
 
 impl Default for Button {
     fn default() -> Self {
+        let w_count = BUTTON_ID_POOL.lock().unwrap().acquire();
+        
         Self {
-            w_count: BUTTON_COUNT.fetch_add(1, Relaxed),
+            w_count,
             text: String::from("Button"),
             icon_path: None,
             icon_place: IconPlace::default(),
@@ -190,8 +207,10 @@ pub struct CheckBox {
 
 impl Default for CheckBox {
     fn default() -> Self {
+        let w_count = CHECK_BOX_ID_POOL.lock().unwrap().acquire();
+        
         Self {
-            w_count: CHECK_BOX_COUNT.fetch_add(1, Relaxed),
+            w_count,
             label: String::from("label"),
             icon_path: Some(String::from("extended_ui/icons/check-mark.png")),
         }
@@ -215,8 +234,10 @@ pub struct Slider {
 
 impl Default for Slider {
     fn default() -> Self {
+        let w_count = SLIDER_ID_POOL.lock().unwrap().acquire();
+        
         Self {
-            w_count: SLIDER_COUNT.fetch_add(1, Relaxed),
+            w_count,
             value: 0,
             step: 1,
             min: 0,
@@ -246,8 +267,10 @@ pub struct InputField {
 
 impl Default for InputField {
     fn default() -> Self {
+        let w_count = INPUT_ID_POOL.lock().unwrap().acquire();
+        
         Self {
-            w_count: INPUT_COUNT.fetch_add(1, Relaxed),
+            w_count,
             text: String::from(""),
             label: String::from("Label"),
             placeholder: String::from(""),
@@ -321,8 +344,10 @@ pub struct ChoiceBox {
 
 impl Default for ChoiceBox {
     fn default() -> Self {
+        let w_count = SELECT_ID_POOL.lock().unwrap().acquire();
+        
         Self {
-            w_count: CHOICE_BOX_COUNT.fetch_add(1, Relaxed),
+            w_count,
             label: String::from("select"),
             value: ChoiceOption::default(),
             options: vec![ChoiceOption::default()],
@@ -373,8 +398,10 @@ pub struct Img {
 
 impl Default for Img {
     fn default() -> Self {
+        let w_count = IMG_ID_POOL.lock().unwrap().acquire();
+        
         Self {
-            w_count: IMG_COUNT.fetch_add(1, Relaxed),
+            w_count,
             src: None,
             alt: String::from(""),
         }

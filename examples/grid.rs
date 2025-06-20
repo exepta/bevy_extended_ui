@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use bevy::window::WindowResolution;
 use bevy_extended_ui::ExtendedUiPlugin;
 use bevy_extended_ui::html::HtmlSource;
+use bevy_extended_ui::registry::UiRegistry;
 
 fn main() {
     let _ = App::new()
@@ -21,6 +22,6 @@ fn main() {
 }
 
 
-fn test_html(mut commands: Commands) {
-    commands.spawn(HtmlSource(String::from("examples/html/grid-ui.html")));
+fn test_html(mut ui_registry: ResMut<UiRegistry>) {
+    ui_registry.add_and_use(String::from("grid-example"), HtmlSource { source: String::from("examples/html/grid-ui.html"), ..default() });
 }

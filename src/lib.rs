@@ -4,6 +4,7 @@ use std::sync::atomic::Ordering::Relaxed;
 use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use crate::html::HtmlPlugin;
+use crate::registry::{RegistryPlugin, UiRegistry};
 use crate::service::ServicePlugin;
 use crate::styling::StylingPlugin;
 use crate::widgets::WidgetPlugin;
@@ -11,7 +12,7 @@ use crate::widgets::WidgetPlugin;
 pub mod widgets;
 pub mod styling;
 pub mod html;
-pub mod prelude;
+pub mod registry;
 pub mod utils;
 pub mod service;
 
@@ -34,6 +35,7 @@ pub struct ExtendedUiConfiguration {
     pub hdr_support: bool,
     pub enable_default_camera: bool,
     pub render_layers: Vec<usize>,
+    pub assets_path: String,
 }
 
 impl Default for ExtendedUiConfiguration {
@@ -49,6 +51,7 @@ impl Default for ExtendedUiConfiguration {
             hdr_support: true,
             enable_default_camera: true,
             render_layers: vec![1, 2],
+            assets_path: String::from("assets/extended_ui/"),
         }
     }
 }
@@ -126,11 +129,12 @@ impl Plugin for ExtendedUiPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ExtendedUiConfiguration>();
         app.init_resource::<ImageCache>();
+        app.init_resource::<UiRegistry>();
         app.init_resource::<CurrentWidgetState>();
         app.register_type::<UIGenID>();
         app.register_type::<BindToID>();
         app.register_type::<UIWidgetState>();
-        app.add_plugins((HtmlPlugin, StylingPlugin, ServicePlugin, WidgetPlugin));
+        app.add_plugins((RegistryPlugin, HtmlPlugin, StylingPlugin, ServicePlugin, WidgetPlugin));
         app.add_systems(Update, load_ui_camera_system
             .run_if(resource_changed::<ExtendedUiConfiguration>));
     }

@@ -9,10 +9,73 @@ use crate::styling::css::apply_property_to_style;
 use crate::styling::Style;
 use crate::widgets::{CheckBox, Div, InputField, Button, HtmlBody, ChoiceBox, Slider, Headline, Paragraph, Img};
 
-/// A component that stores the raw HTML source as a string.
-#[derive(Component, Reflect, Debug, Clone)]
+/// Represents a chunk of HTML source code along with its unique identifier.
+///
+/// This component stores the raw HTML source string and an ID string
+/// that uniquely identifies the source within the UI registry.
+///
+/// # Fields
+///
+/// * `source` - The raw HTML source path as a `String`.
+/// * `source_id` - A unique identifier for this HTML source, typically the name under which
+///   it is registered.
+///
+/// # Derives
+///
+/// This struct derives:
+/// - `Component` to be used as a Bevy ECS component.
+/// - `Reflect` to enable reflection, useful for editor integration and serialization.
+/// - `Debug` for formatting and debugging.
+/// - `Clone` for duplicating instances.
+/// - `Default` to provide a default empty instance.
+///
+/// # Example
+///
+/// ```rust
+/// use bevy_extended_ui::html::HtmlSource;
+/// let html = HtmlSource {
+///     source: "path/to/html".to_string(),
+///     source_id: "main_ui".to_string(),
+/// };
+/// ```
+#[derive(Component, Reflect, Debug, Clone, Default)]
 #[reflect(Component)]
-pub struct HtmlSource(pub String);
+pub struct HtmlSource {
+    /// The raw HTML source code.
+    pub source: String,
+    /// Unique identifier for the HTML source.
+    pub source_id: String,
+}
+
+impl HtmlSource {
+
+    /// Creates a new `HtmlSource` from a file path.
+    ///
+    /// This constructor initializes the `source` field with the given path string
+    /// and uses the default values for all other fields.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - A string slice representing the file path to the HTML source.
+    ///
+    /// # Returns
+    ///
+    /// A new instance of `HtmlSource` with the specified path.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use bevy_extended_ui::html::HtmlSource;
+    /// let html_source = HtmlSource::from_file_path("assets/ui/main.html");
+    /// ```
+    pub fn from_file_path(path: &str) -> HtmlSource {
+        HtmlSource {
+            source: path.to_string(),
+            ..default()
+        }
+    }
+    
+}
 
 /// A component that stores parsed CSS style data using Bevy's `Style` struct.
 #[derive(Component, Reflect, Debug, Clone)]

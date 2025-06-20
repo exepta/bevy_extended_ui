@@ -7,6 +7,7 @@ use bevy_inspector_egui::bevy_egui::EguiPlugin;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_extended_ui::ExtendedUiPlugin;
 use bevy_extended_ui::html::HtmlSource;
+use bevy_extended_ui::registry::UiRegistry;
 use crate::controller::ControllerPlugin;
 
 fn main() {
@@ -29,6 +30,6 @@ fn main() {
 }
 
 
-fn test_html(mut commands: Commands) {
-    commands.spawn(HtmlSource(String::from("examples/html/login-ui.html")));
+fn test_html(mut ui_registry: ResMut<UiRegistry>) {
+    ui_registry.add_and_use(String::from("login-example"), HtmlSource::from_file_path("examples/html/login-ui.html"));
 }
