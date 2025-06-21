@@ -5,7 +5,7 @@ use kuchiki::NodeRef;
 use kuchiki::traits::TendrilSink;
 use crate::html::{HtmlSource, HtmlMeta, HtmlStructureMap, HtmlWidgetNode, HtmlEventBindings};
 use crate::styling::IconPlace;
-use crate::widgets::{Button, CheckBox, ChoiceBox, ChoiceOption, Div, Headline, HeadlineType, HtmlBody, Img, InputCap, InputField, InputType, Paragraph, ProgressBar, Slider};
+use crate::widgets::{Button, CheckBox, ChoiceBox, ChoiceOption, Div, Headline, HeadlineType, HtmlBody, Img, InputCap, InputField, InputType, Paragraph, ProgressBar, Slider, Widget};
 
 /// Plugin that adds a system to convert raw HTML files into Bevy UI entity trees.
 pub struct HtmlConverterSystem;
@@ -24,9 +24,9 @@ impl Plugin for HtmlConverterSystem {
 /// [`HtmlWidgetNode`] tree inserted into the global [`HtmlStructureMap`].
 fn update_html_ui(
     mut structure_map: ResMut<HtmlStructureMap>,
-    query: Query<&HtmlSource, Or<(Changed<HtmlSource>, Added<HtmlSource>)>>,
+    mut query: Query<&mut HtmlSource, Or<(Changed<HtmlSource>, Added<HtmlSource>)>>,
 ) {
-    for html in query.iter() {
+    for mut html in query.iter_mut() {
         let Ok(content) = fs::read_to_string(&html.source) else {
             warn!("Failed to read HTML file: {:?}", html.source);
             continue;
@@ -52,6 +52,10 @@ fn update_html_ui(
                 warn!("Missing <meta controller=...> tag in <head>");
                 String::new()
             });
+        
+        if !meta_controller.is_empty() {
+            html.controller = Some(meta_controller.clone());
+        }
 
         // Extract all <link rel="stylesheet" href="..."> from <head>
         let mut css_sources: Vec<String> = document
@@ -105,7 +109,6 @@ fn update_html_ui(
             &css_sources,
             &label_map,
             &meta_key,
-            &meta_controller,
             &html,
         ) {
             structure_map
@@ -135,7 +138,6 @@ fn parse_html_node(
     css_source: &Vec<String>,
     label_map: &HashMap<String, String>,
     key: &String,
-    controller: &String,
     html: &HtmlSource,
 ) -> Option<HtmlWidgetNode> {
     let element = node.as_element()?;
@@ -158,6 +160,8 @@ fn parse_html_node(
         onmouseleave: attributes.get("onmouseleave").map(|s| s.to_string()),
         onupdate: attributes.get("onupdate").map(|s| s.to_string()),
     };
+    
+    let widget = Widget(html.controller.clone());
 
     match tag.as_str() {
         "button" => {
@@ -187,7 +191,7 @@ fn parse_html_node(
                 icon_path,
                 icon_place,
                 ..default()
-            }, meta, functions))
+            }, meta, functions, widget.clone()))
         },
         "input" => {
             // Map <input> to InputField with associated label and attributes
@@ -221,7 +225,7 @@ fn parse_html_node(
                 icon_path: icon,
                 cap_text_at: cap,
                 ..default()
-            }, meta, functions))
+            }, meta, functions, widget.clone()))
         },
         "checkbox" => {
             // Checkbox with label and optional icon
@@ -232,7 +236,7 @@ fn parse_html_node(
                 label,
                 icon_path: icon,
                 ..default()
-            }, meta, functions))
+            }, meta, functions, widget.clone()))
         },
         "select" => {
             // Parse dropdown options and selected value
@@ -274,7 +278,7 @@ fn parse_html_node(
                     options,
                     ..default()
                 },
-                meta, functions))
+                meta, functions, widget.clone()))
         },
         "slider" => {
             // Parse slider attributes: min, max, value, step
@@ -306,7 +310,7 @@ fn parse_html_node(
                     step,
                     ..default()
                 },
-                meta, functions))
+                meta, functions, widget.clone()))
         },
         "progressbar" => {
             // Parse slider attributes: min, max, value
@@ -331,7 +335,7 @@ fn parse_html_node(
                     min,
                     max,
                     ..default()
-                }, meta, functions))
+                }, meta, functions, widget.clone()))
         },
         "h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
             // Map HTML heading tags to Headline widget with correct level
@@ -353,7 +357,7 @@ fn parse_html_node(
                     h_type,
                     ..default()
                 },
-                meta, functions))
+                meta, functions, widget.clone()))
         },
         "p" => {
             // Paragraph with text content
@@ -363,7 +367,7 @@ fn parse_html_node(
                     text,
                     ..default()
                 },
-                meta, functions))
+                meta, functions, widget.clone()))
         },
         "img" => {
             let src = attributes.get("src").unwrap_or("").to_string();
@@ -375,30 +379,29 @@ fn parse_html_node(
                     alt,
                     ..default()
                 },
-                meta, functions))
+                meta, functions, widget.clone()))
         },
         "div" => {
             // Parse children recursively, build Div container
             let mut children = Vec::new();
             for child in node.children() {
-                if let Some(parsed) = parse_html_node(&child, css_source, label_map, key, controller, html) {
+                if let Some(parsed) = parse_html_node(&child, css_source, label_map, key, html) {
                     children.push(parsed);
                 }
             }
-            Some(HtmlWidgetNode::Div(Div::default(), meta, children, functions))
+            Some(HtmlWidgetNode::Div(Div::default(), meta, children, functions, widget.clone()))
         },
         "body" => {
             // Top-level HtmlBody node with all children parsed
             let children = node.children()
-                .filter_map(|child| parse_html_node(&child, css_source, label_map, key, controller, html))
+                .filter_map(|child| parse_html_node(&child, css_source, label_map, key, html))
                 .collect();
 
             Some(HtmlWidgetNode::HtmlBody(HtmlBody {
                 bind_to_html: Some(key.clone()),
-                fn_controller: Some(controller.clone()),
                 source: Some(html.clone()),
                 ..default()
-            }, meta, children, functions))
+            }, meta, children, functions, widget.clone()))
         }
         // Unsupported or unhandled tags return None
         _ => None,

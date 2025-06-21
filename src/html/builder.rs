@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use crate::html::{HtmlEventBindings, HtmlMeta, HtmlStructureMap, HtmlWidgetNode};
 use crate::styling::convert::{CssClass, CssID, CssSource};
+use crate::widgets::Widget;
 
 /// A plugin that spawns Bevy UI entities from parsed HTML node structures.
 pub struct HtmlBuilderSystem;
@@ -42,43 +43,43 @@ fn spawn_widget_node(
     parent: Option<Entity>,
 ) -> Entity {
     let entity = match node {
-        HtmlWidgetNode::Button(button, meta, functions) => {
-            spawn_with_meta(commands, button.clone(), meta, functions)
+        HtmlWidgetNode::Button(button, meta, functions, widget) => {
+            spawn_with_meta(commands, button.clone(), meta, functions, widget)
         }
-        HtmlWidgetNode::Input(input, meta, functions) => {
-            spawn_with_meta(commands, input.clone(), meta, functions)
+        HtmlWidgetNode::Input(input, meta, functions, widget) => {
+            spawn_with_meta(commands, input.clone(), meta, functions, widget)
         }
-        HtmlWidgetNode::Headline(headline, meta, functions) => {
-            spawn_with_meta(commands, headline.clone(), meta, functions)
+        HtmlWidgetNode::Headline(headline, meta, functions, widget) => {
+            spawn_with_meta(commands, headline.clone(), meta, functions, widget)
         }
-        HtmlWidgetNode::Img(img, meta, functions) => {
-            spawn_with_meta(commands, img.clone(), meta, functions)
+        HtmlWidgetNode::Img(img, meta, functions, widget) => {
+            spawn_with_meta(commands, img.clone(), meta, functions, widget)
         }
-        HtmlWidgetNode::ProgressBar(progress_bar, meta, functions) => {
-            spawn_with_meta(commands, progress_bar.clone(), meta, functions)
+        HtmlWidgetNode::ProgressBar(progress_bar, meta, functions, widget) => {
+            spawn_with_meta(commands, progress_bar.clone(), meta, functions, widget)
         }
-        HtmlWidgetNode::Paragraph(paragraph, meta, functions) => {
-            spawn_with_meta(commands, paragraph.clone(), meta, functions)
+        HtmlWidgetNode::Paragraph(paragraph, meta, functions, widget) => {
+            spawn_with_meta(commands, paragraph.clone(), meta, functions, widget)
         }
-        HtmlWidgetNode::CheckBox(checkbox, meta, functions) => {
-            spawn_with_meta(commands, checkbox.clone(), meta, functions)
+        HtmlWidgetNode::CheckBox(checkbox, meta, functions, widget) => {
+            spawn_with_meta(commands, checkbox.clone(), meta, functions, widget)
         }
-        HtmlWidgetNode::ChoiceBox(choice_box, meta, functions) => {
-            spawn_with_meta(commands, choice_box.clone(), meta, functions)
+        HtmlWidgetNode::ChoiceBox(choice_box, meta, functions, widget) => {
+            spawn_with_meta(commands, choice_box.clone(), meta, functions, widget)
         }
-        HtmlWidgetNode::Slider(slider, meta, functions) => {
-            spawn_with_meta(commands, slider.clone(), meta, functions)
+        HtmlWidgetNode::Slider(slider, meta, functions, widget) => {
+            spawn_with_meta(commands, slider.clone(), meta, functions, widget)
         }
-        HtmlWidgetNode::Div(div, meta, children, functions) => {
-            let entity = spawn_with_meta(commands, div.clone(), meta, functions);
+        HtmlWidgetNode::Div(div, meta, children, functions,widget) => {
+            let entity = spawn_with_meta(commands, div.clone(), meta, functions, widget);
             for child in children {
                 let child_entity = spawn_widget_node(commands, child, asset_server, Some(entity));
                 commands.entity(entity).add_child(child_entity);
             }
             entity
         }
-        HtmlWidgetNode::HtmlBody(body, meta, children, functions) => {
-            let entity = spawn_with_meta(commands, body.clone(), meta, functions);
+        HtmlWidgetNode::HtmlBody(body, meta, children, functions, widget) => {
+            let entity = spawn_with_meta(commands, body.clone(), meta, functions, widget);
             for child in children {
                 let child_entity = spawn_widget_node(commands, child, asset_server, Some(entity));
                 commands.entity(entity).add_child(child_entity);
@@ -105,11 +106,13 @@ fn spawn_with_meta<T: Component>(
     commands: &mut Commands,
     component: T,
     meta: &HtmlMeta,
-    functions: &HtmlEventBindings
+    functions: &HtmlEventBindings,
+    widget: &Widget
 ) -> Entity {
     commands.spawn((
         component,
         functions.clone(),
+        widget.clone(),
         Node::default(),
         CssSource(meta.css.clone()),
         CssClass(meta.class.clone().unwrap_or_default()),
