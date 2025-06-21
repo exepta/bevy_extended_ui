@@ -53,12 +53,34 @@ fn update_html_ui(
                 String::new()
             });
 
-        // Extract CSS source URL from <link href="..."> in <head>, fallback to default
-        let css_source = document
-            .select_first("head link[href]")
+        // Extract all <link rel="stylesheet" href="..."> from <head>
+        let mut css_sources: Vec<String> = document
+            .select("head link[href]")
             .ok()
-            .and_then(|m| m.attributes.borrow().get("href").map(|s| s.to_string()))
-            .unwrap_or_else(|| "assets/css/core.css".to_string());
+            .into_iter()
+            .flatten()
+            .filter_map(|node| {
+                let attrs = node.attributes.borrow();
+                let rel_is_stylesheet = attrs.get("rel").map(|r| r == "stylesheet").unwrap_or(false);
+                let href = attrs.get("href").map(|s| {
+                    if s == "default" {
+                        "assets/css/core.css".to_string()
+                    } else {
+                        s.to_string()
+                    }
+                });
+
+                if rel_is_stylesheet {
+                    href
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        if css_sources.is_empty() {
+            css_sources.push("assets/css/core.css".to_string());
+        }
 
         structure_map.active = Some(meta_key.clone());
 
@@ -69,7 +91,7 @@ fn update_html_ui(
         };
 
         info!("Create UI for HTML with key [{:?}]", meta_key);
-        
+
         if !meta_controller.is_empty() {
             info!("UI controller [{:?}]", meta_controller);
         }
@@ -80,7 +102,7 @@ fn update_html_ui(
         // Parse the body recursively into the HtmlWidgetNode tree
         if let Some(body_widget) = parse_html_node(
             body_node.as_node(),
-            &css_source,
+            &css_sources,
             &label_map,
             &meta_key,
             &meta_controller,
@@ -110,7 +132,7 @@ fn update_html_ui(
 /// or `None` if the element is unsupported or parsing failed.
 fn parse_html_node(
     node: &NodeRef,
-    css_source: &String,
+    css_source: &Vec<String>,
     label_map: &HashMap<String, String>,
     key: &String,
     controller: &String,

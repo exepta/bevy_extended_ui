@@ -121,7 +121,7 @@ impl HtmlStyle {
 #[derive(Debug, Clone, Default)]
 pub struct HtmlMeta {
     /// Embedded `<style>` or global CSS rules.
-    pub css: String,
+    pub css: Vec<String>,
     /// Value of the `id` attribute.
     pub id: Option<String>,
     /// Value(s) of the `class` attribute.

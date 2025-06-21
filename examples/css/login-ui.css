@@ -21,7 +21,7 @@ div {
 
 #container {
     width: 450px;
-    height: 550px;
+    height: 650px;
     background: rgb(255, 255, 255);
     box-shadow: 0 0 5px 7px #303033;
     gap: 0;
@@ -186,7 +186,7 @@ checkbox .check-text {
 }
 
 progressbar {
-    width: 90%;
+    width: 100%;
     height: 10px;
     background: rgba(106, 0, 255, 0.2);
     border-radius: 5px;
@@ -197,4 +197,23 @@ progressbar .progress {
     height: 100%;
     background: #6a00ff;
     border-radius: 5px;
+}
+
+select {
+    width: 100%;
+    height: 55px;
+    border-radius: 5px 0;
+    border: 2px #d4d4f3;
+    color: #d4d4f3;
+    z-index: 1;
+}
+
+select .option-selected .option-sel-text {
+    color: #323436;
+    font-size: 14px;
+}
+
+select .option-drop-box .option-drop-icon {
+    color: #323436;
+    font-size: 14px;
 }

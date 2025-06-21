@@ -76,42 +76,42 @@ fn update_css_conventions(
 ) {
     for (entity, file, id_opt, class_opt, tag_opt, parent_opt) in query.iter() {
 
-        let css_path = resolve_css_path(file.0.as_str());
-
-        if !Path::new(&css_path).exists() {
-            error!("CSS File not found {}", css_path);
-            continue;
-        }
-        
-        let full_style = WidgetStyle::load_from_file(&*css_path);
         let mut merged_styles: HashMap<String, Style> = HashMap::new();
+        let mut css_path_combined = String::new();
 
-        for (selector, style) in full_style.styles.iter() {
-            let parts: Vec<&str> = selector.split_whitespace().collect();
 
-            if matches_selector_chain(&parts, id_opt, class_opt, tag_opt, parent_opt, &parent_query) {
-                merged_styles.insert(selector.clone(), style.clone());
+        for path in &file.0 {
+            let css_path = resolve_css_path(path);
+
+            if !Path::new(&css_path).exists() {
+                error!("CSS File not found {}", css_path);
+                continue;
+            }
+
+            css_path_combined += &format!("{};", css_path);
+
+            let style = WidgetStyle::load_from_file(&css_path);
+            for (selector, value) in style.styles {
+                let parts: Vec<&str> = selector.split_whitespace().collect();
+
+                if matches_selector_chain(&parts, id_opt, class_opt, tag_opt, parent_opt, &parent_query) {
+                    merged_styles.insert(selector.clone(), value.clone());
+                }
             }
         }
 
         let final_style = WidgetStyle {
             styles: merged_styles,
-            css_path: css_path.to_string(),
+            css_path: css_path_combined.to_string(),
             active_style: None,
         };
 
-        match widget_query.get_mut(entity) {
-            Ok(Some(mut existing_style)) => {
-                if existing_style.css_path != css_path {
-                    *existing_style = final_style.clone();
-                    commands.entity(entity).insert(existing_style.clone());
-                } else {
-                    commands.entity(entity).insert(final_style.clone());
-                }
+        if let Ok(Some(existing_style)) = widget_query.get_mut(entity) {
+            if existing_style.styles != final_style.styles {
+                commands.entity(entity).insert(final_style);
             }
-            _ => {
-                commands.entity(entity).insert(final_style.clone());
-            }
+        } else {
+            commands.entity(entity).insert(final_style);
         }
     }
 }
