@@ -28,8 +28,8 @@ use crate::widgets::paragraph::ParagraphWidget;
 use crate::widgets::progress_bar::ProgressBarWidget;
 use crate::widgets::slider::SliderWidget;
 
-#[derive(Component, Default)]
-pub struct Widget;
+#[derive(Component, Default, Clone, Debug)]
+pub struct Widget(pub Option<String>);
 
 #[derive(Component, Clone, Copy, Debug)]
 pub struct WidgetId {
@@ -62,7 +62,6 @@ pub enum WidgetKind {
 pub struct HtmlBody {
     pub w_count: usize,
     pub bind_to_html: Option<String>,
-    pub fn_controller: Option<String>,
     pub source: Option<HtmlSource>,
 }
 
@@ -73,7 +72,6 @@ impl Default for HtmlBody {
         Self {
             w_count,
             bind_to_html: None,
-            fn_controller: None,
             source: None
         }
     }

@@ -19,43 +19,21 @@ impl Plugin for CssService {
     }
 }
 
-/// Applies CSS styles to entities based on their CSS selector metadata and updates their [`WidgetStyle`].
+/// Updates the CSS styles for all entities that have had their `CssSource` added or changed.
 ///
-/// This system reacts to changes or additions to the [`CssSource`] component. It loads the CSS file,
-/// evaluates selectors, and assigns matching styles to entities based on their ID, class, tag name,
-/// and optionally their parent hierarchy. The result is stored in the entity’s [`WidgetStyle`] component.
+/// <p>This system queries entities with a `CssSource` component and evaluates whether their CSS
+/// should be reloaded and merged based on matching selector chains (ID, class, tag, and parent hierarchy).
+/// It loads all defined CSS files, merges matching selectors, and applies the final `WidgetStyle`
+/// to the entity if it has changed or doesn't yet exist.</p>
 ///
-/// # Parameters
-/// - `commands`: Bevy's command buffer for inserting updated styles.
-/// - `query`: Entities that changed or received a [`CssSource`], along with optional metadata like
-///   [`CssID`], [`CssClass`], [`TagName`], and [`ChildOf`] for CSS matching.
-/// - `parent_query`: A query to allow recursive resolution of parent styles during selector matching.
-/// - `widget_query`: Access to current [`WidgetStyle`] components on target entities.
+/// <p>The merge strategy allows multiple CSS files to contribute to the same selector. Properties
+/// from later files override those from earlier ones (similar to cascading behavior in traditional CSS).</p>
 ///
-/// # CSS Matching
-/// - Simple selectors (`#id`, `.class`, `tag`) are supported.
-/// - Selector chains (e.g., `div .button`) are resolved recursively using [`ChildOf`] relationships.
-/// - Pseudo-classes (e.g., `:hover`) are ignored during base matching but preserved in style data.
-///
-/// # Behavior
-/// - If a matching style is found, it replaces or inserts a [`WidgetStyle`] on the entity.
-/// - CSS is only reloaded and applied if the file path changed or on new addition.
-///
-/// # Errors
-/// Logs an error if the CSS file doesn't exist or is unreadable.
-///
-/// # Example
-/// ```css
-/// .button {
-///     width: 100px;
-/// }
-///
-/// div .button {
-///     color: red;
-/// }
-/// ```
-///
-/// Will match `.button` and also `.button` inside a `div`, based on entity hierarchy.
+/// @param commands Bevy `Commands` used to insert updated styles into entities.
+/// @param query A query that returns entities with changed or added `CssSource`, along with optional `CssID`,
+///              `CssClass`, `TagName`, and `ChildOf` components.
+/// @param parent_query A query used to resolve parent hierarchy for matching selector chains.
+/// @param widget_query A query for retrieving and mutating existing `WidgetStyle` components on entities.
 fn update_css_conventions(
     mut commands: Commands,
     query: Query<(
@@ -74,44 +52,24 @@ fn update_css_conventions(
     )>,
     mut widget_query: Query<Option<&mut WidgetStyle>>,
 ) {
-    for (entity, file, id_opt, class_opt, tag_opt, parent_opt) in query.iter() {
-
-        let css_path = resolve_css_path(file.0.as_str());
-
-        if !Path::new(&css_path).exists() {
-            error!("CSS File not found {}", css_path);
-            continue;
-        }
-        
-        let full_style = WidgetStyle::load_from_file(&*css_path);
-        let mut merged_styles: HashMap<String, Style> = HashMap::new();
-
-        for (selector, style) in full_style.styles.iter() {
-            let parts: Vec<&str> = selector.split_whitespace().collect();
-
-            if matches_selector_chain(&parts, id_opt, class_opt, tag_opt, parent_opt, &parent_query) {
-                merged_styles.insert(selector.clone(), style.clone());
-            }
-        }
+    for (entity, css_source, id, class, tag, parent) in query.iter() {
+        let (merged_styles, css_paths) =
+            load_and_merge_styles(&css_source.0, id, class, tag, parent, &parent_query);
 
         let final_style = WidgetStyle {
             styles: merged_styles,
-            css_path: css_path.to_string(),
+            css_path: css_paths.join(";"),
             active_style: None,
         };
 
         match widget_query.get_mut(entity) {
-            Ok(Some(mut existing_style)) => {
-                if existing_style.css_path != css_path {
-                    *existing_style = final_style.clone();
-                    commands.entity(entity).insert(existing_style.clone());
-                } else {
-                    commands.entity(entity).insert(final_style.clone());
-                }
+            Ok(Some(existing)) if existing.styles != final_style.styles => {
+                commands.entity(entity).insert(final_style);
             }
-            _ => {
-                commands.entity(entity).insert(final_style.clone());
+            Ok(None) => {
+                commands.entity(entity).insert(final_style);
             }
+            _ => {}
         }
     }
 }
@@ -209,6 +167,92 @@ fn matches_selector(
     }
 
     false
+}
+
+/// Loads and merges applicable CSS styles from the provided list of paths.
+///
+/// This function resolves each CSS path, loads the associated styles using
+/// `WidgetStyle::load_from_file`, and filters selectors based on whether they match
+/// the current entity's identity (ID, class, tag, and parent chain).
+///
+/// Matching styles are merged together. If the same selector appears multiple times
+/// across CSS files, later declarations will overwrite existing properties within
+/// that selector, rather than replacing the entire style.
+///
+/// # Parameters
+///
+/// - `paths`: A list of relative CSS file paths to load and merge.
+/// - `id`: Optional reference to the entity's `CssID` component.
+/// - `class`: Optional reference to the entity's `CssClass` component.
+/// - `tag`: Optional reference to the entity's `TagName` component.
+/// - `parent`: Optional reference to the entity's `ChildOf` component, used for selector chain matching.
+/// - `parent_query`: A query that provides access to parent entity style components, used to evaluate complex CSS selectors.
+///
+/// # Returns
+///
+/// A tuple containing:
+/// - `HashMap<String, Style>`: A map of matched selectors to their merged `Style` content.
+/// - `Vec<String>`: A list of successfully loaded and resolved CSS file paths.
+///
+/// # Behavior
+///
+/// - Logs an error and skips any CSS file that does not exist.
+/// - Selectors are filtered via `matches_selector_chain`.
+/// - Styles with the same selector are merged using `Style::merge`, allowing later CSS files
+///   to override specific properties.
+///
+/// # Example
+///
+/// ```rust
+/// let (merged_styles, paths) = load_and_merge_styles(
+///     &vec!["base.css".into(), "theme.css".into()],
+///     Some(&css_id),
+///     Some(&css_class),
+///     Some(&tag_name),
+///     Some(&parent),
+///     &parent_query,
+/// );
+/// ```
+fn load_and_merge_styles(
+    paths: &Vec<String>,
+    id: Option<&CssID>,
+    class: Option<&CssClass>,
+    tag: Option<&TagName>,
+    parent: Option<&ChildOf>,
+    parent_query: &Query<(
+        Option<&CssID>,
+        Option<&CssClass>,
+        Option<&TagName>,
+        Option<&ChildOf>,
+    )>,
+) -> (HashMap<String, Style>, Vec<String>) {
+    let mut merged: HashMap<String, Style> = HashMap::new();
+    let mut loaded_paths = Vec::new();
+
+    for path in paths {
+        let full_path = resolve_css_path(path);
+
+        if !Path::new(&full_path).exists() {
+            error!("CSS File not found: {}", full_path);
+            continue;
+        }
+
+        loaded_paths.push(full_path.clone());
+        let style = WidgetStyle::load_from_file(&full_path);
+
+        for (selector, new_style) in style.styles {
+            let selector_parts: Vec<&str> = selector.split_whitespace().collect();
+
+            if matches_selector_chain(&selector_parts, id, class, tag, parent, parent_query) {
+                merged
+                    .entry(selector.clone())
+                    .and_modify(|existing| existing.merge(&new_style))
+                    .or_insert(new_style.clone());
+            }
+        }
+    }
+
+    (merged, loaded_paths)
 }
 
 /// Resolves a CSS file path to a valid file on disk.

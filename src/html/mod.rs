@@ -8,7 +8,7 @@ use crate::html::converter::HtmlConverterSystem;
 use crate::observer::time_tick_trigger::TimeTick;
 use crate::styling::css::apply_property_to_style;
 use crate::styling::Style;
-use crate::widgets::{CheckBox, Div, InputField, Button, HtmlBody, ChoiceBox, Slider, Headline, Paragraph, Img, ProgressBar};
+use crate::widgets::{CheckBox, Div, InputField, Button, HtmlBody, ChoiceBox, Slider, Headline, Paragraph, Img, ProgressBar, Widget};
 
 /// Represents a chunk of HTML source code along with its unique identifier.
 ///
@@ -37,6 +37,7 @@ use crate::widgets::{CheckBox, Div, InputField, Button, HtmlBody, ChoiceBox, Sli
 /// let html = HtmlSource {
 ///     source: "path/to/html".to_string(),
 ///     source_id: "main_ui".to_string(),
+///     controller: None
 /// };
 /// ```
 #[derive(Component, Reflect, Debug, Clone, Default)]
@@ -46,6 +47,8 @@ pub struct HtmlSource {
     pub source: String,
     /// Unique identifier for the HTML source.
     pub source_id: String,
+    /// Controls the function support location
+    pub controller: Option<String>,
 }
 
 impl HtmlSource {
@@ -121,7 +124,7 @@ impl HtmlStyle {
 #[derive(Debug, Clone, Default)]
 pub struct HtmlMeta {
     /// Embedded `<style>` or global CSS rules.
-    pub css: String,
+    pub css: Vec<String>,
     /// Value of the `id` attribute.
     pub id: Option<String>,
     /// Value(s) of the `class` attribute.
@@ -135,27 +138,27 @@ pub struct HtmlMeta {
 #[derive(Debug, Clone)]
 pub enum HtmlWidgetNode {
     /// A `<button>` element.
-    Button(Button, HtmlMeta, HtmlEventBindings),
+    Button(Button, HtmlMeta, HtmlEventBindings, Widget),
     /// An `<input type="text">` field.
-    Input(InputField, HtmlMeta, HtmlEventBindings),
+    Input(InputField, HtmlMeta, HtmlEventBindings, Widget),
     /// A checkbox `<input type="checkbox">`.
-    CheckBox(CheckBox, HtmlMeta, HtmlEventBindings),
+    CheckBox(CheckBox, HtmlMeta, HtmlEventBindings, Widget),
     /// A dropdown or select box.
-    ChoiceBox(ChoiceBox, HtmlMeta, HtmlEventBindings),
+    ChoiceBox(ChoiceBox, HtmlMeta, HtmlEventBindings, Widget),
     /// A img element (`<img>`).
-    Img(Img, HtmlMeta, HtmlEventBindings),
+    Img(Img, HtmlMeta, HtmlEventBindings, Widget),
     /// A img element (`<img>`).
-    ProgressBar(ProgressBar, HtmlMeta, HtmlEventBindings),
+    ProgressBar(ProgressBar, HtmlMeta, HtmlEventBindings, Widget),
     /// A heading element (`<h1>`-`<h6>`).
-    Headline(Headline, HtmlMeta, HtmlEventBindings),
+    Headline(Headline, HtmlMeta, HtmlEventBindings, Widget),
     /// A paragraph `<p>`.
-    Paragraph(Paragraph, HtmlMeta, HtmlEventBindings),
+    Paragraph(Paragraph, HtmlMeta, HtmlEventBindings, Widget),
     /// A slider input (range).
-    Slider(Slider, HtmlMeta, HtmlEventBindings),
+    Slider(Slider, HtmlMeta, HtmlEventBindings, Widget),
     /// A `<div>` container element with nested child nodes.
-    Div(Div, HtmlMeta, Vec<HtmlWidgetNode>, HtmlEventBindings),
+    Div(Div, HtmlMeta, Vec<HtmlWidgetNode>, HtmlEventBindings, Widget),
     /// The root `<body>` element of the HTML structure.
-    HtmlBody(HtmlBody, HtmlMeta, Vec<HtmlWidgetNode>, HtmlEventBindings),
+    HtmlBody(HtmlBody, HtmlMeta, Vec<HtmlWidgetNode>, HtmlEventBindings, Widget),
 }
 
 /// A resource that holds all parsed HTML structures keyed by identifier.

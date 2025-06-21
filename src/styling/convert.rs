@@ -17,7 +17,7 @@ pub struct TagName(pub String);
 /// Component containing the raw CSS source code associated with an entity.
 #[derive(Component, Reflect, Debug, Clone, Default)]
 #[reflect(Component)]
-pub struct CssSource(pub String);
+pub struct CssSource(pub Vec<String>);
 
 /// Component representing one or more CSS classes applied to an element.
 #[derive(Component, Reflect, Debug, Clone)]

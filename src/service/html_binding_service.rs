@@ -1,5 +1,7 @@
+use std::path::Path;
 use bevy::prelude::*;
-use crate::html::{HtmlEventBindings, HtmlFunctionRegistry};
+use crate::html::{HtmlEventBindings, HtmlFunctionRegistry, HtmlSource};
+use crate::widgets::Widget;
 
 pub struct HtmlBindingService;
 
@@ -21,33 +23,53 @@ impl Plugin for HtmlBindingService {
 /// - `registry`: Resource containing mappings from event names to system functions.
 /// - `commands`: Commands to add observers to entities.
 fn fetch_observers(
-    query: Query<(Entity, &HtmlEventBindings), Added<HtmlEventBindings>>,
+    controller_query: Query<&HtmlSource, With<HtmlSource>>,
+    query: Query<(Entity, &HtmlEventBindings, &Widget), Added<HtmlEventBindings>>,
     registry: Res<HtmlFunctionRegistry>,
     mut commands: Commands
 ) {
-    for (entity, bindings) in query.iter() {
-        if let Some(name) = &bindings.onclick {
-            if let Some(system) = registry.click.get(name) {
-                commands.entity(entity).observe(system.clone());
+    for (entity, bindings, widget) in query.iter() {
+        for source in controller_query.iter() {
+            if let Some(controller) = source.controller.clone() {
+                if let Some(widget_con) = widget.0.clone() {
+                    if !controller.eq(&widget_con) {
+                        return;
+                    }
+                    
+                    if !exist_controller(&controller) {
+                        error!("Controller path {} not found", controller);
+                        return;
+                    }
+                }
             }
-        }
+            if let Some(name) = &bindings.onclick {
+                if let Some(system) = registry.click.get(name) {
+                    commands.entity(entity).observe(system.clone());
+                }
+            }
 
-        if let Some(name) = &bindings.onmouseenter {
-            if let Some(system) = registry.over.get(name) {
-                commands.entity(entity).observe(system.clone());
+            if let Some(name) = &bindings.onmouseenter {
+                if let Some(system) = registry.over.get(name) {
+                    commands.entity(entity).observe(system.clone());
+                }
             }
-        }
 
-        if let Some(name) = &bindings.onmouseleave {
-            if let Some(system) = registry.out.get(name) {
-                commands.entity(entity).observe(system.clone());
+            if let Some(name) = &bindings.onmouseleave {
+                if let Some(system) = registry.out.get(name) {
+                    commands.entity(entity).observe(system.clone());
+                }
             }
-        }
-        
-        if let Some(name) = &bindings.onupdate {
-            if let Some(system) = registry.update.get(name) {
-                commands.entity(entity).observe(system.clone());
+
+            if let Some(name) = &bindings.onupdate {
+                if let Some(system) = registry.update.get(name) {
+                    commands.entity(entity).observe(system.clone());
+                }
             }
         }
     }
+}
+
+fn exist_controller(controller: &str) -> bool {
+    let path = Path::new(controller);
+    path.exists()
 }

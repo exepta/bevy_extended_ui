@@ -92,7 +92,7 @@ impl UiRegistry {
     /// * `name` - The name under which the UI source will be registered.
     /// * `source` - The HTML source data.
     pub fn add(&mut self, name: String, source: HtmlSource) {
-        self.collection.insert(name.clone(), HtmlSource { source: source.source.clone(), source_id: name.clone() });
+        self.collection.insert(name.clone(), HtmlSource { source: source.source.clone(), source_id: name.clone(), ..default() });
     }
 
     /// Adds a UI source and marks it as currently in use.
@@ -102,7 +102,7 @@ impl UiRegistry {
     /// * `name` - The name to register and use.
     /// * `source` - The HTML source data.
     pub fn add_and_use(&mut self, name: String, source: HtmlSource) {
-        self.add(name.clone(), HtmlSource { source: source.source.clone(), source_id: name.clone() });
+        self.add(name.clone(), HtmlSource { source: source.source.clone(), source_id: name.clone(), ..default() });
         self.use_ui(&name);
     }
 
