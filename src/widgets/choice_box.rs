@@ -168,7 +168,7 @@ fn internal_node_creation_system(
                             BorderColor::default(),
                             BorderRadius::default(),
                             ZIndex::default(),
-                            state,
+                            state.clone(),
                             IgnoreParentState,
                             option.clone(),
                             css_source.clone(),
@@ -196,7 +196,7 @@ fn internal_node_creation_system(
                                             ..default()
                                         },
                                         ZIndex::default(),
-                                        UIWidgetState::default(),
+                                        state.clone(),
                                         IgnoreParentState,
                                         css_source.clone(),
                                         CssClass(vec![String::from("option-icon"), String::from("option-text")]),
@@ -220,7 +220,7 @@ fn internal_node_creation_system(
                                     TextFont::default(),
                                     TextLayout::default(),
                                     ZIndex::default(),
-                                    UIWidgetState::default(),
+                                    state.clone(),
                                     IgnoreParentState,
                                     css_source.clone(),
                                     CssClass(vec![String::from("option-text")]),
@@ -484,24 +484,31 @@ fn on_internal_cursor_leave(
 /// - Optional: `UIWidgetState::focused`
 fn on_internal_option_click(
     trigger: Trigger<Pointer<Click>>,
-    mut option_query: Query<(Entity, &mut UIWidgetState, &ChoiceOption, &BindToID), (With<ChoiceOptionBase>, Without<ChoiceBox>)>,
+    mut option_query: Query<(Entity, &mut UIWidgetState, &ChoiceOption, &BindToID, &Children), (With<ChoiceOptionBase>, Without<ChoiceBox>)>,
     mut parent_query: Query<(Entity, &mut UIWidgetState, &UIGenID, &mut ChoiceBox), (With<ChoiceBox>, Without<ChoiceOptionBase>)>,
     mut selected_query: Query<(&BindToID, &Children), With<SelectedOptionBase>>,
     mut text_query: Query<&mut Text>,
+    mut inner_query: Query<&mut UIWidgetState, (Without<ChoiceOptionBase>,  Without<ChoiceBox>)>,
 ) {
     let clicked_entity = trigger.target;
 
 
     let (clicked_parent_id, clicked_option_text, clicked_option_icon) =
-        if let Ok((_, _, option, bind_id)) = option_query.get(clicked_entity) {
+        if let Ok((_, _, option, bind_id, _)) = option_query.get(clicked_entity) {
             (bind_id.0.clone(), option.text.clone(), option.icon_path.clone())
         } else {
             return;
         };
 
-    for (entity, mut state, _, bind_id) in option_query.iter_mut() {
+    for (entity, mut state, _, bind_id, children) in option_query.iter_mut() {
         if bind_id.0 == clicked_parent_id {
             state.checked = entity == clicked_entity;
+
+            for child in children.iter() {
+                if let Ok(mut inner_state) = inner_query.get_mut(child) {
+                    inner_state.checked = state.checked;
+                }
+            }
         }
     }
 
@@ -513,7 +520,7 @@ fn on_internal_option_click(
 
 
             if clicked_option_text.is_empty() && clicked_option_icon.is_none() {
-                if let Ok((_, mut state, _, _)) = option_query.get_mut(clicked_entity) {
+                if let Ok((_, mut state, _, _, _)) = option_query.get_mut(clicked_entity) {
                     state.focused = false;
                 }
             }

@@ -187,33 +187,16 @@ checkbox .check-text {
 
 progressbar {
     width: 100%;
-    height: 10px;
-    background: rgba(106, 0, 255, 0.2);
-    border-radius: 5px;
-}
-
-progressbar .progress {
-    width: 20%;
-    height: 100%;
-    background: #6a00ff;
-    border-radius: 5px;
 }
 
 select {
     width: 100%;
-    height: 55px;
-    border-radius: 5px 0;
-    border: 2px #d4d4f3;
-    color: #d4d4f3;
-    z-index: 1;
 }
 
 select .option-selected .option-sel-text {
     color: #323436;
-    font-size: 14px;
 }
 
 select .option-drop-box .option-drop-icon {
     color: #323436;
-    font-size: 14px;
 }
