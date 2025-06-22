@@ -10,12 +10,12 @@ use crate::styling::{Background, FontVal, Radius, Style};
 
 /// Loads a CSS file and parses it into a [`HashMap`] of selectors to [`Style`] structs.
 ///
-/// This function reads a `.css` file from disk, parses its rules, and converts each supported
+/// This function reads a `.css` file from the disk, parses its rules, and converts each supported
 /// CSS property into a Bevy-compatible [`Style`] representation. These styles can later be applied
 /// to UI nodes.
 ///
 /// # Parameters
-/// - `path`: A path to the CSS file. If empty, falls back to the default path `"assets/internal.css"`.
+/// - `path`: A path to the CSS file. If empty, it falls back to the default path `"assets/internal.css"`.
 ///
 /// # Returns
 /// - `Ok(HashMap<selector, Style>)` on success, where each key is a full CSS selector (e.g. `#login:hover`)
@@ -38,6 +38,7 @@ pub fn load_css(path: &str) -> Result<HashMap<String, Style>, String> {
     if !path.is_empty() {
         internal_path = path;
     }
+    
     let css = match fs::read_to_string(internal_path) {
         Ok(content) => content,
         Err(err) => {
@@ -53,14 +54,29 @@ pub fn load_css(path: &str) -> Result<HashMap<String, Style>, String> {
             return Ok(HashMap::new());
         }
     };
-    
+
+    let mut css_vars = HashMap::new();
     let mut style_map = HashMap::new();
+
     for rule in &stylesheet.rules.0 {
         if let CssRule::Style(style_rule) = rule {
             let selector = match style_rule.selectors.to_css_string(PrinterOptions::default()) {
                 Ok(s) => s,
                 Err(_) => continue,
             };
+
+            if selector.trim() == ":root" {
+                for property in &style_rule.declarations.declarations {
+                    let property_id = property.property_id();
+                    let name = property_id.name();
+                    if name.starts_with("--") {
+                        if let Ok(value) = property.value_to_css_string(PrinterOptions::default()) {
+                            css_vars.insert(name.to_string(), value);
+                        }
+                    }
+                }
+                continue;
+            }
 
             let mut style = Style::default();
             for property in &style_rule.declarations.declarations {
@@ -71,9 +87,17 @@ pub fn load_css(path: &str) -> Result<HashMap<String, Style>, String> {
                     Err(_) => continue,
                 };
 
-                apply_property_to_style(&mut style, name, &value);
+                // check for var(...)
+                let mut resolved_value = value.clone();
+                if let Some(var_name) = value.strip_prefix("var(").and_then(|s| s.strip_suffix(")")) {
+                    if let Some(var_value) = css_vars.get(var_name.trim()) {
+                        resolved_value = var_value.clone();
+                    }
+                }
+
+                apply_property_to_style(&mut style, name, &resolved_value);
             }
-            
+
             style_map.insert(selector, style);
         }
     }
@@ -278,7 +302,7 @@ pub fn convert_to_val(value: String) -> Option<Val> {
     val
 }
 
-/// Converts a numeric string into an [`i32`], if the format is valid.
+/// Converts a numeric string into an [`i32`] if the format is valid.
 ///
 /// # Parameters
 /// - `value`: A [`String`] containing an integer, optionally negative (e.g. `"42"`, `"-10"`).
@@ -561,7 +585,7 @@ pub fn convert_to_radius(value: String) -> Option<Radius> {
     })
 }
 
-/// Converts a CSS shorthand (e.g. `margin`, `padding`) into a Bevy [`UiRect`].
+/// Converts CSS shorthand (e.g. `margin`, `padding`) into a Bevy [`UiRect`].
 ///
 /// Accepts 1–4 values:
 /// - 1 value → all sides
@@ -626,7 +650,7 @@ pub fn convert_to_ui_rect(value: String) -> Option<UiRect> {
 /// - 1 value: x, y, blur, and spread all set to the same value.
 /// - 2 values: x and y set; blur and spread default to 0.
 /// - 3 values: x, y, blur set; spread defaults to 0.
-/// - 4 values: x, y, blur, and spread all set.
+/// - 4 values: x, y, blur, and spread all sets.
 ///
 /// If the input is malformed or missing required parts, returns `None`.
 ///
@@ -774,7 +798,7 @@ pub fn convert_to_bevy_justify_content(value: String) -> Option<JustifyContent> 
  * Recognized values include: "start", "flex-start", "end", "flex-end", "center",
  * "baseline", and "stretch".
  *
- * @param value The CSS align-items value as a string slice.
+ * @param value The CSS align-item value as a string slice.
  * @return Some(AlignItems) if the value is recognized, None otherwise.
  */
 pub fn convert_to_bevy_align_items(value: String) -> Option<AlignItems> {
@@ -869,7 +893,7 @@ pub fn convert_to_bevy_grid_flow(value: String) -> Option<GridAutoFlow> {
 /**
  * Converts a CSS grid placement string into a `GridPlacement` enum.
  *
- * Supports values such as:
+ * Supports values such as
  * - "span N" (where N is a positive integer),
  * - "start/end" (two positive integers separated by a slash),
  * - or a single positive integer (start).
