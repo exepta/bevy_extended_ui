@@ -13,7 +13,7 @@ pub struct ImageWidget;
 
 impl Plugin for ImageWidget {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, internal_node_creation_system);
+        app.add_systems(Update, (internal_node_creation_system, update_src));
     }
 }
 
@@ -93,6 +93,58 @@ fn internal_node_creation_system(
         )).observe(on_internal_click)
             .observe(on_internal_cursor_entered)
             .observe(on_internal_cursor_leave);
+    }
+}
+
+/// Updates the `ImageNode` texture for UI widgets when the associated `Img` component changes.
+///
+/// <p>
+/// This system listens for changes to the `Img` component and updates the corresponding
+/// `ImageNode` by loading the image from the specified `src` path. If the path is already
+/// cached, the existing handle is reused. The `UIWidgetState` is also accessed to allow future
+/// extensions (e.g., reacting to image changes).
+/// </p>
+///
+/// # Parameters
+/// - `query`: A query that retrieves all entities with mutable access to `ImageNode`,
+///   `UIWidgetState`, and an `Img` component, filtered by the `Changed<Img>` condition.
+/// - `asset_server`: A handle to Bevy's asset server for loading images from disk.
+/// - `image_cache`: A mutable reference to an image cache used to avoid reloading assets.
+/// - `images`: A mutable reference to the global asset collection of loaded `Image` assets.
+///
+/// # Behavior
+/// For each changed `Img`:
+/// - If the `src` field is `Some`, the image is loaded or reused from cache.
+/// - The `ImageNode` is updated with the new image handle.
+/// - The `UIWidgetState` is accessed (currently unchanged, but ready for future use).
+///
+/// # See Also
+/// - [`get_or_load_image`]: Utility function to cache or load images from a path.
+/// - [`ImageNode`]: Component that defines image appearance in the UI.
+/// - [`Img`]: Component holding the `src` image path for UI image widgets.
+fn update_src(
+    mut query: Query<(&mut ImageNode, &mut UIWidgetState, &Img), (With<Img>, Changed<Img>)>,
+    asset_server: Res<AssetServer>,
+    mut image_cache: ResMut<ImageCache>,
+    mut images: ResMut<Assets<Image>>,
+) {
+    for (image, mut state, img) in query.iter_mut() {
+        let mut current_img = image;
+        if let Some(path) = img.src.clone() {
+            let handle = get_or_load_image(
+                path.as_str(),
+                &mut image_cache,
+                &mut images,
+                &asset_server,
+            );
+
+            *current_img = ImageNode {
+                image: handle,
+                ..default()
+            };
+            
+            state.checked = state.checked;
+        }
     }
 }
 
