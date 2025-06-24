@@ -56,6 +56,7 @@ fn internal_node_creation_system(
             BackgroundColor::default(),
             ImageNode::default(),
             ZIndex::default(),
+            Pickable::default(),
             css_source,
             TagName("body".to_string()),
             RenderLayers::layer(*layer),
