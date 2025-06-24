@@ -58,7 +58,8 @@ pub fn update_widget_styles_system(
         Option<&mut TextFont>,
         Option<&mut TextLayout>,
         Option<&mut ImageNode>,
-        Option<&mut ZIndex>
+        Option<&mut ZIndex>,
+        Option<&mut Pickable>
     )>,
     asset_server: Res<AssetServer>,
     mut image_cache: ResMut<ImageCache>,
@@ -104,7 +105,7 @@ pub fn update_widget_styles_system(
         
         if let Ok((
                       node, background, border_color, border_radius, box_shadow,
-                      text_color, text_font, text_layout, image_node, z_index
+                      text_color, text_font, text_layout, image_node, z_index, pick_able
                   )) = style_query.get_mut(entity)
         {
             apply_style_to_node(&final_style, node);
@@ -170,6 +171,10 @@ pub fn update_widget_styles_system(
 
             if let Some(mut index) = z_index {
                 index.0 = final_style.z_index.unwrap_or(0);
+            }
+            
+            if let Some(mut pick) = pick_able {
+                *pick = final_style.pointer_events.unwrap_or_default();
             }
         }
     }

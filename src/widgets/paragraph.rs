@@ -48,6 +48,7 @@ fn internal_node_creation_system(
             TextFont::default(),
             TextLayout::default(),
             ZIndex::default(),
+            Pickable::default(),
             css_source,
             TagName("p".to_string()),
             RenderLayers::layer(*layer),

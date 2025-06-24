@@ -168,6 +168,7 @@ pub struct Style {
     pub gap: Option<Val>,
     pub text_wrap: Option<LineBreak>,
     pub z_index: Option<i32>,
+    pub pointer_events: Option<Pickable>
 }
 
 impl Style {
@@ -223,6 +224,7 @@ impl Style {
         if other.gap.is_some()                   { self.gap = other.gap.clone(); }
         if other.text_wrap.is_some()             { self.text_wrap = other.text_wrap.clone(); }
         if other.z_index.is_some()               { self.z_index = other.z_index.clone(); }
+        if other.pointer_events.is_some()        { self.pointer_events = other.pointer_events.clone(); }
     }
 }
 

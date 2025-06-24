@@ -84,7 +84,8 @@ fn internal_node_creation_system(
             RenderLayers::layer(*layer),
             SliderNeedInit,
             SliderBase,
-        )).observe(on_click_track)
+        )).insert(Pickable::default())
+            .observe(on_click_track)
             .observe(on_drag_track)
             .observe(on_internal_click)
             .observe(on_internal_cursor_entered)

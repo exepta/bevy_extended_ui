@@ -85,6 +85,7 @@ fn internal_node_creation_system(
             BorderRadius::default(),
             BoxShadow::new(Colored::TRANSPARENT, Val::Px(0.), Val::Px(0.), Val::Px(0.), Val::Px(0.)),
             ZIndex::default(),
+            Pickable::default(),
             css_source,
             TagName("img".to_string()),
             RenderLayers::layer(*layer),

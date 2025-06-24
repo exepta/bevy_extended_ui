@@ -264,6 +264,7 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
 
         "text-wrap" => style.text_wrap = convert_to_bevy_line_break(value.to_string()),
         "z-index" => style.z_index = convert_to_i32(value.to_string()),
+        "pointer-events" => style.pointer_events = convert_to_bevy_pick_able(value.to_string()),
 
         _ => {}
     }
@@ -868,6 +869,37 @@ pub fn convert_to_bevy_line_break(value: String) -> Option<LineBreak> {
         "pretty" | "balance" => { Some(LineBreak::WordBoundary) },
         "unset" => { Some(LineBreak::AnyCharacter) },
         _=> { Some(LineBreak::default()) }
+    }
+}
+
+/// Converts a string value into a `Pickable` component used by Bevy UI.
+///
+/// <p>
+/// This function interprets the input string and returns an appropriate `Pickable`
+/// configuration. If the value is `"none"`, it returns `Pickable::IGNORE` to disable pointer
+/// interactions. For all other values, it returns the default `Pickable` behavior.
+/// </p>
+///
+/// # Parameters
+/// - `value`: A `String` containing the desired pickable mode (e.g., `"none"`, `"auto"`, etc.).
+///
+/// # Returns
+/// An `Option<Pickable>`:
+/// - `Some(Pickable::IGNORE)` if the value is `"none"`
+/// - `Some(Pickable::default())` for any other input
+///
+/// # Example
+/// ```
+/// use bevy::prelude::Pickable;
+/// use bevy_extended_ui::styling::css::convert_to_bevy_pick_able;
+/// let pickable = convert_to_bevy_pick_able("none".to_string());
+/// assert_eq!(pickable, Some(Pickable::IGNORE));
+/// ```
+pub fn convert_to_bevy_pick_able(value: String) -> Option<Pickable> {
+    let trimmed = value.trim();
+    match trimmed { 
+        "none" => { Some(Pickable::IGNORE) }
+        _=> { Some(Pickable::default()) }
     }
 }
 
