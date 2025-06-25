@@ -3,7 +3,7 @@ use std::fs;
 use bevy::prelude::*;
 use kuchiki::NodeRef;
 use kuchiki::traits::TendrilSink;
-use crate::html::{HtmlSource, HtmlMeta, HtmlStructureMap, HtmlWidgetNode, HtmlEventBindings};
+use crate::html::{HtmlSource, HtmlMeta, HtmlStructureMap, HtmlWidgetNode, HtmlEventBindings, HtmlStates};
 use crate::styling::IconPlace;
 use crate::widgets::{Button, CheckBox, ChoiceBox, ChoiceOption, Div, Headline, HeadlineType, HtmlBody, Img, InputCap, InputField, InputType, Paragraph, ProgressBar, Slider, Widget};
 
@@ -153,6 +153,12 @@ fn parse_html_node(
             .map(|s| s.split_whitespace().map(str::to_string).collect()),
         style: attributes.get("style").map(|s| s.to_string()),
     };
+
+    let states = HtmlStates {
+        disabled: attributes.contains("disabled"),
+        readonly: attributes.contains("readonly"),
+        hidden: attributes.contains("hidden"),
+    };
     
     let functions = HtmlEventBindings {
         onclick: attributes.get("onclick").map(|s| s.to_string()),
@@ -191,7 +197,7 @@ fn parse_html_node(
                 icon_path,
                 icon_place,
                 ..default()
-            }, meta, functions, widget.clone()))
+            }, meta, states, functions, widget.clone()))
         },
         "input" => {
             // Map <input> to InputField with associated label and attributes
@@ -225,7 +231,7 @@ fn parse_html_node(
                 icon_path: icon,
                 cap_text_at: cap,
                 ..default()
-            }, meta, functions, widget.clone()))
+            }, meta, states, functions, widget.clone()))
         },
         "checkbox" => {
             // Checkbox with label and optional icon
@@ -236,7 +242,7 @@ fn parse_html_node(
                 label,
                 icon_path: icon,
                 ..default()
-            }, meta, functions, widget.clone()))
+            }, meta, states, functions, widget.clone()))
         },
         "select" => {
             // Parse dropdown options and selected value
@@ -278,7 +284,7 @@ fn parse_html_node(
                     options,
                     ..default()
                 },
-                meta, functions, widget.clone()))
+                meta, states, functions, widget.clone()))
         },
         "slider" => {
             // Parse slider attributes: min, max, value, step
@@ -310,7 +316,7 @@ fn parse_html_node(
                     step,
                     ..default()
                 },
-                meta, functions, widget.clone()))
+                meta, states, functions, widget.clone()))
         },
         "progressbar" => {
             // Parse slider attributes: min, max, value
@@ -335,7 +341,7 @@ fn parse_html_node(
                     min,
                     max,
                     ..default()
-                }, meta, functions, widget.clone()))
+                }, meta, states, functions, widget.clone()))
         },
         "h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
             // Map HTML heading tags to Headline widget with correct level
@@ -357,7 +363,7 @@ fn parse_html_node(
                     h_type,
                     ..default()
                 },
-                meta, functions, widget.clone()))
+                meta, states, functions, widget.clone()))
         },
         "p" => {
             // Paragraph with text content
@@ -367,7 +373,7 @@ fn parse_html_node(
                     text,
                     ..default()
                 },
-                meta, functions, widget.clone()))
+                meta, states, functions, widget.clone()))
         },
         "img" => {
             let src = attributes.get("src").unwrap_or("").to_string();
@@ -379,7 +385,7 @@ fn parse_html_node(
                     alt,
                     ..default()
                 },
-                meta, functions, widget.clone()))
+                meta, states, functions, widget.clone()))
         },
         "div" => {
             // Parse children recursively, build Div container
@@ -389,7 +395,7 @@ fn parse_html_node(
                     children.push(parsed);
                 }
             }
-            Some(HtmlWidgetNode::Div(Div::default(), meta, children, functions, widget.clone()))
+            Some(HtmlWidgetNode::Div(Div::default(), meta, states, children, functions, widget.clone()))
         },
         "body" => {
             // Top-level HtmlBody node with all children parsed
@@ -401,7 +407,7 @@ fn parse_html_node(
                 bind_to_html: Some(key.clone()),
                 source: Some(html.clone()),
                 ..default()
-            }, meta, children, functions, widget.clone()))
+            }, meta, states, children, functions, widget.clone()))
         }
         // Unsupported or unhandled tags return None
         _ => None,

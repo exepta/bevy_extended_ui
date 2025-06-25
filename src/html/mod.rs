@@ -133,32 +133,39 @@ pub struct HtmlMeta {
     pub style: Option<String>,
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct HtmlStates {
+    pub hidden: bool,
+    pub disabled: bool,
+    pub readonly: bool
+}
+
 /// An enum representing a node in the HTML DOM hierarchy,
 /// mapped to Bevy UI components.
 #[derive(Debug, Clone)]
 pub enum HtmlWidgetNode {
     /// A `<button>` element.
-    Button(Button, HtmlMeta, HtmlEventBindings, Widget),
+    Button(Button, HtmlMeta, HtmlStates, HtmlEventBindings, Widget),
     /// An `<input type="text">` field.
-    Input(InputField, HtmlMeta, HtmlEventBindings, Widget),
+    Input(InputField, HtmlMeta, HtmlStates, HtmlEventBindings, Widget),
     /// A checkbox `<input type="checkbox">`.
-    CheckBox(CheckBox, HtmlMeta, HtmlEventBindings, Widget),
+    CheckBox(CheckBox, HtmlMeta, HtmlStates, HtmlEventBindings, Widget),
     /// A dropdown or select box.
-    ChoiceBox(ChoiceBox, HtmlMeta, HtmlEventBindings, Widget),
+    ChoiceBox(ChoiceBox, HtmlMeta, HtmlStates, HtmlEventBindings, Widget),
     /// A img element (`<img>`).
-    Img(Img, HtmlMeta, HtmlEventBindings, Widget),
+    Img(Img, HtmlMeta, HtmlStates, HtmlEventBindings, Widget),
     /// A img element (`<img>`).
-    ProgressBar(ProgressBar, HtmlMeta, HtmlEventBindings, Widget),
+    ProgressBar(ProgressBar, HtmlMeta, HtmlStates, HtmlEventBindings, Widget),
     /// A heading element (`<h1>`-`<h6>`).
-    Headline(Headline, HtmlMeta, HtmlEventBindings, Widget),
+    Headline(Headline, HtmlMeta, HtmlStates, HtmlEventBindings, Widget),
     /// A paragraph `<p>`.
-    Paragraph(Paragraph, HtmlMeta, HtmlEventBindings, Widget),
+    Paragraph(Paragraph, HtmlMeta, HtmlStates, HtmlEventBindings, Widget),
     /// A slider input (range).
-    Slider(Slider, HtmlMeta, HtmlEventBindings, Widget),
+    Slider(Slider, HtmlMeta, HtmlStates, HtmlEventBindings, Widget),
     /// A `<div>` container element with nested child nodes.
-    Div(Div, HtmlMeta, Vec<HtmlWidgetNode>, HtmlEventBindings, Widget),
+    Div(Div, HtmlMeta, HtmlStates, Vec<HtmlWidgetNode>, HtmlEventBindings, Widget),
     /// The root `<body>` element of the HTML structure.
-    HtmlBody(HtmlBody, HtmlMeta, Vec<HtmlWidgetNode>, HtmlEventBindings, Widget),
+    HtmlBody(HtmlBody, HtmlMeta, HtmlStates, Vec<HtmlWidgetNode>, HtmlEventBindings, Widget),
 }
 
 /// A resource that holds all parsed HTML structures keyed by identifier.
