@@ -1,13 +1,14 @@
 use bevy::prelude::*;
-use crate::html::{HtmlEventBindings, HtmlMeta, HtmlStructureMap, HtmlWidgetNode};
+use crate::html::{HtmlEventBindings, HtmlMeta, HtmlStates, HtmlStructureMap, HtmlWidgetNode};
 use crate::styling::convert::{CssClass, CssID, CssSource};
+use crate::UIWidgetState;
 use crate::widgets::Widget;
 
 /// A plugin that spawns Bevy UI entities from parsed HTML node structures.
 pub struct HtmlBuilderSystem;
 
 impl Plugin for HtmlBuilderSystem {
-    /// Registers the HTML builder system to run whenever the HTML structure map resource changes.
+    /// Registers the HTML builder system to run whenever the HTML structure maps resource changes.
     fn build(&self, app: &mut App) {
         app.add_systems(Update, build_html_source.run_if(resource_changed::<HtmlStructureMap>));
     }
@@ -43,43 +44,43 @@ fn spawn_widget_node(
     parent: Option<Entity>,
 ) -> Entity {
     let entity = match node {
-        HtmlWidgetNode::Button(button, meta, functions, widget) => {
-            spawn_with_meta(commands, button.clone(), meta, functions, widget)
+        HtmlWidgetNode::Button(button, meta, states, functions, widget) => {
+            spawn_with_meta(commands, button.clone(), meta, states, functions, widget)
         }
-        HtmlWidgetNode::Input(input, meta, functions, widget) => {
-            spawn_with_meta(commands, input.clone(), meta, functions, widget)
+        HtmlWidgetNode::Input(input, meta, states, functions, widget) => {
+            spawn_with_meta(commands, input.clone(), meta, states, functions, widget)
         }
-        HtmlWidgetNode::Headline(headline, meta, functions, widget) => {
-            spawn_with_meta(commands, headline.clone(), meta, functions, widget)
+        HtmlWidgetNode::Headline(headline, meta, states, functions, widget) => {
+            spawn_with_meta(commands, headline.clone(), meta, states, functions, widget)
         }
-        HtmlWidgetNode::Img(img, meta, functions, widget) => {
-            spawn_with_meta(commands, img.clone(), meta, functions, widget)
+        HtmlWidgetNode::Img(img, meta, states, functions, widget) => {
+            spawn_with_meta(commands, img.clone(), meta, states, functions, widget)
         }
-        HtmlWidgetNode::ProgressBar(progress_bar, meta, functions, widget) => {
-            spawn_with_meta(commands, progress_bar.clone(), meta, functions, widget)
+        HtmlWidgetNode::ProgressBar(progress_bar, meta, states, functions, widget) => {
+            spawn_with_meta(commands, progress_bar.clone(), meta, states, functions, widget)
         }
-        HtmlWidgetNode::Paragraph(paragraph, meta, functions, widget) => {
-            spawn_with_meta(commands, paragraph.clone(), meta, functions, widget)
+        HtmlWidgetNode::Paragraph(paragraph, meta, states, functions, widget) => {
+            spawn_with_meta(commands, paragraph.clone(), meta, states, functions, widget)
         }
-        HtmlWidgetNode::CheckBox(checkbox, meta, functions, widget) => {
-            spawn_with_meta(commands, checkbox.clone(), meta, functions, widget)
+        HtmlWidgetNode::CheckBox(checkbox, meta, states, functions, widget) => {
+            spawn_with_meta(commands, checkbox.clone(), meta, states, functions, widget)
         }
-        HtmlWidgetNode::ChoiceBox(choice_box, meta, functions, widget) => {
-            spawn_with_meta(commands, choice_box.clone(), meta, functions, widget)
+        HtmlWidgetNode::ChoiceBox(choice_box, meta, states, functions, widget) => {
+            spawn_with_meta(commands, choice_box.clone(), meta, states, functions, widget)
         }
-        HtmlWidgetNode::Slider(slider, meta, functions, widget) => {
-            spawn_with_meta(commands, slider.clone(), meta, functions, widget)
+        HtmlWidgetNode::Slider(slider, meta, states, functions, widget) => {
+            spawn_with_meta(commands, slider.clone(), meta, states, functions, widget)
         }
-        HtmlWidgetNode::Div(div, meta, children, functions,widget) => {
-            let entity = spawn_with_meta(commands, div.clone(), meta, functions, widget);
+        HtmlWidgetNode::Div(div, meta, states, children, functions,widget) => {
+            let entity = spawn_with_meta(commands, div.clone(), meta, states, functions, widget);
             for child in children {
                 let child_entity = spawn_widget_node(commands, child, asset_server, Some(entity));
                 commands.entity(entity).add_child(child_entity);
             }
             entity
         }
-        HtmlWidgetNode::HtmlBody(body, meta, children, functions, widget) => {
-            let entity = spawn_with_meta(commands, body.clone(), meta, functions, widget);
+        HtmlWidgetNode::HtmlBody(body, meta, states, children, functions, widget) => {
+            let entity = spawn_with_meta(commands, body.clone(), meta, states, functions, widget);
             for child in children {
                 let child_entity = spawn_widget_node(commands, child, asset_server, Some(entity));
                 commands.entity(entity).add_child(child_entity);
@@ -106,9 +107,20 @@ fn spawn_with_meta<T: Component>(
     commands: &mut Commands,
     component: T,
     meta: &HtmlMeta,
+    states: &HtmlStates,
     functions: &HtmlEventBindings,
     widget: &Widget
 ) -> Entity {
+    let mut visible = Visibility::Inherited;
+    let mut ui_state = UIWidgetState::default();
+    
+    if states.hidden {
+        visible = Visibility::Hidden;
+    }
+    
+    ui_state.readonly = states.readonly;
+    ui_state.disabled = states.disabled;
+    
     commands.spawn((
         component,
         functions.clone(),
@@ -117,5 +129,7 @@ fn spawn_with_meta<T: Component>(
         CssSource(meta.css.clone()),
         CssClass(meta.class.clone().unwrap_or_default()),
         CssID(meta.id.clone().unwrap_or_default()),
+        ui_state,
+        visible
     )).id()
 }
