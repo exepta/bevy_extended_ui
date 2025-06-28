@@ -6,6 +6,7 @@ use bevy::prelude::*;
 use crate::html::builder::HtmlBuilderSystem;
 use crate::html::converter::HtmlConverterSystem;
 use crate::observer::time_tick_trigger::TimeTick;
+use crate::observer::widget_init_trigger::WidgetInit;
 use crate::styling::css::apply_property_to_style;
 use crate::styling::Style;
 use crate::widgets::{CheckBox, Div, InputField, Button, HtmlBody, ChoiceBox, Slider, Headline, Paragraph, Img, ProgressBar, Widget};
@@ -214,6 +215,19 @@ type OutObserverFn = fn(Trigger<Pointer<Out>>, Commands);
 /// Due to the frequency of these events, observers should be designed for efficient execution.
 type UpdateObserverFn = fn(Trigger<TimeTick>, Commands);
 
+/// Type alias for a load observer function used to handle [`WidgetInit`] events.
+///
+/// This function type defines a callback invoked when a widget initialization event is triggered,
+/// allowing custom logic to run during widget setup.
+///
+/// # Parameters
+/// - `Trigger<WidgetInit>`: The trigger object carrying the [`WidgetInit`] event data.
+/// - `Commands`: The [`Commands`] used to issue additional actions or spawn entities.
+///
+/// # See also
+/// [`WidgetInit`], [`Commands`]
+type LoadObserverFn = fn(Trigger<WidgetInit>, Commands);
+
 /// Registry resource that maps event handler names to their observer functions.
 ///
 /// Holds hash maps for click, mouse over, mouse out, and update events.
@@ -231,6 +245,8 @@ pub struct HtmlFunctionRegistry {
 
     /// Map of function names to update event observer functions.
     pub update: HashMap<String, UpdateObserverFn>,
+
+    pub load: HashMap<String, LoadObserverFn>,
 }
 
 /// Component representing HTML event bindings on an entity.
@@ -253,6 +269,8 @@ pub struct HtmlEventBindings {
 
     /// Optional function name to call on update event.
     pub onupdate: Option<String>,
+
+    pub onload: Option<String>,
 }
 
 /// The main plugin that registers all HTML UI systems and resources.

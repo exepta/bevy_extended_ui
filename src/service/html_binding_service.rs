@@ -65,6 +65,12 @@ fn fetch_observers(
                     commands.entity(entity).observe(system.clone());
                 }
             }
+
+            if let Some(name) = &bindings.onload {
+                if let Some(system) = registry.load.get(name) {
+                    commands.entity(entity).observe(system.clone());
+                }
+            }
         }
     }
 }

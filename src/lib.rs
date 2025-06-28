@@ -5,7 +5,7 @@ use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use crate::html::HtmlPlugin;
 use crate::observer::ObserverRegistryPlugin;
-use crate::registry::{RegistryPlugin, UiRegistry};
+use crate::registry::{UiInitResource, RegistryPlugin, UiRegistry};
 use crate::service::ServicePlugin;
 use crate::styling::StylingPlugin;
 use crate::widgets::WidgetPlugin;
@@ -131,6 +131,7 @@ impl Plugin for ExtendedUiPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ExtendedUiConfiguration>();
         app.init_resource::<ImageCache>();
+        app.init_resource::<UiInitResource>();
         app.init_resource::<UiRegistry>();
         app.init_resource::<CurrentWidgetState>();
         app.register_type::<UIGenID>();

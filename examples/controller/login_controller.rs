@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use bevy_extended_ui::html::{HtmlEventBindings, HtmlFunctionRegistry};
 use bevy_extended_ui::observer::time_tick_trigger::TimeTick;
+use bevy_extended_ui::observer::widget_init_trigger::WidgetInit;
 use bevy_extended_ui::widgets::ProgressBar;
 
 #[derive(Resource, Clone, Debug, PartialEq, Eq, Default)]
@@ -20,6 +21,10 @@ fn register_functions(mut functions: ResMut<HtmlFunctionRegistry>) {
     functions.click.insert("username".to_string(), username);
     functions.over.insert("hover".to_string(), hover);
     functions.update.insert("progress".to_string(), progress);
+    functions.load.insert("test".to_string(), test);
+    functions.load.insert("test_2".to_string(), test_2);
+    functions.load.insert("test_3".to_string(), test_3);
+    functions.load.insert("test_4".to_string(), test_4);
 }
 
 fn login(event: Trigger<Pointer<Click>>, mut commands: Commands) {
@@ -58,4 +63,21 @@ fn progress(event: Trigger<TimeTick>, mut commands: Commands) {
             }
         }
     });
+}
+
+fn test(event: Trigger<WidgetInit>, _commands: Commands) {
+    info!("Load {:?} - 1", event.target);
+}
+
+
+fn test_2(event: Trigger<WidgetInit>, _commands: Commands) {
+    info!("Load {:?} - 2", event.target);
+}
+
+fn test_3(event: Trigger<WidgetInit>, _commands: Commands) {
+    info!("Load {:?} - 3", event.target);
+}
+
+fn test_4(event: Trigger<WidgetInit>, _commands: Commands) {
+    info!("Load {:?} - 4", event.target);
 }
