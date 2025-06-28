@@ -5,7 +5,13 @@ use crate::UIWidgetState;
 use crate::widgets::Widget;
 
 #[derive(Event)]
-pub struct AllWidgetsSpawned;
+struct AllWidgetsSpawned;
+
+#[derive(Resource, Default)]
+struct ShowWidgetsTimer {
+    timer: Timer,
+    active: bool,
+}
 
 /// A plugin that spawns Bevy UI entities from parsed HTML node structures.
 pub struct HtmlBuilderSystem;
@@ -14,8 +20,10 @@ impl Plugin for HtmlBuilderSystem {
     /// Registers the HTML builder system to run whenever the HTML structure maps resource changes.
     fn build(&self, app: &mut App) {
         app.add_event::<AllWidgetsSpawned>();
+        app.insert_resource(ShowWidgetsTimer::default());
         app.add_systems(Update, build_html_source.run_if(resource_changed::<HtmlStructureMap>));
-        app.add_systems(Update, show_all_widgets.after(build_html_source));
+        app.add_systems(Update, show_all_widgets_start.after(build_html_source));
+        app.add_systems(Update, show_all_widgets_finish.after(show_all_widgets_start));
     }
 }
 
@@ -39,15 +47,28 @@ fn build_html_source(
     }
 }
 
-fn show_all_widgets(
+fn show_all_widgets_start(
     mut events: EventReader<AllWidgetsSpawned>,
-    mut query: Query<&mut Visibility, With<Widget>>,
+    mut timer: ResMut<ShowWidgetsTimer>,
 ) {
     for _event in events.read() {
+        timer.timer = Timer::from_seconds(0.1, TimerMode::Once);
+        timer.active = true;
+        debug!("Starting 100ms timer before showing widgets");
+    }
+}
+
+fn show_all_widgets_finish(
+    time: Res<Time>,
+    mut timer: ResMut<ShowWidgetsTimer>,
+    mut query: Query<&mut Visibility, With<Widget>>,
+) {
+    if timer.active && timer.timer.tick(time.delta()).finished() {
         for mut visibility in query.iter_mut() {
             *visibility = Visibility::Inherited;
         }
-        debug!("All widgets are now visible");
+        timer.active = false;
+        debug!("All widgets are now visible after 100ms delay");
     }
 }
 
