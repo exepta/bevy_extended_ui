@@ -245,7 +245,7 @@ pub struct HtmlFunctionRegistry {
 
     /// Map of function names to update event observer functions.
     pub update: HashMap<String, UpdateObserverFn>,
-    
+
     pub load: HashMap<String, LoadObserverFn>,
 }
 
@@ -269,7 +269,7 @@ pub struct HtmlEventBindings {
 
     /// Optional function name to call on update event.
     pub onupdate: Option<String>,
-    
+
     pub onload: Option<String>,
 }
 

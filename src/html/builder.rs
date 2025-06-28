@@ -7,6 +7,9 @@ use crate::widgets::Widget;
 #[derive(Event)]
 struct AllWidgetsSpawned;
 
+#[derive(Component)]
+struct NeedHidden;
+
 #[derive(Resource, Default)]
 struct ShowWidgetsTimer {
     timer: Timer,
@@ -61,7 +64,7 @@ fn show_all_widgets_start(
 fn show_all_widgets_finish(
     time: Res<Time>,
     mut timer: ResMut<ShowWidgetsTimer>,
-    mut query: Query<&mut Visibility, With<Widget>>,
+    mut query: Query<&mut Visibility, (With<Widget>, Without<NeedHidden>)>,
 ) {
     if timer.active && timer.timer.tick(time.delta()).finished() {
         for mut visibility in query.iter_mut() {
@@ -151,17 +154,13 @@ fn spawn_with_meta<T: Component>(
     functions: &HtmlEventBindings,
     widget: &Widget
 ) -> Entity {
-    let mut visible = Visibility::Hidden;
     let mut ui_state = UIWidgetState::default();
     
-    if states.hidden {
-        visible = Visibility::Hidden;
-    }
     
     ui_state.readonly = states.readonly;
     ui_state.disabled = states.disabled;
     
-    commands.spawn((
+    let entity = commands.spawn((
         component,
         functions.clone(),
         widget.clone(),
@@ -170,6 +169,12 @@ fn spawn_with_meta<T: Component>(
         CssClass(meta.class.clone().unwrap_or_default()),
         CssID(meta.id.clone().unwrap_or_default()),
         ui_state,
-        visible
-    )).id()
+        Visibility::Hidden
+    )).id();
+    
+    if states.hidden { 
+        commands.entity(entity).insert(NeedHidden); 
+    }
+
+entity
 }
