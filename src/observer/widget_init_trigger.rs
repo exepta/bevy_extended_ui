@@ -28,19 +28,15 @@ fn init_widget(
     mut ui_init: ResMut<UiInitResource>,
 ) {
     if ui_init.0 {
-        let mut ready = false;
         for (entity, data, vis) in query.iter() {
             commands.trigger_targets(WidgetInit {
                 target: entity,
                 widget_data: data.clone(),
             }, entity);
             if !vis.eq(&Visibility::Hidden) {
-                ready = true;
+                ui_init.0 = false;
             }
         }
         debug!("Init widget successfully");
-        if ready {
-            ui_init.0 = false;
-        }
     }
 }

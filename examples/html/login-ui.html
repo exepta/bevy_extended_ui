@@ -13,11 +13,11 @@
 
         <!-- Input Field with type text and an icon -->
         <label for="username">Username</label>
-        <input id="username" onclick="username" type="text" icon="extended_ui/icons/check-mark.png"/>
+        <input id="username"  onload="test_2" onclick="username" type="text" icon="extended_ui/icons/check-mark.png"/>
 
         <!-- Input Field with type password and an icon -->
         <label for="password">Password</label>
-        <input id="password" type="password" />
+        <input id="password"  onload="test_3" type="password" />
 
         <!-- Remember me -->
         <checkbox id="remember-me">Remember me</checkbox>
@@ -27,7 +27,7 @@
 
         <!-- Login container -->
         <div class="button-container">
-            <button id="login" onclick="login" onmouseenter="hover">
+            <button id="login" onclick="login" onmouseenter="hover"  onload="test_4">
                 <icon src="extended_ui/icons/check-mark.png"></icon>
                 Login
             </button>
