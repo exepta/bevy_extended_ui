@@ -165,6 +165,7 @@ fn parse_html_node(
         onmouseenter: attributes.get("onmouseenter").map(|s| s.to_string()),
         onmouseleave: attributes.get("onmouseleave").map(|s| s.to_string()),
         onupdate: attributes.get("onupdate").map(|s| s.to_string()),
+        onload: attributes.get("onload").map(|s| s.to_string()),
     };
     
     let widget = Widget(html.controller.clone());

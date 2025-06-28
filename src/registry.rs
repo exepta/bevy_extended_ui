@@ -182,6 +182,16 @@ impl UiRegistry {
     }
 }
 
+/// Resource flag used to control whether UI widgets should be initialized.
+///
+/// This resource wraps a single `bool` value indicating whether the widget initialization
+/// logic should run during the next update cycle.
+///
+/// # Fields
+/// - `0`: A `bool` flag. `true` means initialization should run; `false` means no initialization.
+#[derive(Default, Resource, Debug)]
+pub struct UiInitResource(pub bool);
+
 /// Resource tracking the last UI usage name to detect changes.
 #[derive(Resource, Debug)]
 struct LastUiUsage(pub Option<String>);
@@ -215,12 +225,13 @@ impl Plugin for RegistryPlugin {
 fn update_que(
     mut commands: Commands,
     ui_registry: Res<UiRegistry>,
+    mut ui_init: ResMut<UiInitResource>,
     query: Query<(Entity, &HtmlSource), With<HtmlSource>>,
     body_query: Query<Entity, (Without<HtmlSource>, With<HtmlBody>)>,
 ) {
     if let Some(name) = ui_registry.current.clone() {
         if query.is_empty() {
-            spawn_ui_source(&mut commands, &name, &ui_registry);
+            spawn_ui_source(&mut commands, &name, &ui_registry, &mut ui_init);
             return;
         }
 
@@ -235,7 +246,7 @@ fn update_que(
                 commands.entity(body_entity).despawn();
             }
 
-            spawn_ui_source(&mut commands, &name, &ui_registry);
+            spawn_ui_source(&mut commands, &name, &ui_registry, &mut ui_init);
 
             // Despawn outdated UI entity
             commands.entity(entity).despawn();
@@ -259,8 +270,9 @@ fn update_que(
 /// * `commands` - Commands to spawn the UI entity.
 /// * `name` - The name of the UI to spawn.
 /// * `ui_registry` - The UI registry resource.
-fn spawn_ui_source(commands: &mut Commands, name: &str, ui_registry: &UiRegistry) {
+fn spawn_ui_source(commands: &mut Commands, name: &str, ui_registry: &UiRegistry, ui_init: &mut UiInitResource) {
     if let Some(source) = ui_registry.get(name) {
+        ui_init.0 = true;
         commands.spawn((
             Name::new(name.to_string()),
             source.clone(),
