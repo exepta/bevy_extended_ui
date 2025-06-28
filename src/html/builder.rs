@@ -4,13 +4,18 @@ use crate::styling::convert::{CssClass, CssID, CssSource};
 use crate::UIWidgetState;
 use crate::widgets::Widget;
 
+#[derive(Event)]
+pub struct AllWidgetsSpawned;
+
 /// A plugin that spawns Bevy UI entities from parsed HTML node structures.
 pub struct HtmlBuilderSystem;
 
 impl Plugin for HtmlBuilderSystem {
     /// Registers the HTML builder system to run whenever the HTML structure maps resource changes.
     fn build(&self, app: &mut App) {
+        app.add_event::<AllWidgetsSpawned>();
         app.add_systems(Update, build_html_source.run_if(resource_changed::<HtmlStructureMap>));
+        app.add_systems(Update, show_all_widgets.after(build_html_source));
     }
 }
 
@@ -22,13 +27,27 @@ fn build_html_source(
     mut commands: Commands,
     structure_map: Res<HtmlStructureMap>,
     asset_server: Res<AssetServer>,
+    mut event_writer: EventWriter<AllWidgetsSpawned>,
 ) {
     if let Some(active) = structure_map.active.clone() {
         if let Some(structure) = structure_map.html_map.get(active.as_str()) {
             for node in structure {
                 spawn_widget_node(&mut commands, node, &asset_server, None);
             }
+            event_writer.write(AllWidgetsSpawned);
         }
+    }
+}
+
+fn show_all_widgets(
+    mut events: EventReader<AllWidgetsSpawned>,
+    mut query: Query<&mut Visibility, With<Widget>>,
+) {
+    for _event in events.read() {
+        for mut visibility in query.iter_mut() {
+            *visibility = Visibility::Inherited;
+        }
+        debug!("All widgets are now visible");
     }
 }
 
@@ -111,7 +130,7 @@ fn spawn_with_meta<T: Component>(
     functions: &HtmlEventBindings,
     widget: &Widget
 ) -> Entity {
-    let mut visible = Visibility::Inherited;
+    let mut visible = Visibility::Hidden;
     let mut ui_state = UIWidgetState::default();
     
     if states.hidden {
