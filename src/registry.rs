@@ -3,7 +3,10 @@ use std::sync::Mutex;
 use bevy::prelude::*;
 use once_cell::sync::Lazy;
 use crate::html::HtmlSource;
+use crate::UIGenID;
 use crate::widgets::{HtmlBody, WidgetId, WidgetKind};
+
+pub static UI_ID_GENERATE: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
 
 /// A global thread-safe pool of IDs for the "body" widget.
 pub static BODY_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
@@ -300,6 +303,7 @@ fn despawn_widget_ids(
     last_ui_usage: Option<Res<LastUiUsage>>,
     query: Query<Entity, With<WidgetId>>,
     widget_ids: Query<&WidgetId>,
+    ui_id: Query<&UIGenID>
 ) {
     if let Some(name) = ui_registry.current.clone() {
         if let Some(last_ui) = last_ui_usage {
@@ -311,6 +315,10 @@ fn despawn_widget_ids(
                 }
             }
         }
+    }
+    
+    for id in ui_id.iter() {
+        UI_ID_GENERATE.lock().unwrap().release(id.0);
     }
 
     for entity in query.iter() {

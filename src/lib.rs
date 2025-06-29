@@ -1,11 +1,9 @@
 use std::collections::HashMap;
-use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering::Relaxed;
 use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 use crate::html::HtmlPlugin;
 use crate::observer::ObserverRegistryPlugin;
-use crate::registry::{UiInitResource, RegistryPlugin, UiRegistry};
+use crate::registry::{UiInitResource, RegistryPlugin, UiRegistry, UI_ID_GENERATE};
 use crate::service::ServicePlugin;
 use crate::styling::StylingPlugin;
 use crate::widgets::WidgetPlugin;
@@ -17,8 +15,6 @@ pub mod registry;
 pub mod utils;
 pub mod service;
 pub mod observer;
-
-static UI_ID_GENERATE: AtomicUsize = AtomicUsize::new(1);
 
 /// A cache mapping image paths to their loaded handles,
 /// preventing duplicate loads and allowing cleanup of unused images.
@@ -100,7 +96,7 @@ impl Default for UIGenID {
 
     /// Generates a new unique `UIGenID` using a global atomic counter.
     fn default() -> Self {
-        Self(UI_ID_GENERATE.fetch_add(1, Relaxed))
+        Self(UI_ID_GENERATE.lock().unwrap().acquire())
     }
 }
 
