@@ -47,7 +47,7 @@ version = "0.8.1"
 
 # Css3 Converter
 [dependencies.lightningcss]
-version = "1.0.0-alpha.66"
+version = "1.0.0-alpha.67"
 
 [dependencies.once_cell]
 version = "1.21.3"
