@@ -50,7 +50,7 @@ Here's a simple example of a button that we spawn
 ```
 In the end it should look like this:
 
-![Result Example](docs/example.gif)
+![bHYuo.gif](https://s14.gifyu.com/images/bHYuo.gif)](https://gifyu.com/image/bHYuo)
 
 HTML works now with bevy_extended_ui. You can show the html from your website in bevy!
 But currently these widgets ar supported:
@@ -154,5 +154,5 @@ The crate supports many CSS things, the list below shows the future support:
 
 | `Bevy` version | `bevy_extended_ui` version |
 |----------------|----------------------------|
-| 0.16.1         | 0.1.0 - 0.2.0              |
-| 0.16.0         | 0.1.0 - 0.2.0              |
+| 0.16.1         | 0.1.0 - 0.2.1              |
+| 0.16.0         | 0.1.0 - 0.2.1              |
