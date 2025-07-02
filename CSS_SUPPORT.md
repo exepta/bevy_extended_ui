@@ -322,3 +322,11 @@ div {
 ```
 
 this value can be negative too!
+
+#### Pointer-Events
+```css
+div {
+    pointer-events: none;
+}
+```
+The value `none` is bevy `Pickable::Ignore` all other ar `Pickable::default()`
