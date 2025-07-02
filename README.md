@@ -33,7 +33,6 @@ fn main() {
 }
 ```
 
-
 Next, you can get started right away. Currently, there are widgets (Div, Button, Checkbox, InputField, and Slider). Note that these aren't all the widgets! More are coming soon.
 
 Here's a simple example of a button that we spawn
@@ -48,7 +47,8 @@ Here's a simple example of a button that we spawn
         ]
     ));
 ```
-In the end it should look like this:
+
+Here is an example of some widgets:
 
 <img alt="bHYuo.gif" height="750" src="https://s14.gifyu.com/images/bHYuo.gif" width="600"/>
 
@@ -156,3 +156,8 @@ The crate supports many CSS things, the list below shows the future support:
 |----------------|----------------------------|
 | 0.16.1         | 0.1.0 - 0.2.1              |
 | 0.16.0         | 0.1.0 - 0.2.1              |
+
+### Important Links
+[Link to Css rules](CSS_SUPPORT.md)
+
+[Link to Widget attributes](WIDGETS.md)

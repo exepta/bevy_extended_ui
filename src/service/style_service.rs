@@ -172,9 +172,13 @@ pub fn update_widget_styles_system(
             if let Some(mut index) = z_index {
                 index.0 = final_style.z_index.unwrap_or(0);
             }
-            
+
             if let Some(mut pick) = pick_able {
-                *pick = final_style.pointer_events.unwrap_or_default();
+                let old_pick = pick.clone();
+                *pick = final_style.pointer_events.unwrap_or(Pickable {
+                    is_hoverable: old_pick.is_hoverable,
+                    should_block_lower: old_pick.should_block_lower,
+                });
             }
         }
     }
