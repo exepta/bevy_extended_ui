@@ -50,7 +50,7 @@ Here's a simple example of a button that we spawn
 ```
 In the end it should look like this:
 
-![Result Example](docs/example.gif)
+<img alt="bHYuo.gif" height="750" src="https://s14.gifyu.com/images/bHYuo.gif" width="600"/>
 
 HTML works now with bevy_extended_ui. You can show the html from your website in bevy!
 But currently these widgets ar supported:
