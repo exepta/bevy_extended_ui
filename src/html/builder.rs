@@ -1,8 +1,8 @@
 use bevy::prelude::*;
-use crate::html::{HtmlEventBindings, HtmlMeta, HtmlStates, HtmlStructureMap, HtmlWidgetNode};
+use crate::html::{HtmlEventBindings, HtmlID, HtmlMeta, HtmlStates, HtmlStructureMap, HtmlWidgetNode};
 use crate::styling::convert::{CssClass, CssID, CssSource};
 use crate::UIWidgetState;
-use crate::widgets::Widget;
+use crate::widgets::{HtmlBody, Widget};
 
 #[derive(Event)]
 struct AllWidgetsSpawned;
@@ -39,14 +39,42 @@ fn build_html_source(
     structure_map: Res<HtmlStructureMap>,
     asset_server: Res<AssetServer>,
     mut event_writer: EventWriter<AllWidgetsSpawned>,
+    mut query: Query<(&mut Visibility, &HtmlBody), With<HtmlBody>>,
 ) {
     if let Some(active) = structure_map.active.clone() {
-        if let Some(structure) = structure_map.html_map.get(active.as_str()) {
-            for node in structure {
-                spawn_widget_node(&mut commands, node, &asset_server, None);
+            if query.is_empty() {
+                if let Some(structure) = structure_map.html_map.get(active.as_str()) {
+                    for node in structure {
+                        spawn_widget_node(&mut commands, node, &asset_server, None);
+                    }
+                    event_writer.write(AllWidgetsSpawned);
+                    info!("CREATE FIRST! Active: {}", active);
+                }
+            } else {
+                let mut found = false;
+                for (mut vis, body) in query.iter_mut() {
+                    if let Some(bind) = body.bind_to_html.clone() {
+                        if bind.eq(&active) {
+                            info!("FOUND! Active: {}", active);
+                            *vis = Visibility::Inherited;
+                            event_writer.write(AllWidgetsSpawned);
+                            found = true;
+                        }
+                    }
+                }
+                
+                if !found {
+                    
+                    if let Some(structure) = structure_map.html_map.get(active.as_str()) {
+                        info!("NOT FOUND! Load Active: {}, Content: {:#?}", active, structure);
+                        for node in structure {
+                            spawn_widget_node(&mut commands, node, &asset_server, None);
+                        }
+                        event_writer.write(AllWidgetsSpawned);
+                    }
+                }
             }
-            event_writer.write(AllWidgetsSpawned);
-        }
+        
     }
 }
 
@@ -64,14 +92,57 @@ fn show_all_widgets_start(
 fn show_all_widgets_finish(
     time: Res<Time>,
     mut timer: ResMut<ShowWidgetsTimer>,
-    mut query: Query<&mut Visibility, (With<Widget>, Without<NeedHidden>)>,
+    mut query: Query<(&mut Visibility, &HtmlID), (With<Widget>, Without<NeedHidden>)>,
+    current_body: Query<&HtmlBody>,
+    structure_map: Res<HtmlStructureMap>,
 ) {
     if timer.active && timer.timer.tick(time.delta()).finished() {
-        for mut visibility in query.iter_mut() {
-            *visibility = Visibility::Inherited;
+        if let Some(active) = structure_map.active.clone() {
+            for body in current_body.iter() {
+                if let Some(bind) = body.bind_to_html.clone() {
+                    if bind.eq(&active) {
+                        if let Some(map_nodes) = structure_map.html_map.get(active.as_str()) {
+                            let mut valid_ids = Vec::new();
+                            collect_html_ids(map_nodes, &mut valid_ids);
+
+                            for (mut visibility, widget_id) in query.iter_mut() {
+                                if valid_ids.contains(widget_id) {
+                                    *visibility = Visibility::Inherited;
+                                }
+                            }
+
+                            timer.active = false;
+                            debug!("All widgets for '{}' are now visible after 100ms delay", active);
+                        }
+                    }
+                }
+            }
         }
-        timer.active = false;
-        debug!("All widgets are now visible after 100ms delay");
+    }
+}
+fn collect_html_ids(nodes: &Vec<HtmlWidgetNode>, ids: &mut Vec<HtmlID>) {
+    for node in nodes {
+        match node {
+            HtmlWidgetNode::Button(_, _, _, _, _, id)
+            | HtmlWidgetNode::Input(_, _, _, _, _, id)
+            | HtmlWidgetNode::CheckBox(_, _, _, _, _, id)
+            | HtmlWidgetNode::ChoiceBox(_, _, _, _, _, id)
+            | HtmlWidgetNode::Img(_, _, _, _, _, id)
+            | HtmlWidgetNode::ProgressBar(_, _, _, _, _, id)
+            | HtmlWidgetNode::Headline(_, _, _, _, _, id)
+            | HtmlWidgetNode::Paragraph(_, _, _, _, _, id)
+            | HtmlWidgetNode::Slider(_, _, _, _, _, id) => {
+                ids.push(id.clone());
+            }
+            HtmlWidgetNode::Div(_, _, _, children, _, _, id) => {
+                ids.push(id.clone());
+                collect_html_ids(children, ids);
+            }
+            HtmlWidgetNode::HtmlBody(_, _, _, children, _, _, id) => {
+                ids.push(id.clone());
+                collect_html_ids(children, ids);
+            }
+        }
     }
 }
 
@@ -87,43 +158,43 @@ fn spawn_widget_node(
     parent: Option<Entity>,
 ) -> Entity {
     let entity = match node {
-        HtmlWidgetNode::Button(button, meta, states, functions, widget) => {
-            spawn_with_meta(commands, button.clone(), meta, states, functions, widget)
+        HtmlWidgetNode::Button(button, meta, states, functions, widget, id) => {
+            spawn_with_meta(commands, button.clone(), meta, states, functions, widget, id)
         }
-        HtmlWidgetNode::Input(input, meta, states, functions, widget) => {
-            spawn_with_meta(commands, input.clone(), meta, states, functions, widget)
+        HtmlWidgetNode::Input(input, meta, states, functions, widget, id) => {
+            spawn_with_meta(commands, input.clone(), meta, states, functions, widget, id)
         }
-        HtmlWidgetNode::Headline(headline, meta, states, functions, widget) => {
-            spawn_with_meta(commands, headline.clone(), meta, states, functions, widget)
+        HtmlWidgetNode::Headline(headline, meta, states, functions, widget, id) => {
+            spawn_with_meta(commands, headline.clone(), meta, states, functions, widget, id)
         }
-        HtmlWidgetNode::Img(img, meta, states, functions, widget) => {
-            spawn_with_meta(commands, img.clone(), meta, states, functions, widget)
+        HtmlWidgetNode::Img(img, meta, states, functions, widget, id) => {
+            spawn_with_meta(commands, img.clone(), meta, states, functions, widget, id)
         }
-        HtmlWidgetNode::ProgressBar(progress_bar, meta, states, functions, widget) => {
-            spawn_with_meta(commands, progress_bar.clone(), meta, states, functions, widget)
+        HtmlWidgetNode::ProgressBar(progress_bar, meta, states, functions, widget, id) => {
+            spawn_with_meta(commands, progress_bar.clone(), meta, states, functions, widget, id)
         }
-        HtmlWidgetNode::Paragraph(paragraph, meta, states, functions, widget) => {
-            spawn_with_meta(commands, paragraph.clone(), meta, states, functions, widget)
+        HtmlWidgetNode::Paragraph(paragraph, meta, states, functions, widget, id) => {
+            spawn_with_meta(commands, paragraph.clone(), meta, states, functions, widget, id)
         }
-        HtmlWidgetNode::CheckBox(checkbox, meta, states, functions, widget) => {
-            spawn_with_meta(commands, checkbox.clone(), meta, states, functions, widget)
+        HtmlWidgetNode::CheckBox(checkbox, meta, states, functions, widget, id) => {
+            spawn_with_meta(commands, checkbox.clone(), meta, states, functions, widget, id)
         }
-        HtmlWidgetNode::ChoiceBox(choice_box, meta, states, functions, widget) => {
-            spawn_with_meta(commands, choice_box.clone(), meta, states, functions, widget)
+        HtmlWidgetNode::ChoiceBox(choice_box, meta, states, functions, widget, id) => {
+            spawn_with_meta(commands, choice_box.clone(), meta, states, functions, widget, id)
         }
-        HtmlWidgetNode::Slider(slider, meta, states, functions, widget) => {
-            spawn_with_meta(commands, slider.clone(), meta, states, functions, widget)
+        HtmlWidgetNode::Slider(slider, meta, states, functions, widget, id) => {
+            spawn_with_meta(commands, slider.clone(), meta, states, functions, widget, id)
         }
-        HtmlWidgetNode::Div(div, meta, states, children, functions,widget) => {
-            let entity = spawn_with_meta(commands, div.clone(), meta, states, functions, widget);
+        HtmlWidgetNode::Div(div, meta, states, children, functions,widget, id) => {
+            let entity = spawn_with_meta(commands, div.clone(), meta, states, functions, widget, id);
             for child in children {
                 let child_entity = spawn_widget_node(commands, child, asset_server, Some(entity));
                 commands.entity(entity).add_child(child_entity);
             }
             entity
         }
-        HtmlWidgetNode::HtmlBody(body, meta, states, children, functions, widget) => {
-            let entity = spawn_with_meta(commands, body.clone(), meta, states, functions, widget);
+        HtmlWidgetNode::HtmlBody(body, meta, states, children, functions, widget, id) => {
+            let entity = spawn_with_meta(commands, body.clone(), meta, states, functions, widget, id);
             for child in children {
                 let child_entity = spawn_widget_node(commands, child, asset_server, Some(entity));
                 commands.entity(entity).add_child(child_entity);
@@ -152,7 +223,8 @@ fn spawn_with_meta<T: Component>(
     meta: &HtmlMeta,
     states: &HtmlStates,
     functions: &HtmlEventBindings,
-    widget: &Widget
+    widget: &Widget,
+    id: &HtmlID
 ) -> Entity {
     let mut ui_state = UIWidgetState::default();
     
@@ -164,6 +236,7 @@ fn spawn_with_meta<T: Component>(
         component,
         functions.clone(),
         widget.clone(),
+        id.clone(),
         Node::default(),
         CssSource(meta.css.clone()),
         CssClass(meta.class.clone().unwrap_or_default()),
