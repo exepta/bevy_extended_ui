@@ -200,3 +200,30 @@ select .option-selected .option-sel-text {
 select .option-drop-box .option-drop-icon {
     color: #323436;
 }
+
+slider {
+    display: flex;
+    justify-content: start;
+    align-items: center;
+    width: 350px;
+    height: 10px;
+    background: #5b5b63;
+    border-radius: 5px;
+}
+
+slider .track {
+    width: 0;
+    height: 100%;
+    background: #9857fb;
+    border-radius: 5px;
+    pointer-events: none;
+}
+
+slider .thumb {
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 4px #9857fb;
+    background: #d4d4f3;
+}

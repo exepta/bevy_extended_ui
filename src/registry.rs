@@ -230,7 +230,7 @@ fn update_que(
     ui_registry: Res<UiRegistry>,
     mut ui_init: ResMut<UiInitResource>,
     query: Query<(Entity, &HtmlSource), With<HtmlSource>>,
-    body_query: Query<Entity, (Without<HtmlSource>, With<HtmlBody>)>,
+    mut body_query: Query<(&mut Visibility, &HtmlBody), (Without<HtmlSource>, With<HtmlBody>)>,
 ) {
     if let Some(name) = ui_registry.current.clone() {
         if query.is_empty() {
@@ -245,8 +245,12 @@ fn update_que(
             }
 
             // Despawn old body entities before spawning a new UI
-            for body_entity in body_query.iter() {
-                commands.entity(body_entity).despawn();
+            for (mut body_vis, body) in body_query.iter_mut() {
+                if let Some(bind) = body.bind_to_html.clone() {
+                    if bind.eq(&html_source.source_id) {
+                        *body_vis = Visibility::Hidden;
+                    }
+                }
             }
 
             spawn_ui_source(&mut commands, &name, &ui_registry, &mut ui_init);
@@ -255,10 +259,14 @@ fn update_que(
             commands.entity(entity).despawn();
         }
     } else {
-        for (entity, _) in query.iter() {
+        for (entity, html_source) in query.iter() {
             // Despawn old body entities before spawning a new UI
-            for body_entity in body_query.iter() {
-                commands.entity(body_entity).despawn();
+            for (mut body_vis, body) in body_query.iter_mut() {
+                if let Some(bind) = body.bind_to_html.clone() {
+                    if bind.eq(&html_source.source_id) {
+                        *body_vis = Visibility::Hidden;
+                    }
+                }
             }
             // Despawn outdated UI entity
             commands.entity(entity).despawn();

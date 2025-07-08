@@ -2,6 +2,7 @@ mod converter;
 mod builder;
 
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use bevy::prelude::*;
 use crate::html::builder::HtmlBuilderSystem;
 use crate::html::converter::HtmlConverterSystem;
@@ -10,6 +11,8 @@ use crate::observer::widget_init_trigger::WidgetInit;
 use crate::styling::css::apply_property_to_style;
 use crate::styling::Style;
 use crate::widgets::{CheckBox, Div, InputField, Button, HtmlBody, ChoiceBox, Slider, Headline, Paragraph, Img, ProgressBar, Widget};
+
+static HTML_ID_COUNTER: AtomicUsize = AtomicUsize::new(1);
 
 /// Represents a chunk of HTML source code along with its unique identifier.
 ///
@@ -146,27 +149,27 @@ pub struct HtmlStates {
 #[derive(Debug, Clone)]
 pub enum HtmlWidgetNode {
     /// A `<button>` element.
-    Button(Button, HtmlMeta, HtmlStates, HtmlEventBindings, Widget),
+    Button(Button, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
     /// An `<input type="text">` field.
-    Input(InputField, HtmlMeta, HtmlStates, HtmlEventBindings, Widget),
+    Input(InputField, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
     /// A checkbox `<input type="checkbox">`.
-    CheckBox(CheckBox, HtmlMeta, HtmlStates, HtmlEventBindings, Widget),
+    CheckBox(CheckBox, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
     /// A dropdown or select box.
-    ChoiceBox(ChoiceBox, HtmlMeta, HtmlStates, HtmlEventBindings, Widget),
+    ChoiceBox(ChoiceBox, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
     /// A img element (`<img>`).
-    Img(Img, HtmlMeta, HtmlStates, HtmlEventBindings, Widget),
+    Img(Img, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
     /// A img element (`<img>`).
-    ProgressBar(ProgressBar, HtmlMeta, HtmlStates, HtmlEventBindings, Widget),
+    ProgressBar(ProgressBar, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
     /// A heading element (`<h1>`-`<h6>`).
-    Headline(Headline, HtmlMeta, HtmlStates, HtmlEventBindings, Widget),
+    Headline(Headline, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
     /// A paragraph `<p>`.
-    Paragraph(Paragraph, HtmlMeta, HtmlStates, HtmlEventBindings, Widget),
+    Paragraph(Paragraph, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
     /// A slider input (range).
-    Slider(Slider, HtmlMeta, HtmlStates, HtmlEventBindings, Widget),
+    Slider(Slider, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
     /// A `<div>` container element with nested child nodes.
-    Div(Div, HtmlMeta, HtmlStates, Vec<HtmlWidgetNode>, HtmlEventBindings, Widget),
+    Div(Div, HtmlMeta, HtmlStates, Vec<HtmlWidgetNode>, HtmlEventBindings, Widget, HtmlID),
     /// The root `<body>` element of the HTML structure.
-    HtmlBody(HtmlBody, HtmlMeta, HtmlStates, Vec<HtmlWidgetNode>, HtmlEventBindings, Widget),
+    HtmlBody(HtmlBody, HtmlMeta, HtmlStates, Vec<HtmlWidgetNode>, HtmlEventBindings, Widget, HtmlID),
 }
 
 /// A resource that holds all parsed HTML structures keyed by identifier.
@@ -185,6 +188,15 @@ impl Default for HtmlStructureMap {
             html_map: HashMap::new(),
             active: None,
         }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Component)]
+pub struct HtmlID(pub usize);
+
+impl Default for HtmlID {
+    fn default() -> Self {
+        Self(HTML_ID_COUNTER.fetch_add(1, Ordering::Relaxed))
     }
 }
 

@@ -45,9 +45,14 @@ fn internal_node_creation_system(
         if let Some(source) = source_opt {
             css_source = source.clone();
         }
+        
+        let mut html_id = String::new();
+        if let Some(id) = body.bind_to_html.clone() {
+            html_id = id;
+        }
 
         commands.entity(entity).insert((
-            Name::new(format!("Body-{}", body.w_count)),
+            Name::new(format!("Body-{}-{}", html_id, body.w_count)),
             Node::default(),
             WidgetId {
                 id: body.w_count,
