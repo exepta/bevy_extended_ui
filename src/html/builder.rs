@@ -42,39 +42,41 @@ fn build_html_source(
     mut query: Query<(&mut Visibility, &HtmlBody), With<HtmlBody>>,
 ) {
     if let Some(active) = structure_map.active.clone() {
-            if query.is_empty() {
-                if let Some(structure) = structure_map.html_map.get(active.as_str()) {
-                    for node in structure {
-                        spawn_widget_node(&mut commands, node, &asset_server, None);
-                    }
-                    event_writer.write(AllWidgetsSpawned);
-                    info!("CREATE FIRST! Active: {}", active);
-                }
-            } else {
-                let mut found = false;
-                for (mut vis, body) in query.iter_mut() {
-                    if let Some(bind) = body.bind_to_html.clone() {
-                        if bind.eq(&active) {
-                            info!("FOUND! Active: {}", active);
-                            *vis = Visibility::Inherited;
-                            event_writer.write(AllWidgetsSpawned);
-                            found = true;
-                        }
-                    }
-                }
-                
-                if !found {
-                    
-                    if let Some(structure) = structure_map.html_map.get(active.as_str()) {
-                        info!("NOT FOUND! Load Active: {}, Content: {:#?}", active, structure);
-                        for node in structure {
-                            spawn_widget_node(&mut commands, node, &asset_server, None);
-                        }
+        if query.is_empty() {
+            spawn_structure_for_active(&mut commands, &active, &structure_map, &asset_server, &mut event_writer);
+        } else {
+            let mut found = false;
+            for (mut vis, body) in query.iter_mut() {
+                if let Some(bind) = body.bind_to_html.clone() {
+                    if bind.eq(&active) {
+                        *vis = Visibility::Inherited;
                         event_writer.write(AllWidgetsSpawned);
+                        found = true;
                     }
                 }
             }
-        
+
+            if !found {
+                spawn_structure_for_active(&mut commands, &active, &structure_map, &asset_server, &mut event_writer);
+            }
+        }
+    }
+}
+
+fn spawn_structure_for_active(
+    commands: &mut Commands,
+    active: &str,
+    structure_map: &Res<HtmlStructureMap>,
+    asset_server: &Res<AssetServer>,
+    event_writer: &mut EventWriter<AllWidgetsSpawned>,
+) {
+    if let Some(structure) = structure_map.html_map.get(active) {
+        for node in structure {
+            spawn_widget_node(commands, node, asset_server, None);
+        }
+        event_writer.write(AllWidgetsSpawned);
+    } else {
+        warn!("No structure found for active: {}", active);
     }
 }
 

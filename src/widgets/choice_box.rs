@@ -319,7 +319,7 @@ fn update_content_box_visibility(
             }
 
             if state.open {
-                *visibility = Visibility::Visible;
+                *visibility = Visibility::Inherited;
             } else {
                 *visibility = Visibility::Hidden;
             }
@@ -358,7 +358,7 @@ fn handle_scroll_events(
 
     for event in scroll_events.read() {
         for (layout_entity, visibility, children) in layout_query.iter_mut() {
-            if *visibility != Visibility::Visible {
+            if *visibility != Visibility::Visible || *visibility != Visibility::Inherited {
                 continue;
             }
 

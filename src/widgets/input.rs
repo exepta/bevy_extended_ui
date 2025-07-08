@@ -293,9 +293,9 @@ fn update_cursor_visibility(
                     style.background = Some(Background { color: background.0, ..default() });
                 }
 
-                if !visibility.eq(&Visibility::Visible) {
+                if !visibility.eq(&Visibility::Inherited) || !visibility.eq(&Visibility::Visible) {
 
-                    *visibility = Visibility::Visible;
+                    *visibility = Visibility::Inherited;
                     for (mut text, bind_id) in text_query.iter_mut() {
                         if bind_id.0 != ui_id.0 {
                             continue;
