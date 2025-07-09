@@ -1,4 +1,3 @@
-use std::path::Path;
 use bevy::prelude::*;
 use crate::html::{HtmlEventBindings, HtmlFunctionRegistry, HtmlSource};
 use crate::widgets::Widget;
@@ -28,16 +27,11 @@ fn fetch_observers(
     registry: Res<HtmlFunctionRegistry>,
     mut commands: Commands
 ) {
-    for (entity, bindings, widget) in query.iter() {
-        for source in controller_query.iter() {
+    for source in controller_query.iter() {
+        for (entity, bindings, widget) in query.iter() {
             if let Some(controller) = source.controller.clone() {
                 if let Some(widget_con) = widget.0.clone() {
                     if !controller.eq(&widget_con) {
-                        return;
-                    }
-                    
-                    if !exist_controller(&controller) {
-                        error!("Controller path {} not found", controller);
                         return;
                     }
                 }
@@ -73,9 +67,4 @@ fn fetch_observers(
             }
         }
     }
-}
-
-fn exist_controller(controller: &str) -> bool {
-    let path = Path::new(controller);
-    path.exists()
 }
