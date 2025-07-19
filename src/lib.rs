@@ -1,3 +1,4 @@
+#![feature(trivial_bounds)]
 use std::collections::HashMap;
 use bevy::prelude::*;
 use bevy::render::view::RenderLayers;

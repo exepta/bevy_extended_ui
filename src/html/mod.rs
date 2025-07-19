@@ -1,11 +1,16 @@
 mod converter;
 mod builder;
+mod reload;
 
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::mpsc::Receiver;
 use bevy::prelude::*;
+use notify::{ RecommendedWatcher, Event, Error };
 use crate::html::builder::HtmlBuilderSystem;
 use crate::html::converter::HtmlConverterSystem;
+use crate::html::reload::HtmlReloadSystem;
 use crate::observer::time_tick_trigger::TimeTick;
 use crate::observer::widget_init_trigger::WidgetInit;
 use crate::styling::css::apply_property_to_style;
@@ -84,6 +89,27 @@ impl HtmlSource {
     }
     
 }
+
+#[derive(Event)]
+pub struct AllWidgetsSpawned;
+
+#[derive(Component)]
+pub struct NeedHidden;
+
+#[derive(Resource, Default)]
+pub struct ShowWidgetsTimer {
+    pub timer: Timer,
+    pub active: bool,
+}
+
+#[derive(Resource)]
+pub struct HtmlWatcher {
+    pub watcher: RecommendedWatcher,
+    rx: Arc<Mutex<Receiver<std::result::Result<Event, Error>>>>,
+}
+
+#[derive(Event)]
+pub struct HtmlChangeEvent;
 
 /// A component that stores parsed CSS style data using Bevy's `Style` struct.
 #[derive(Component, Reflect, Debug, Clone)]
@@ -291,11 +317,12 @@ pub struct HtmlPlugin;
 impl Plugin for HtmlPlugin {
     /// Configures the app to support HTML parsing and UI construction.
     fn build(&self, app: &mut App) {
+        app.add_event::<HtmlChangeEvent>();
         app.init_resource::<HtmlStructureMap>();
         app.init_resource::<HtmlFunctionRegistry>();
         app.register_type::<HtmlEventBindings>();
         app.register_type::<HtmlSource>();
         app.register_type::<HtmlStyle>();
-        app.add_plugins((HtmlConverterSystem, HtmlBuilderSystem));
+        app.add_plugins((HtmlConverterSystem, HtmlBuilderSystem, HtmlReloadSystem));
     }
 }

@@ -1,20 +1,8 @@
 use bevy::prelude::*;
-use crate::html::{HtmlEventBindings, HtmlID, HtmlMeta, HtmlStates, HtmlStructureMap, HtmlWidgetNode};
+use crate::html::{AllWidgetsSpawned, HtmlEventBindings, HtmlID, HtmlMeta, HtmlStates, HtmlStructureMap, HtmlWidgetNode, NeedHidden, ShowWidgetsTimer};
 use crate::styling::convert::{CssClass, CssID, CssSource};
 use crate::UIWidgetState;
 use crate::widgets::{HtmlBody, Widget};
-
-#[derive(Event)]
-struct AllWidgetsSpawned;
-
-#[derive(Component)]
-struct NeedHidden;
-
-#[derive(Resource, Default)]
-struct ShowWidgetsTimer {
-    timer: Timer,
-    active: bool,
-}
 
 /// A plugin that spawns Bevy UI entities from parsed HTML node structures.
 pub struct HtmlBuilderSystem;
