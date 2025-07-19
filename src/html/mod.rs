@@ -46,7 +46,8 @@ static HTML_ID_COUNTER: AtomicUsize = AtomicUsize::new(1);
 /// let html = HtmlSource {
 ///     source: "path/to/html".to_string(),
 ///     source_id: "main_ui".to_string(),
-///     controller: None
+///     controller: None,
+///     was_updated: false,
 /// };
 /// ```
 #[derive(Component, Reflect, Debug, Clone, Default)]
@@ -58,6 +59,8 @@ pub struct HtmlSource {
     pub source_id: String,
     /// Controls the function support location
     pub controller: Option<String>,
+    
+    pub was_updated: bool,
 }
 
 impl HtmlSource {

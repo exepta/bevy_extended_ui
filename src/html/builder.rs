@@ -75,7 +75,7 @@ fn show_all_widgets_start(
     for _event in events.read() {
         timer.timer = Timer::from_seconds(0.1, TimerMode::Once);
         timer.active = true;
-        debug!("Starting 100ms timer before showing widgets");
+        info!("Starting 100ms timer before showing widgets");
     }
 }
 
@@ -102,7 +102,7 @@ fn show_all_widgets_finish(
                             }
 
                             timer.active = false;
-                            debug!("All widgets for '{}' are now visible after 100ms delay", active);
+                            info!("All widgets for '{}' are now visible after 100ms delay", active);
                         }
                     }
                 }
