@@ -26,6 +26,10 @@ fn start_file_watcher(mut commands: Commands, ui_registry: Res<UiRegistry>) {
                     .join(watch_path);
             }
 
+            info!("============================================");
+            info!("Watching html file: {}", watch_path.display());
+            info!("============================================");
+
             let (tx, rx) = channel();
 
             let mut watcher = recommended_watcher(tx)
