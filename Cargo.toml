@@ -56,7 +56,7 @@ version = "1.21.3"
 regex = "1.11.1"
 
 [dependencies.bevy-inspector-egui]
-version = "0.31.0"
+version = "0.32.0"
 
 [dependencies.notify]
 version = "8.1.0"
