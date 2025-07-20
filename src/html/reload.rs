@@ -14,18 +14,22 @@ impl Plugin for HtmlReloadSystem {
     }
 }
 
-fn start_file_watcher(mut commands: Commands) {
-    let (tx, rx) = channel();
+fn start_file_watcher(mut commands: Commands, ui_registry: Res<UiRegistry>) {
+    if let Some(active) = ui_registry.current.clone() {
+        if let Some(source) = ui_registry.get(&active) {
+            let (tx, rx) = channel();
 
-    let mut watcher = recommended_watcher(tx).expect("Failed to create watcher");
-    watcher
-        .watch("examples/html/login-ui.html".as_ref(), RecursiveMode::NonRecursive)
-        .expect("Failed to watch");
+            let mut watcher = recommended_watcher(tx).expect("Failed to create watcher");
+            watcher
+                .watch(source.source.as_ref(), RecursiveMode::NonRecursive)
+                .expect("Failed to watch");
 
-    commands.insert_resource(HtmlWatcher {
-        watcher,
-        rx: Arc::new(Mutex::new(rx)),
-    });
+            commands.insert_resource(HtmlWatcher {
+                watcher,
+                rx: Arc::new(Mutex::new(rx)),
+            });
+        }
+    }
 }
 
 fn detect_changes(
