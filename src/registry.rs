@@ -80,6 +80,8 @@ pub struct UiRegistry {
     pub collection: HashMap<String, HtmlSource>,
     /// The currently active UI name, if any.
     pub current: Option<String>,
+    
+    pub ui_update: bool,
 }
 
 impl UiRegistry {
@@ -161,6 +163,10 @@ impl UiRegistry {
         self.collection.get(name)
     }
 
+    pub fn get_mut(&mut self, name: &str) -> Option<&mut HtmlSource> {
+        self.collection.get_mut(name)
+    }
+
     /// Sets the currently active UI by name if it exists in the registry.
     ///
     /// If the UI with the given name exists in the internal collection, it will be marked
@@ -227,10 +233,10 @@ impl Plugin for RegistryPlugin {
 /// * `body_query` - Query for body entities without `HtmlSource` but with `HtmlBody`.
 fn update_que(
     mut commands: Commands,
-    ui_registry: Res<UiRegistry>,
+    mut ui_registry: ResMut<UiRegistry>,
     mut ui_init: ResMut<UiInitResource>,
     query: Query<(Entity, &HtmlSource), With<HtmlSource>>,
-    mut body_query: Query<(&mut Visibility, &HtmlBody), (Without<HtmlSource>, With<HtmlBody>)>,
+    mut body_query: Query<(Entity, &mut Visibility, &HtmlBody), (Without<HtmlSource>, With<HtmlBody>)>,
 ) {
     if let Some(name) = ui_registry.current.clone() {
         if query.is_empty() {
@@ -239,20 +245,26 @@ fn update_que(
         }
 
         for (entity, html_source) in query.iter() {
-            if html_source.source_id == name {
+            if html_source.source_id == name && !ui_registry.ui_update{
                 warn!("UI {} is already loaded", name);
                 continue;
             }
 
             // Despawn old body entities before spawning a new UI
-            for (mut body_vis, body) in body_query.iter_mut() {
-                if let Some(bind) = body.bind_to_html.clone() {
-                    if bind.eq(&html_source.source_id) {
-                        *body_vis = Visibility::Hidden;
+            for (body_entity, mut body_vis, body) in body_query.iter_mut() {
+                if ui_registry.ui_update {
+                    commands.entity(body_entity).despawn();
+                } else {
+                    if let Some(bind) = body.bind_to_html.clone() {
+                        if bind.eq(&html_source.source_id) {
+                            *body_vis = Visibility::Hidden;
+                        }
                     }
                 }
             }
 
+            ui_registry.ui_update = false;
+            
             spawn_ui_source(&mut commands, &name, &ui_registry, &mut ui_init);
 
             // Despawn outdated UI entity
@@ -260,14 +272,15 @@ fn update_que(
         }
     } else {
         for (entity, html_source) in query.iter() {
-            // Despawn old body entities before spawning a new UI
-            for (mut body_vis, body) in body_query.iter_mut() {
+
+            for (_, mut body_vis, body) in body_query.iter_mut() {
                 if let Some(bind) = body.bind_to_html.clone() {
                     if bind.eq(&html_source.source_id) {
                         *body_vis = Visibility::Hidden;
                     }
                 }
             }
+
             // Despawn outdated UI entity
             commands.entity(entity).despawn();
         }
@@ -314,15 +327,14 @@ fn despawn_widget_ids(
     ui_id: Query<&UIGenID>
 ) {
     if let Some(name) = ui_registry.current.clone() {
-        if let Some(last_ui) = last_ui_usage {
-            if let Some(last_ui_name) = last_ui.0.clone() {
-                if last_ui_name.eq(&name) {
-                    // UI hasn't changed, skip releasing IDs
-                    info!("UI unchanged: current = {}, last = {}", name, last_ui_name);
-                    return;
+            if let Some(last_ui) = last_ui_usage {
+                if let Some(last_ui_name) = last_ui.0.clone() {
+                    if last_ui_name.eq(&name) {
+                        // UI hasn't changed, skip releasing IDs
+                        debug!("UI unchanged: current = {}, last = {}", name, last_ui_name);
+                    }
                 }
             }
-        }
     }
     
     for id in ui_id.iter() {

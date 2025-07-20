@@ -42,7 +42,7 @@ fn test_html_setup(mut commands: Commands, mut ui_registry: ResMut<UiRegistry>) 
         "login-example".to_string(),
         HtmlSource::from_file_path("examples/html/login-ui.html"),
     );
-    
+
     commands.insert_resource(HtmlTestTimer {
         timer: Timer::from_seconds(10.0, TimerMode::Once),
         state: 0,

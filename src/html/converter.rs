@@ -24,7 +24,7 @@ impl Plugin for HtmlConverterSystem {
 /// [`HtmlWidgetNode`] tree inserted into the global [`HtmlStructureMap`].
 fn update_html_ui(
     mut structure_map: ResMut<HtmlStructureMap>,
-    mut query: Query<&mut HtmlSource, Or<(Changed<HtmlSource>, Added<HtmlSource>)>>,
+    mut query: Query<&mut HtmlSource, Added<HtmlSource>>,
 ) {
     for mut html in query.iter_mut() {
         let Ok(content) = fs::read_to_string(&html.source) else {
