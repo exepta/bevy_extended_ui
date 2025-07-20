@@ -1,6 +1,6 @@
 [package]
 name = "bevy_extended_ui"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2024"
 authors = ["Daniel Ramke <genshin.exepta@outlook.com>"]
 description = "Create simply ui's in bevy like react from javascript"

@@ -1,3 +1,5 @@
+use std::env;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::channel;
 use bevy::prelude::*;
@@ -17,12 +19,20 @@ impl Plugin for HtmlReloadSystem {
 fn start_file_watcher(mut commands: Commands, ui_registry: Res<UiRegistry>) {
     if let Some(active) = ui_registry.current.clone() {
         if let Some(source) = ui_registry.get(&active) {
+            let mut watch_path = PathBuf::from(&source.source);
+            if watch_path.is_relative() {
+                watch_path = env::current_dir()
+                    .expect("Could not get current dir")
+                    .join(watch_path);
+            }
+
             let (tx, rx) = channel();
 
-            let mut watcher = recommended_watcher(tx).expect("Failed to create watcher");
+            let mut watcher = recommended_watcher(tx)
+                .expect("Failed to create watcher");
             watcher
-                .watch(source.source.as_ref(), RecursiveMode::NonRecursive)
-                .expect("Failed to watch");
+                .watch(watch_path.as_path(), RecursiveMode::NonRecursive)
+                .unwrap_or_else(|e| panic!("Failed to watch {}: {}", watch_path.display(), e));
 
             commands.insert_resource(HtmlWatcher {
                 watcher,
