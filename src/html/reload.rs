@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex};
 use std::sync::mpsc::channel;
 use bevy::prelude::*;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
-use crate::html::{HtmlChangeEvent, HtmlSource, HtmlWatcher};
+use crate::html::{HtmlChangeEvent, HtmlWatcher, HTML_ID_COUNTER};
 use crate::registry::UiRegistry;
 
 pub struct HtmlReloadSystem;
@@ -45,38 +45,17 @@ fn detect_changes(
 fn reload_html(
     mut ev: EventReader<HtmlChangeEvent>,
     mut registry: ResMut<UiRegistry>,
-    mut query: Query<&mut HtmlSource>
 ) {
     if ev.read().next().is_none() {
         return;
     }
 
-    let ui_name = match registry.current.as_ref() {
-        Some(name) => name.clone(),
-        None => {
-            warn!("HtmlChangeEvent, but nothing to reload.");
-            return;
-        }
-    };
-
-    let current_source = match registry.collection.get_mut(&ui_name) {
-        Some(src) => src,
-        None => {
-            warn!("HtmlChangeEvent, but '{}' not in registry.", ui_name);
-            return;
-        }
-    };
-
-    if current_source.was_updated {
+    if registry.ui_update {
         return;
     }
 
-    current_source.was_updated = true;
-    for mut src in query.iter_mut() {
-        if src.source_id.eq(&ui_name) {
-            src.was_updated = true;
-        }
-    }
+    HTML_ID_COUNTER.store(1, std::sync::atomic::Ordering::Relaxed);
+    registry.ui_update = true;
 
     info!("Reloaded html file");
 }

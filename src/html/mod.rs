@@ -17,7 +17,7 @@ use crate::styling::css::apply_property_to_style;
 use crate::styling::Style;
 use crate::widgets::{CheckBox, Div, InputField, Button, HtmlBody, ChoiceBox, Slider, Headline, Paragraph, Img, ProgressBar, Widget};
 
-static HTML_ID_COUNTER: AtomicUsize = AtomicUsize::new(1);
+pub static HTML_ID_COUNTER: AtomicUsize = AtomicUsize::new(1);
 
 /// Represents a chunk of HTML source code along with its unique identifier.
 ///
@@ -47,7 +47,6 @@ static HTML_ID_COUNTER: AtomicUsize = AtomicUsize::new(1);
 ///     source: "path/to/html".to_string(),
 ///     source_id: "main_ui".to_string(),
 ///     controller: None,
-///     was_updated: false,
 /// };
 /// ```
 #[derive(Component, Reflect, Debug, Clone, Default)]
@@ -58,9 +57,7 @@ pub struct HtmlSource {
     /// Unique identifier for the HTML source.
     pub source_id: String,
     /// Controls the function support location
-    pub controller: Option<String>,
-    
-    pub was_updated: bool,
+    pub controller: Option<String>
 }
 
 impl HtmlSource {

@@ -80,6 +80,8 @@ pub struct UiRegistry {
     pub collection: HashMap<String, HtmlSource>,
     /// The currently active UI name, if any.
     pub current: Option<String>,
+    
+    pub ui_update: bool,
 }
 
 impl UiRegistry {
@@ -231,9 +233,9 @@ impl Plugin for RegistryPlugin {
 /// * `body_query` - Query for body entities without `HtmlSource` but with `HtmlBody`.
 fn update_que(
     mut commands: Commands,
-    ui_registry: Res<UiRegistry>,
+    mut ui_registry: ResMut<UiRegistry>,
     mut ui_init: ResMut<UiInitResource>,
-    mut query: Query<(Entity, &mut HtmlSource), With<HtmlSource>>,
+    query: Query<(Entity, &HtmlSource), With<HtmlSource>>,
     mut body_query: Query<(Entity, &mut Visibility, &HtmlBody), (Without<HtmlSource>, With<HtmlBody>)>,
 ) {
     if let Some(name) = ui_registry.current.clone() {
@@ -242,17 +244,16 @@ fn update_que(
             return;
         }
 
-        for (entity, mut html_source) in query.iter_mut() {
-            if html_source.source_id == name && !html_source.was_updated {
+        for (entity, html_source) in query.iter() {
+            if html_source.source_id == name && !ui_registry.ui_update{
                 warn!("UI {} is already loaded", name);
                 continue;
             }
 
             // Despawn old body entities before spawning a new UI
             for (body_entity, mut body_vis, body) in body_query.iter_mut() {
-                if html_source.was_updated {
+                if ui_registry.ui_update {
                     commands.entity(body_entity).despawn();
-                    html_source.was_updated = false;
                 } else {
                     if let Some(bind) = body.bind_to_html.clone() {
                         if bind.eq(&html_source.source_id) {
@@ -262,6 +263,8 @@ fn update_que(
                 }
             }
 
+            ui_registry.ui_update = false;
+            
             spawn_ui_source(&mut commands, &name, &ui_registry, &mut ui_init);
 
             // Despawn outdated UI entity
