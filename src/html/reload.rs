@@ -11,7 +11,7 @@ pub struct HtmlReloadSystem;
 
 impl Plugin for HtmlReloadSystem {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, start_file_watcher);
+        app.add_systems(Update, start_file_watcher.run_if(resource_changed::<UiRegistry>));
         app.add_systems(Update, (detect_changes, reload_html.after(detect_changes)).run_if(resource_exists::<HtmlWatcher>));
     }
 }
