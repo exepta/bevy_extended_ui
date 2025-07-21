@@ -80,7 +80,7 @@ pub struct UiRegistry {
     pub collection: HashMap<String, HtmlSource>,
     /// The currently active UI name, if any.
     pub current: Option<String>,
-    
+
     pub ui_update: bool,
 }
 
@@ -184,6 +184,7 @@ impl UiRegistry {
     pub fn use_ui(&mut self, name: &str) {
         if self.get(name).is_some() {
             self.current = Some(name.to_string());
+            self.ui_update = false;
         } else {
             warn!("Ui was empty and will removed now!");
             self.current = None;
@@ -264,7 +265,7 @@ fn update_que(
             }
 
             ui_registry.ui_update = false;
-            
+
             spawn_ui_source(&mut commands, &name, &ui_registry, &mut ui_init);
 
             // Despawn outdated UI entity
