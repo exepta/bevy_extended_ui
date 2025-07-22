@@ -94,10 +94,10 @@ fn update_html_ui(
             continue;
         };
 
-        info!("Create UI for HTML with key [{:?}]", meta_key);
+        debug!("Create UI for HTML with key [{:?}]", meta_key);
 
         if !meta_controller.is_empty() {
-            info!("UI controller [{:?}]", meta_controller);
+            debug!("UI controller [{:?}]", meta_controller);
         }
 
         // Collect <label for="..."> mappings for input field labels

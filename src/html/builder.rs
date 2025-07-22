@@ -94,11 +94,9 @@ fn show_all_widgets_finish(
                         if let Some(map_nodes) = structure_map.html_map.get(active.as_str()) {
                             let mut valid_ids = Vec::new();
                             collect_html_ids(map_nodes, &mut valid_ids);
-                            //info!("Valid ids: {:?}", valid_ids);
 
-                            info!("Not too times!");
+                            debug!("show_all_widgets_finish: Not too times!");
                             for (mut visibility, widget_id) in query.iter_mut() {
-                                //info!("Setting visibility for: {:?}", widget_id);
                                 if valid_ids.contains(widget_id) {
                                     *visibility = Visibility::Inherited;
                                 }

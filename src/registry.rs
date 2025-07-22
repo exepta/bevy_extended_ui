@@ -302,7 +302,7 @@ fn spawn_ui_source(commands: &mut Commands, name: &str, ui_registry: &UiRegistry
             Name::new(name.to_string()),
             source.clone(),
         ));
-        info!("Loaded Registered UI {:?}", source);
+        debug!("Loaded Registered UI {:?}", source);
     } else {
         warn!("UI source {} not found in registry", name);
     }

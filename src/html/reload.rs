@@ -27,9 +27,9 @@ fn start_file_watcher(mut commands: Commands, ui_registry: Res<UiRegistry>) {
                     .join(watch_path);
             }
 
-            info!("============================================");
-            info!("Watching html file: {}", watch_path.display());
-            info!("============================================");
+            debug!("============================================");
+            debug!("Watching html file: {}", watch_path.display());
+            debug!("============================================");
 
             let (tx, rx) = channel();
 
@@ -76,5 +76,5 @@ fn reload_html(
     HTML_ID_COUNTER.store(1, std::sync::atomic::Ordering::Relaxed);
     registry.ui_update = true;
 
-    info!("Reloaded html file");
+    debug!("Reloaded html file");
 }
