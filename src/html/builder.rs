@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use crate::html::{AllWidgetsSpawned, HtmlEventBindings, HtmlID, HtmlMeta, HtmlStates, HtmlStructureMap, HtmlWidgetNode, NeedHidden, ShowWidgetsTimer, HTML_ID_COUNTER};
+use crate::html::{AllWidgetsSpawned, HtmlEventBindings, HtmlID, HtmlMeta, HtmlStates, HtmlStructureMap, HtmlWidgetNode, NeedHidden, ShowWidgetsTimer};
 use crate::styling::convert::{CssClass, CssID, CssSource};
 use crate::UIWidgetState;
 use crate::widgets::{HtmlBody, Widget};
@@ -87,7 +87,6 @@ fn show_all_widgets_finish(
     structure_map: Res<HtmlStructureMap>,
 ) {
     if timer.active && timer.timer.tick(time.delta()).finished() {
-        HTML_ID_COUNTER.store(1, std::sync::atomic::Ordering::Relaxed);
         if let Some(active) = structure_map.active.clone() {
             for body in current_body.iter() {
                 if let Some(bind) = body.bind_to_html.clone() {
@@ -95,10 +94,11 @@ fn show_all_widgets_finish(
                         if let Some(map_nodes) = structure_map.html_map.get(active.as_str()) {
                             let mut valid_ids = Vec::new();
                             collect_html_ids(map_nodes, &mut valid_ids);
-                            info!("Valid ids: {:?}", valid_ids);
+                            //info!("Valid ids: {:?}", valid_ids);
 
+                            info!("Not too times!");
                             for (mut visibility, widget_id) in query.iter_mut() {
-                                info!("Setting visibility for: {:?}", widget_id);
+                                //info!("Setting visibility for: {:?}", widget_id);
                                 if valid_ids.contains(widget_id) {
                                     *visibility = Visibility::Inherited;
                                 }
