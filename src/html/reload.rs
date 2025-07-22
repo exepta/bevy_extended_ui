@@ -5,6 +5,7 @@ use std::sync::mpsc::channel;
 use bevy::prelude::*;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
 use crate::html::{HtmlChangeEvent, HtmlWatcher, HTML_ID_COUNTER};
+use crate::html::builder::build_html_source;
 use crate::registry::UiRegistry;
 
 pub struct HtmlReloadSystem;
@@ -12,7 +13,7 @@ pub struct HtmlReloadSystem;
 impl Plugin for HtmlReloadSystem {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, start_file_watcher.run_if(resource_changed::<UiRegistry>));
-        app.add_systems(Update, (detect_changes, reload_html.after(detect_changes)).run_if(resource_exists::<HtmlWatcher>));
+        app.add_systems(Update, (detect_changes, reload_html.after(detect_changes)).run_if(resource_exists::<HtmlWatcher>).before(build_html_source));
     }
 }
 

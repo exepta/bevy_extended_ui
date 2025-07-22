@@ -22,7 +22,7 @@ impl Plugin for HtmlBuilderSystem {
 ///
 /// This system is triggered when the [`HtmlStructureMap`] resource changes.
 /// It looks up the active structure and recursively spawns UI entities for each node.
-fn build_html_source(
+pub fn build_html_source(
     mut commands: Commands,
     structure_map: Res<HtmlStructureMap>,
     asset_server: Res<AssetServer>,
@@ -113,6 +113,7 @@ fn show_all_widgets_finish(
         }
     }
 }
+
 fn collect_html_ids(nodes: &Vec<HtmlWidgetNode>, ids: &mut Vec<HtmlID>) {
     for node in nodes {
         match node {
