@@ -59,4 +59,4 @@ regex = "1.11.1"
 version = "0.31.0"
 
 [dependencies.notify]
-version = "8.1.0"
+version = "8.2.0"
