@@ -16,7 +16,7 @@ path = "src/lib.rs"
 
 # Bevy 0.16.0 main library
 [dependencies.bevy]
-version = "0.16.1"
+version = "0.17.2"
 default-features = false
 features = [
     "bevy_asset",
