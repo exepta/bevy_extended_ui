@@ -1,7 +1,7 @@
+use bevy::camera::visibility::RenderLayers;
 use bevy::ecs::relationship::RelatedSpawnerCommands;
 use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
 use bevy::prelude::*;
-use bevy::render::view::RenderLayers;
 use crate::styling::convert::{CssClass, CssSource, TagName};
 use crate::{BindToID, CurrentWidgetState, ExtendedUiConfiguration, IgnoreParentState, ImageCache, UIGenID, UIWidgetState};
 use crate::service::image_cache_service::{get_or_load_image, DEFAULT_CHOICE_BOX_KEY};
@@ -346,7 +346,7 @@ fn update_content_box_visibility(
 /// - `Node::top` on [`ChoiceOptionBase`] children
 /// - `WidgetStyle::top`
 fn handle_scroll_events(
-    mut scroll_events: EventReader<MouseWheel>,
+    mut scroll_events: MessageReader<MouseWheel>,
     mut layout_query: Query<(Entity, &Visibility, &Children), With<ChoiceLayoutBoxBase>>,
     mut option_query: Query<(&mut Node, &mut WidgetStyle, &ChildOf), With<ChoiceOptionBase>>,
     time: Res<Time>,
@@ -418,11 +418,11 @@ fn handle_scroll_events(
 /// - `UIWidgetState::open`
 /// - `CurrentWidgetState::widget_id`
 fn on_internal_click(
-    trigger: Trigger<Pointer<Click>>,
+    trigger: On<Pointer<Click>>,
     mut query: Query<(&mut UIWidgetState, &UIGenID), With<ChoiceBox>>,
     mut current_widget_state: ResMut<CurrentWidgetState>,
 ) {
-    if let Ok((mut state, gen_id)) = query.get_mut(trigger.target) {
+    if let Ok((mut state, gen_id)) = query.get_mut(trigger.entity) {
         state.focused = true;
         state.open = !state.open;
         current_widget_state.widget_id = gen_id.0;
@@ -439,10 +439,10 @@ fn on_internal_click(
 /// # Affects:
 /// - `UIWidgetState::hovered`
 fn on_internal_cursor_entered(
-    trigger: Trigger<Pointer<Over>>,
+    trigger: On<Pointer<Over>>,
     mut query: Query<&mut UIWidgetState, With<ChoiceBox>>,
 ) {
-    if let Ok(mut state) = query.get_mut(trigger.target) {
+    if let Ok(mut state) = query.get_mut(trigger.entity) {
         state.hovered = true;
     }
 }
@@ -455,10 +455,10 @@ fn on_internal_cursor_entered(
 /// # Affects:
 /// - `UIWidgetState::hovered`
 fn on_internal_cursor_leave(
-    trigger: Trigger<Pointer<Out>>,
+    trigger: On<Pointer<Out>>,
     mut query: Query<&mut UIWidgetState, With<ChoiceBox>>,
 ) {
-    if let Ok(mut state) = query.get_mut(trigger.target) {
+    if let Ok(mut state) = query.get_mut(trigger.entity) {
         state.hovered = false;
     }
 }
@@ -484,14 +484,14 @@ fn on_internal_cursor_leave(
 /// - `Text` in `SelectedOptionBase`
 /// - Optional: `UIWidgetState::focused`
 fn on_internal_option_click(
-    trigger: Trigger<Pointer<Click>>,
+    trigger: On<Pointer<Click>>,
     mut option_query: Query<(Entity, &mut UIWidgetState, &ChoiceOption, &BindToID, &Children), (With<ChoiceOptionBase>, Without<ChoiceBox>)>,
     mut parent_query: Query<(Entity, &mut UIWidgetState, &UIGenID, &mut ChoiceBox), (With<ChoiceBox>, Without<ChoiceOptionBase>)>,
     mut selected_query: Query<(&BindToID, &Children), With<SelectedOptionBase>>,
     mut text_query: Query<&mut Text>,
     mut inner_query: Query<&mut UIWidgetState, (Without<ChoiceOptionBase>,  Without<ChoiceBox>)>,
 ) {
-    let clicked_entity = trigger.target;
+    let clicked_entity = trigger.entity;
 
 
     let (clicked_parent_id, clicked_option_text, clicked_option_icon) =
@@ -549,11 +549,11 @@ fn on_internal_option_click(
 /// # Affects:
 /// - `UIWidgetState::hovered` on option and visual children
 fn on_internal_option_cursor_entered(
-    trigger: Trigger<Pointer<Over>>,
+    trigger: On<Pointer<Over>>,
     mut query: Query<(&mut UIWidgetState, &Children), With<ChoiceOptionBase>>,
     mut inner_query: Query<&mut UIWidgetState, Without<ChoiceOptionBase>>,
 ) {
-    if let Ok((mut state, children)) = query.get_mut(trigger.target) {
+    if let Ok((mut state, children)) = query.get_mut(trigger.entity) {
         state.hovered = true;
         
         for child in children.iter() {
@@ -572,11 +572,11 @@ fn on_internal_option_cursor_entered(
 /// # Affects:
 /// - `UIWidgetState::hovered` on option and visual children
 fn on_internal_option_cursor_leave(
-    trigger: Trigger<Pointer<Out>>,
+    trigger: On<Pointer<Out>>,
     mut query: Query<(&mut UIWidgetState, &Children), With<ChoiceOptionBase>>,
     mut inner_query: Query<&mut UIWidgetState, Without<ChoiceOptionBase>>,
 ) {
-    if let Ok((mut state, children)) = query.get_mut(trigger.target) {
+    if let Ok((mut state, children)) = query.get_mut(trigger.entity) {
         state.hovered = false;
 
         for child in children.iter() {

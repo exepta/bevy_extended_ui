@@ -27,8 +27,8 @@ fn register_functions(mut functions: ResMut<HtmlFunctionRegistry>) {
     functions.load.insert("test_4".to_string(), test_4);
 }
 
-fn login(event: Trigger<Pointer<Click>>, mut commands: Commands) {
-    info!("Clicked {:?}", event.target);
+fn login(event: On<Pointer<Click>>, mut commands: Commands) {
+    info!("Clicked {:?}", event.entity);
     commands.queue(|command: &mut World| {
         let info = command.resource::<HtmlFunctionRegistry>().click.len();
         info!("Info: {}", info);
@@ -40,16 +40,16 @@ fn login(event: Trigger<Pointer<Click>>, mut commands: Commands) {
     });
 }
 
-fn hover(event: Trigger<Pointer<Over>>, _commands: Commands) {
-    info!("Hovered {:?}", event.target);
+fn hover(event: On<Pointer<Over>>, _commands: Commands) {
+    info!("Hovered {:?}", event.entity);
 }
 
-fn username(event: Trigger<Pointer<Click>>, _commands: Commands) {
-    info!("Input Clicked {:?}", event.target);
+fn username(event: On<Pointer<Click>>, _commands: Commands) {
+    info!("Input Clicked {:?}", event.entity);
 }
 
-fn progress(event: Trigger<TimeTick>, mut commands: Commands) {
-    let target = event.target();
+fn progress(event: On<TimeTick>, mut commands: Commands) {
+    let target = event.entity;
 
     commands.queue(move |command: &mut World| {
         let mut query = command.query_filtered::<(Entity, &mut ProgressBar), With<ProgressBar>>();
@@ -65,19 +65,19 @@ fn progress(event: Trigger<TimeTick>, mut commands: Commands) {
     });
 }
 
-fn test(event: Trigger<WidgetInit>, _commands: Commands) {
-    info!("Load {:?} - 1", event.target);
+fn test(event: On<WidgetInit>, _commands: Commands) {
+    info!("Load {:?} - 1", event.entity);
 }
 
 
-fn test_2(event: Trigger<WidgetInit>, _commands: Commands) {
-    info!("Load {:?} - 2", event.target);
+fn test_2(event: On<WidgetInit>, _commands: Commands) {
+    info!("Load {:?} - 2", event.entity);
 }
 
-fn test_3(event: Trigger<WidgetInit>, _commands: Commands) {
-    info!("Load {:?} - 3", event.target);
+fn test_3(event: On<WidgetInit>, _commands: Commands) {
+    info!("Load {:?} - 3", event.entity);
 }
 
-fn test_4(event: Trigger<WidgetInit>, _commands: Commands) {
-    info!("Load {:?} - 4", event.target);
+fn test_4(event: On<WidgetInit>, _commands: Commands) {
+    info!("Load {:?} - 4", event.entity);
 }

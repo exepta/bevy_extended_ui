@@ -90,7 +90,7 @@ impl HtmlSource {
     
 }
 
-#[derive(Event)]
+#[derive(Event, Message)]
 pub struct AllWidgetsSpawned;
 
 #[derive(Component)]
@@ -108,7 +108,7 @@ pub struct HtmlWatcher {
     rx: Arc<Mutex<Receiver<std::result::Result<Event, Error>>>>,
 }
 
-#[derive(Event)]
+#[derive(Event, Message)]
 pub struct HtmlChangeEvent;
 
 /// A component that stores parsed CSS style data using Bevy's `Style` struct.
@@ -230,19 +230,19 @@ impl Default for HtmlID {
 ///
 /// These functions are called when a `Trigger` event for a pointer click occurs,
 /// receiving the event trigger and a `Commands` object to issue commands.
-type ClickObserverFn = fn(Trigger<Pointer<Click>>, Commands);
+type ClickObserverFn = fn(On<Pointer<Click>>, Commands);
 
 /// Function pointer type for mouse over event observers.
 ///
 /// These functions are called when a `Trigger` event for a pointer over occurs,
 /// receiving the event trigger and a `Commands` object.
-type OverObserverFn = fn(Trigger<Pointer<Over>>, Commands);
+type OverObserverFn = fn(On<Pointer<Over>>, Commands);
 
 /// Function pointer type for mouse out event observers.
 ///
 /// These functions are called when a `Trigger` event for a pointer out occurs,
 /// receiving the event trigger and a `Commands` object.
-type OutObserverFn = fn(Trigger<Pointer<Out>>, Commands);
+type OutObserverFn = fn(On<Pointer<Out>>, Commands);
 
 /// Function pointer type for update event observers.
 ///
@@ -251,7 +251,7 @@ type OutObserverFn = fn(Trigger<Pointer<Out>>, Commands);
 ///
 /// They receive the event trigger and a `Commands` object for issuing commands.
 /// Due to the frequency of these events, observers should be designed for efficient execution.
-type UpdateObserverFn = fn(Trigger<TimeTick>, Commands);
+type UpdateObserverFn = fn(On<TimeTick>, Commands);
 
 /// Type alias for a load observer function used to handle [`WidgetInit`] events.
 ///
@@ -264,7 +264,7 @@ type UpdateObserverFn = fn(Trigger<TimeTick>, Commands);
 ///
 /// # See also
 /// [`WidgetInit`], [`Commands`]
-type LoadObserverFn = fn(Trigger<WidgetInit>, Commands);
+type LoadObserverFn = fn(On<WidgetInit>, Commands);
 
 /// Registry resource that maps event handler names to their observer functions.
 ///
@@ -317,7 +317,7 @@ pub struct HtmlPlugin;
 impl Plugin for HtmlPlugin {
     /// Configures the app to support HTML parsing and UI construction.
     fn build(&self, app: &mut App) {
-        app.add_event::<HtmlChangeEvent>();
+        app.add_message::<HtmlChangeEvent>();
         app.init_resource::<HtmlStructureMap>();
         app.init_resource::<HtmlFunctionRegistry>();
         app.register_type::<HtmlEventBindings>();

@@ -1,9 +1,9 @@
 [package]
 name = "bevy_extended_ui"
-version = "0.2.2"
+version = "0.3.0"
 edition = "2024"
 authors = ["Daniel Ramke <genshin.exepta@outlook.com>"]
-description = "Create simply ui's in bevy like react from javascript"
+description = "Create simply ui's with css and html for bevy."
 license = "Apache-2.0"
 repository = "https://github.com/exepta/bevy_extended_ui"
 readme = "README.md"
@@ -14,9 +14,9 @@ categories = ["gui", "rendering"]
 name = "bevy_extended_ui"
 path = "src/lib.rs"
 
-# Bevy 0.16.0 main library
+# Bevy 0.17.0 main library
 [dependencies.bevy]
-version = "0.16.1"
+version = "0.17.2"
 default-features = false
 features = [
     "bevy_asset",
@@ -47,16 +47,16 @@ version = "0.8.1"
 
 # Css3 Converter
 [dependencies.lightningcss]
-version = "1.0.0-alpha.67"
+version = "1.0.0-alpha.68"
 
 [dependencies.once_cell]
 version = "1.21.3"
 
-[dependencies]
-regex = "1.11.1"
+[dependencies.regex]
+version = "1.12.2"
 
 [dependencies.bevy-inspector-egui]
-version = "0.31.0"
+version = "0.34.0"
 
 [dependencies.notify]
-version = "8.1.0"
+version = "8.2.0"

@@ -10,7 +10,7 @@ pub struct HtmlBuilderSystem;
 impl Plugin for HtmlBuilderSystem {
     /// Registers the HTML builder system to run whenever the HTML structure maps resource changes.
     fn build(&self, app: &mut App) {
-        app.add_event::<AllWidgetsSpawned>();
+        app.add_message::<AllWidgetsSpawned>();
         app.insert_resource(ShowWidgetsTimer::default());
         app.add_systems(Update, build_html_source.run_if(resource_changed::<HtmlStructureMap>));
         app.add_systems(Update, show_all_widgets_start.after(build_html_source));
@@ -26,7 +26,7 @@ pub fn build_html_source(
     mut commands: Commands,
     structure_map: Res<HtmlStructureMap>,
     asset_server: Res<AssetServer>,
-    mut event_writer: EventWriter<AllWidgetsSpawned>,
+    mut event_writer: MessageWriter<AllWidgetsSpawned>,
     mut query: Query<(&mut Visibility, &HtmlBody), With<HtmlBody>>,
 ) {
     if let Some(active) = structure_map.active.clone() {
@@ -56,7 +56,7 @@ fn spawn_structure_for_active(
     active: &str,
     structure_map: &Res<HtmlStructureMap>,
     asset_server: &Res<AssetServer>,
-    event_writer: &mut EventWriter<AllWidgetsSpawned>,
+    event_writer: &mut MessageWriter<AllWidgetsSpawned>,
 ) {
     if let Some(structure) = structure_map.html_map.get(active) {
         for node in structure {
@@ -69,7 +69,7 @@ fn spawn_structure_for_active(
 }
 
 fn show_all_widgets_start(
-    mut events: EventReader<AllWidgetsSpawned>,
+    mut events: MessageReader<AllWidgetsSpawned>,
     mut timer: ResMut<ShowWidgetsTimer>,
 ) {
     for _event in events.read() {
@@ -86,7 +86,7 @@ fn show_all_widgets_finish(
     current_body: Query<&HtmlBody>,
     structure_map: Res<HtmlStructureMap>,
 ) {
-    if timer.active && timer.timer.tick(time.delta()).finished() {
+    if timer.active && timer.timer.tick(time.delta()).is_finished() {
         if let Some(active) = structure_map.active.clone() {
             for body in current_body.iter() {
                 if let Some(bind) = body.bind_to_html.clone() {

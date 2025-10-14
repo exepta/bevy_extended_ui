@@ -22,13 +22,13 @@ fn main() {
             WindowPlugin {
                 primary_window: Some(Window {
                     title: "Debug Html UI".to_string(),
-                    resolution: WindowResolution::new(1270.0, 720.0),
+                    resolution: WindowResolution::new(1270, 720),
                     ..default()
                 }),
                 ..default()
             }
         ))
-        .add_plugins(EguiPlugin { enable_multipass_for_primary_context: true })
+        .add_plugins(EguiPlugin::default())
         .add_plugins(WorldInspectorPlugin::default().run_if(input_toggle_active(false, KeyCode::F1)))
         .add_plugins((ExtendedUiPlugin, ControllerPlugin))
         .add_systems(Startup, test_html_setup)

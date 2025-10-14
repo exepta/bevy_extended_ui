@@ -1,7 +1,8 @@
 #![feature(trivial_bounds)]
 use std::collections::HashMap;
+use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
-use bevy::render::view::RenderLayers;
+use bevy::render::view::Hdr;
 use crate::html::HtmlPlugin;
 use crate::observer::ObserverRegistryPlugin;
 use crate::registry::{UiInitResource, RegistryPlugin, UiRegistry, UI_ID_GENERATE};
@@ -158,18 +159,21 @@ fn load_ui_camera_system(
     mut query: Query<(Entity, &mut Camera, &mut RenderLayers), With<UiCamera>>,
 ) {
     if configuration.enable_default_camera {
-        if let Some((_, mut camera, mut layers)) = query.iter_mut().next() {
-            camera.hdr = configuration.hdr_support;
+        if let Some((cam_entity, mut camera, mut layers)) = query.iter_mut().next() {
+/*            camera.hdr = configuration.hdr_support;*/
             camera.order = configuration.order;
             *layers = RenderLayers::from_layers(configuration.render_layers.as_slice());
 
+            if configuration.hdr_support {
+                commands.entity(cam_entity).insert(Hdr::default());
+            }
+            
             info!("Ui Camera updated!");
         } else {
-            commands.spawn((
+            let cam_entity = commands.spawn((
                 Name::new("Extended Ui Camera"),
                 Camera2d,
                 Camera {
-                    hdr: configuration.hdr_support,
                     order: configuration.order,
                     ..default()
                 },
@@ -177,8 +181,11 @@ fn load_ui_camera_system(
                 RenderLayers::from_layers(configuration.render_layers.as_slice()),
                 Transform::from_translation(Vec3::Z * 1000.0),
                 UiCamera,
-            ));
+            )).id();
 
+            if configuration.hdr_support {
+                commands.entity(cam_entity).insert(Hdr::default());
+            }
             info!("Ui Camera created!");
         }
     } else {

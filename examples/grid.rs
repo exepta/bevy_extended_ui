@@ -10,7 +10,7 @@ fn main() {
             WindowPlugin {
                 primary_window: Some(Window {
                     title: "Debug Html Grid UI".to_string(),
-                    resolution: WindowResolution::new(1270.0, 720.0),
+                    resolution: WindowResolution::new(1270, 720),
                     ..default()
                 }),
                 ..default()

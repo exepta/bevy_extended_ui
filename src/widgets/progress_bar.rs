@@ -1,5 +1,5 @@
+use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
-use bevy::render::view::RenderLayers;
 use bevy::window::PrimaryWindow;
 use crate::styling::convert::{CssClass, CssSource, TagName};
 use crate::{BindToID, CurrentWidgetState, ExtendedUiConfiguration, UIGenID, UIWidgetState};
@@ -188,11 +188,11 @@ fn initialize_progress_bar_visual_state(
 /// This will set the `focused` state of the progress bar and update
 /// the currently active widget state in the global UI state resource.
 fn on_internal_click(
-    trigger: Trigger<Pointer<Click>>,
+    trigger: On<Pointer<Click>>,
     mut query: Query<(&mut UIWidgetState, &UIGenID), With<ProgressBar>>,
     mut current_widget_state: ResMut<CurrentWidgetState>
 ) {
-    if let Ok((mut state, gen_id)) = query.get_mut(trigger.target) {
+    if let Ok((mut state, gen_id)) = query.get_mut(trigger.entity) {
         state.focused = true;
         current_widget_state.widget_id = gen_id.0;
     }
@@ -202,10 +202,10 @@ fn on_internal_click(
 ///
 /// Sets the `hovered` flag to true in the widget state.
 fn on_internal_cursor_entered(
-    trigger: Trigger<Pointer<Over>>,
+    trigger: On<Pointer<Over>>,
     mut query: Query<&mut UIWidgetState, With<ProgressBar>>,
 ) {
-    if let Ok(mut state) = query.get_mut(trigger.target) {
+    if let Ok(mut state) = query.get_mut(trigger.entity) {
         state.hovered = true;
     }
 }
@@ -214,10 +214,10 @@ fn on_internal_cursor_entered(
 ///
 /// Resets the `hovered` flag to false in the widget state.
 fn on_internal_cursor_leave(
-    trigger: Trigger<Pointer<Out>>,
+    trigger: On<Pointer<Out>>,
     mut query: Query<&mut UIWidgetState, With<ProgressBar>>,
 ) {
-    if let Ok(mut state) = query.get_mut(trigger.target) {
+    if let Ok(mut state) = query.get_mut(trigger.entity) {
         state.hovered = false;
     }
 }

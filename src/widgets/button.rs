@@ -1,7 +1,7 @@
+use bevy::camera::visibility::RenderLayers;
 use bevy::ecs::relationship::RelatedSpawnerCommands;
 use bevy::prelude::*;
-use bevy::render::view::RenderLayers;
-use crate::{BindToID, CurrentWidgetState, ExtendedUiConfiguration, ImageCache, UIGenID, UIWidgetState};
+use crate::{widgets, BindToID, CurrentWidgetState, ExtendedUiConfiguration, ImageCache, UIGenID, UIWidgetState};
 use crate::styling::convert::{CssClass, CssSource, TagName};
 use crate::styling::IconPlace;
 use crate::styling::paint::Colored;
@@ -122,11 +122,11 @@ fn internal_node_creation_system(
 /// - `layer`: The render layer.
 /// - `css_source`: Used to apply class-based styling to the icon node.
 fn on_internal_click(
-    trigger: Trigger<Pointer<Click>>,
+    trigger: On<Pointer<Click>>,
     mut query: Query<(&mut UIWidgetState, &UIGenID), With<Button>>,
     mut current_widget_state: ResMut<CurrentWidgetState>
 ) {
-    if let Ok((mut state, gen_id)) = query.get_mut(trigger.target) {
+    if let Ok((mut state, gen_id)) = query.get_mut(trigger.entity) {
         state.focused = true;
         current_widget_state.widget_id = gen_id.0;
     }
@@ -137,10 +137,10 @@ fn on_internal_click(
 /// Sets the `focused` state to true and updates the global `CurrentWidgetState`
 /// to track the focused widget's ID.
 fn on_internal_cursor_entered(
-    trigger: Trigger<Pointer<Over>>,
+    trigger: On<Pointer<Over>>,
     mut query: Query<&mut UIWidgetState, With<Button>>,
 ) {
-    if let Ok(mut state) = query.get_mut(trigger.target) {
+    if let Ok(mut state) = query.get_mut(trigger.entity) {
         state.hovered = true;
     }
 }
@@ -149,10 +149,10 @@ fn on_internal_cursor_entered(
 ///
 /// Sets the `hovered` flag on the widget's UI state.
 fn on_internal_cursor_leave(
-    trigger: Trigger<Pointer<Out>>,
+    trigger: On<Pointer<Out>>,
     mut query: Query<&mut UIWidgetState, With<Button>>,
 ) {
-    if let Ok(mut state) = query.get_mut(trigger.target) {
+    if let Ok(mut state) = query.get_mut(trigger.entity) {
         state.hovered = false;
     }
 }
@@ -162,7 +162,7 @@ fn on_internal_cursor_leave(
 /// Clears the `hovered` flag on the widget's UI state.
 fn place_icon(
     builder: &mut RelatedSpawnerCommands<ChildOf>, 
-    btn: &Button, 
+    btn: &widgets::Button,
     asset_server: &Res<AssetServer>,
     image_cache: &mut ResMut<ImageCache>,
     id: usize, 
@@ -170,8 +170,9 @@ fn place_icon(
     css_source: CssSource,
 ) {
     if let Some(icon) = btn.icon_path.clone() {
+        let owned_icon = icon.to_string();
         let handle = image_cache.map.entry(icon.clone())
-            .or_insert_with(|| asset_server.load(icon.as_str()))
+            .or_insert_with(|| asset_server.load(owned_icon.clone()))
             .clone();
         
         builder.spawn((

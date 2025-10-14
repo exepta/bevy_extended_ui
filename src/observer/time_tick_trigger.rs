@@ -4,10 +4,10 @@ use crate::widgets::WidgetId;
 /// Event representing a tick targeted at a specific widget entity.
 ///
 /// Contains the target entity and the associated widget data.
-#[derive(Event)]
+#[derive(Message, EntityEvent)]
 pub struct TimeTick {
     /// The entity that is the target of this tick event.
-    pub target: Entity,
+    pub entity: Entity,
     /// The widget data identifier associated with the target.
     pub widget_data: WidgetId,
 }
@@ -25,7 +25,7 @@ impl Plugin for TimeTickTriggerObserver {
     /// # Parameters
     /// - `app`: Mutable reference to the Bevy app builder.
     fn build(&self, app: &mut App) {
-        app.add_event::<TimeTick>();
+        app.add_message::<TimeTick>();
         app.add_systems(Update, emit_time_tick);
     }
 }
@@ -40,6 +40,6 @@ impl Plugin for TimeTickTriggerObserver {
 /// - `query`: Query that retrieves all entities with `WidgetId`.
 fn emit_time_tick(mut commands: Commands, query: Query<(Entity, &WidgetId)>) {
     for (entity, data) in query.iter() {
-        commands.trigger_targets(TimeTick { target: entity, widget_data: data.clone() }, entity);
+        commands.trigger(TimeTick { entity, widget_data: data.clone() });
     }
 }

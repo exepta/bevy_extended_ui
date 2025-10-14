@@ -1,5 +1,5 @@
+use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
-use bevy::render::view::RenderLayers;
 use crate::{CurrentWidgetState, ExtendedUiConfiguration, UIGenID, UIWidgetState};
 use crate::styling::convert::{CssSource, TagName};
 use crate::widgets::{Headline, WidgetId, WidgetKind};
@@ -104,11 +104,11 @@ fn update_text(mut query: Query<(&mut Text, &Headline), With<Headline>>) {
 /// - `UIWidgetState::focused`
 /// - `CurrentWidgetState::widget_id`
 fn on_internal_click(
-    trigger: Trigger<Pointer<Click>>,
+    trigger: On<Pointer<Click>>,
     mut query: Query<(&mut UIWidgetState, &UIGenID), With<Headline>>,
     mut current_widget_state: ResMut<CurrentWidgetState>
 ) {
-    if let Ok((mut state, gen_id)) = query.get_mut(trigger.target) {
+    if let Ok((mut state, gen_id)) = query.get_mut(trigger.entity) {
         state.focused = true;
         current_widget_state.widget_id = gen_id.0;
     }
@@ -124,10 +124,10 @@ fn on_internal_click(
 /// # Affects:
 /// - `UIWidgetState::hovered`
 fn on_internal_cursor_entered(
-    trigger: Trigger<Pointer<Over>>,
+    trigger: On<Pointer<Over>>,
     mut query: Query<&mut UIWidgetState, With<Headline>>,
 ) {
-    if let Ok(mut state) = query.get_mut(trigger.target) {
+    if let Ok(mut state) = query.get_mut(trigger.entity) {
         state.hovered = true;
     }
 }
@@ -142,10 +142,10 @@ fn on_internal_cursor_entered(
 /// # Affects:
 /// - `UIWidgetState::hovered`
 fn on_internal_cursor_leave(
-    trigger: Trigger<Pointer<Out>>,
+    trigger: On<Pointer<Out>>,
     mut query: Query<&mut UIWidgetState, With<Headline>>,
 ) {
-    if let Ok(mut state) = query.get_mut(trigger.target) {
+    if let Ok(mut state) = query.get_mut(trigger.entity) {
         state.hovered = false;
     }
 }
