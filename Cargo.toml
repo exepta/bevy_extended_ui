@@ -17,29 +17,7 @@ path = "src/lib.rs"
 # Bevy 0.17.0 main library
 [dependencies.bevy]
 version = "0.17.2"
-default-features = false
-features = [
-    "bevy_asset",
-    "bevy_color",
-    "bevy_core_pipeline",
-    "bevy_render",
-    "bevy_text",
-    "bevy_ui",
-    "default_font",
-    "multi_threaded",
-    "png",
-    "jpeg",
-    "gif",
-    "ico",
-    "webp",
-    "bevy_mesh_picking_backend",
-    "bevy_picking",
-    "custom_cursor",
-    "bevy_ui_picking_backend",
-    "bevy_winit",
-    "x11",
-    "bevy_log"
-]
+default-features = true
 
 # Html Converter
 [dependencies.kuchiki]

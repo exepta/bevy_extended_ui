@@ -870,14 +870,16 @@ fn get_active_text_color(style: &WidgetStyle) -> Color {
 /// - `query`: Query to access mutable UI widget state and generation ID of input fields.
 /// - `current_widget_state`: Mutable resource tracking the currently focused widget ID.
 fn on_internal_click(
-    trigger: On<Pointer<Click>>,
+    mut trigger: On<Pointer<Click>>,
     mut query: Query<(&mut UIWidgetState, &UIGenID), With<InputField>>,
     mut current_widget_state: ResMut<CurrentWidgetState>
 ) {
-    if let Ok((mut state, gen_id)) = query.get_mut(trigger.entity) {
+    if let Ok((mut state, gen_id)) = query.get_mut(trigger.event_target()) {
         state.focused = true;
         current_widget_state.widget_id = gen_id.0;
     }
+
+    trigger.propagate(false);
 }
 
 /// Handles pointer cursor entering input fields.
@@ -888,12 +890,14 @@ fn on_internal_click(
 /// - `trigger`: The pointer over trigger containing the target entity.
 /// - `query`: Query to access mutable UI widget state of input fields.
 fn on_internal_cursor_entered(
-    trigger: On<Pointer<Over>>,
+    mut trigger: On<Pointer<Over>>,
     mut query: Query<&mut UIWidgetState, With<InputField>>,
 ) {
-    if let Ok(mut state) = query.get_mut(trigger.entity) {
+    if let Ok(mut state) = query.get_mut(trigger.event_target()) {
         state.hovered = true;
     }
+
+    trigger.propagate(false);
 }
 
 /// Handles pointer cursor leaving input fields.
@@ -904,10 +908,12 @@ fn on_internal_cursor_entered(
 /// - `trigger`: The pointer out trigger containing the target entity.
 /// - `query`: Query to access mutable UI widget state of input fields.
 fn on_internal_cursor_leave(
-    trigger: On<Pointer<Out>>,
+    mut trigger: On<Pointer<Out>>,
     mut query: Query<&mut UIWidgetState, With<InputField>>,
 ) {
-    if let Ok(mut state) = query.get_mut(trigger.entity) {
+    if let Ok(mut state) = query.get_mut(trigger.event_target()) {
         state.hovered = false;
     }
+
+    trigger.propagate(false);
 }

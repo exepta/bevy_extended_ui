@@ -149,7 +149,7 @@ fn internal_node_creation_system(
 /// - If unchecked, despawns any child nodes under the `CheckBoxMark`.
 /// - Sets `focused = true` and toggles `checked`.
 fn on_internal_click(
-    trigger: On<Pointer<Click>>,
+    mut trigger: On<Pointer<Click>>,
     mut commands: Commands,
     mut query: Query<(&mut UIWidgetState, &UIGenID, &CheckBox, &CssSource), With<CheckBox>>,
     inner_query: Query<(Entity, &BindToID, Option<&Children>, &ComputedNode), With<CheckBoxMark>>,
@@ -211,6 +211,8 @@ fn on_internal_click(
             }
         }
     }
+    
+    trigger.propagate(false);
 }
 
 /// Handles cursor-entered events on checkboxes.
@@ -222,12 +224,14 @@ fn on_internal_click(
 /// - `trigger`: A [`On<Pointer<Over>>`] when the pointer enters the checkbox area.
 /// - `query`: Query for the UI widget state to be modified.
 fn on_internal_cursor_entered(
-    trigger: On<Pointer<Over>>,
+    mut trigger: On<Pointer<Over>>,
     mut query: Query<&mut UIWidgetState, With<CheckBox>>,
 ) {
     if let Ok(mut state) = query.get_mut(trigger.entity) {
         state.hovered = true;
     }
+
+    trigger.propagate(false);
 }
 
 /// Handles cursor-leave events on checkboxes.
@@ -239,10 +243,12 @@ fn on_internal_cursor_entered(
 /// - `trigger`: A [`On<Pointer<Out>>`] when the pointer leaves the checkbox area.
 /// - `query`: Query for the UI widget state to be modified.
 fn on_internal_cursor_leave(
-    trigger: On<Pointer<Out>>,
+    mut trigger: On<Pointer<Out>>,
     mut query: Query<&mut UIWidgetState, With<CheckBox>>,
 ) {
     if let Ok(mut state) = query.get_mut(trigger.entity) {
         state.hovered = false;
     }
+
+    trigger.propagate(false);
 }

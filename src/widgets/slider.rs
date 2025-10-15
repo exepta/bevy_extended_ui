@@ -140,7 +140,7 @@ fn internal_node_creation_system(
 /// - `query`: Query to access and mutate UI widget state and generation ID for sliders.
 /// - `current_widget_state`: Mutable resource tracking the currently focused widget.
 fn on_internal_click(
-    trigger: On<Pointer<Click>>,
+    mut trigger: On<Pointer<Click>>,
     mut query: Query<(&mut UIWidgetState, &UIGenID), With<Slider>>,
     mut current_widget_state: ResMut<CurrentWidgetState>
 ) {
@@ -148,6 +148,8 @@ fn on_internal_click(
         state.focused = true;
         current_widget_state.widget_id = gen_id.0;
     }
+
+    trigger.propagate(false);
 }
 
 /// Event handler for pointer cursor entering slider entities.
@@ -158,12 +160,14 @@ fn on_internal_click(
 /// - `trigger`: The pointer over event trigger containing the target entity.
 /// - `query`: Query to mutate UI widget state for sliders.
 fn on_internal_cursor_entered(
-    trigger: On<Pointer<Over>>,
+    mut trigger: On<Pointer<Over>>,
     mut query: Query<&mut UIWidgetState, With<Slider>>,
 ) {
     if let Ok(mut state) = query.get_mut(trigger.entity) {
         state.hovered = true;
     }
+
+    trigger.propagate(false);
 }
 
 /// Event handler for pointer cursor leaving slider entities.
@@ -174,12 +178,14 @@ fn on_internal_cursor_entered(
 /// - `trigger`: The pointer out event trigger containing the target entity.
 /// - `query`: Query to mutate UI widget state for sliders.
 fn on_internal_cursor_leave(
-    trigger: On<Pointer<Out>>,
+    mut trigger: On<Pointer<Out>>,
     mut query: Query<&mut UIWidgetState, With<Slider>>,
 ) {
     if let Ok(mut state) = query.get_mut(trigger.entity) {
         state.hovered = false;
     }
+
+    trigger.propagate(false);
 }
 
 /// Handles dragging of the slider thumb, updating its position and the slider value.

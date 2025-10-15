@@ -160,7 +160,7 @@ fn update_src(
 /// - `UIWidgetState::focused`
 /// - `CurrentWidgetState::widget_id`
 fn on_internal_click(
-    trigger: On<Pointer<Click>>,
+    mut trigger: On<Pointer<Click>>,
     mut query: Query<(&mut UIWidgetState, &UIGenID), With<Img>>,
     mut current_widget_state: ResMut<CurrentWidgetState>
 ) {
@@ -168,6 +168,8 @@ fn on_internal_click(
         state.focused = true;
         current_widget_state.widget_id = gen_id.0;
     }
+
+    trigger.propagate(false);
 }
 
 /// Marks an [`Img`] node as hovered when the cursor enters.
@@ -178,12 +180,14 @@ fn on_internal_click(
 /// # Affects:
 /// - `UIWidgetState::hovered`
 fn on_internal_cursor_entered(
-    trigger: On<Pointer<Over>>,
+    mut trigger: On<Pointer<Over>>,
     mut query: Query<&mut UIWidgetState, With<Img>>,
 ) {
     if let Ok(mut state) = query.get_mut(trigger.entity) {
         state.hovered = true;
     }
+
+    trigger.propagate(false);
 }
 
 /// Unsets the hover state of an [`Img`] node when the cursor exits.
@@ -194,10 +198,12 @@ fn on_internal_cursor_entered(
 /// # Affects:
 /// - `UIWidgetState::hovered`
 fn on_internal_cursor_leave(
-    trigger: On<Pointer<Out>>,
+    mut trigger: On<Pointer<Out>>,
     mut query: Query<&mut UIWidgetState, With<Img>>,
 ) {
     if let Ok(mut state) = query.get_mut(trigger.entity) {
         state.hovered = false;
     }
+
+    trigger.propagate(false);
 }

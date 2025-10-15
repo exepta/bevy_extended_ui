@@ -418,7 +418,7 @@ fn handle_scroll_events(
 /// - `UIWidgetState::open`
 /// - `CurrentWidgetState::widget_id`
 fn on_internal_click(
-    trigger: On<Pointer<Click>>,
+    mut trigger: On<Pointer<Click>>,
     mut query: Query<(&mut UIWidgetState, &UIGenID), With<ChoiceBox>>,
     mut current_widget_state: ResMut<CurrentWidgetState>,
 ) {
@@ -427,6 +427,8 @@ fn on_internal_click(
         state.open = !state.open;
         current_widget_state.widget_id = gen_id.0;
     }
+
+    trigger.propagate(false);
 }
 
 /// Sets `hovered = true` on a [`ChoiceBox`] when the cursor enters its area.
@@ -439,12 +441,14 @@ fn on_internal_click(
 /// # Affects:
 /// - `UIWidgetState::hovered`
 fn on_internal_cursor_entered(
-    trigger: On<Pointer<Over>>,
+    mut trigger: On<Pointer<Over>>,
     mut query: Query<&mut UIWidgetState, With<ChoiceBox>>,
 ) {
     if let Ok(mut state) = query.get_mut(trigger.entity) {
         state.hovered = true;
     }
+
+    trigger.propagate(false);
 }
 
 /// Sets `hovered = false` on a [`ChoiceBox`] when the cursor exits its area.
@@ -455,12 +459,14 @@ fn on_internal_cursor_entered(
 /// # Affects:
 /// - `UIWidgetState::hovered`
 fn on_internal_cursor_leave(
-    trigger: On<Pointer<Out>>,
+    mut trigger: On<Pointer<Out>>,
     mut query: Query<&mut UIWidgetState, With<ChoiceBox>>,
 ) {
     if let Ok(mut state) = query.get_mut(trigger.entity) {
         state.hovered = false;
     }
+
+    trigger.propagate(false);
 }
 
 // Option Component

@@ -135,6 +135,7 @@ impl Plugin for ExtendedUiPlugin {
         app.register_type::<UIGenID>();
         app.register_type::<BindToID>();
         app.register_type::<UIWidgetState>();
+        app.register_type::<Camera>();
         app.add_plugins((RegistryPlugin, ObserverRegistryPlugin, HtmlPlugin, StylingPlugin, ServicePlugin, WidgetPlugin));
         app.add_systems(Update, load_ui_camera_system
             .run_if(resource_changed::<ExtendedUiConfiguration>));
@@ -167,7 +168,7 @@ fn load_ui_camera_system(
             if configuration.hdr_support {
                 commands.entity(cam_entity).insert(Hdr::default());
             }
-            
+
             info!("Ui Camera updated!");
         } else {
             let cam_entity = commands.spawn((

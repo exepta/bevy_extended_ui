@@ -188,7 +188,7 @@ fn initialize_progress_bar_visual_state(
 /// This will set the `focused` state of the progress bar and update
 /// the currently active widget state in the global UI state resource.
 fn on_internal_click(
-    trigger: On<Pointer<Click>>,
+    mut trigger: On<Pointer<Click>>,
     mut query: Query<(&mut UIWidgetState, &UIGenID), With<ProgressBar>>,
     mut current_widget_state: ResMut<CurrentWidgetState>
 ) {
@@ -196,28 +196,34 @@ fn on_internal_click(
         state.focused = true;
         current_widget_state.widget_id = gen_id.0;
     }
+
+    trigger.propagate(false);
 }
 
 /// Called when the mouse enters the progress bar.
 ///
 /// Sets the `hovered` flag to true in the widget state.
 fn on_internal_cursor_entered(
-    trigger: On<Pointer<Over>>,
+    mut trigger: On<Pointer<Over>>,
     mut query: Query<&mut UIWidgetState, With<ProgressBar>>,
 ) {
     if let Ok(mut state) = query.get_mut(trigger.entity) {
         state.hovered = true;
     }
+
+    trigger.propagate(false);
 }
 
 /// Called when the mouse leaves the progress bar.
 ///
 /// Resets the `hovered` flag to false in the widget state.
 fn on_internal_cursor_leave(
-    trigger: On<Pointer<Out>>,
+    mut trigger: On<Pointer<Out>>,
     mut query: Query<&mut UIWidgetState, With<ProgressBar>>,
 ) {
     if let Ok(mut state) = query.get_mut(trigger.entity) {
         state.hovered = false;
     }
+    
+    trigger.propagate(false);
 }

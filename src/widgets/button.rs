@@ -122,7 +122,7 @@ fn internal_node_creation_system(
 /// - `layer`: The render layer.
 /// - `css_source`: Used to apply class-based styling to the icon node.
 fn on_internal_click(
-    trigger: On<Pointer<Click>>,
+    mut trigger: On<Pointer<Click>>,
     mut query: Query<(&mut UIWidgetState, &UIGenID), With<Button>>,
     mut current_widget_state: ResMut<CurrentWidgetState>
 ) {
@@ -130,6 +130,8 @@ fn on_internal_click(
         state.focused = true;
         current_widget_state.widget_id = gen_id.0;
     }
+
+    trigger.propagate(false);
 }
 
 /// Handles click events for [`Button`] components.
@@ -137,24 +139,28 @@ fn on_internal_click(
 /// Sets the `focused` state to true and updates the global `CurrentWidgetState`
 /// to track the focused widget's ID.
 fn on_internal_cursor_entered(
-    trigger: On<Pointer<Over>>,
+    mut trigger: On<Pointer<Over>>,
     mut query: Query<&mut UIWidgetState, With<Button>>,
 ) {
     if let Ok(mut state) = query.get_mut(trigger.entity) {
         state.hovered = true;
     }
+
+    trigger.propagate(false);
 }
 
 /// Handle pointer hover enters events for [`Button`] components.
 ///
 /// Sets the `hovered` flag on the widget's UI state.
 fn on_internal_cursor_leave(
-    trigger: On<Pointer<Out>>,
+    mut trigger: On<Pointer<Out>>,
     mut query: Query<&mut UIWidgetState, With<Button>>,
 ) {
     if let Ok(mut state) = query.get_mut(trigger.entity) {
         state.hovered = false;
     }
+
+    trigger.propagate(false);
 }
 
 /// Handle pointer hover leave events for [`Button`] components.
