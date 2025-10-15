@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::time::Duration;
+use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
-use bevy::render::view::RenderLayers;
 use crate::styling::convert::{CssClass, CssSource, TagName};
 use crate::{BindToID, CurrentWidgetState, ExtendedUiConfiguration, ImageCache, UIGenID, UIWidgetState};
 use crate::styling::{Background, FontVal};
@@ -131,8 +131,9 @@ fn internal_node_creation_system(
             InputFieldBase
         )).with_children(|builder| {
             if let Some(icon_path) = field.icon_path.clone() {
+                let owned_icon = icon_path.to_string();
                 let handle = image_cache.map.entry(icon_path.clone())
-                    .or_insert_with(|| asset_server.load(icon_path.as_str()))
+                    .or_insert_with(|| asset_server.load(owned_icon.clone()))
                     .clone();
 
                 // Icon left
@@ -388,7 +389,7 @@ fn update_cursor_position(
                 if keyboard_input.pressed(key) {
                     if let Some(timer) = key_repeat.timers.get_mut(&key) {
                         timer.tick(time.delta());
-                        if timer.finished() {
+                        if timer.is_finished() {
                             match key {
                                 KeyCode::ArrowLeft => {
                                     text_field.cursor_position = text_field.cursor_position.saturating_sub(1);
@@ -520,19 +521,19 @@ fn handle_input_horizontal_scroll(
             if bind_id.0 == ui_id.0 {
                 match input_field.cap_text_at {
                     InputCap::NoCap => {
-                        let visible_left = scroll.offset_x;
-                        let visible_right = scroll.offset_x + available_width;
+                        let visible_left = scroll.x;
+                        let visible_right = scroll.x + available_width;
 
                         if cursor_x > visible_right {
-                            scroll.offset_x = cursor_x - available_width + char_width;
+                            scroll.x = cursor_x - available_width + char_width;
                         }
                         else if cursor_x < visible_left {
-                            scroll.offset_x = cursor_x;
+                            scroll.x = cursor_x;
                         }
 
                         let total_text_width = input_field.text.len() as f32 * char_width;
                         if total_text_width < available_width {
-                            scroll.offset_x = 0.0;
+                            scroll.x = 0.0;
                         }
                     }
                     _ => {}
@@ -657,7 +658,7 @@ fn handle_typing(
 
                             if let Some(timer) = key_repeat.timers.get_mut(key) {
                                 timer.tick(time.delta());
-                                if timer.finished() {
+                                if timer.is_finished() {
                                     in_field.text.push(char);
                                     in_field.cursor_position += 1;
                                     if in_field.input_type.eq(&InputType::Password) {
@@ -675,7 +676,7 @@ fn handle_typing(
                     if keyboard.pressed(KeyCode::Backspace) {
                         if let Some(timer) = key_repeat.timers.get_mut(&KeyCode::Backspace) {
                             timer.tick(time.delta());
-                            if timer.finished() {
+                            if timer.is_finished() {
                                 if in_field.cursor_position > 0 && !in_field.text.is_empty() {
                                     in_field.text.pop();
                                     in_field.cursor_position -= 1;
@@ -869,14 +870,16 @@ fn get_active_text_color(style: &WidgetStyle) -> Color {
 /// - `query`: Query to access mutable UI widget state and generation ID of input fields.
 /// - `current_widget_state`: Mutable resource tracking the currently focused widget ID.
 fn on_internal_click(
-    trigger: Trigger<Pointer<Click>>,
+    mut trigger: On<Pointer<Click>>,
     mut query: Query<(&mut UIWidgetState, &UIGenID), With<InputField>>,
     mut current_widget_state: ResMut<CurrentWidgetState>
 ) {
-    if let Ok((mut state, gen_id)) = query.get_mut(trigger.target) {
+    if let Ok((mut state, gen_id)) = query.get_mut(trigger.event_target()) {
         state.focused = true;
         current_widget_state.widget_id = gen_id.0;
     }
+
+    trigger.propagate(false);
 }
 
 /// Handles pointer cursor entering input fields.
@@ -887,12 +890,14 @@ fn on_internal_click(
 /// - `trigger`: The pointer over trigger containing the target entity.
 /// - `query`: Query to access mutable UI widget state of input fields.
 fn on_internal_cursor_entered(
-    trigger: Trigger<Pointer<Over>>,
+    mut trigger: On<Pointer<Over>>,
     mut query: Query<&mut UIWidgetState, With<InputField>>,
 ) {
-    if let Ok(mut state) = query.get_mut(trigger.target) {
+    if let Ok(mut state) = query.get_mut(trigger.event_target()) {
         state.hovered = true;
     }
+
+    trigger.propagate(false);
 }
 
 /// Handles pointer cursor leaving input fields.
@@ -903,10 +908,12 @@ fn on_internal_cursor_entered(
 /// - `trigger`: The pointer out trigger containing the target entity.
 /// - `query`: Query to access mutable UI widget state of input fields.
 fn on_internal_cursor_leave(
-    trigger: Trigger<Pointer<Out>>,
+    mut trigger: On<Pointer<Out>>,
     mut query: Query<&mut UIWidgetState, With<InputField>>,
 ) {
-    if let Ok(mut state) = query.get_mut(trigger.target) {
+    if let Ok(mut state) = query.get_mut(trigger.event_target()) {
         state.hovered = false;
     }
+
+    trigger.propagate(false);
 }

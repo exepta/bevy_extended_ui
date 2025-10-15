@@ -1,5 +1,5 @@
+use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
-use bevy::render::view::RenderLayers;
 use crate::{CurrentWidgetState, ExtendedUiConfiguration, UIGenID, UIWidgetState};
 use crate::styling::convert::{CssSource, TagName};
 use crate::styling::paint::Colored;
@@ -84,14 +84,16 @@ fn internal_node_creation_system(
 /// - `UIWidgetState::focused`
 /// - `CurrentWidgetState::widget_id`
 fn on_internal_click(
-    trigger: Trigger<Pointer<Click>>,
+    mut trigger: On<Pointer<Click>>,
     mut query: Query<(&mut UIWidgetState, &UIGenID), With<Div>>,
     mut current_widget_state: ResMut<CurrentWidgetState>
 ) {
-    if let Ok((mut state, gen_id)) = query.get_mut(trigger.target) {
+    if let Ok((mut state, gen_id)) = query.get_mut(trigger.entity) {
         state.focused = true;
         current_widget_state.widget_id = gen_id.0;
     }
+
+    trigger.propagate(false);
 }
 
 /// Sets `hovered = true` when the cursor enters a [`Div`] widget's bounds.
@@ -104,12 +106,14 @@ fn on_internal_click(
 /// # Affects:
 /// - `UIWidgetState::hovered`
 fn on_internal_cursor_entered(
-    trigger: Trigger<Pointer<Over>>,
+    mut trigger: On<Pointer<Over>>,
     mut query: Query<&mut UIWidgetState, With<Div>>,
 ) {
-    if let Ok(mut state) = query.get_mut(trigger.target) {
+    if let Ok(mut state) = query.get_mut(trigger.entity) {
         state.hovered = true;
     }
+
+    trigger.propagate(false);
 }
 
 /// Sets `hovered = false` when the cursor leaves a [`Div`] widget's bounds.
@@ -120,10 +124,12 @@ fn on_internal_cursor_entered(
 /// # Affects:
 /// - `UIWidgetState::hovered`
 fn on_internal_cursor_leave(
-    trigger: Trigger<Pointer<Out>>,
+    mut trigger: On<Pointer<Out>>,
     mut query: Query<&mut UIWidgetState, With<Div>>,
 ) {
-    if let Ok(mut state) = query.get_mut(trigger.target) {
+    if let Ok(mut state) = query.get_mut(trigger.entity) {
         state.hovered = false;
     }
+
+    trigger.propagate(false);
 }

@@ -63,7 +63,8 @@ pub fn get_or_load_image(
         return handle.clone();
     }
 
-    let handle: Handle<Image> = asset_server.load(path);
+    let owned_path = path.to_string();
+    let handle: Handle<Image> = asset_server.load(owned_path.clone());
 
     if handle.path().is_none() {
         warn!("Image not found at '{}', using embedded fallback.", path);
@@ -109,12 +110,14 @@ pub fn pre_load_assets(
                 if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
                     if supported_extensions.contains(&ext.to_lowercase().as_str()) {
                         if let Some(asset_path) = path.strip_prefix("assets").ok() {
-                            let asset_str = asset_path.to_str().unwrap_or_default();
+                            if let Some(asset_str) = asset_path.to_str() {
+                                let owned_path = asset_str.to_string();
 
-                            let handle: Handle<Image> = asset_server.load(asset_str);
-                            image_cache.map.insert(asset_str.to_string(), handle.clone());
+                                let handle: Handle<Image> = asset_server.load(owned_path.clone());
+                                image_cache.map.insert(owned_path.clone(), handle.clone());
 
-                            debug!("Preloaded image: {}", asset_str);
+                                debug!("Preloaded image: {}", owned_path);
+                            }
                         }
                     }
                 }

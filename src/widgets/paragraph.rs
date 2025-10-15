@@ -1,5 +1,5 @@
+use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
-use bevy::render::view::RenderLayers;
 use crate::{CurrentWidgetState, ExtendedUiConfiguration, UIGenID, UIWidgetState};
 use crate::styling::convert::{CssSource, TagName};
 use crate::widgets::{Paragraph, WidgetId, WidgetKind};
@@ -88,14 +88,16 @@ fn update_text(mut query: Query<(&mut Text, &Paragraph), With<Paragraph>>) {
 /// - `query`: Query to access mutable UI widget state and generation ID of paragraphs.
 /// - `current_widget_state`: Mutable resource tracking the currently focused widget ID.
 fn on_internal_click(
-    trigger: Trigger<Pointer<Click>>,
+    mut trigger: On<Pointer<Click>>,
     mut query: Query<(&mut UIWidgetState, &UIGenID), With<Paragraph>>,
     mut current_widget_state: ResMut<CurrentWidgetState>
 ) {
-    if let Ok((mut state, gen_id)) = query.get_mut(trigger.target) {
+    if let Ok((mut state, gen_id)) = query.get_mut(trigger.entity) {
         state.focused = true;
         current_widget_state.widget_id = gen_id.0;
     }
+
+    trigger.propagate(false);
 }
 
 /// Handles the pointer cursor entering paragraph nodes.
@@ -106,12 +108,14 @@ fn on_internal_click(
 /// - `trigger`: The pointer over trigger containing the target entity.
 /// - `query`: Query to access mutable UI widget state of paragraphs.
 fn on_internal_cursor_entered(
-    trigger: Trigger<Pointer<Over>>,
+    mut trigger: On<Pointer<Over>>,
     mut query: Query<&mut UIWidgetState, With<Paragraph>>,
 ) {
-    if let Ok(mut state) = query.get_mut(trigger.target) {
+    if let Ok(mut state) = query.get_mut(trigger.entity) {
         state.hovered = true;
     }
+
+    trigger.propagate(false);
 }
 
 /// Handles pointer cursor leaving paragraph nodes.
@@ -122,10 +126,12 @@ fn on_internal_cursor_entered(
 /// - `trigger`: The pointer out trigger containing the target entity.
 /// - `query`: Query to access mutable UI widget state of paragraphs.
 fn on_internal_cursor_leave(
-    trigger: Trigger<Pointer<Out>>,
+    mut trigger: On<Pointer<Out>>,
     mut query: Query<&mut UIWidgetState, With<Paragraph>>,
 ) {
-    if let Ok(mut state) = query.get_mut(trigger.target) {
+    if let Ok(mut state) = query.get_mut(trigger.entity) {
         state.hovered = false;
     }
+
+    trigger.propagate(false);
 }

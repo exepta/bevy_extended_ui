@@ -1,0 +1,4 @@
+[toolchain]
+channel = "nightly-2025-08-07"   # oder einfach "nightly"
+components = ["clippy","rustfmt"] # ggf. "miri", "rustc-codegen-cranelift"
+profile = "minimal"

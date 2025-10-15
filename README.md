@@ -154,6 +154,7 @@ The crate supports many CSS things, the list below shows the future support:
 
 | `Bevy` version | `bevy_extended_ui` version |
 |----------------|----------------------------|
+| 0.17.2         | 0.3.0                      |
 | 0.16.1         | 0.1.0 - 0.2.2              |
 | 0.16.0         | 0.1.0 - 0.2.2              |
 

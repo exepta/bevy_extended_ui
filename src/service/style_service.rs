@@ -129,7 +129,7 @@ pub fn update_widget_styles_system(
             }
 
             if let Some(mut bc) = border_color {
-                bc.0 = final_style.border_color.unwrap_or(Color::NONE);
+                bc.set_all(final_style.border_color.unwrap_or(Color::NONE));
             }
 
             if let Some(mut tc) = text_color {

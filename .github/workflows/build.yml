@@ -34,7 +34,15 @@ jobs:
         uses: dtolnay/rust-toolchain@nightly
 
       - name: Install Dependencies
-        run: sudo apt-get update && sudo apt-get install --no-install-recommends libasound2-dev libudev-dev
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends \
+            pkg-config \
+            libasound2-dev \
+            libudev-dev \
+            libwayland-dev \
+            wayland-protocols \
+            libxkbcommon-dev
 
       - name: Install coverage tool if not installed
         run: |

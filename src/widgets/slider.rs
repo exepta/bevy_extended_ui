@@ -1,5 +1,5 @@
+use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
-use bevy::render::view::RenderLayers;
 use bevy::window::PrimaryWindow;
 use crate::styling::convert::{CssClass, CssSource, TagName};
 use crate::{BindToID, CurrentWidgetState, ExtendedUiConfiguration, UIGenID, UIWidgetState};
@@ -140,14 +140,16 @@ fn internal_node_creation_system(
 /// - `query`: Query to access and mutate UI widget state and generation ID for sliders.
 /// - `current_widget_state`: Mutable resource tracking the currently focused widget.
 fn on_internal_click(
-    trigger: Trigger<Pointer<Click>>,
+    mut trigger: On<Pointer<Click>>,
     mut query: Query<(&mut UIWidgetState, &UIGenID), With<Slider>>,
     mut current_widget_state: ResMut<CurrentWidgetState>
 ) {
-    if let Ok((mut state, gen_id)) = query.get_mut(trigger.target) {
+    if let Ok((mut state, gen_id)) = query.get_mut(trigger.entity) {
         state.focused = true;
         current_widget_state.widget_id = gen_id.0;
     }
+
+    trigger.propagate(false);
 }
 
 /// Event handler for pointer cursor entering slider entities.
@@ -158,12 +160,14 @@ fn on_internal_click(
 /// - `trigger`: The pointer over event trigger containing the target entity.
 /// - `query`: Query to mutate UI widget state for sliders.
 fn on_internal_cursor_entered(
-    trigger: Trigger<Pointer<Over>>,
+    mut trigger: On<Pointer<Over>>,
     mut query: Query<&mut UIWidgetState, With<Slider>>,
 ) {
-    if let Ok(mut state) = query.get_mut(trigger.target) {
+    if let Ok(mut state) = query.get_mut(trigger.entity) {
         state.hovered = true;
     }
+
+    trigger.propagate(false);
 }
 
 /// Event handler for pointer cursor leaving slider entities.
@@ -174,12 +178,14 @@ fn on_internal_cursor_entered(
 /// - `trigger`: The pointer out event trigger containing the target entity.
 /// - `query`: Query to mutate UI widget state for sliders.
 fn on_internal_cursor_leave(
-    trigger: Trigger<Pointer<Out>>,
+    mut trigger: On<Pointer<Out>>,
     mut query: Query<&mut UIWidgetState, With<Slider>>,
 ) {
-    if let Ok(mut state) = query.get_mut(trigger.target) {
+    if let Ok(mut state) = query.get_mut(trigger.entity) {
         state.hovered = false;
     }
+
+    trigger.propagate(false);
 }
 
 /// Handles dragging of the slider thumb, updating its position and the slider value.
@@ -197,7 +203,7 @@ fn on_internal_cursor_leave(
 /// - `thumb_query`: Query to mutate the slider thumb node, component, and style.
 /// - `window_query`: Query to access the primary window for a scale factor.
 fn on_move_thumb(
-    event: Trigger<Pointer<Drag>>,
+    event: On<Pointer<Drag>>,
     mut query: Query<(&mut Slider, &ComputedNode, &Children), With<Slider>>,
     mut track_query: Query<(&mut Node, &mut WidgetStyle), (With<SliderTrack>, Without<SliderThumb>)>,
     mut thumb_query: Query<(&mut Node, &mut SliderThumb, &mut WidgetStyle), (With<SliderThumb>, Without<SliderTrack>)>,
@@ -210,7 +216,7 @@ fn on_move_thumb(
     for (mut slider, computed_node, children) in query.iter_mut() {
         let slider_width = computed_node.size().x / window.scale_factor();
         for child in children.iter() {
-            if event.target.eq(&child) {
+            if event.entity.eq(&child) {
                 let next_child = children.iter().next();
                 if let Ok((mut thumb_node, mut slider_thumb, mut style)) = thumb_query.get_mut(child) {
                     slider_thumb.current_x += event.event.delta.x;
@@ -256,7 +262,7 @@ fn on_move_thumb(
 /// - `thumb_query`: Query for slider thumb nodes, components, and styles.
 /// - `window_query`: Query for the primary window to get a scale factor.
 fn on_click_track(
-    event: Trigger<Pointer<Click>>,
+    event: On<Pointer<Click>>,
     query: Query<(Entity, &mut Slider, &ComputedNode, &UIGenID, &Children), With<Slider>>,
     track_query: Query<(&mut Node, &BindToID, &mut WidgetStyle), (With<SliderTrack>, Without<SliderThumb>)>,
     thumb_query: Query<(&mut Node, &mut SliderThumb, &BindToID, &mut WidgetStyle), (With<SliderThumb>, Without<SliderTrack>)>,
@@ -265,7 +271,7 @@ fn on_click_track(
     if let Ok(window) = window_query.single() {
         handle_track_event(
             event.pointer_location.position,
-            event.target,
+            event.entity,
             query,
             track_query,
             thumb_query,
@@ -287,7 +293,7 @@ fn on_click_track(
 /// - `thumb_query`: Query for slider thumb nodes, components, and styles.
 /// - `window_query`: Query for the primary window to get a scale factor.
 fn on_drag_track(
-    event: Trigger<Pointer<Drag>>,
+    event: On<Pointer<Drag>>,
     query: Query<(Entity, &mut Slider, &ComputedNode, &UIGenID, &Children), With<Slider>>,
     track_query: Query<(&mut Node, &BindToID, &mut WidgetStyle), (With<SliderTrack>, Without<SliderThumb>)>,
     thumb_query: Query<(&mut Node, &mut SliderThumb, &BindToID, &mut WidgetStyle), (With<SliderThumb>, Without<SliderTrack>)>,
@@ -296,7 +302,7 @@ fn on_drag_track(
     if let Ok(window) = window_query.single() {
         handle_track_event(
             event.pointer_location.position,
-            event.target,
+            event.entity,
             query,
             track_query,
             thumb_query,

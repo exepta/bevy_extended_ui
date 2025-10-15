@@ -49,7 +49,7 @@ fn start_file_watcher(mut commands: Commands, ui_registry: Res<UiRegistry>) {
 
 fn detect_changes(
     watcher: Res<HtmlWatcher>,
-    mut reload: EventWriter<HtmlChangeEvent>
+    mut reload: MessageWriter<HtmlChangeEvent>
 ) {
     let guard = watcher.rx.lock().unwrap();
     while let Ok(Ok(event)) = guard.try_recv() {
@@ -62,7 +62,7 @@ fn detect_changes(
 
 
 fn reload_html(
-    mut ev: EventReader<HtmlChangeEvent>,
+    mut ev: MessageReader<HtmlChangeEvent>,
     mut registry: ResMut<UiRegistry>,
 ) {
     if ev.read().next().is_none() {
