@@ -74,6 +74,7 @@ jobs:
             echo "new-release-version=" >> $GITHUB_OUTPUT
             echo "new-release-prerelease=false" >> $GITHUB_OUTPUT
           fi
+          rm release_output.log
 
       - name: Cache Rust dependencies
         if: steps.semantic.outputs.new-release-published == 'true'
