@@ -1,76 +1,47 @@
-#![feature(trivial_bounds)]
-use std::collections::HashMap;
+mod utils;
+pub mod io;
+
+use bevy::app::PluginGroupBuilder;
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
 use bevy::render::view::Hdr;
-use crate::html::HtmlPlugin;
-use crate::observer::ObserverRegistryPlugin;
-use crate::registry::{UiInitResource, RegistryPlugin, UiRegistry, UI_ID_GENERATE};
-use crate::service::ServicePlugin;
-use crate::styling::StylingPlugin;
-use crate::widgets::WidgetPlugin;
+use crate::io::UiIoPlugin;
 
-pub mod widgets;
-pub mod styling;
-pub mod html;
-pub mod registry;
-pub mod utils;
-pub mod service;
-pub mod observer;
-
-/// A cache mapping image paths to their loaded handles,
-/// preventing duplicate loads and allowing cleanup of unused images.
-#[derive(Resource, Default)]
-pub struct ImageCache {
-    pub map: HashMap<String, Handle<Image>>,
-}
-
-/// Global UI configuration resource.
-///
-/// Controls UI camera order, HDR support, whether the default UI camera is enabled,
-/// and which render layers to use.
-#[derive(Resource, Debug, Clone)]
+#[derive(Resource, Reflect, Debug)]
+#[reflect(Resource)]
 pub struct ExtendedUiConfiguration {
-    pub order: isize,
-    pub hdr_support: bool,
+    pub internal_asset_path: String,
+    pub used_render_layers: Vec<usize>,
     pub enable_default_camera: bool,
-    pub render_layers: Vec<usize>,
-    pub assets_path: String,
+    pub default_camera_configuration: DefaultUiCameraConfiguration
 }
+
 
 impl Default for ExtendedUiConfiguration {
-
-    /// Returns a default `ExtendedUiConfiguration` with:
-    /// - `order` = 2
-    /// - `hdr_support` enabled
-    /// - `enable_default_camera` enabled
-    /// - `render_layers` set to layers 1 and 2
     fn default() -> Self {
         Self {
-            order: 2,
-            hdr_support: true,
+            internal_asset_path: "assets/extended_ui/".to_string(),
+            used_render_layers: vec![1, 2],
             enable_default_camera: true,
-            render_layers: vec![1, 2],
-            assets_path: String::from("assets/extended_ui/"),
+            default_camera_configuration: DefaultUiCameraConfiguration::default()
         }
     }
+
 }
 
-/// Tracks the currently focused or active widget by its ID.
-///
-/// This resource holds the ID of the widget that currently has focus.
-#[derive(Resource, Debug, Clone)]
-pub struct CurrentWidgetState {
-    pub widget_id: usize,
+#[derive(Reflect, Debug)]
+pub struct DefaultUiCameraConfiguration {
+    pub order: isize,
+    pub hdr_enabled: bool,
+    pub camera_name: String
 }
 
-impl Default for CurrentWidgetState {
-
-    /// Returns a default `CurrentWidgetState` with `widget_id` set to 0
-    /// (meaning no widget currently focused).
+impl Default for DefaultUiCameraConfiguration {
     fn default() -> Self {
-        Self {
-            widget_id: 0,
+        DefaultUiCameraConfiguration {
+            order: 2,
+            hdr_enabled: true,
+            camera_name: "ExtendedUiCamera".to_string()
         }
     }
 }
@@ -81,64 +52,35 @@ impl Default for CurrentWidgetState {
 #[derive(Component)]
 struct UiCamera;
 
-/// Marker component for UI elements that should ignore the parent widget state.
-///
-/// Used to mark UI nodes that do not inherit state like `focused`, `hovered`, etc.
-#[derive(Component)]
-pub struct IgnoreParentState;
+struct InternalPlugin;
 
-/// Unique identifier for UI elements.
-///
-/// Each UI element should have a unique `UIGenID` generated atomically.
-#[derive(Component, Reflect, Debug, Clone)]
-#[reflect(Component)]
-pub struct UIGenID(usize);
-
-impl Default for UIGenID {
-
-    /// Generates a new unique `UIGenID` using a global atomic counter.
-    fn default() -> Self {
-        Self(UI_ID_GENERATE.lock().unwrap().acquire())
+impl Plugin for InternalPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_plugins(UiIoPlugin);
+        app.init_resource::<ExtendedUiConfiguration>();
+        app.add_systems(Update, load_ui_camera_system
+            .run_if(resource_changed::<ExtendedUiConfiguration>));
     }
-}
-
-/// Associates a UI child entity with a parent widget by ID.
-///
-/// Used for binding UI components to their logical parent.
-#[derive(Component, Reflect, Debug, Clone)]
-#[reflect(Component)]
-pub struct BindToID(pub usize);
-
-/// Stores the interaction and UI state flags for a widget.
-///
-/// Contains boolean flags for common widget states such as focused, hovered, disabled, etc.
-#[derive(Component, Reflect, Default, PartialEq, Eq, Debug, Clone)]
-#[reflect(Component)]
-pub struct UIWidgetState {
-    pub focused: bool,
-    pub hovered: bool,
-    pub disabled: bool,
-    pub readonly: bool,
-    pub checked: bool,
-    pub open: bool,
 }
 
 pub struct ExtendedUiPlugin;
 
 impl Plugin for ExtendedUiPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<ExtendedUiConfiguration>();
-        app.init_resource::<ImageCache>();
-        app.init_resource::<UiInitResource>();
-        app.init_resource::<UiRegistry>();
-        app.init_resource::<CurrentWidgetState>();
-        app.register_type::<UIGenID>();
-        app.register_type::<BindToID>();
-        app.register_type::<UIWidgetState>();
-        app.register_type::<Camera>();
-        app.add_plugins((RegistryPlugin, ObserverRegistryPlugin, HtmlPlugin, StylingPlugin, ServicePlugin, WidgetPlugin));
-        app.add_systems(Update, load_ui_camera_system
-            .run_if(resource_changed::<ExtendedUiConfiguration>));
+        app.add_plugins(InternalPlugin);
+    }
+}
+
+pub trait HotReloadExt {
+    fn with_asset_reload(self, enabled: bool) -> PluginGroupBuilder;
+}
+
+impl HotReloadExt for PluginGroupBuilder {
+    fn with_asset_reload(self, enabled: bool) -> PluginGroupBuilder {
+        self.set(AssetPlugin {
+            watch_for_changes_override: Some(enabled),
+            ..default()
+        })
     }
 }
 
@@ -156,43 +98,43 @@ impl Plugin for ExtendedUiPlugin {
 /// - `query`: Query to find existing UI cameras for update or removal.
 fn load_ui_camera_system(
     mut commands: Commands,
-    configuration: Res<ExtendedUiConfiguration>,
     mut query: Query<(Entity, &mut Camera, &mut RenderLayers), With<UiCamera>>,
+    configuration: Res<ExtendedUiConfiguration>,
 ) {
     if configuration.enable_default_camera {
-        if let Some((cam_entity, mut camera, mut layers)) = query.iter_mut().next() {
-/*            camera.hdr = configuration.hdr_support;*/
-            camera.order = configuration.order;
-            *layers = RenderLayers::from_layers(configuration.render_layers.as_slice());
+        if let Some((camera_entity, mut camera, mut render_layers)) = query.iter_mut().next() {
+            camera.order = configuration.default_camera_configuration.order;
+            *render_layers = RenderLayers::from_layers(configuration.used_render_layers.as_slice());
 
-            if configuration.hdr_support {
-                commands.entity(cam_entity).insert(Hdr::default());
+            if configuration.default_camera_configuration.hdr_enabled {
+                commands.entity(camera_entity).insert(Hdr::default());
             }
 
-            info!("Ui Camera updated!");
+            info!("ExtendedUI Camera updated!")
         } else {
-            let cam_entity = commands.spawn((
-                Name::new("Extended Ui Camera"),
+            let camera_entity = commands.spawn((
+                Name::new(configuration.default_camera_configuration.camera_name.clone()),
                 Camera2d,
                 Camera {
-                    order: configuration.order,
-                    ..default()
+                    order: configuration.default_camera_configuration.order,
+                    ..Default::default()
                 },
                 Msaa::Sample4,
-                RenderLayers::from_layers(configuration.render_layers.as_slice()),
+                RenderLayers::from_layers(configuration.used_render_layers.as_slice()),
                 Transform::from_translation(Vec3::Z * 1000.0),
                 UiCamera,
             )).id();
 
-            if configuration.hdr_support {
-                commands.entity(cam_entity).insert(Hdr::default());
+            if configuration.default_camera_configuration.hdr_enabled {
+                commands.entity(camera_entity).insert(Hdr::default());
             }
-            info!("Ui Camera created!");
+
+            info!("ExtendedUI Camera created!")
         }
     } else {
-        for (entity, _, _) in query.iter() {
-            commands.entity(entity).despawn();
-            info!("Ui Camera removed!");
+        for (camera_entity, _, _) in query.iter() {
+            commands.entity(camera_entity).despawn();
+            info!("ExtendedUI Camera removed!");
         }
     }
 }
