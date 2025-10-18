@@ -1,0 +1,135 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - beta
+      - release
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  id-token: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release:
+    name: Semantic Release
+    runs-on: ubuntu-latest
+    outputs:
+      published: ${{ steps.semantic.outputs.new-release-published }}
+      version: ${{ steps.semantic.outputs.new-release-version }}
+      prerelease: ${{ steps.semantic.outputs.new-release-prerelease }}
+    steps:
+      - name: "Generate token"
+        id: generate_token
+        uses: actions/create-github-app-token@v2
+        with:
+            app-id: ${{ secrets.SEMANTIC_RELEASE_APP_ID }}
+            private-key: ${{ secrets.SEMANTIC_RELEASE_PRIVATE_KEY }}
+            owner: ${{ github.repository_owner }}
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ steps.generate_token.outputs.token }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 'lts/*'
+
+      - name: Release
+        id: semantic
+        env:
+          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
+        run: |
+          set -o pipefail
+          npx -p @semantic-release/commit-analyzer \
+               -p @semantic-release/github \
+               -p @semantic-release/release-notes-generator \
+               -p @semantic-release/exec \
+               -p @semantic-release/git \
+               -p conventional-changelog-conventionalcommits \
+               -p semantic-release \
+               semantic-release 2>&1 | tee release_output.log
+          
+          # Parse semantic-release output and set only needed GitHub Actions outputs
+          if grep -q "Published release" release_output.log; then
+            echo "new-release-published=true" >> $GITHUB_OUTPUT
+            
+            # Extract version from "Published release X.Y.Z" line
+            VERSION=$(grep "Published release" release_output.log | sed -n 's/.*Published release \([^ ]*\).*/\1/p')
+            echo "new-release-version=$VERSION" >> $GITHUB_OUTPUT
+            
+            # Check if it's a prerelease (contains beta, alpha, rc, etc.)
+            if [[ "$VERSION" =~ (beta|alpha|rc) ]]; then
+              echo "new-release-prerelease=true" >> $GITHUB_OUTPUT
+            else
+              echo "new-release-prerelease=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "new-release-published=false" >> $GITHUB_OUTPUT
+            echo "new-release-version=" >> $GITHUB_OUTPUT
+            echo "new-release-prerelease=false" >> $GITHUB_OUTPUT
+          fi
+
+  build:
+    name: Build
+    needs: release
+    if: ${{ needs.release.outputs.published == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-release-${{ hashFiles('**/Cargo.toml') }}
+
+      - name: Install Nightly toolchain
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends \
+            pkg-config \
+            libasound2-dev \
+            libudev-dev \
+            libwayland-dev \
+            wayland-protocols \
+            libxkbcommon-dev
+
+      - name: Build
+        run: cargo build --release
+
+  publish:
+    name: Publish to crates.io
+    runs-on: ubuntu-latest
+    needs: [release, build]
+    if: ${{ needs.release.outputs.published == 'true' }}
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Publish to crates.io
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish --no-verify
+
