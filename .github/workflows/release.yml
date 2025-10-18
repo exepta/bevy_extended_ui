@@ -16,13 +16,10 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  release:
-    name: Semantic Release
+  release-build-publish:
+    name: Release, Build and Publish
     runs-on: ubuntu-latest
-    outputs:
-      published: ${{ steps.semantic.outputs.new-release-published }}
-      version: ${{ steps.semantic.outputs.new-release-version }}
-      prerelease: ${{ steps.semantic.outputs.new-release-prerelease }}
+    timeout-minutes: 30
     steps:
       - name: "Generate token"
         id: generate_token
@@ -43,7 +40,7 @@ jobs:
         with:
           node-version: 'lts/*'
 
-      - name: Release
+      - name: Semantic Release
         id: semantic
         env:
           GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
@@ -78,17 +75,8 @@ jobs:
             echo "new-release-prerelease=false" >> $GITHUB_OUTPUT
           fi
 
-  build:
-    name: Build
-    needs: release
-    if: ${{ needs.release.outputs.published == 'true' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@v4
-
-      - name: Cache
+      - name: Cache Rust dependencies
+        if: steps.semantic.outputs.new-release-published == 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -100,9 +88,11 @@ jobs:
           key: ${{ runner.os }}-cargo-release-${{ hashFiles('**/Cargo.toml') }}
 
       - name: Install Nightly toolchain
+        if: steps.semantic.outputs.new-release-published == 'true'
         uses: dtolnay/rust-toolchain@nightly
 
       - name: Install Dependencies
+        if: steps.semantic.outputs.new-release-published == 'true'
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends \
@@ -114,21 +104,15 @@ jobs:
             libxkbcommon-dev
 
       - name: Build
+        if: steps.semantic.outputs.new-release-published == 'true'
         run: cargo build --release
 
-  publish:
-    name: Publish to crates.io
-    runs-on: ubuntu-latest
-    needs: [release, build]
-    if: ${{ needs.release.outputs.published == 'true' }}
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@v4
-
-      - name: Install Rust toolchain (stable)
+      - name: Install stable toolchain for publishing
+        if: steps.semantic.outputs.new-release-published == 'true'
         uses: dtolnay/rust-toolchain@stable
 
       - name: Publish to crates.io
+        if: steps.semantic.outputs.new-release-published == 'true'
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: cargo publish --no-verify
