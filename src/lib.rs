@@ -1,11 +1,17 @@
 mod utils;
 pub mod io;
+mod styles;
+mod widgets;
+mod registry;
+mod services;
 
 use bevy::app::PluginGroupBuilder;
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
 use bevy::render::view::Hdr;
 use crate::io::UiIoPlugin;
+use crate::services::ServicePlugin;
+use crate::widgets::WidgetPlugin;
 
 #[derive(Resource, Reflect, Debug)]
 #[reflect(Resource)]
@@ -15,7 +21,6 @@ pub struct ExtendedUiConfiguration {
     pub enable_default_camera: bool,
     pub default_camera_configuration: DefaultUiCameraConfiguration
 }
-
 
 impl Default for ExtendedUiConfiguration {
     fn default() -> Self {
@@ -58,6 +63,7 @@ impl Plugin for InternalPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(UiIoPlugin);
         app.init_resource::<ExtendedUiConfiguration>();
+        app.add_plugins((ServicePlugin, WidgetPlugin));
         app.add_systems(Update, load_ui_camera_system
             .run_if(resource_changed::<ExtendedUiConfiguration>));
     }
