@@ -34,7 +34,7 @@ version = "1.21.3"
 version = "1.12.2"
 
 [dependencies.bevy-inspector-egui]
-version = "0.34.0"
+version = "0.35.0"
 
 [dependencies.notify]
 version = "8.2.0"
