@@ -8,6 +8,8 @@ pub static BODY_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::n
 
 pub static DIV_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
 
+pub static BUTTON_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
+
 /// A pool that manages reusable integer IDs for widgets.
 /// It hands out new IDs or recycles freed IDs.
 pub struct IdPool {

@@ -34,6 +34,29 @@ pub struct CssID(pub String);
 #[reflect(Component)]
 pub struct CssSource(pub Vec<Handle<CssAsset>>);
 
+impl CssSource {
+
+    pub fn from_path(asset_server: &AssetServer, path: &str) -> Self {
+        Self(vec![asset_server.load::<CssAsset>(path.to_string())])
+    }
+
+    pub fn push_path(&mut self, asset_server: &AssetServer, path: &str) {
+        self.0.push(asset_server.load::<CssAsset>(path.to_string()));
+    }
+
+    pub fn from_paths(
+        asset_server: &AssetServer,
+        paths: impl IntoIterator<Item = impl Into<String>>,
+    ) -> Self {
+        Self(
+            paths
+                .into_iter()
+                .map(|p| asset_server.load::<CssAsset>(p.into()))
+                .collect(),
+        )
+    }
+}
+
 /// Represents the border-radius of a rectangle with individual corner values.
 #[derive(Reflect, Default, Clone, PartialEq, Debug)]
 pub struct Radius {

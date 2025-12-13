@@ -14,7 +14,7 @@ use crate::html::reload::HtmlReloadPlugin;
 use crate::io::{CssAsset, HtmlAsset};
 use crate::styles::parser::apply_property_to_style;
 use crate::styles::Style;
-use crate::widgets::{Body, Div, Widget};
+use crate::widgets::{Button, Body, Div, Widget};
 
 pub static HTML_ID_COUNTER: AtomicUsize = AtomicUsize::new(1);
 
@@ -120,7 +120,10 @@ pub struct HtmlStates {
 pub enum HtmlWidgetNode {
     /// The root `<body>` element of the HTML structure.
     Body(Body, HtmlMeta, HtmlStates, Vec<HtmlWidgetNode>, HtmlEventBindings, Widget, HtmlID),
+    /// A `<div>` container element with nested child nodes.
     Div(Div, HtmlMeta, HtmlStates, Vec<HtmlWidgetNode>, HtmlEventBindings, Widget, HtmlID),
+    /// A `<button>` element.
+    Button(Button, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
 }
 
 /// Stores all parsed HTML structures keyed by `<meta name="...">`.

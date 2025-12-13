@@ -1,9 +1,12 @@
 mod body;
 mod div;
+mod button;
 
 use bevy::prelude::*;
-use crate::registry::{BODY_ID_POOL, DIV_ID_POOL, UI_ID_GENERATE};
+use crate::registry::{BODY_ID_POOL, BUTTON_ID_POOL, DIV_ID_POOL, UI_ID_GENERATE};
+use crate::styles::IconPlace;
 use crate::widgets::body::BodyWidget;
+use crate::widgets::button::ButtonWidget;
 use crate::widgets::div::DivWidget;
 
 /// Marker component for UI elements that should ignore the parent widget state.
@@ -94,6 +97,7 @@ impl Plugin for ExtendedWidgetPlugin {
         app.register_type::<Body>();
         app.add_plugins((
             BodyWidget,
+            ButtonWidget,
             DivWidget
         ));
     }
@@ -135,5 +139,32 @@ impl Default for Div {
     fn default() -> Self {
         let entry = DIV_ID_POOL.lock().unwrap().acquire();
         Self(entry)
+    }
+}
+
+// ===============================================
+//                     Button
+// ===============================================
+
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+#[require(UIGenID, UIWidgetState, Widget)]
+pub struct Button {
+    pub entry: usize,
+    pub text: String,
+    pub icon_place: IconPlace,
+    pub icon_path: Option<String>,
+}
+
+impl Default for Button {
+    fn default() -> Self {
+        let entry = BUTTON_ID_POOL.lock().unwrap().acquire();
+
+        Self {
+            entry,
+            text: String::from("Button"),
+            icon_path: None,
+            icon_place: IconPlace::default(),
+        }
     }
 }

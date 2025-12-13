@@ -9,7 +9,8 @@ use crate::html::{
     HtmlWidgetNode,
 };
 use crate::io::{CssAsset, HtmlAsset};
-use crate::widgets::{Body, Div, Widget};
+use crate::styles::IconPlace;
+use crate::widgets::{Body, Button, Div, Widget};
 
 pub struct HtmlConverterSystem;
 
@@ -210,6 +211,35 @@ fn parse_html_node(
                 widget.clone(),
                 HtmlID::default(),
             ))
+        }
+        "button" => {
+            // Parse button text and optional icon
+            let mut icon_path = None;
+            let mut icon_place = IconPlace::Left;
+            let mut found_text = false;
+
+            for child in node.children() {
+                if let Some(el) = child.as_element() {
+                    if el.name.local.eq("icon") {
+                        if let Some(src) = el.attributes.borrow().get("src") {
+                            icon_path = Some(src.to_string());
+                            if found_text {
+                                icon_place = IconPlace::Right;
+                            }
+                        }
+                    }
+                } else if child.as_text().map(|t| !t.borrow().trim().is_empty()).unwrap_or(false) {
+                    found_text = true;
+                }
+            }
+
+            let text = node.text_contents().trim().to_string();
+            Some(HtmlWidgetNode::Button(Button {
+                text,
+                icon_path,
+                icon_place,
+                ..default()
+            }, meta, states, functions, widget.clone(), HtmlID::default()))
         }
         "div" => {
             let mut children = Vec::new();

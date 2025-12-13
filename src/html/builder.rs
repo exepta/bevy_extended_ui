@@ -125,6 +125,9 @@ fn show_all_widgets_finish(
 fn collect_html_ids(nodes: &Vec<HtmlWidgetNode>, ids: &mut Vec<HtmlID>) {
     for node in nodes {
         match node {
+            HtmlWidgetNode::Button(_, _, _, _, _, id) => {
+                ids.push(id.clone());
+            }
             HtmlWidgetNode::Body(_, _, _, children, _, _, id) => {
                 ids.push(id.clone());
                 collect_html_ids(children, ids);
@@ -145,6 +148,9 @@ fn spawn_widget_node(
     parent: Option<Entity>,
 ) -> Entity {
     let entity = match node {
+        HtmlWidgetNode::Button(button, meta, states, functions, widget, id) => {
+            spawn_with_meta(commands, button.clone(), meta, states, functions, widget, id)
+        }
         HtmlWidgetNode::Body(body, meta, states, children, functions, widget, id) => {
             let entity = spawn_with_meta(commands, body.clone(), meta, states, functions, widget, id);
             for child in children {
