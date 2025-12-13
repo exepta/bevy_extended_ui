@@ -3,13 +3,19 @@ use std::collections::HashMap;
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
 use bevy::render::view::Hdr;
+use crate::html::ExtendedUiHtmlPlugin;
 use crate::io::ExtendedIoPlugin;
+use crate::services::ExtendedServicePlugin;
+use crate::styles::ExtendedStylingPlugin;
 use crate::widgets::ExtendedWidgetPlugin;
 
 pub mod utils;
 pub mod widgets;
 pub mod io;
 pub mod registry;
+pub mod html;
+pub mod styles;
+pub mod services;
 
 /// A cache mapping image paths to their loaded handles,
 /// preventing duplicate loads and allowing cleanup of unused images.
@@ -82,7 +88,13 @@ impl Plugin for ExtendedUiPlugin {
         app.init_resource::<ImageCache>();
         app.init_resource::<CurrentWidgetState>();
         app.register_type::<Camera>();
-        app.add_plugins((ExtendedWidgetPlugin, ExtendedIoPlugin));
+        app.add_plugins((
+            ExtendedWidgetPlugin,
+            ExtendedServicePlugin,
+            ExtendedStylingPlugin,
+            ExtendedIoPlugin,
+            ExtendedUiHtmlPlugin
+        ));
         app.add_systems(Update, load_ui_camera_system
             .run_if(resource_changed::<ExtendedUiConfiguration>));
     }

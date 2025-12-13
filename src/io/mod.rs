@@ -96,7 +96,6 @@ fn resolve_relative(base_dir: &PathBuf, raw: &str) -> PathBuf {
 fn extract_css_links_lenient(html: &str) -> Vec<String> {
     let mut out = Vec::new();
 
-    // “Good enough” Start: splitte grob nach "<link"
     for chunk in html.split("<link").skip(1) {
         let tag = chunk.split('>').next().unwrap_or("");
 

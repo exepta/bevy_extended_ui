@@ -1,5 +1,10 @@
+mod body;
+mod div;
+
 use bevy::prelude::*;
-use crate::registry::UI_ID_GENERATE;
+use crate::registry::{BODY_ID_POOL, DIV_ID_POOL, UI_ID_GENERATE};
+use crate::widgets::body::BodyWidget;
+use crate::widgets::div::DivWidget;
 
 /// Marker component for UI elements that should ignore the parent widget state.
 ///
@@ -22,12 +27,24 @@ impl Default for UIGenID {
     }
 }
 
+impl UIGenID {
+    pub fn get(&self) -> usize {
+        self.0
+    }
+}
+
 /// Associates a UI child entity with a parent widget by ID.
 ///
 /// Used for binding UI components to their logical parent.
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
 pub struct BindToID(pub usize);
+
+impl BindToID {
+    pub fn get(&self) -> usize {
+        self.0
+    }
+}
 
 /// Stores the interaction and UI state flags for a widget.
 ///
@@ -43,6 +60,30 @@ pub struct UIWidgetState {
     pub open: bool,
 }
 
+#[derive(Component, Default, Clone, Debug)]
+pub struct Widget(pub Option<String>);
+
+#[derive(Component, Clone, Copy, Debug)]
+pub struct WidgetId {
+    pub id: usize,
+    pub kind: WidgetKind,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum WidgetKind {
+    Body,
+    Div,
+    Headline,
+    Paragraph,
+    Button,
+    CheckBox,
+    Slider,
+    InputField,
+    ChoiceBox,
+    Img,
+    ProgressBar,
+}
+
 pub struct ExtendedWidgetPlugin;
 
 impl Plugin for ExtendedWidgetPlugin {
@@ -50,5 +91,49 @@ impl Plugin for ExtendedWidgetPlugin {
         app.register_type::<UIGenID>();
         app.register_type::<BindToID>();
         app.register_type::<UIWidgetState>();
+        app.register_type::<Body>();
+        app.add_plugins((
+            BodyWidget,
+            DivWidget
+        ));
+    }
+}
+
+// ===============================================
+//                       Body
+// ===============================================
+
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+#[require(UIGenID, UIWidgetState, GlobalTransform, InheritedVisibility, Widget)]
+pub struct Body {
+    pub entry: usize,
+    pub html_key: Option<String>,
+}
+
+impl Default for Body {
+    fn default() -> Self {
+        let entry = BODY_ID_POOL.lock().unwrap().acquire();
+
+        Self {
+            entry,
+            html_key: None,
+        }
+    }
+}
+
+// ===============================================
+//                       Div
+// ===============================================
+
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+#[require(UIGenID, UIWidgetState, GlobalTransform, InheritedVisibility, Widget)]
+pub struct Div(pub usize);
+
+impl Default for Div {
+    fn default() -> Self {
+        let entry = DIV_ID_POOL.lock().unwrap().acquire();
+        Self(entry)
     }
 }

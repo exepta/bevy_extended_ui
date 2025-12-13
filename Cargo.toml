@@ -18,6 +18,7 @@ path = "src/lib.rs"
 [dependencies.bevy]
 version = "0.17.3"
 default-features = true
+features = ["file_watcher"]
 
 # Html Converter
 [dependencies.kuchiki]
@@ -35,6 +36,3 @@ version = "1.12.2"
 
 [dependencies.bevy-inspector-egui]
 version = "0.35.0"
-
-[dependencies.notify]
-version = "8.2.0"
