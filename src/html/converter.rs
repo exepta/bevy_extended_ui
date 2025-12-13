@@ -10,7 +10,7 @@ use crate::html::{
 };
 use crate::io::{CssAsset, HtmlAsset};
 use crate::styles::IconPlace;
-use crate::widgets::{Body, Button, Div, Widget};
+use crate::widgets::{Body, Button, CheckBox, Div, Headline, HeadlineType, Paragraph, Widget};
 
 pub const DEFAULT_UI_CSS: &str = "default/extended_ui.css";
 
@@ -203,6 +203,7 @@ fn parse_html_node(
                 HtmlID::default(),
             ))
         }
+
         "button" => {
             // Parse button text and optional icon
             let mut icon_path = None;
@@ -232,6 +233,52 @@ fn parse_html_node(
                 ..default()
             }, meta, states, functions, widget.clone(), HtmlID::default()))
         }
+
+        "checkbox" => {
+            // Checkbox with label and optional icon
+            let label = node.text_contents().trim().to_string();
+            let icon_path = attributes.get("icon").unwrap_or("extended_ui/icons/check-mark.png");
+            let icon = Some(String::from(icon_path));
+            Some(HtmlWidgetNode::CheckBox(CheckBox {
+                label,
+                icon_path: icon,
+                ..default()
+            }, meta, states, functions, widget.clone(), HtmlID::default()))
+        }
+
+        "h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
+            // Map HTML heading tags to Headline widget with correct level
+            let h_type = match tag.as_str() {
+                "h1" => HeadlineType::H1,
+                "h2" => HeadlineType::H2,
+                "h3" => HeadlineType::H3,
+                "h4" => HeadlineType::H4,
+                "h5" => HeadlineType::H5,
+                "h6" => HeadlineType::H6,
+                _ => HeadlineType::H3,
+            };
+
+            let text = node.text_contents().trim().to_string();
+
+            Some(HtmlWidgetNode::Headline(
+                Headline {
+                    text,
+                    h_type,
+                    ..default()
+                },
+                meta, states, functions, widget.clone(), HtmlID::default()))
+        }
+
+        "p" => {
+            let text = node.text_contents().trim().to_string();
+            Some(HtmlWidgetNode::Paragraph(
+                Paragraph {
+                    text,
+                    ..default()
+                },
+                meta, states, functions, widget.clone(), HtmlID::default()))
+        }
+
         "div" => {
             let mut children = Vec::new();
             for child in node.children() {

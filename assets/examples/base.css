@@ -6,12 +6,16 @@ body {
 
 .test {
     background: #59cc59;
-    width: 100px;
+    width: 175px;
     height: 100px;
 }
 
 .test2 {
     background: #5656ff;
     width: 200px;
-    height: 300px;
+    height: 400px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
 }

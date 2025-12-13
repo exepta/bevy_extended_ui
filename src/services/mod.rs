@@ -1,7 +1,7 @@
 mod css_service;
 mod style_service;
 mod state_service;
-mod image_service;
+pub mod image_service;
 
 use bevy::prelude::*;
 use crate::services::css_service::CssService;

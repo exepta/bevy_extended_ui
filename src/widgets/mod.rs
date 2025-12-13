@@ -1,13 +1,20 @@
 mod body;
 mod div;
 mod button;
+mod check_box;
+mod headline;
+mod paragraph;
 
+use std::fmt;
 use bevy::prelude::*;
-use crate::registry::{BODY_ID_POOL, BUTTON_ID_POOL, DIV_ID_POOL, UI_ID_GENERATE};
+use crate::registry::*;
 use crate::styles::IconPlace;
 use crate::widgets::body::BodyWidget;
 use crate::widgets::button::ButtonWidget;
+use crate::widgets::check_box::CheckBoxWidget;
 use crate::widgets::div::DivWidget;
+use crate::widgets::headline::HeadlineWidget;
+use crate::widgets::paragraph::ParagraphWidget;
 
 /// Marker component for UI elements that should ignore the parent widget state.
 ///
@@ -98,7 +105,10 @@ impl Plugin for ExtendedWidgetPlugin {
         app.add_plugins((
             BodyWidget,
             ButtonWidget,
-            DivWidget
+            DivWidget,
+            CheckBoxWidget,
+            HeadlineWidget,
+            ParagraphWidget,
         ));
     }
 }
@@ -165,6 +175,104 @@ impl Default for Button {
             text: String::from("Button"),
             icon_path: None,
             icon_place: IconPlace::default(),
+        }
+    }
+}
+
+// ===============================================
+//                     CheckBox
+// ===============================================
+
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+#[require(UIGenID, UIWidgetState, Widget)]
+pub struct CheckBox {
+    pub w_count: usize,
+    pub label: String,
+    pub icon_path: Option<String>,
+}
+
+impl Default for CheckBox {
+    fn default() -> Self {
+        let w_count = CHECK_BOX_ID_POOL.lock().unwrap().acquire();
+
+        Self {
+            w_count,
+            label: String::from("label"),
+            icon_path: Some(String::from("extended_ui/icons/check-mark.png")),
+        }
+    }
+}
+
+// ===============================================
+//                       Headline
+// ===============================================
+
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+#[require(UIGenID, UIWidgetState, Widget)]
+pub struct Headline {
+    pub w_count: usize,
+    pub text: String,
+    pub h_type: HeadlineType
+}
+
+impl Default for Headline {
+
+    fn default() -> Self {
+        let w_count = HEADLINE_ID_POOL.lock().unwrap().acquire();
+        Self {
+            w_count,
+            text: String::from("Headline"),
+            h_type: HeadlineType::H3
+        }
+    }
+}
+
+#[derive(Reflect, Default, Debug, Clone, Eq, PartialEq)]
+pub enum HeadlineType {
+    #[default]
+    H1,
+    H2,
+    H3,
+    H4,
+    H5,
+    H6,
+}
+
+impl fmt::Display for HeadlineType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            HeadlineType::H1 => "h1",
+            HeadlineType::H2 => "h2",
+            HeadlineType::H3 => "h3",
+            HeadlineType::H4 => "h4",
+            HeadlineType::H5 => "h5",
+            HeadlineType::H6 => "h6",
+        };
+        write!(f, "{}", s)
+    }
+}
+
+// ===============================================
+//                     Paragraph
+// ===============================================
+
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+#[require(UIGenID, UIWidgetState, Widget)]
+pub struct Paragraph {
+    pub w_count: usize,
+    pub text: String,
+}
+
+impl Default for Paragraph {
+    fn default() -> Self {
+        let w_count = PARAGRAPH_ID_POOL.lock().unwrap().acquire();
+
+        Self {
+            w_count,
+            text: String::from(""),
         }
     }
 }

@@ -125,7 +125,10 @@ fn show_all_widgets_finish(
 fn collect_html_ids(nodes: &Vec<HtmlWidgetNode>, ids: &mut Vec<HtmlID>) {
     for node in nodes {
         match node {
-            HtmlWidgetNode::Button(_, _, _, _, _, id) => {
+            HtmlWidgetNode::Button(_, _, _, _, _, id)
+            | HtmlWidgetNode::CheckBox(_, _, _, _, _, id)
+            | HtmlWidgetNode::Headline(_, _, _, _, _, id)
+            | HtmlWidgetNode::Paragraph(_, _, _, _, _, id)=> {
                 ids.push(id.clone());
             }
             HtmlWidgetNode::Body(_, _, _, children, _, _, id) => {
@@ -150,6 +153,15 @@ fn spawn_widget_node(
     let entity = match node {
         HtmlWidgetNode::Button(button, meta, states, functions, widget, id) => {
             spawn_with_meta(commands, button.clone(), meta, states, functions, widget, id)
+        }
+        HtmlWidgetNode::CheckBox(checkbox, meta, states, functions, widget, id) => {
+            spawn_with_meta(commands, checkbox.clone(), meta, states, functions, widget, id)
+        }
+        HtmlWidgetNode::Headline(headline, meta, states, functions, widget, id) => {
+            spawn_with_meta(commands, headline.clone(), meta, states, functions, widget, id)
+        }
+        HtmlWidgetNode::Paragraph(paragraph, meta, states, functions, widget, id) => {
+            spawn_with_meta(commands, paragraph.clone(), meta, states, functions, widget, id)
         }
         HtmlWidgetNode::Body(body, meta, states, children, functions, widget, id) => {
             let entity = spawn_with_meta(commands, body.clone(), meta, states, functions, widget, id);

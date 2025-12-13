@@ -1,3 +1,5 @@
+/* Button */
+
 button {
     background: #bcbcbc;
     width: 140px;
@@ -11,4 +13,96 @@ button {
 
 button:hover {
     background: #a9a9a9;
+}
+
+button .button-text {
+    color: #303039;
+}
+
+/* CheckBox */
+
+checkbox {
+    width: 150px;
+    height: 40px;
+    display: flex;
+    justify-content: start;
+    align-items: center;
+    flex-direction: row;
+    gap: 10px;
+}
+
+checkbox .mark-box {
+    width: 25px;
+    height: 25px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-radius: 2px;
+    border: 2px white;
+}
+
+checkbox .mark-box .mark {
+    color: #ffffff;
+    width: 16px;
+    height: 16px;
+}
+
+checkbox:checked .mark-box {
+    border-color: #8534f5;
+    background: #8534f5;
+}
+
+checkbox .check-text {
+    font-size: 13px;
+}
+
+/* Headline */
+
+h1 {
+    font-size: 48px;
+    font-weight: 600;
+    color: #000000;
+    margin: 16px;
+}
+
+h2 {
+    font-size: 40px;
+    font-weight: 600;
+    color: #000000;
+    margin: 16px;
+}
+
+h3 {
+    font-size: 32px;
+    font-weight: 600;
+    color: #000000;
+    margin: 16px;
+}
+
+h4 {
+    font-size: 24px;
+    font-weight: 600;
+    color: #000000;
+    margin: 16px;
+}
+
+h5 {
+    font-size: 20px;
+    font-weight: 600;
+    color: #000000;
+    margin: 16px;
+}
+
+h6 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #000000;
+    margin: 16px;
+}
+
+/* Paragraph */
+p {
+    margin: 8px;
+    font-size: 12px;
+    color: #000000;
 }
