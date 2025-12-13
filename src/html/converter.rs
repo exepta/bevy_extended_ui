@@ -12,6 +12,8 @@ use crate::io::{CssAsset, HtmlAsset};
 use crate::styles::IconPlace;
 use crate::widgets::{Body, Button, Div, Widget};
 
+pub const DEFAULT_UI_CSS: &str = "default/extended_ui.css";
+
 pub struct HtmlConverterSystem;
 
 impl Plugin for HtmlConverterSystem {
@@ -92,7 +94,6 @@ fn update_html_ui(
             .into_iter()
             .flatten()
             .filter_map(|node| {
-                // IMPORTANT: clone values out of the borrowed attributes
                 let attrs = node.attributes.borrow();
 
                 let rel = attrs.get("rel")?.to_string();
@@ -103,24 +104,14 @@ fn update_html_ui(
                 let raw_href = attrs.get("href")?.to_string();
                 drop(attrs);
 
-                let raw_href = if raw_href == "default" {
-                    // Must be relative to assets/ root (NOT "assets/...")
-                    "css/core.css".to_string()
-                } else {
-                    raw_href
-                };
-
-                // Resolve relative href based on the HTML asset path:
-                // e.g. "examples/test.html" + "base.css" => "examples/base.css"
+                // Resolve href relative to the HTML file location inside assets/
                 let resolved = resolve_relative_path(&html.get_source_path(), &raw_href);
 
                 Some(asset_server.load::<CssAsset>(resolved))
             })
             .collect();
 
-        if css_handles.is_empty() {
-            css_handles.push(asset_server.load::<CssAsset>("css/core.css"));
-        }
+        css_handles = with_default_css_first(&asset_server, css_handles);
 
         // Mark this UI as active.
         structure_map.active = Some(meta_key.clone());
@@ -305,4 +296,19 @@ fn resolve_relative_path(html_path: &str, href: &str) -> String {
     base.join(href)
         .to_string_lossy()
         .replace('\\', "/")
+}
+
+fn with_default_css_first(
+    asset_server: &AssetServer,
+    mut css: Vec<Handle<CssAsset>>,
+) -> Vec<Handle<CssAsset>> {
+    let default = asset_server.load::<CssAsset>(DEFAULT_UI_CSS);
+
+    // Remove default if it already exists somewhere
+    css.retain(|h| h.id() != default.id());
+
+    // Insert default at position 0
+    css.insert(0, default);
+
+    css
 }

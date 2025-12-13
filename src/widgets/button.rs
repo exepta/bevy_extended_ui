@@ -57,7 +57,6 @@ fn internal_node_creation_system(
         let mut css_source = CssSource::default();
         if let Some(source) = source_opt {
             css_source = source.clone();
-            css_source.push_path(&asset_server, "default/extended_ui.css");
         }
 
         commands.entity(entity).insert((
