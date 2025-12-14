@@ -18,7 +18,7 @@ path = "src/lib.rs"
 [dependencies.bevy]
 version = "0.17.3"
 default-features = true
-features = ["file_watcher"]
+features = ["file_watcher", "jpeg", "png", "webp"]
 
 # Html Converter
 [dependencies.kuchiki]

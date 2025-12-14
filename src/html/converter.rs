@@ -10,7 +10,7 @@ use crate::html::{
 };
 use crate::io::{CssAsset, HtmlAsset};
 use crate::styles::IconPlace;
-use crate::widgets::{Body, Button, CheckBox, Div, Headline, HeadlineType, Paragraph, Widget};
+use crate::widgets::{Body, Button, CheckBox, Div, Headline, HeadlineType, Img, Paragraph, Widget};
 
 pub const DEFAULT_UI_CSS: &str = "default/extended_ui.css";
 
@@ -105,7 +105,7 @@ fn update_html_ui(
                 drop(attrs);
 
                 // Resolve href relative to the HTML file location inside assets/
-                let resolved = resolve_relative_path(&html.get_source_path(), &raw_href);
+                let resolved = resolve_relative_asset_path(&html.get_source_path(), &raw_href);
 
                 Some(asset_server.load::<CssAsset>(resolved))
             })
@@ -205,7 +205,6 @@ fn parse_html_node(
         }
 
         "button" => {
-            // Parse button text and optional icon
             let mut icon_path = None;
             let mut icon_place = IconPlace::Left;
             let mut found_text = false;
@@ -247,7 +246,6 @@ fn parse_html_node(
         }
 
         "h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
-            // Map HTML heading tags to Headline widget with correct level
             let h_type = match tag.as_str() {
                 "h1" => HeadlineType::H1,
                 "h2" => HeadlineType::H2,
@@ -267,6 +265,30 @@ fn parse_html_node(
                     ..default()
                 },
                 meta, states, functions, widget.clone(), HtmlID::default()))
+        }
+
+        "img" => {
+            let src_raw = attributes.get("src").unwrap_or("").to_string();
+            let alt = attributes.get("alt").unwrap_or("").to_string();
+
+            let src_resolved = if src_raw.trim().is_empty() {
+                None
+            } else {
+                Some(resolve_relative_asset_path(&html.get_source_path(), &src_raw))
+            };
+
+            Some(HtmlWidgetNode::Img(
+                Img {
+                    src: src_resolved,
+                    alt,
+                    ..default()
+                },
+                meta,
+                states,
+                functions,
+                widget.clone(),
+                HtmlID::default(),
+            ))
         }
 
         "p" => {
@@ -317,25 +339,17 @@ fn collect_labels_by_for(node: &NodeRef) -> HashMap<String, String> {
 }
 
 /// Resolves a CSS href found inside an HTML document to a path that the AssetServer understands.
-fn resolve_relative_path(html_path: &str, href: &str) -> String {
+pub fn resolve_relative_asset_path(html_path: &str, href: &str) -> String {
     let mut href = href.replace('\\', "/");
 
-    // If a user wrote "assets/..." strip it because AssetServer already roots at assets/.
     if let Some(rest) = href.strip_prefix("assets/") {
         href = rest.to_string();
     }
 
-    // "/..." means "absolute within assets/"
     if let Some(rest) = href.strip_prefix('/') {
         return rest.to_string();
     }
 
-    // If it already looks like assets-root relative (contains folders) and is not ./ ../, keep it.
-    if href.contains('/') && !href.starts_with("./") && !href.starts_with("../") {
-        return href;
-    }
-
-    // Otherwise resolve relative to the folder of the HTML file.
     let base = std::path::Path::new(html_path)
         .parent()
         .unwrap_or(std::path::Path::new(""));

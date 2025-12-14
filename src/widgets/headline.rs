@@ -50,10 +50,10 @@ fn internal_node_creation_system(
         }
 
         commands.entity(entity).insert((
-            Name::new(format!("{}-{}", headline.h_type.to_string().to_uppercase(), headline.w_count)),
+            Name::new(format!("{}-{}", headline.h_type.to_string().to_uppercase(), headline.entry)),
             Node::default(),
             WidgetId {
-                id: headline.w_count,
+                id: headline.entry,
                 kind: WidgetKind::Headline
             },
             Text::new(headline.text.clone()),

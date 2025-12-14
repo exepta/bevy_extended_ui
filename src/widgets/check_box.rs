@@ -58,7 +58,7 @@ fn internal_node_creation_system(
         }
 
         commands.entity(entity).insert((
-            Name::new(format!("CheckBox-{}", checkbox.w_count)),
+            Name::new(format!("CheckBox-{}", checkbox.entry)),
             Node {
                 width: Val::Px(200.0),
                 height: Val::Px(40.0),
@@ -68,7 +68,7 @@ fn internal_node_creation_system(
                 ..default()
             },
             WidgetId {
-                id: checkbox.w_count,
+                id: checkbox.entry,
                 kind: WidgetKind::CheckBox
             },
             BackgroundColor::default(),
@@ -84,7 +84,7 @@ fn internal_node_creation_system(
             CheckBoxBase,
             children![
                 (
-                    Name::new(format!("Check-Mark-{}", checkbox.w_count)),
+                    Name::new(format!("Check-Mark-{}", checkbox.entry)),
                     Node {
                       display: Display::Flex,
                       justify_content: JustifyContent::Center,
@@ -106,7 +106,7 @@ fn internal_node_creation_system(
                     CheckBoxMark,
                 ),
                 (
-                    Name::new(format!("Check-Label-{}", checkbox.w_count)),
+                    Name::new(format!("Check-Label-{}", checkbox.entry)),
                     Text::new(checkbox.label.clone()),
                     TextColor::default(),
                     TextFont::default(),
@@ -177,7 +177,7 @@ fn on_internal_click(
                 let mut child = None;
                 commands.entity(entity).with_children(|builder| {
                     let in_child = builder.spawn((
-                        Name::new(format!("Mark-{}", checkbox.w_count)),
+                        Name::new(format!("Mark-{}", checkbox.entry)),
                         Node {
                             width: Val::Px(width),
                             height: Val::Px(height),

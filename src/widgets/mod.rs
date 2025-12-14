@@ -4,6 +4,7 @@ mod button;
 mod check_box;
 mod headline;
 mod paragraph;
+mod image;
 
 use std::fmt;
 use bevy::prelude::*;
@@ -14,6 +15,7 @@ use crate::widgets::button::ButtonWidget;
 use crate::widgets::check_box::CheckBoxWidget;
 use crate::widgets::div::DivWidget;
 use crate::widgets::headline::HeadlineWidget;
+use crate::widgets::image::ImageWidget;
 use crate::widgets::paragraph::ParagraphWidget;
 
 /// Marker component for UI elements that should ignore the parent widget state.
@@ -108,6 +110,7 @@ impl Plugin for ExtendedWidgetPlugin {
             DivWidget,
             CheckBoxWidget,
             HeadlineWidget,
+            ImageWidget,
             ParagraphWidget,
         ));
     }
@@ -187,17 +190,17 @@ impl Default for Button {
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, Widget)]
 pub struct CheckBox {
-    pub w_count: usize,
+    pub entry: usize,
     pub label: String,
     pub icon_path: Option<String>,
 }
 
 impl Default for CheckBox {
     fn default() -> Self {
-        let w_count = CHECK_BOX_ID_POOL.lock().unwrap().acquire();
+        let entry = CHECK_BOX_ID_POOL.lock().unwrap().acquire();
 
         Self {
-            w_count,
+            entry,
             label: String::from("label"),
             icon_path: Some(String::from("extended_ui/icons/check-mark.png")),
         }
@@ -212,7 +215,7 @@ impl Default for CheckBox {
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, Widget)]
 pub struct Headline {
-    pub w_count: usize,
+    pub entry: usize,
     pub text: String,
     pub h_type: HeadlineType
 }
@@ -220,9 +223,9 @@ pub struct Headline {
 impl Default for Headline {
 
     fn default() -> Self {
-        let w_count = HEADLINE_ID_POOL.lock().unwrap().acquire();
+        let entry = HEADLINE_ID_POOL.lock().unwrap().acquire();
         Self {
-            w_count,
+            entry,
             text: String::from("Headline"),
             h_type: HeadlineType::H3
         }
@@ -255,6 +258,31 @@ impl fmt::Display for HeadlineType {
 }
 
 // ===============================================
+//                       Image
+// ===============================================
+
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+#[require(UIGenID, UIWidgetState, GlobalTransform, InheritedVisibility, Widget)]
+pub struct Img {
+    pub entry: usize,
+    pub src: Option<String>,
+    pub alt: String,
+}
+
+impl Default for Img {
+    fn default() -> Self {
+        let entry = IMAGE_ID_POOL.lock().unwrap().acquire();
+
+        Self {
+            entry,
+            src: None,
+            alt: String::from(""),
+        }
+    }
+}
+
+// ===============================================
 //                     Paragraph
 // ===============================================
 
@@ -262,16 +290,16 @@ impl fmt::Display for HeadlineType {
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, Widget)]
 pub struct Paragraph {
-    pub w_count: usize,
+    pub entry: usize,
     pub text: String,
 }
 
 impl Default for Paragraph {
     fn default() -> Self {
-        let w_count = PARAGRAPH_ID_POOL.lock().unwrap().acquire();
+        let entry = PARAGRAPH_ID_POOL.lock().unwrap().acquire();
 
         Self {
-            w_count,
+            entry,
             text: String::from(""),
         }
     }

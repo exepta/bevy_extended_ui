@@ -37,10 +37,10 @@ fn internal_node_creation_system(
         }
 
         commands.entity(entity).insert((
-            Name::new(format!("Paragraph-{}", paragraph.w_count)),
+            Name::new(format!("Paragraph-{}", paragraph.entry)),
             Node::default(),
             WidgetId {
-                id: paragraph.w_count,
+                id: paragraph.entry,
                 kind: WidgetKind::Paragraph
             },
             Text::new(paragraph.text.clone()),

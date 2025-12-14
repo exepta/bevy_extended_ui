@@ -128,6 +128,7 @@ fn collect_html_ids(nodes: &Vec<HtmlWidgetNode>, ids: &mut Vec<HtmlID>) {
             HtmlWidgetNode::Button(_, _, _, _, _, id)
             | HtmlWidgetNode::CheckBox(_, _, _, _, _, id)
             | HtmlWidgetNode::Headline(_, _, _, _, _, id)
+            | HtmlWidgetNode::Img(_, _, _, _, _, id)
             | HtmlWidgetNode::Paragraph(_, _, _, _, _, id)=> {
                 ids.push(id.clone());
             }
@@ -159,6 +160,9 @@ fn spawn_widget_node(
         }
         HtmlWidgetNode::Headline(headline, meta, states, functions, widget, id) => {
             spawn_with_meta(commands, headline.clone(), meta, states, functions, widget, id)
+        }
+        HtmlWidgetNode::Img(img, meta, states, functions, widget, id) => {
+            spawn_with_meta(commands, img.clone(), meta, states, functions, widget, id)
         }
         HtmlWidgetNode::Paragraph(paragraph, meta, states, functions, widget, id) => {
             spawn_with_meta(commands, paragraph.clone(), meta, states, functions, widget, id)
