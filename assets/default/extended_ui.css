@@ -303,3 +303,42 @@ select .choice-content-box .choice-option:checked {
 select .choice-content-box .choice-option .option-text:checked {
     color: white;
 }
+
+/* Slider */
+slider {
+    width: 250px;
+    height: 26px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+slider .slider-track {
+    width: 100%;
+    height: 10px;
+    background: #fcfcfc;
+    border-radius: 5px;
+    position: relative;
+    overflow: visible;
+}
+
+slider .slider-track .track-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 0;
+    background: #a163f9;
+    border-radius: 5px;
+}
+
+slider .slider-track .thumb {
+    width: 20px;
+    height: 20px;
+    background: #fcfcfc;
+    border-radius: 50%;
+    border: 2px solid #a163f9;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+}

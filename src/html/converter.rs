@@ -10,7 +10,7 @@ use crate::html::{
 };
 use crate::io::{CssAsset, HtmlAsset};
 use crate::styles::IconPlace;
-use crate::widgets::{Body, Button, CheckBox, ChoiceBox, ChoiceOption, Div, Headline, HeadlineType, Img, InputCap, InputField, InputType, Paragraph, Widget};
+use crate::widgets::{Body, Button, CheckBox, ChoiceBox, ChoiceOption, Div, Headline, HeadlineType, Img, InputCap, InputField, InputType, Paragraph, Slider, Widget};
 
 pub const DEFAULT_UI_CSS: &str = "default/extended_ui.css";
 
@@ -392,6 +392,39 @@ fn parse_html_node(
                 ChoiceBox {
                     value,
                     options,
+                    ..default()
+                },
+                meta, states, functions, widget.clone(), HtmlID::default()))
+        }
+
+        "slider" => {
+            // Parse slider attributes: min, max, value, step
+            let min = attributes
+                .get("min")
+                .and_then(|v| v.parse::<f32>().ok())
+                .unwrap_or(0.0);
+
+            let max = attributes
+                .get("max")
+                .and_then(|v| v.parse::<f32>().ok())
+                .unwrap_or(100.0);
+
+            let value = attributes
+                .get("value")
+                .and_then(|v| v.parse::<f32>().ok())
+                .unwrap_or(min);
+
+            let step = attributes
+                .get("step")
+                .and_then(|v| v.parse::<f32>().ok())
+                .unwrap_or(1.0);
+
+            Some(HtmlWidgetNode::Slider(
+                Slider {
+                    value,
+                    min,
+                    max,
+                    step,
                     ..default()
                 },
                 meta, states, functions, widget.clone(), HtmlID::default()))

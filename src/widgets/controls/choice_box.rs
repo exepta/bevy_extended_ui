@@ -89,10 +89,10 @@ fn internal_node_creation_system(
         }
 
         commands.entity(entity).insert((
-            Name::new(format!("Choice-Box-{}", choice_box.w_count)),
+            Name::new(format!("Choice-Box-{}", choice_box.entry)),
             Node::default(),
             WidgetId {
-                id: choice_box.w_count,
+                id: choice_box.entry,
                 kind: WidgetKind::ChoiceBox
             },
             BackgroundColor::default(),
@@ -113,7 +113,7 @@ fn internal_node_creation_system(
 
                 // Overlay label
                 builder.spawn((
-                    Name::new(format!("Select-Label-{}", choice_box.w_count)),
+                    Name::new(format!("Select-Label-{}", choice_box.entry)),
                     Node::default(),
                     Text::new(choice_box.label.clone()),
                     TextColor::default(),
@@ -132,7 +132,7 @@ fn internal_node_creation_system(
                 generate_child_selected_option(builder, &css_source.clone(), choice_box, layer, &id.0, &mut *image_cache, &mut images, &asset_server);
 
                 builder.spawn((
-                    Name::new(format!("Choice-Content-{}", choice_box.w_count)),
+                    Name::new(format!("Choice-Content-{}", choice_box.entry)),
                     Node::default(),
                     BackgroundColor::default(),
                     ImageNode::default(),
@@ -176,7 +176,7 @@ fn internal_node_creation_system(
                             };
 
                         builder.spawn((
-                            Name::new(format!("Option-{}", choice_box.w_count)),
+                            Name::new(format!("Option-{}", choice_box.entry)),
                             Node::default(),
                             BackgroundColor::default(),
                             ImageNode::default(),
@@ -205,7 +205,7 @@ fn internal_node_creation_system(
                                     );
 
                                     builder.spawn((
-                                        Name::new(format!("Option-Icon-{}", choice_box.w_count)),
+                                        Name::new(format!("Option-Icon-{}", choice_box.entry)),
                                         ImageNode {
                                             image: handle,
                                             ..default()
@@ -229,7 +229,7 @@ fn internal_node_creation_system(
                                 }
 
                                 builder.spawn((
-                                    Name::new(format!("Option-Text-{}", choice_box.w_count)),
+                                    Name::new(format!("Option-Text-{}", choice_box.entry)),
                                     text,
                                     TextColor::default(),
                                     TextFont::default(),
@@ -668,7 +668,7 @@ fn generate_child_selected_option(
 
     // Selected Container
     builder.spawn((
-        Name::new(format!("Option-Selected-{}", choice_box.w_count)),
+        Name::new(format!("Option-Selected-{}", choice_box.entry)),
         Node::default(),
         BackgroundColor::default(),
         ImageNode::default(),
@@ -685,7 +685,7 @@ fn generate_child_selected_option(
 
         // Selected Text
         builder.spawn((
-            Name::new(format!("Option-Sel-Text-{}", choice_box.w_count)),
+            Name::new(format!("Option-Sel-Text-{}", choice_box.entry)),
             Text::new(choice_box.value.text.clone()),
             TextColor::default(),
             TextFont::default(),
@@ -702,7 +702,7 @@ fn generate_child_selected_option(
     });
 
     builder.spawn((
-        Name::new(format!("Arrow-Box-{}", choice_box.w_count)),
+        Name::new(format!("Arrow-Box-{}", choice_box.entry)),
         Node::default(),
         BackgroundColor::default(),
         ImageNode::default(),
@@ -725,7 +725,7 @@ fn generate_child_selected_option(
         );
 
         builder.spawn((
-            Name::new(format!("Drop-Icon-{}", choice_box.w_count)),
+            Name::new(format!("Drop-Icon-{}", choice_box.entry)),
             ImageNode {
                 image: handle,
                 ..default()

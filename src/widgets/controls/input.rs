@@ -108,10 +108,10 @@ fn internal_node_creation_system(
         commands
             .entity(entity)
             .insert((
-                Name::new(format!("Input-{}", field.w_count)),
+                Name::new(format!("Input-{}", field.entry)),
                 Node::default(),
                 WidgetId {
-                    id: field.w_count,
+                    id: field.entry,
                     kind: WidgetKind::InputField,
                 },
                 BackgroundColor::default(),
@@ -143,7 +143,7 @@ fn internal_node_creation_system(
 
                     // Icon left
                     builder.spawn((
-                        Name::new(format!("Input-Icon-{}", field.w_count)),
+                        Name::new(format!("Input-Icon-{}", field.entry)),
                         Node::default(),
                         BackgroundColor::default(),
                         ImageNode::default(),
@@ -158,7 +158,7 @@ fn internal_node_creation_system(
                         InputFieldIcon,
                         BindToID(id.0),
                         children![(
-                            Name::new(format!("Icon-{}", field.w_count)),
+                            Name::new(format!("Icon-{}", field.entry)),
                             ImageNode { image: handle, ..default() },
                             ZIndex::default(),
                             UIWidgetState::default(),
@@ -173,7 +173,7 @@ fn internal_node_creation_system(
 
                 // Overlay label
                 builder.spawn((
-                    Name::new(format!("Input-Label-{}", field.w_count)),
+                    Name::new(format!("Input-Label-{}", field.entry)),
                     Node::default(),
                     Text::new(field.label.clone()),
                     TextColor::default(),
@@ -192,7 +192,7 @@ fn internal_node_creation_system(
                 // Text content children
                 builder
                     .spawn((
-                        Name::new(format!("Input-Text-Container-{}", field.w_count)),
+                        Name::new(format!("Input-Text-Container-{}", field.entry)),
                         Node::default(),
                         BackgroundColor::default(),
                         BorderColor::default(),
@@ -209,7 +209,7 @@ fn internal_node_creation_system(
                         children![
                             // Input Cursor
                             (
-                                Name::new(format!("Cursor-{}", field.w_count)),
+                                Name::new(format!("Cursor-{}", field.entry)),
                                 Node::default(),
                                 BackgroundColor::default(),
                                 ImageNode::default(),
@@ -227,7 +227,7 @@ fn internal_node_creation_system(
                             ),
                             // Input Text
                             (
-                                Name::new(format!("Text-{}", field.w_count)),
+                                Name::new(format!("Text-{}", field.entry)),
                                 Node::default(),
                                 Text::new(field.text.clone()),
                                 TextColor::default(),

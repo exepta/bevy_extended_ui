@@ -14,7 +14,7 @@ use crate::html::reload::HtmlReloadPlugin;
 use crate::io::{CssAsset, HtmlAsset};
 use crate::styles::parser::apply_property_to_style;
 use crate::styles::Style;
-use crate::widgets::{Button, Body, Div, Widget, CheckBox, Headline, Paragraph, Img, InputField, ChoiceBox};
+use crate::widgets::{Button, Body, Div, Widget, CheckBox, Headline, Paragraph, Img, InputField, ChoiceBox, Slider};
 
 pub static HTML_ID_COUNTER: AtomicUsize = AtomicUsize::new(1);
 
@@ -136,6 +136,8 @@ pub enum HtmlWidgetNode {
     Input(InputField, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
     /// A paragraph `<p>`.
     Paragraph(Paragraph, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
+    /// A slider input (range).
+    Slider(Slider, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
 }
 
 /// Stores all parsed HTML structures keyed by `<meta name="...">`.

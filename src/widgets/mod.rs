@@ -16,6 +16,7 @@ use content::image::ImageWidget;
 use controls::input::InputWidget;
 use content::paragraph::ParagraphWidget;
 use crate::widgets::controls::choice_box::ChoiceBoxWidget;
+use crate::widgets::controls::slider::SliderWidget;
 
 /// Marker component for UI elements that should ignore the parent widget state.
 ///
@@ -113,6 +114,7 @@ impl Plugin for ExtendedWidgetPlugin {
             ImageWidget,
             InputWidget,
             ParagraphWidget,
+            SliderWidget
         ));
     }
 }
@@ -216,7 +218,7 @@ impl Default for CheckBox {
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, Widget)]
 pub struct ChoiceBox {
-    pub w_count: usize,
+    pub entry: usize,
     pub label: String,
     pub value: ChoiceOption,
     pub options: Vec<ChoiceOption>,
@@ -225,10 +227,10 @@ pub struct ChoiceBox {
 
 impl Default for ChoiceBox {
     fn default() -> Self {
-        let w_count = CHOICE_BOX_ID_POOL.lock().unwrap().acquire();
+        let entry = CHOICE_BOX_ID_POOL.lock().unwrap().acquire();
 
         Self {
-            w_count,
+            entry,
             label: String::from("select"),
             value: ChoiceOption::default(),
             options: vec![ChoiceOption::default()],
@@ -347,7 +349,7 @@ impl Default for Img {
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, Widget)]
 pub struct InputField {
-    pub w_count: usize,
+    pub entry: usize,
     pub text: String,
     pub label: String,
     pub placeholder: String,
@@ -360,10 +362,10 @@ pub struct InputField {
 
 impl Default for InputField {
     fn default() -> Self {
-        let w_count = INPUT_ID_POOL.lock().unwrap().acquire();
+        let entry = INPUT_ID_POOL.lock().unwrap().acquire();
 
         Self {
-            w_count,
+            entry,
             text: String::from(""),
             label: String::from("Label"),
             placeholder: String::from(""),
@@ -445,6 +447,35 @@ impl Default for Paragraph {
         Self {
             entry,
             text: String::from(""),
+        }
+    }
+}
+
+// ===============================================
+//                      Slider
+// ===============================================
+
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+#[require(UIGenID, UIWidgetState, Widget)]
+pub struct Slider {
+    pub w_count: usize,
+    pub value: f32,
+    pub step: f32,
+    pub min: f32,
+    pub max: f32
+}
+
+impl Default for Slider {
+    fn default() -> Self {
+        let w_count = SLIDER_ID_POOL.lock().unwrap().acquire();
+
+        Self {
+            w_count,
+            value: 0.0,
+            step: 1.0,
+            min: 0.0,
+            max: 100.0,
         }
     }
 }

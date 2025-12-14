@@ -131,7 +131,8 @@ fn collect_html_ids(nodes: &Vec<HtmlWidgetNode>, ids: &mut Vec<HtmlID>) {
             | HtmlWidgetNode::Headline(_, _, _, _, _, id)
             | HtmlWidgetNode::Img(_, _, _, _, _, id)
             | HtmlWidgetNode::Input(_, _, _, _, _, id)
-            | HtmlWidgetNode::Paragraph(_, _, _, _, _, id)=> {
+            | HtmlWidgetNode::Paragraph(_, _, _, _, _, id)
+            | HtmlWidgetNode::Slider(_, _, _, _, _, id) => {
                 ids.push(id.clone());
             }
             HtmlWidgetNode::Body(_, _, _, children, _, _, id) => {
@@ -174,6 +175,9 @@ fn spawn_widget_node(
         }
         HtmlWidgetNode::Paragraph(paragraph, meta, states, functions, widget, id) => {
             spawn_with_meta(commands, paragraph.clone(), meta, states, functions, widget, id)
+        }
+        HtmlWidgetNode::Slider(slider, meta, states, functions, widget, id) => {
+            spawn_with_meta(commands, slider.clone(), meta, states, functions, widget, id)
         }
         HtmlWidgetNode::Body(body, meta, states, children, functions, widget, id) => {
             let entity = spawn_with_meta(commands, body.clone(), meta, states, functions, widget, id);
