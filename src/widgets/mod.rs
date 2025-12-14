@@ -1,25 +1,21 @@
 mod body;
 mod div;
-mod button;
-mod check_box;
-mod headline;
-mod paragraph;
-mod image;
-mod input;
 mod controls;
+mod content;
 
 use std::fmt;
 use bevy::prelude::*;
 use crate::registry::*;
 use crate::styles::IconPlace;
 use crate::widgets::body::BodyWidget;
-use crate::widgets::button::ButtonWidget;
-use crate::widgets::check_box::CheckBoxWidget;
+use controls::button::ButtonWidget;
+use controls::check_box::CheckBoxWidget;
 use crate::widgets::div::DivWidget;
-use crate::widgets::headline::HeadlineWidget;
-use crate::widgets::image::ImageWidget;
-use crate::widgets::input::InputWidget;
-use crate::widgets::paragraph::ParagraphWidget;
+use content::headline::HeadlineWidget;
+use content::image::ImageWidget;
+use controls::input::InputWidget;
+use content::paragraph::ParagraphWidget;
+use crate::widgets::controls::choice_box::ChoiceBoxWidget;
 
 /// Marker component for UI elements that should ignore the parent widget state.
 ///
@@ -112,6 +108,7 @@ impl Plugin for ExtendedWidgetPlugin {
             ButtonWidget,
             DivWidget,
             CheckBoxWidget,
+            ChoiceBoxWidget,
             HeadlineWidget,
             ImageWidget,
             InputWidget,
@@ -207,6 +204,62 @@ impl Default for CheckBox {
             entry,
             label: String::from("label"),
             icon_path: Some(String::from("extended_ui/icons/check-mark.png")),
+        }
+    }
+}
+
+// ===============================================
+//                   ChoiceBox
+// ===============================================
+
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+#[require(UIGenID, UIWidgetState, Widget)]
+pub struct ChoiceBox {
+    pub w_count: usize,
+    pub label: String,
+    pub value: ChoiceOption,
+    pub options: Vec<ChoiceOption>,
+    pub icon_path: Option<String>,
+}
+
+impl Default for ChoiceBox {
+    fn default() -> Self {
+        let w_count = CHOICE_BOX_ID_POOL.lock().unwrap().acquire();
+
+        Self {
+            w_count,
+            label: String::from("select"),
+            value: ChoiceOption::default(),
+            options: vec![ChoiceOption::default()],
+            icon_path: Some(String::from("extended_ui/icons/drop-arrow.png")),
+        }
+    }
+}
+
+#[derive(Component, Reflect, Debug, Clone, PartialEq, Eq)]
+pub struct ChoiceOption {
+    pub text: String,
+    pub internal_value: String,
+    pub icon_path: Option<String>,
+}
+
+impl Default for ChoiceOption {
+    fn default() -> Self {
+        Self {
+            text: String::from("Please Select"),
+            internal_value: String::from("default"),
+            icon_path: None,
+        }
+    }
+}
+
+impl ChoiceOption {
+    pub fn new(text: &str) -> Self {
+        Self {
+            text: text.to_string(),
+            internal_value: text.trim().to_string(),
+            icon_path: None,
         }
     }
 }

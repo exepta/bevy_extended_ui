@@ -10,7 +10,7 @@ use crate::html::{
 };
 use crate::io::{CssAsset, HtmlAsset};
 use crate::styles::IconPlace;
-use crate::widgets::{Body, Button, CheckBox, Div, Headline, HeadlineType, Img, InputCap, InputField, InputType, Paragraph, Widget};
+use crate::widgets::{Body, Button, CheckBox, ChoiceBox, ChoiceOption, Div, Headline, HeadlineType, Img, InputCap, InputField, InputType, Paragraph, Widget};
 
 pub const DEFAULT_UI_CSS: &str = "default/extended_ui.css";
 
@@ -245,6 +245,25 @@ fn parse_html_node(
             }, meta, states, functions, widget.clone(), HtmlID::default()))
         }
 
+        "div" => {
+            let mut children = Vec::new();
+            for child in node.children() {
+                if let Some(parsed) = parse_html_node(&child, css_sources, label_map, key, html) {
+                    children.push(parsed);
+                }
+            }
+
+            Some(HtmlWidgetNode::Div(
+                Div::default(),
+                meta,
+                states,
+                children,
+                functions,
+                widget.clone(),
+                HtmlID::default(),
+            ))
+        }
+
         "h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
             let h_type = match tag.as_str() {
                 "h1" => HeadlineType::H1,
@@ -335,23 +354,47 @@ fn parse_html_node(
                 meta, states, functions, widget.clone(), HtmlID::default()))
         }
 
-        "div" => {
-            let mut children = Vec::new();
+        "select" => {
+            // Parse dropdown options and selected value
+            let mut options = Vec::new();
+            let mut selected_value = None;
+
             for child in node.children() {
-                if let Some(parsed) = parse_html_node(&child, css_sources, label_map, key, html) {
-                    children.push(parsed);
+                if let Some(option_el) = child.as_element() {
+                    if option_el.name.local.eq("option") {
+                        let attrs = option_el.attributes.borrow();
+                        let value = attrs.get("value").unwrap_or("").to_string();
+                        let icon = attrs.get("icon").unwrap_or("").to_string();
+                        let text = child.text_contents().trim().to_string();
+
+                        let icon_path = if icon.trim().is_empty() { None } else { Some(icon) };
+
+                        let option = ChoiceOption {
+                            text: text.clone(),
+                            internal_value: value.clone(),
+                            icon_path,
+                        };
+
+                        if attrs.contains("selected") {
+                            selected_value = Some(option.clone());
+                        }
+
+                        options.push(option);
+                    }
                 }
             }
 
-            Some(HtmlWidgetNode::Div(
-                Div::default(),
-                meta,
-                states,
-                children,
-                functions,
-                widget.clone(),
-                HtmlID::default(),
-            ))
+            let value = selected_value.unwrap_or_else(|| {
+                options.first().cloned().unwrap_or_default()
+            });
+
+            Some(HtmlWidgetNode::ChoiceBox(
+                ChoiceBox {
+                    value,
+                    options,
+                    ..default()
+                },
+                meta, states, functions, widget.clone(), HtmlID::default()))
         }
         _ => None,
     }

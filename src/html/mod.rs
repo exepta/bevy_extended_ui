@@ -14,7 +14,7 @@ use crate::html::reload::HtmlReloadPlugin;
 use crate::io::{CssAsset, HtmlAsset};
 use crate::styles::parser::apply_property_to_style;
 use crate::styles::Style;
-use crate::widgets::{Button, Body, Div, Widget, CheckBox, Headline, Paragraph, Img, InputField};
+use crate::widgets::{Button, Body, Div, Widget, CheckBox, Headline, Paragraph, Img, InputField, ChoiceBox};
 
 pub static HTML_ID_COUNTER: AtomicUsize = AtomicUsize::new(1);
 
@@ -126,6 +126,8 @@ pub enum HtmlWidgetNode {
     Button(Button, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
     /// A checkbox `<input type="checkbox">`.
     CheckBox(CheckBox, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
+    /// A dropdown or select box.
+    ChoiceBox(ChoiceBox, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
     /// A heading element (`<h1>`-`<h6>`).
     Headline(Headline, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
     /// A img element (`<img>`).
