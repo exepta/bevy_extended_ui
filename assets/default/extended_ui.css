@@ -48,8 +48,8 @@ checkbox .mark-box .mark {
 }
 
 checkbox:checked .mark-box {
-    border-color: #8534f5;
-    background: #8534f5;
+    border-color: #a163f9;
+    background: #a163f9;
 }
 
 checkbox .check-text {
@@ -110,7 +110,7 @@ input {
 }
 
 input:hover {
-    border-color: #732bd6;
+    border-color: #a163f9;
 }
 
 input:focus {
@@ -148,7 +148,7 @@ input .in-text-container {
 }
 
 input:hover .input-label {
-    color: #732bd6;
+    color: #a163f9;
 }
 
 input:focus .input-label {
