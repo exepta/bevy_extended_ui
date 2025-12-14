@@ -10,7 +10,7 @@ use crate::html::{
 };
 use crate::io::{CssAsset, HtmlAsset};
 use crate::styles::IconPlace;
-use crate::widgets::{Body, Button, CheckBox, Div, Headline, HeadlineType, Img, Paragraph, Widget};
+use crate::widgets::{Body, Button, CheckBox, Div, Headline, HeadlineType, Img, InputCap, InputField, InputType, Paragraph, Widget};
 
 pub const DEFAULT_UI_CSS: &str = "default/extended_ui.css";
 
@@ -150,7 +150,7 @@ fn update_html_ui(
 fn parse_html_node(
     node: &NodeRef,
     css_sources: &Vec<Handle<CssAsset>>,
-    _label_map: &HashMap<String, String>,
+    label_map: &HashMap<String, String>,
     key: &String,
     html: &HtmlSource,
 ) -> Option<HtmlWidgetNode> {
@@ -187,7 +187,7 @@ fn parse_html_node(
         "body" => {
             let children = node
                 .children()
-                .filter_map(|child| parse_html_node(&child, css_sources, _label_map, key, html))
+                .filter_map(|child| parse_html_node(&child, css_sources, label_map, key, html))
                 .collect();
 
             Some(HtmlWidgetNode::Body(
@@ -291,6 +291,40 @@ fn parse_html_node(
             ))
         }
 
+        "input" => {
+            let id = attributes.get("id").map(|s| s.to_string());
+            let label = id
+                .as_ref()
+                .and_then(|id| label_map.get(id))
+                .cloned()
+                .unwrap_or_default();
+
+            let text = attributes.get("value").unwrap_or("").to_string();
+            let placeholder = attributes.get("placeholder").unwrap_or("").to_string();
+            let input_type = attributes.get("type").unwrap_or("text").to_string();
+            let icon_path = attributes.get("icon").unwrap_or("");
+            let icon: Option<String> = if !icon_path.is_empty() { Some(String::from(icon_path)) } else { None };
+            let cap = match attributes.get("maxlength") {
+                Some(value) if value.trim().eq_ignore_ascii_case("auto") => InputCap::CapAtNodeSize,
+                Some(value) if value.trim().is_empty() => InputCap::NoCap,
+                Some(value) => {
+                    let length = value.trim().parse::<usize>().unwrap_or(0);
+                    InputCap::CapAt(length)
+                }
+                None => InputCap::NoCap,
+            };
+
+            Some(HtmlWidgetNode::Input(InputField {
+                label,
+                placeholder,
+                text,
+                input_type: InputType::from_str(&input_type).unwrap_or_default(),
+                icon_path: icon,
+                cap_text_at: cap,
+                ..default()
+            }, meta, states, functions, widget.clone(), HtmlID::default()))
+        }
+
         "p" => {
             let text = node.text_contents().trim().to_string();
             Some(HtmlWidgetNode::Paragraph(
@@ -304,7 +338,7 @@ fn parse_html_node(
         "div" => {
             let mut children = Vec::new();
             for child in node.children() {
-                if let Some(parsed) = parse_html_node(&child, css_sources, _label_map, key, html) {
+                if let Some(parsed) = parse_html_node(&child, css_sources, label_map, key, html) {
                     children.push(parsed);
                 }
             }

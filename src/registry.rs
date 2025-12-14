@@ -16,6 +16,8 @@ pub static HEADLINE_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPoo
 
 pub static IMAGE_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
 
+pub static INPUT_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
+
 pub static PARAGRAPH_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
 
 /// A pool that manages reusable integer IDs for widgets.

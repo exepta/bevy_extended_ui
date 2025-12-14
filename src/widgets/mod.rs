@@ -5,6 +5,8 @@ mod check_box;
 mod headline;
 mod paragraph;
 mod image;
+mod input;
+mod controls;
 
 use std::fmt;
 use bevy::prelude::*;
@@ -16,6 +18,7 @@ use crate::widgets::check_box::CheckBoxWidget;
 use crate::widgets::div::DivWidget;
 use crate::widgets::headline::HeadlineWidget;
 use crate::widgets::image::ImageWidget;
+use crate::widgets::input::InputWidget;
 use crate::widgets::paragraph::ParagraphWidget;
 
 /// Marker component for UI elements that should ignore the parent widget state.
@@ -111,6 +114,7 @@ impl Plugin for ExtendedWidgetPlugin {
             CheckBoxWidget,
             HeadlineWidget,
             ImageWidget,
+            InputWidget,
             ParagraphWidget,
         ));
     }
@@ -278,6 +282,93 @@ impl Default for Img {
             entry,
             src: None,
             alt: String::from(""),
+        }
+    }
+}
+
+// ===============================================
+//                   InputField
+// ===============================================
+
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+#[require(UIGenID, UIWidgetState, Widget)]
+pub struct InputField {
+    pub w_count: usize,
+    pub text: String,
+    pub label: String,
+    pub placeholder: String,
+    pub cursor_position: usize,
+    pub clear_after_focus_lost: bool,
+    pub icon_path: Option<String>,
+    pub input_type: InputType,
+    pub cap_text_at: InputCap
+}
+
+impl Default for InputField {
+    fn default() -> Self {
+        let w_count = INPUT_ID_POOL.lock().unwrap().acquire();
+
+        Self {
+            w_count,
+            text: String::from(""),
+            label: String::from("Label"),
+            placeholder: String::from(""),
+            clear_after_focus_lost: false,
+            cursor_position: 0,
+            icon_path: None,
+            cap_text_at: InputCap::default(),
+            input_type: InputType::default(),
+        }
+    }
+}
+
+#[derive(Reflect, Default, Debug, Clone, Eq, PartialEq)]
+pub enum InputType {
+    #[default]
+    Text,
+    Email,
+    Date,
+    Password,
+    Number
+}
+
+impl InputType {
+    pub fn is_valid_char(&self, c: char) -> bool {
+        match self {
+            InputType::Text | InputType::Password => true,
+            InputType::Number => c.is_ascii_digit() || "+-*/() ".contains(c),
+            InputType::Email => c.is_ascii_alphanumeric() || c == '@' || c == '.' || c == '-',
+            InputType::Date => c.is_ascii_digit() || c == '/' || c == '-' || c == '.'
+        }
+    }
+
+    pub fn from_str(value: &str) -> Option<InputType> {
+        match value.to_lowercase().as_str() {
+            "text" => Some(InputType::Text),
+            "password" => Some(InputType::Password),
+            "number" => Some(InputType::Number),
+            "email" => Some(InputType::Email),
+            "date" => Some(InputType::Date),
+            _ => None
+        }
+    }
+}
+
+#[derive(Reflect, Default, Debug, Clone, Eq, PartialEq)]
+pub enum InputCap {
+    #[default]
+    NoCap,
+    CapAtNodeSize,
+    CapAt(usize), // 0 means no cap!
+}
+
+impl InputCap {
+    pub fn get_value(&self) -> usize {
+        match self {
+            Self::CapAt(value) => *value,
+            Self::NoCap => 0,
+            Self::CapAtNodeSize => 0
         }
     }
 }

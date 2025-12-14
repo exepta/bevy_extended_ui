@@ -14,7 +14,7 @@ use crate::html::reload::HtmlReloadPlugin;
 use crate::io::{CssAsset, HtmlAsset};
 use crate::styles::parser::apply_property_to_style;
 use crate::styles::Style;
-use crate::widgets::{Button, Body, Div, Widget, CheckBox, Headline, Paragraph, Img};
+use crate::widgets::{Button, Body, Div, Widget, CheckBox, Headline, Paragraph, Img, InputField};
 
 pub static HTML_ID_COUNTER: AtomicUsize = AtomicUsize::new(1);
 
@@ -130,6 +130,8 @@ pub enum HtmlWidgetNode {
     Headline(Headline, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
     /// A img element (`<img>`).
     Img(Img, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
+    /// An `<input type="text">` field.
+    Input(InputField, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
     /// A paragraph `<p>`.
     Paragraph(Paragraph, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
 }

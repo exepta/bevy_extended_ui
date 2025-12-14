@@ -100,6 +100,73 @@ h6 {
     margin: 16px;
 }
 
+/* Input Fields */
+
+input {
+    width: 350px;
+    height: 55px;
+    border-radius: 5px;
+    border: 2px white;
+}
+
+input:hover {
+    border-color: #732bd6;
+}
+
+input:focus {
+    border-color: #a163f9;
+}
+
+input .input-label {
+    position: absolute;
+    left: 10px;
+    top: 19px;
+    font-size: 14px;
+}
+
+input .in-icon-container {
+    width: 50px;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.in-icon-container .in-icon {
+    font-size: 16px;
+}
+
+input .in-text-container {
+    height: 100%;
+    width: 95%;
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    overflow-y: hidden;
+    overflow-x: scroll;
+    padding-left: 10px;
+}
+
+input:hover .input-label {
+    color: #732bd6;
+}
+
+input:focus .input-label {
+    color: #a163f9;
+}
+
+input .in-text-container .input-text {
+    font-size: 15px;
+    width: 100%;
+    text-wrap: nowrap;
+}
+
+input .in-text-container .input-cursor {
+    width: 2px;
+    height: 20px;
+    background: white;
+}
+
 /* Paragraph */
 p {
     margin: 8px;
