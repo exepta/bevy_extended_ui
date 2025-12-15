@@ -64,6 +64,8 @@ fn internal_node_creation_system(
                 BackgroundColor::default(),
                 BorderColor::default(),
                 BorderRadius::default(),
+                Transform::default(),
+                GlobalTransform::default(),
                 ZIndex::default(),
                 css_source.clone(),
                 PreviousSliderValue(slider.value),
@@ -91,6 +93,8 @@ fn internal_node_creation_system(
                         BorderRadius::default(),
                         ZIndex::default(),
                         UIWidgetState::default(),
+                        Transform::default(),
+                        GlobalTransform::default(),
                         css_source.clone(),
                         CssClass(vec!["slider-track".to_string()]),
                         RenderLayers::layer(layer),
@@ -197,22 +201,15 @@ fn on_track_click(
     let Ok(window) = window_q.single() else { return; };
     let sf = window.scale_factor() * ui_scale.0;
 
-    info!("1");
-
-    // IMPORTANT: use the listener entity (the one you attached `.observe` to)
     let track_entity = trigger.entity;
 
     let Ok((track_node, track_gt, bind)) = track_q.get(track_entity) else { return; };
     let Some(hit_pos) = trigger.hit.position else { return; };
 
-    info!("2");
-
     let track_width = (track_node.size().x / sf).max(1.0);
     let Some(thumb_width) = find_bound_width(bind.0, &thumb_size_q, sf) else { return; };
 
-    info!("3");
-
-    let click_x = world_to_local_left_x(hit_pos, track_gt, track_width, sf);
+    let click_x = world_to_local_left_x(hit_pos, track_gt, track_width);
     let desired_left = click_x - thumb_width * 0.5;
 
     apply_from_track_left_x(
@@ -274,15 +271,10 @@ fn on_thumb_drag(
     );
 }
 
-fn world_to_local_left_x(
-    hit_world: Vec3,
-    track_gt: &GlobalTransform,
-    track_width: f32,
-    scale: f32,
-) -> f32 {
+fn world_to_local_left_x(hit_world: Vec3, track_gt: &GlobalTransform, track_width: f32) -> f32 {
     let inv = track_gt.to_matrix().inverse();
     let local = inv.transform_point3(hit_world);
-    local.x / scale + track_width * 0.5
+    local.x + track_width * 0.5
 }
 
 fn apply_from_track_left_x(
