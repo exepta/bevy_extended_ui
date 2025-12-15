@@ -10,7 +10,7 @@ use crate::html::{
 };
 use crate::io::{CssAsset, HtmlAsset};
 use crate::styles::IconPlace;
-use crate::widgets::{Body, Button, CheckBox, ChoiceBox, ChoiceOption, Div, Headline, HeadlineType, Img, InputCap, InputField, InputType, Paragraph, Slider, Widget};
+use crate::widgets::{Body, Button, CheckBox, ChoiceBox, ChoiceOption, Div, Divider, DividerAlignment, Headline, HeadlineType, Img, InputCap, InputField, InputType, Paragraph, Slider, Widget};
 
 pub const DEFAULT_UI_CSS: &str = "default/extended_ui.css";
 
@@ -262,6 +262,16 @@ fn parse_html_node(
                 widget.clone(),
                 HtmlID::default(),
             ))
+        }
+
+        "divider" => {
+            let alignment = attributes.get("alignment").unwrap_or("horizontal");
+            Some(HtmlWidgetNode::Divider(
+                Divider {
+                    alignment: DividerAlignment::from_str(alignment).unwrap_or_default(),
+                    ..default()
+                },
+                meta, states, functions, widget.clone(), HtmlID::default()))
         }
 
         "h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {

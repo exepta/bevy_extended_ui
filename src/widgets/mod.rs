@@ -15,6 +15,7 @@ use content::headline::HeadlineWidget;
 use content::image::ImageWidget;
 use controls::input::InputWidget;
 use content::paragraph::ParagraphWidget;
+use crate::widgets::content::divider::DividerWidget;
 use crate::widgets::controls::choice_box::ChoiceBoxWidget;
 use crate::widgets::controls::slider::SliderWidget;
 
@@ -84,16 +85,16 @@ pub struct WidgetId {
 #[derive(Debug, Clone, Copy)]
 pub enum WidgetKind {
     Body,
-    Div,
-    Headline,
-    Paragraph,
     Button,
     CheckBox,
-    Slider,
-    InputField,
     ChoiceBox,
+    Div,
+    Divider,
+    Headline,
     Img,
-    ProgressBar,
+    InputField,
+    Paragraph,
+    Slider,
 }
 
 pub struct ExtendedWidgetPlugin;
@@ -108,6 +109,7 @@ impl Plugin for ExtendedWidgetPlugin {
             BodyWidget,
             ButtonWidget,
             DivWidget,
+            DividerWidget,
             CheckBoxWidget,
             ChoiceBoxWidget,
             HeadlineWidget,
@@ -267,7 +269,56 @@ impl ChoiceOption {
 }
 
 // ===============================================
-//                       Headline
+//                   Divider
+// ===============================================
+
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+#[require(UIGenID, UIWidgetState, Widget)]
+pub struct Divider {
+    pub entry: usize,
+    pub alignment: DividerAlignment
+}
+
+impl Default for Divider {
+    fn default() -> Self {
+        let entry = DIVIDER_ID_POOL.lock().unwrap().acquire();
+        Self {
+            entry,
+            alignment: DividerAlignment::default(),
+        }
+    }
+}
+
+#[derive(Reflect, Default, Debug, Clone, Eq, PartialEq)]
+pub enum DividerAlignment {
+    #[default]
+    Vertical,
+    Horizontal
+}
+
+impl DividerAlignment {
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "vertical" | "vert" | "v" => Some(Self::Vertical),
+            "horizontal" | "horiz" | "h" => Some(Self::Horizontal),
+            _ => None,
+        }
+    }
+}
+
+impl fmt::Display for DividerAlignment {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            DividerAlignment::Horizontal => "horizontal",
+            DividerAlignment::Vertical => "vertical",
+        };
+        write!(f, "{}", s)
+    }
+}
+
+// ===============================================
+//                   Headline
 // ===============================================
 
 #[derive(Component, Reflect, Debug, Clone)]
@@ -459,7 +510,7 @@ impl Default for Paragraph {
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, Widget)]
 pub struct Slider {
-    pub w_count: usize,
+    pub entry: usize,
     pub value: f32,
     pub step: f32,
     pub min: f32,
@@ -468,10 +519,10 @@ pub struct Slider {
 
 impl Default for Slider {
     fn default() -> Self {
-        let w_count = SLIDER_ID_POOL.lock().unwrap().acquire();
+        let entry = SLIDER_ID_POOL.lock().unwrap().acquire();
 
         Self {
-            w_count,
+            entry,
             value: 0.0,
             step: 1.0,
             min: 0.0,

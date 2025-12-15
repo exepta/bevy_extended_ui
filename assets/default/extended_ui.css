@@ -56,6 +56,23 @@ checkbox .check-text {
     font-size: 13px;
 }
 
+/* Divider */
+
+divider {
+    background: #d4d4f3;
+    margin: 5px;
+}
+
+.divider-vert {
+    width: 1px;
+    height: 25px;
+}
+
+.divider-hori {
+    width: 25px;
+    height: 1px;
+}
+
 /* Headline */
 
 h1 {

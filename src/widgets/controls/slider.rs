@@ -61,7 +61,7 @@ fn internal_node_creation_system(
             .entity(entity)
             .insert((
                 Node::default(),
-                WidgetId { id: slider.w_count, kind: WidgetKind::Slider },
+                WidgetId { id: slider.entry, kind: WidgetKind::Slider },
                 BackgroundColor::default(),
                 BorderColor::default(),
                 BorderRadius::default(),
@@ -78,14 +78,14 @@ fn internal_node_creation_system(
                 ImageNode::default(),
                 BoxShadow::new(Colored::TRANSPARENT, Val::Px(0.), Val::Px(0.), Val::Px(0.), Val::Px(0.)),
             ))
-            .insert(Name::new(format!("Slider-{}", slider.w_count)))
+            .insert(Name::new(format!("Slider-{}", slider.entry)))
             .observe(on_internal_click)
             .observe(on_internal_cursor_entered)
             .observe(on_internal_cursor_leave)
             .with_children(|builder| {
                 builder
                     .spawn((
-                        Name::new(format!("Slider-Track-Box-{}", slider.w_count)),
+                        Name::new(format!("Slider-Track-Box-{}", slider.entry)),
                         Node::default(),
                         BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.0)),
                         BorderColor::default(),
@@ -105,7 +105,7 @@ fn internal_node_creation_system(
                     .with_children(|builder| {
                         builder
                             .spawn((
-                                Name::new(format!("Slider-Fill-{}", slider.w_count)),
+                                Name::new(format!("Slider-Fill-{}", slider.entry)),
                                 Node {
                                     position_type: PositionType::Absolute,
                                     left: Val::Px(0.0),
@@ -130,7 +130,7 @@ fn internal_node_creation_system(
 
                         builder
                             .spawn((
-                                Name::new(format!("Slider-Thumb-{}", slider.w_count)),
+                                Name::new(format!("Slider-Thumb-{}", slider.entry)),
                                 Node::default(),
                                 BackgroundColor::default(),
                                 BorderColor::default(),
