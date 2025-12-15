@@ -7,7 +7,12 @@ What will come in the next version?
 - [x] Input Widget will be completely refactored and become more feature.
 - [x] Choice Box Widget will be updated and more flexible.
 - [x] Slider reworked and bug fixes.
-- [ ] More Widgets like Divider, Switch Button, Radio Button, Toggle Button and more.
+- [ ] More Widgets:
+    - [x] Divider Widget
+    - [ ] Progress Bar Widget
+    - [ ] Radio Button Widget
+    - [ ] Toggle Button Widget
+    - [ ] Switch Button Widget
 - [ ] Widgets will become scrollable with a scroll bar.
 - [ ] More CSS support.
 - [ ] Refactored Bind system for HTML.
