@@ -192,9 +192,10 @@ fn on_track_click(
     mut fill_q: Query<(&mut Node, &BindToID, &mut UiStyle), (With<SliderTrackFill>, Without<SliderThumb>)>,
     mut thumb_q: Query<(&mut Node, &mut SliderThumb, &BindToID, &mut UiStyle), (With<SliderThumb>, Without<SliderTrackFill>)>,
     window_q: Query<&Window, With<PrimaryWindow>>,
+    ui_scale: Res<UiScale>
 ) {
     let Ok(window) = window_q.single() else { return; };
-    let sf = window.scale_factor();
+    let sf = window.scale_factor() * ui_scale.0;
 
     info!("1");
 
@@ -211,11 +212,11 @@ fn on_track_click(
 
     info!("3");
 
-    let click_x = world_to_local_left_x(hit_pos, track_gt, track_width);
+    let click_x = world_to_local_left_x(hit_pos, track_gt, track_width, sf);
     let desired_left = click_x - thumb_width * 0.5;
 
     apply_from_track_left_x(
-        bind.0,                // <-- this is your usize BindToID
+        bind.0, // <-- this is your usize BindToID
         desired_left,
         track_width,
         thumb_width,
@@ -237,12 +238,20 @@ fn on_thumb_drag(
     mut fill_q: Query<(&mut Node, &BindToID, &mut UiStyle), (With<SliderTrackFill>, Without<SliderThumb>)>,
     mut thumb_q: Query<(&mut Node, &mut SliderThumb, &BindToID, &mut UiStyle), (With<SliderThumb>, Without<SliderTrackFill>)>,
     window_q: Query<&Window, With<PrimaryWindow>>,
+    ui_scale: Res<UiScale>,
 ) {
-    let Ok(window) = window_q.single() else { return };
-    let sf = window.scale_factor();
+    let Ok(window) = window_q.single() else {
+        return;
+    };
+    let sf = window.scale_factor() * ui_scale.0;
 
-    let Ok(parent) = parent_q.get(event.entity) else { return; };
-    let Ok((track_node, bind)) = track_q.get(parent.parent()) else { return; };
+    let Ok(parent) = parent_q.get(event.entity) else {
+        return;
+    };
+    let Ok((track_node, bind)) = track_q.get(parent.parent()) else {
+        return;
+    };
+
     let track_width = (track_node.size().x / sf).max(1.0);
 
     let Ok(thumb_node) = thumb_node_q.get(event.entity) else { return; };
@@ -265,10 +274,15 @@ fn on_thumb_drag(
     );
 }
 
-fn world_to_local_left_x(hit_world: Vec3, track_gt: &GlobalTransform, track_width: f32) -> f32 {
+fn world_to_local_left_x(
+    hit_world: Vec3,
+    track_gt: &GlobalTransform,
+    track_width: f32,
+    scale: f32,
+) -> f32 {
     let inv = track_gt.to_matrix().inverse();
     let local = inv.transform_point3(hit_world);
-    local.x + track_width * 0.5
+    local.x / scale + track_width * 0.5
 }
 
 fn apply_from_track_left_x(
@@ -356,9 +370,12 @@ fn detect_change_slider_values(
     mut fill_q: Query<(&mut Node, &BindToID, &mut UiStyle), (With<SliderTrackFill>, Without<SliderThumb>)>,
     mut thumb_q: Query<(&mut Node, &mut SliderThumb, &BindToID, &mut UiStyle), (With<SliderThumb>, Without<SliderTrackFill>)>,
     window_q: Query<&Window, With<PrimaryWindow>>,
+    ui_scale: Res<UiScale>,
 ) {
-    let Ok(window) = window_q.single() else { return };
-    let sf = window.scale_factor();
+    let Ok(window) = window_q.single() else {
+        return;
+    };
+    let sf = window.scale_factor() * ui_scale.0;
 
     let shift = keyboard.pressed(KeyCode::ShiftLeft) || keyboard.pressed(KeyCode::ShiftRight);
 
@@ -397,9 +414,12 @@ fn initialize_slider_visual_state(
     mut fill_q: Query<(&mut Node, &BindToID, &mut UiStyle), (With<SliderTrackFill>, Without<SliderThumb>)>,
     mut thumb_q: Query<(&mut Node, &mut SliderThumb, &BindToID, &mut UiStyle), (With<SliderThumb>, Without<SliderTrackFill>)>,
     window_q: Query<&Window, With<PrimaryWindow>>,
+    ui_scale: Res<UiScale>,
 ) {
-    let Ok(window) = window_q.single() else { return };
-    let sf = window.scale_factor();
+    let Ok(window) = window_q.single() else {
+        return;
+    };
+    let sf = window.scale_factor() * ui_scale.0;
 
     for (entity, mut slider, ui_id, needs) in slider_q.iter_mut() {
         if needs.is_none() {
