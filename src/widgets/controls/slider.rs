@@ -1,6 +1,7 @@
 use bevy::camera::visibility::RenderLayers;
 use bevy::ecs::query::QueryFilter;
 use bevy::prelude::*;
+use bevy::ui::RelativeCursorPosition;
 use bevy::window::PrimaryWindow;
 
 use crate::{CurrentWidgetState, ExtendedUiConfiguration};
@@ -64,8 +65,6 @@ fn internal_node_creation_system(
                 BackgroundColor::default(),
                 BorderColor::default(),
                 BorderRadius::default(),
-                Transform::default(),
-                GlobalTransform::default(),
                 ZIndex::default(),
                 css_source.clone(),
                 PreviousSliderValue(slider.value),
@@ -93,8 +92,7 @@ fn internal_node_creation_system(
                         BorderRadius::default(),
                         ZIndex::default(),
                         UIWidgetState::default(),
-                        Transform::default(),
-                        GlobalTransform::default(),
+                        RelativeCursorPosition::default(),
                         css_source.clone(),
                         CssClass(vec!["slider-track".to_string()]),
                         RenderLayers::layer(layer),
@@ -190,30 +188,37 @@ fn on_internal_cursor_leave(
 
 fn on_track_click(
     mut trigger: On<Pointer<Click>>,
+    ui_scale: Res<UiScale>,
+    window_q: Query<&Window, With<PrimaryWindow>>,
+
     mut slider_query: Query<(&mut Slider, &UIGenID), With<Slider>>,
-    track_q: Query<(&ComputedNode, &GlobalTransform, &BindToID), With<SliderTrackContainer>>,
+    track_q: Query<(&ComputedNode, &BindToID, &RelativeCursorPosition), With<SliderTrackContainer>>,
     thumb_size_q: Query<(&ComputedNode, &BindToID), With<SliderThumb>>,
+
     mut fill_q: Query<(&mut Node, &BindToID, &mut UiStyle), (With<SliderTrackFill>, Without<SliderThumb>)>,
     mut thumb_q: Query<(&mut Node, &mut SliderThumb, &BindToID, &mut UiStyle), (With<SliderThumb>, Without<SliderTrackFill>)>,
-    window_q: Query<&Window, With<PrimaryWindow>>,
-    ui_scale: Res<UiScale>
 ) {
     let Ok(window) = window_q.single() else { return; };
     let sf = window.scale_factor() * ui_scale.0;
 
-    let track_entity = trigger.entity;
-
-    let Ok((track_node, track_gt, bind)) = track_q.get(track_entity) else { return; };
-    let Some(hit_pos) = trigger.hit.position else { return; };
+    let Ok((track_node, bind, rel)) = track_q.get(trigger.entity) else { return; };
 
     let track_width = (track_node.size().x / sf).max(1.0);
     let Some(thumb_width) = find_bound_width(bind.0, &thumb_size_q, sf) else { return; };
 
-    let click_x = world_to_local_left_x(hit_pos, track_gt, track_width);
+    let Some(n) = rel.normalized else {
+        info!("RelativeCursorPosition.normalized is None (cursor unknown)");
+        trigger.propagate(false);
+        return;
+    };
+
+    let t = (n.x + 0.5).clamp(0.0, 1.0);
+    let click_x = t * track_width;
+
     let desired_left = click_x - thumb_width * 0.5;
 
     apply_from_track_left_x(
-        bind.0, // <-- this is your usize BindToID
+        bind.0,
         desired_left,
         track_width,
         thumb_width,
@@ -222,7 +227,6 @@ fn on_track_click(
         &mut thumb_q,
     );
 
-    // so the click doesn't bubble up and get re-handled / swallowed elsewhere
     trigger.propagate(false);
 }
 
@@ -269,12 +273,6 @@ fn on_thumb_drag(
         &mut fill_q,
         &mut thumb_q,
     );
-}
-
-fn world_to_local_left_x(hit_world: Vec3, track_gt: &GlobalTransform, track_width: f32) -> f32 {
-    let inv = track_gt.to_matrix().inverse();
-    let local = inv.transform_point3(hit_world);
-    local.x + track_width * 0.5
 }
 
 fn apply_from_track_left_x(

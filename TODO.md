@@ -6,7 +6,7 @@ What will come in the next version?
 - [x] Rework Image, Button, Checkbox, Headline, Paragraph, Div and Body Widget
 - [x] Input Widget will be completely refactored and become more feature.
 - [x] Choice Box Widget will be updated and more flexible.
-- [ ] Slider reworked and bug fixes.
+- [x] Slider reworked and bug fixes.
 - [ ] More Widgets like Divider, Switch Button, Radio Button, Toggle Button and more.
 - [ ] Widgets will become scrollable with a scroll bar.
 - [ ] More CSS support.

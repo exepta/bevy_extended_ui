@@ -140,6 +140,7 @@ fn load_ui_camera_system(
                 RenderLayers::from_layers(configuration.render_layers.as_slice()),
                 Transform::from_translation(Vec3::Z * 1000.0),
                 UiCamera,
+                IsDefaultUiCamera
             )).id();
 
             if configuration.hdr_support {
