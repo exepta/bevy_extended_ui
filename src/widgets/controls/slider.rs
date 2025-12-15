@@ -1,4 +1,5 @@
 use bevy::camera::visibility::RenderLayers;
+use bevy::ecs::query::QueryFilter;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 
@@ -84,12 +85,7 @@ fn internal_node_creation_system(
                 builder
                     .spawn((
                         Name::new(format!("Slider-Track-Box-{}", slider.w_count)),
-                        Node {
-                            width: Val::Percent(100.0),
-                            height: Val::Percent(100.0),
-                            position_type: PositionType::Relative,
-                            ..default()
-                        },
+                        Node::default(),
                         BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.0)),
                         BorderColor::default(),
                         BorderRadius::default(),
@@ -104,7 +100,6 @@ fn internal_node_creation_system(
                     ))
                     .insert(ImageNode::default())
                     .observe(on_track_click)
-                    .observe(on_track_drag)
                     .with_children(|builder| {
                         builder
                             .spawn((
@@ -134,12 +129,7 @@ fn internal_node_creation_system(
                         builder
                             .spawn((
                                 Name::new(format!("Slider-Thumb-{}", slider.w_count)),
-                                Node {
-                                    position_type: PositionType::Absolute,
-                                    left: Val::Px(0.0),
-                                    top: Val::Percent(50.0),
-                                    ..default()
-                                },
+                                Node::default(),
                                 BackgroundColor::default(),
                                 BorderColor::default(),
                                 BorderRadius::default(),
@@ -195,7 +185,7 @@ fn on_internal_cursor_leave(
 }
 
 fn on_track_click(
-    event: On<Pointer<Click>>,
+    mut trigger: On<Pointer<Click>>,
     mut slider_query: Query<(&mut Slider, &UIGenID), With<Slider>>,
     track_q: Query<(&ComputedNode, &GlobalTransform, &BindToID), With<SliderTrackContainer>>,
     thumb_size_q: Query<(&ComputedNode, &BindToID), With<SliderThumb>>,
@@ -203,68 +193,39 @@ fn on_track_click(
     mut thumb_q: Query<(&mut Node, &mut SliderThumb, &BindToID, &mut UiStyle), (With<SliderThumb>, Without<SliderTrackFill>)>,
     window_q: Query<&Window, With<PrimaryWindow>>,
 ) {
-    let Ok(window) = window_q.single() else { return };
+    let Ok(window) = window_q.single() else { return; };
     let sf = window.scale_factor();
 
-    let Ok((track_node, track_gt, bind)) = track_q.get(event.entity) else { return; };
-    let Some(hit_pos) = event.hit.position else { return; };
+    info!("1");
+
+    // IMPORTANT: use the listener entity (the one you attached `.observe` to)
+    let track_entity = trigger.entity;
+
+    let Ok((track_node, track_gt, bind)) = track_q.get(track_entity) else { return; };
+    let Some(hit_pos) = trigger.hit.position else { return; };
+
+    info!("2");
 
     let track_width = (track_node.size().x / sf).max(1.0);
-    let Some(thumb_width) = find_thumb_width(bind.0, &thumb_size_q, sf) else { return; };
+    let Some(thumb_width) = find_bound_width(bind.0, &thumb_size_q, sf) else { return; };
 
-    let local_x = world_to_local_left_x(hit_pos, track_gt, track_width);
+    info!("3");
+
+    let click_x = world_to_local_left_x(hit_pos, track_gt, track_width);
+    let desired_left = click_x - thumb_width * 0.5;
 
     apply_from_track_left_x(
-        bind.0,
-        local_x,
+        bind.0,                // <-- this is your usize BindToID
+        desired_left,
         track_width,
         thumb_width,
         &mut slider_query,
         &mut fill_q,
         &mut thumb_q,
     );
-}
 
-fn on_track_drag(
-    event: On<Pointer<Drag>>,
-    mut slider_query: Query<(&mut Slider, &UIGenID), With<Slider>>,
-    track_q: Query<(&ComputedNode, &BindToID), With<SliderTrackContainer>>,
-    thumb_size_q: Query<(&ComputedNode, &BindToID), With<SliderThumb>>,
-    mut fill_q: Query<(&mut Node, &BindToID, &mut UiStyle), (With<SliderTrackFill>, Without<SliderThumb>)>,
-    mut thumb_q: Query<(&mut Node, &mut SliderThumb, &BindToID, &mut UiStyle), (With<SliderThumb>, Without<SliderTrackFill>)>,
-    window_q: Query<&Window, With<PrimaryWindow>>,
-) {
-    let Ok(window) = window_q.single() else { return };
-    let sf = window.scale_factor();
-
-    let Ok((track_node, bind)) = track_q.get(event.entity) else { return; };
-    let track_width = (track_node.size().x / sf).max(1.0);
-
-    let Some(thumb_width) = find_thumb_width(bind.0, &thumb_size_q, sf) else { return; };
-    let half = thumb_width * 0.5;
-
-    let dx = event.event.delta.x / sf;
-
-    let mut current_center = None;
-    for (_, thumb, b, _) in thumb_q.iter() {
-        if b.0 == bind.0 {
-            current_center = Some(thumb.current_center_x);
-            break;
-        }
-    }
-    let Some(current_center) = current_center else { return; };
-
-    let current_left = current_center - half;
-
-    apply_from_track_left_x(
-        bind.0,
-        current_left + dx,
-        track_width,
-        thumb_width,
-        &mut slider_query,
-        &mut fill_q,
-        &mut thumb_q,
-    );
+    // so the click doesn't bubble up and get re-handled / swallowed elsewhere
+    trigger.propagate(false);
 }
 
 fn on_thumb_drag(
@@ -355,7 +316,7 @@ fn apply_slider_from_thumb_left(
     let percent = percent.clamp(0.0, 1.0);
 
     let center_x = left + half;
-    let fill_width = percent * track_width;
+    let fill_width = center_x.clamp(0.0, track_width);
 
     for (mut node, mut thumb, bind, mut style) in thumb_q.iter_mut() {
         if bind.0 != ui_id.0 {
@@ -363,7 +324,6 @@ fn apply_slider_from_thumb_left(
         }
         thumb.current_center_x = center_x;
         node.left = Val::Px(left);
-        node.top = Val::Percent(50.0);
 
         for (_, s) in style.styles.iter_mut() {
             s.left = Some(node.left);
@@ -418,8 +378,8 @@ fn detect_change_slider_values(
         }
         **prev = slider.value;
 
-        let track_width = find_track_width(ui_id.0, &track_q, sf).unwrap_or(1.0);
-        let Some(thumb_width) = find_thumb_width(ui_id.0, &thumb_size_q, sf) else { continue; };
+        let track_width = find_bound_width(ui_id.0, &track_q, sf).unwrap_or(1.0);
+        let Some(thumb_width) = find_bound_width(ui_id.0, &thumb_size_q, sf) else { continue; };
 
         let max_left = (track_width - thumb_width).max(0.0);
         let percent = ((slider.value - slider.min) / (slider.max - slider.min)).clamp(0.0, 1.0);
@@ -446,8 +406,8 @@ fn initialize_slider_visual_state(
             continue;
         }
 
-        let track_width = find_track_width(ui_id.0, &track_q, sf).unwrap_or(1.0);
-        let Some(thumb_width) = find_thumb_width(ui_id.0, &thumb_size_q, sf) else { continue; };
+        let track_width = find_bound_width(ui_id.0, &track_q, sf).unwrap_or(1.0);
+        let Some(thumb_width) = find_bound_width(ui_id.0, &thumb_size_q, sf) else { continue; };
 
         let max_left = (track_width - thumb_width).max(0.0);
         let percent = ((slider.value - slider.min) / (slider.max - slider.min)).clamp(0.0, 1.0);
@@ -459,28 +419,16 @@ fn initialize_slider_visual_state(
     }
 }
 
-fn find_track_width(
+fn find_bound_width<Q>(
     ui_id: usize,
-    track_q: &Query<(&ComputedNode, &BindToID), With<SliderTrackContainer>>,
+    query: &Query<(&ComputedNode, &BindToID), Q>,
     scale_factor: f32,
-) -> Option<f32> {
-    for (computed, bind) in track_q.iter() {
-        if bind.0 == ui_id {
-            return Some((computed.size().x / scale_factor).max(1.0));
-        }
-    }
-    None
-}
-
-fn find_thumb_width(
-    ui_id: usize,
-    thumb_size_q: &Query<(&ComputedNode, &BindToID), With<SliderThumb>>,
-    scale_factor: f32,
-) -> Option<f32> {
-    for (computed, bind) in thumb_size_q.iter() {
-        if bind.0 == ui_id {
-            return Some((computed.size().x / scale_factor).max(1.0));
-        }
-    }
-    None
+) -> Option<f32>
+where
+    Q: QueryFilter,
+{
+    query
+        .iter()
+        .find(|(_, bind)| bind.0 == ui_id)
+        .map(|(computed, _)| (computed.size().x / scale_factor).max(1.0))
 }

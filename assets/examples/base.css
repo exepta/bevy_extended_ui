@@ -6,8 +6,10 @@ body {
 
 .test {
     background: #59cc59;
-    width: 175px;
+    width: 400px;
     height: 100px;
+    display: flex;
+    flex-direction: column;
 }
 
 .test2 {

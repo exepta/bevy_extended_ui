@@ -320,6 +320,9 @@ slider .slider-track {
     border-radius: 5px;
     position: relative;
     overflow: visible;
+    display: flex;
+    justify-content: start;
+    align-items: center;
 }
 
 slider .slider-track .track-fill {
@@ -333,12 +336,10 @@ slider .slider-track .track-fill {
 }
 
 slider .slider-track .thumb {
-    width: 20px;
-    height: 20px;
+    width: 16px;
+    height: 16px;
     background: #fcfcfc;
     border-radius: 50%;
-    border: 2px solid #a163f9;
     position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
+    box-shadow: 0 0 3px 3px #303033;
 }
