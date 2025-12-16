@@ -9,6 +9,7 @@ What will come in the next version?
 - [x] Slider reworked and bug fixes.
 - [ ] More Widgets:
     - [x] Divider Widget
+    - [ ] Button Group Widget
     - [ ] Progress Bar Widget
     - [ ] Radio Button Widget
     - [ ] Toggle Button Widget

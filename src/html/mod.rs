@@ -14,7 +14,7 @@ use crate::html::reload::HtmlReloadPlugin;
 use crate::io::{CssAsset, HtmlAsset};
 use crate::styles::parser::apply_property_to_style;
 use crate::styles::Style;
-use crate::widgets::{Button, Body, Div, Widget, CheckBox, Headline, Paragraph, Img, InputField, ChoiceBox, Slider, Divider};
+use crate::widgets::{Button, Body, Div, Widget, CheckBox, Headline, Paragraph, Img, InputField, ChoiceBox, Slider, Divider, FieldSet, RadioButton};
 
 pub static HTML_ID_COUNTER: AtomicUsize = AtomicUsize::new(1);
 
@@ -126,10 +126,12 @@ pub enum HtmlWidgetNode {
     Divider(Divider, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
     /// A `<button>` element.
     Button(Button, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
-    /// A checkbox `<input type="checkbox">`.
+    /// A checkbox `<checkbox>`.
     CheckBox(CheckBox, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
     /// A dropdown or select box.
     ChoiceBox(ChoiceBox, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
+    /// A `<fieldset>` container element with nested child nodes from type `<radio> and <toggle>`.
+    FieldSet(FieldSet, HtmlMeta, HtmlStates, Vec<HtmlWidgetNode>, HtmlEventBindings, Widget, HtmlID),
     /// A heading element (`<h1>`-`<h6>`).
     Headline(Headline, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
     /// A img element (`<img>`).
@@ -138,6 +140,8 @@ pub enum HtmlWidgetNode {
     Input(InputField, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
     /// A paragraph `<p>`.
     Paragraph(Paragraph, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
+    /// A radio-button `<radio>`.
+    RadioButton(RadioButton, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
     /// A slider input (range).
     Slider(Slider, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
 }

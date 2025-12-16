@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use bevy::asset::AssetEvent;
 use bevy::prelude::*;
+use bevy_inspector_egui::egui::TextBuffer;
 use kuchiki::{traits::TendrilSink, NodeRef};
 
 use crate::html::{
@@ -10,7 +11,7 @@ use crate::html::{
 };
 use crate::io::{CssAsset, HtmlAsset};
 use crate::styles::IconPlace;
-use crate::widgets::{Body, Button, CheckBox, ChoiceBox, ChoiceOption, Div, Divider, DividerAlignment, Headline, HeadlineType, Img, InputCap, InputField, InputType, Paragraph, Slider, Widget};
+use crate::widgets::{Body, Button, CheckBox, ChoiceBox, ChoiceOption, Div, Divider, DividerAlignment, FieldMode, FieldSet, Headline, HeadlineType, Img, InputCap, InputField, InputType, Paragraph, RadioButton, Slider, Widget};
 
 pub const DEFAULT_UI_CSS: &str = "default/extended_ui.css";
 
@@ -273,6 +274,26 @@ fn parse_html_node(
                 },
                 meta, states, functions, widget.clone(), HtmlID::default()))
         }
+        
+        "fieldset" => {
+            let allow_none = attributes.get("allow-none").map(|s| s.to_string()) == Some("true".to_string());
+            let mode = attributes.get("mode").unwrap_or("single").to_string();
+            let mut children = Vec::new();
+            for child in node.children() {
+                if let Some(parsed) = parse_html_node(&child, css_sources, label_map, key, html) {
+                    children.push(parsed);
+                }
+            }
+            
+            Some(HtmlWidgetNode::FieldSet(
+                FieldSet {
+                    allow_none,
+                    field_mode: FieldMode::from_str(mode.as_str()).unwrap_or(FieldMode::Single),
+                    ..default()
+                },
+                meta, states, children, functions, widget.clone(), HtmlID::default()
+            ))
+        }
 
         "h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
             let h_type = match tag.as_str() {
@@ -362,6 +383,21 @@ fn parse_html_node(
                     ..default()
                 },
                 meta, states, functions, widget.clone(), HtmlID::default()))
+        }
+
+        "radio" => {
+            let value = attributes.get("value").unwrap_or("").to_string();
+            let label = node.text_contents().trim().to_string();
+            
+            if attributes.contains("selected") {
+                
+            }
+            
+            Some(HtmlWidgetNode::RadioButton(RadioButton {
+                label,
+                value,
+                ..default()
+            }, meta, states, functions, widget.clone(), HtmlID::default()))
         }
 
         "select" => {

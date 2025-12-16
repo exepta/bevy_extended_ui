@@ -8,16 +8,9 @@ use bevy::prelude::*;
 use crate::registry::*;
 use crate::styles::IconPlace;
 use crate::widgets::body::BodyWidget;
-use controls::button::ButtonWidget;
-use controls::check_box::CheckBoxWidget;
 use crate::widgets::div::DivWidget;
-use content::headline::HeadlineWidget;
-use content::image::ImageWidget;
-use controls::input::InputWidget;
-use content::paragraph::ParagraphWidget;
-use crate::widgets::content::divider::DividerWidget;
-use crate::widgets::controls::choice_box::ChoiceBoxWidget;
-use crate::widgets::controls::slider::SliderWidget;
+use crate::widgets::content::ExtendedContentWidgets;
+use crate::widgets::controls::ExtendedControlWidgets;
 
 /// Marker component for UI elements that should ignore the parent widget state.
 ///
@@ -90,10 +83,12 @@ pub enum WidgetKind {
     ChoiceBox,
     Div,
     Divider,
+    FieldSet,
     Headline,
     Img,
     InputField,
     Paragraph,
+    RadioButton,
     Slider,
 }
 
@@ -106,17 +101,10 @@ impl Plugin for ExtendedWidgetPlugin {
         app.register_type::<UIWidgetState>();
         app.register_type::<Body>();
         app.add_plugins((
+            ExtendedControlWidgets,
+            ExtendedContentWidgets,
             BodyWidget,
-            ButtonWidget,
             DivWidget,
-            DividerWidget,
-            CheckBoxWidget,
-            ChoiceBoxWidget,
-            HeadlineWidget,
-            ImageWidget,
-            InputWidget,
-            ParagraphWidget,
-            SliderWidget
         ));
     }
 }
@@ -186,6 +174,7 @@ impl Default for Button {
         }
     }
 }
+
 
 // ===============================================
 //                     CheckBox
@@ -316,6 +305,66 @@ impl fmt::Display for DividerAlignment {
         write!(f, "{}", s)
     }
 }
+
+// ===============================================
+//                   FieldSet
+// ===============================================
+
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+#[require(UIGenID, UIWidgetState, Widget)]
+pub struct FieldSet {
+    pub entry: usize,
+    pub kind: Option<FieldKind>,
+    pub field_mode: FieldMode,
+    pub allow_none: bool
+}
+
+impl Default for FieldSet {
+    fn default() -> Self {
+        let entry = FIELDSET_ID_POOL.lock().unwrap().acquire();
+        Self {
+            entry,
+            kind: None,
+            field_mode: FieldMode::Single,
+            allow_none: false
+        }
+    }
+}
+
+#[derive(Reflect, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FieldKind {
+    Radio,
+    Toggle,
+}
+
+#[derive(Reflect, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FieldMode {
+    Multi,
+    Single,
+    Count(u8)
+}
+
+impl FieldMode {
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "single" | "solo" | "one" => Some(Self::Single),
+            "multi" | "more" => Some(Self::Multi),
+            "count" => Some(Self::Count(0)),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Component, Reflect, Debug)]
+#[reflect(Component)]
+pub struct InFieldSet(pub Entity);
+
+#[derive(Component, Reflect, Debug, Default)]
+pub struct FiledSelectionSingle(pub Option<Entity>);
+
+#[derive(Component, Reflect, Debug, Default)]
+pub struct FieldSelectionMulti(pub Vec<Entity>);
 
 // ===============================================
 //                   Headline
@@ -498,6 +547,31 @@ impl Default for Paragraph {
         Self {
             entry,
             text: String::from(""),
+        }
+    }
+}
+
+// ===============================================
+//                   Radio Button
+// ===============================================
+
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+#[require(UIGenID, UIWidgetState, Widget)]
+pub struct RadioButton {
+    pub entry: usize,
+    pub label: String,
+    pub value: String,
+}
+
+impl Default for RadioButton {
+    fn default() -> Self {
+        let entry = RADIO_ID_POOL.lock().unwrap().acquire();
+
+        Self {
+            entry,
+            label: String::from("label"),
+            value: String::from(""),
         }
     }
 }

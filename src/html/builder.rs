@@ -125,6 +125,10 @@ fn show_all_widgets_finish(
 fn collect_html_ids(nodes: &Vec<HtmlWidgetNode>, ids: &mut Vec<HtmlID>) {
     for node in nodes {
         match node {
+            HtmlWidgetNode::Body(_, _, _, children, _, _, id) => {
+                ids.push(id.clone());
+                collect_html_ids(children, ids);
+            }
             HtmlWidgetNode::Button(_, _, _, _, _, id)
             | HtmlWidgetNode::CheckBox(_, _, _, _, _, id)
             | HtmlWidgetNode::ChoiceBox(_, _, _, _, _, id)
@@ -133,14 +137,15 @@ fn collect_html_ids(nodes: &Vec<HtmlWidgetNode>, ids: &mut Vec<HtmlID>) {
             | HtmlWidgetNode::Img(_, _, _, _, _, id)
             | HtmlWidgetNode::Input(_, _, _, _, _, id)
             | HtmlWidgetNode::Paragraph(_, _, _, _, _, id)
+            | HtmlWidgetNode::RadioButton(_, _, _, _, _, id)
             | HtmlWidgetNode::Slider(_, _, _, _, _, id) => {
                 ids.push(id.clone());
             }
-            HtmlWidgetNode::Body(_, _, _, children, _, _, id) => {
+            HtmlWidgetNode::Div(_, _, _, children, _, _, id) => {
                 ids.push(id.clone());
                 collect_html_ids(children, ids);
             }
-            HtmlWidgetNode::Div(_, _, _, children, _, _, id) => {
+            HtmlWidgetNode::FieldSet(_, _, _, children, _, _, id) => {
                 ids.push(id.clone());
                 collect_html_ids(children, ids);
             }
@@ -156,6 +161,14 @@ fn spawn_widget_node(
     parent: Option<Entity>,
 ) -> Entity {
     let entity = match node {
+        HtmlWidgetNode::Body(body, meta, states, children, functions, widget, id) => {
+            let entity = spawn_with_meta(commands, body.clone(), meta, states, functions, widget, id);
+            for child in children {
+                let child_entity = spawn_widget_node(commands, child, asset_server, Some(entity));
+                commands.entity(entity).add_child(child_entity);
+            }
+            entity
+        }
         HtmlWidgetNode::Button(button, meta, states, functions, widget, id) => {
             spawn_with_meta(commands, button.clone(), meta, states, functions, widget, id)
         }
@@ -165,8 +178,24 @@ fn spawn_widget_node(
         HtmlWidgetNode::ChoiceBox(choice_box, meta, states, functions, widget, id) => {
             spawn_with_meta(commands, choice_box.clone(), meta, states, functions, widget, id)
         }
+        HtmlWidgetNode::Div(div, meta, states, children, functions, widget, id) => {
+            let entity = spawn_with_meta(commands, div.clone(), meta, states, functions, widget, id);
+            for child in children {
+                let child_entity = spawn_widget_node(commands, child, asset_server, Some(entity));
+                commands.entity(entity).add_child(child_entity);
+            }
+            entity
+        }
         HtmlWidgetNode::Divider(divider, meta, states, functions, widget, id) => {
             spawn_with_meta(commands, divider.clone(), meta, states, functions, widget, id)
+        }
+        HtmlWidgetNode::FieldSet(fieldset, meta, states, children, functions, widget, id) => {
+            let entity = spawn_with_meta(commands, fieldset.clone(), meta, states, functions, widget, id);
+            for child in children {
+                let child_entity = spawn_widget_node(commands, child, asset_server, Some(entity));
+                commands.entity(entity).add_child(child_entity);
+            }
+            entity
         }
         HtmlWidgetNode::Headline(headline, meta, states, functions, widget, id) => {
             spawn_with_meta(commands, headline.clone(), meta, states, functions, widget, id)
@@ -180,25 +209,11 @@ fn spawn_widget_node(
         HtmlWidgetNode::Paragraph(paragraph, meta, states, functions, widget, id) => {
             spawn_with_meta(commands, paragraph.clone(), meta, states, functions, widget, id)
         }
+        HtmlWidgetNode::RadioButton(radio_button, meta, states, functions, widget, id) => {
+            spawn_with_meta(commands, radio_button.clone(), meta, states, functions, widget, id)
+        }
         HtmlWidgetNode::Slider(slider, meta, states, functions, widget, id) => {
             spawn_with_meta(commands, slider.clone(), meta, states, functions, widget, id)
-        }
-        HtmlWidgetNode::Body(body, meta, states, children, functions, widget, id) => {
-            let entity = spawn_with_meta(commands, body.clone(), meta, states, functions, widget, id);
-            for child in children {
-                let child_entity = spawn_widget_node(commands, child, asset_server, Some(entity));
-                commands.entity(entity).add_child(child_entity);
-            }
-            entity
-        }
-
-        HtmlWidgetNode::Div(div, meta, states, children, functions, widget, id) => {
-            let entity = spawn_with_meta(commands, div.clone(), meta, states, functions, widget, id);
-            for child in children {
-                let child_entity = spawn_widget_node(commands, child, asset_server, Some(entity));
-                commands.entity(entity).add_child(child_entity);
-            }
-            entity
         }
     };
 

@@ -6,7 +6,7 @@ body {
 
 .test {
     background: #59cc59;
-    width: 400px;
+    width: 300px;
     height: 100px;
     display: flex;
     flex-direction: column;
@@ -20,4 +20,20 @@ body {
     justify-content: center;
     align-items: center;
     flex-direction: column;
+}
+
+.test3 {
+    width: 200px;
+    height: 200px;
+}
+
+.test4 {
+    background: #4e7b9f;
+    width: 350px;
+    height: 400px;
+    display: flex;
+    justify-content: start;
+    align-items: center;
+    flex-direction: column;
+    gap: 10px;
 }

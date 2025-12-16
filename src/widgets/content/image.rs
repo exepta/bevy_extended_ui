@@ -284,8 +284,8 @@ fn sync_alt_text_with_image_state(
     }
 }
 
-/// Loads image handle from img.src if non-empty, and assigns it to ImageNode.
-/// This avoids duplicating get_or_load_image logic.
+/// Loads an image handle from img.src if non-empty and assigns it to ImageNode.
+/// This avoids duplicating the get_or_load_image logic.
 fn assign_image_from_src(
     image_node: &mut ImageNode,
     img: &Img,
