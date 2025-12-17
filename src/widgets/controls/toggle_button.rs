@@ -1,59 +1,37 @@
-use crate::styles::paint::Colored;
-use crate::styles::{CssClass, CssSource, IconPlace, TagName};
-use crate::widgets::{BindToID, Button, UIGenID, UIWidgetState, WidgetId, WidgetKind};
-use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
+use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
+use crate::styles::{CssClass, CssSource, IconPlace, TagName};
+use crate::styles::paint::Colored;
+use crate::widgets::{BindToID, ToggleButton, UIGenID, UIWidgetState, WidgetId, WidgetKind};
 use crate::widgets::controls::place_icon_if;
 
 #[derive(Component)]
-struct ButtonBase;
+struct ToggleButtonBase;
 
 #[derive(Component)]
-struct ButtonText;
+struct ToggleButtonText;
 
-pub struct ButtonWidget;
+pub struct ToggleButtonWidget;
 
-impl Plugin for ButtonWidget {
+impl Plugin for ToggleButtonWidget {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, internal_node_creation_system);
     }
 }
 
-/// System that initializes internal UI nodes for [`Button`] components.
-///
-/// This system is responsible for spawning Bevy UI elements for every [`Button`] entity
-/// that hasn't been initialized yet (i.e., does not contain [`ButtonBase`]).
-///
-/// Each button gets:
-/// - A styled node container with a background, border, shadow, etc.
-/// - A text child node
-/// - An optional icon node (on left or right)
-/// - Observers for pointer interaction
-///
-/// # Parameters
-/// - `commands`: Used to insert components and spawn children.
-/// - `query`: Finds all `Button` entities that haven't been initialized.
-/// - `config`: UI configuration including rendering layer setup.
-/// - `asset_server`: Used to load icons for buttons.
-/// - `image_cache`: Caches icon handles to avoid reloading assets.
-///
-/// # Inserted Components
-/// - [`Node`], [`ImageNode`], [`BackgroundColor`], [`BorderColor`], [`BorderRadius`], [`BoxShadow`]
-/// - [`CssSource`], [`TagName`], [`CssClass`], [`RenderLayers`], [`ZIndex`], [`ButtonBase`]
-/// - Observers for click and hover events
 fn internal_node_creation_system(
     mut commands: Commands,
     query: Query<
-        (Entity, &UIGenID, &Button, Option<&CssSource>),
-        (With<Button>, Without<ButtonBase>),
+        (Entity, &UIGenID, &ToggleButton, Option<&CssSource>),
+        (With<ToggleButton>, Without<ToggleButtonBase>),
     >,
     config: Res<ExtendedUiConfiguration>,
     asset_server: Res<AssetServer>,
     mut image_cache: ResMut<ImageCache>,
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
-    for (entity, id, button, source_opt) in query.iter() {
+    for (entity, id, toggle_button, source_opt) in query.iter() {
         let mut css_source = CssSource::default();
         if let Some(source) = source_opt {
             css_source = source.clone();
@@ -62,11 +40,11 @@ fn internal_node_creation_system(
         commands
             .entity(entity)
             .insert((
-                Name::new(format!("Button-{}", button.entry)),
+                Name::new(format!("ToggleButton-{}", toggle_button.entry)),
                 Node::default(),
                 WidgetId {
-                    id: button.entry,
-                    kind: WidgetKind::Button,
+                    id: toggle_button.entry,
+                    kind: WidgetKind::ToggleButton,
                 },
                 BackgroundColor::default(),
                 ImageNode::default(),
@@ -84,15 +62,15 @@ fn internal_node_creation_system(
                 css_source.clone(),
                 TagName("button".to_string()),
                 RenderLayers::layer(*layer),
-                ButtonBase,
+                ToggleButtonBase,
             ))
             .with_children(|builder| {
                 place_icon_if(
                     builder,
-                    button.icon_place,
+                    toggle_button.icon_place,
                     IconPlace::Left,
-                    &button.icon_path,
-                    button.entry,
+                    &toggle_button.icon_path,
+                    toggle_button.entry,
                     &asset_server,
                     &mut image_cache,
                     vec!["button-text".to_string()],
@@ -102,8 +80,8 @@ fn internal_node_creation_system(
                 );
 
                 builder.spawn((
-                    Name::new(format!("Button-Text-{}", button.entry)),
-                    Text::new(button.text.clone()),
+                    Name::new(format!("ToggleButton-Text-{}", toggle_button.entry)),
+                    Text::new(toggle_button.label.clone()),
                     TextColor::default(),
                     TextFont::default(),
                     TextLayout::default(),
@@ -114,15 +92,15 @@ fn internal_node_creation_system(
                     Pickable::IGNORE,
                     BindToID(id.0),
                     RenderLayers::layer(*layer),
-                    ButtonText,
+                    ToggleButtonText,
                 ));
 
                 place_icon_if(
                     builder,
-                    button.icon_place,
+                    toggle_button.icon_place,
                     IconPlace::Right,
-                    &button.icon_path,
-                    button.entry,
+                    &toggle_button.icon_path,
+                    toggle_button.entry,
                     &asset_server,
                     &mut image_cache,
                     vec!["button-text".to_string()],
@@ -137,22 +115,9 @@ fn internal_node_creation_system(
     }
 }
 
-/// Helper function that spawns an icon image as a child of a button node.
-///
-/// This is used by `internal_node_creation_system` to place the button's icon on
-/// the left or right, depending on the configuration.
-///
-/// # Parameters
-/// - `builder`: The Bevy child spawner.
-/// - `btn`: The button component, providing an icon path and other data.
-/// - `asset_server`: Asset loader for image paths.
-/// - `image_cache`: Cache to avoid reloading the same asset multiple times.
-/// - `id`: The UI generation ID of the parent button.
-/// - `layer`: The render layer.
-/// - `css_source`: Used to apply class-based styling to the icon node.
 fn on_internal_click(
     mut trigger: On<Pointer<Click>>,
-    mut query: Query<(&mut UIWidgetState, &UIGenID), With<Button>>,
+    mut query: Query<(&mut UIWidgetState, &UIGenID), With<ToggleButton>>,
     mut current_widget_state: ResMut<CurrentWidgetState>,
 ) {
     if let Ok((mut state, gen_id)) = query.get_mut(trigger.entity) {
@@ -163,13 +128,9 @@ fn on_internal_click(
     trigger.propagate(false);
 }
 
-/// Handles click events for [`Button`] components.
-///
-/// Sets the `focused` state to true and updates the global `CurrentWidgetState`
-/// to track the focused widget's ID.
 fn on_internal_cursor_entered(
     mut trigger: On<Pointer<Over>>,
-    mut query: Query<&mut UIWidgetState, With<Button>>,
+    mut query: Query<&mut UIWidgetState, With<ToggleButton>>,
 ) {
     if let Ok(mut state) = query.get_mut(trigger.entity) {
         state.hovered = true;
@@ -178,12 +139,9 @@ fn on_internal_cursor_entered(
     trigger.propagate(false);
 }
 
-/// Handle pointer hover enters events for [`Button`] components.
-///
-/// Sets the `hovered` flag on the widget's UI state.
 fn on_internal_cursor_leave(
     mut trigger: On<Pointer<Out>>,
-    mut query: Query<&mut UIWidgetState, With<Button>>,
+    mut query: Query<&mut UIWidgetState, With<ToggleButton>>,
 ) {
     if let Ok(mut state) = query.get_mut(trigger.entity) {
         state.hovered = false;

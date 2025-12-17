@@ -9,6 +9,7 @@ button {
     display: flex;
     justify-content: center;
     align-items: center;
+    gap: 10px;
 }
 
 button:hover {
@@ -417,3 +418,5 @@ slider .slider-track .thumb {
     position: absolute;
     box-shadow: 0 0 3px 3px #303033;
 }
+
+/* Toggle Button */

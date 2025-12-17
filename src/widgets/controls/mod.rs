@@ -1,3 +1,5 @@
+use bevy::camera::visibility::RenderLayers;
+use bevy::ecs::relationship::RelatedSpawnerCommands;
 use crate::widgets::controls::button::ButtonWidget;
 use crate::widgets::controls::check_box::CheckBoxWidget;
 use crate::widgets::controls::choice_box::ChoiceBoxWidget;
@@ -6,6 +8,10 @@ use crate::widgets::controls::input::InputWidget;
 use crate::widgets::controls::radio_button::RadioButtonWidget;
 use crate::widgets::controls::slider::SliderWidget;
 use bevy::prelude::*;
+use crate::ImageCache;
+use crate::styles::{CssClass, CssSource, IconPlace};
+use crate::widgets::controls::toggle_button::ToggleButtonWidget;
+use crate::widgets::{BindToID, UIWidgetState};
 
 pub mod button;
 pub mod check_box;
@@ -14,6 +20,10 @@ pub mod fieldset;
 pub mod input;
 pub mod radio_button;
 pub mod slider;
+pub mod toggle_button;
+
+#[derive(Component)]
+pub struct ButtonImage;
 
 pub struct ExtendedControlWidgets;
 
@@ -27,6 +37,72 @@ impl Plugin for ExtendedControlWidgets {
             InputWidget,
             RadioButtonWidget,
             SliderWidget,
+            ToggleButtonWidget,
+        ));
+    }
+}
+
+pub fn place_icon_if(
+    builder: &mut RelatedSpawnerCommands<ChildOf>,
+    icon_place: IconPlace,
+    desired_place: IconPlace,
+    icon_path: &Option<String>,
+    entry: usize,
+    asset_server: &Res<AssetServer>,
+    image_cache: &mut ResMut<ImageCache>,
+    css_class: Vec<String>,
+    id: usize,
+    layer: usize,
+    css_source: CssSource,
+) {
+    if icon_place == desired_place {
+        place_icon(
+            builder,
+            icon_path,
+            entry,
+            asset_server,
+            image_cache,
+            css_class,
+            id,
+            layer,
+            css_source,
+        );
+    }
+}
+
+/// Handle pointer hover leave events for [`Button`] components.
+///
+/// Clears the `hovered` flag on the widget's UI state.
+fn place_icon(
+    builder: &mut RelatedSpawnerCommands<ChildOf>,
+    icon_path: &Option<String>,
+    entry: usize,
+    asset_server: &Res<AssetServer>,
+    image_cache: &mut ResMut<ImageCache>,
+    css_class: Vec<String>,
+    id: usize,
+    layer: usize,
+    css_source: CssSource,
+) {
+    if let Some(icon) = icon_path.clone() {
+        let owned_icon = icon.to_string();
+        let handle = image_cache
+            .map
+            .entry(icon.clone())
+            .or_insert_with(|| asset_server.load(owned_icon.clone()))
+            .clone();
+
+        builder.spawn((
+            Name::new(format!("Button-Icon-{}", entry)),
+            ImageNode::new(handle),
+            RenderLayers::layer(layer),
+            Pickable::IGNORE,
+            UIWidgetState::default(),
+            css_source.clone(),
+            CssClass(css_class),
+            BindToID(id),
+            ZIndex(1),
+            ButtonImage,
         ));
     }
 }

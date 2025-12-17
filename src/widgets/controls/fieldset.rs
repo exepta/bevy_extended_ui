@@ -1,7 +1,7 @@
 use crate::ExtendedUiConfiguration;
 use crate::styles::paint::Colored;
 use crate::styles::{CssSource, TagName};
-use crate::widgets::{CheckBox, FieldKind, FieldSelectionMulti, FieldSet, FiledSelectionSingle, RadioButton, WidgetId, WidgetKind};
+use crate::widgets::{ToggleButton, FieldKind, FieldSelectionMulti, FieldSet, FiledSelectionSingle, RadioButton, WidgetId, WidgetKind};
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
 
@@ -72,7 +72,7 @@ fn detect_fieldset_kind_system(
     mut commands: Commands,
     mut fieldsets: Query<(Entity, &mut FieldSet, Option<&Children>, &mut FieldSetWarned)>,
     radio_q: Query<(), With<RadioButton>>,
-    toggle_q: Query<(), With<CheckBox>>,
+    toggle_q: Query<(), With<ToggleButton>>,
 ) {
     for (fs_entity, mut fs, direct_children, mut warned) in fieldsets.iter_mut() {
         let mut radios = 0;

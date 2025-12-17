@@ -213,29 +213,7 @@ fn parse_html_node(
         }
 
         "button" => {
-            let mut icon_path = None;
-            let mut icon_place = IconPlace::Left;
-            let mut found_text = false;
-
-            for child in node.children() {
-                if let Some(el) = child.as_element() {
-                    if el.name.local.eq("icon") {
-                        if let Some(src) = el.attributes.borrow().get("src") {
-                            icon_path = Some(src.to_string());
-                            if found_text {
-                                icon_place = IconPlace::Right;
-                            }
-                        }
-                    }
-                } else if child
-                    .as_text()
-                    .map(|t| !t.borrow().trim().is_empty())
-                    .unwrap_or(false)
-                {
-                    found_text = true;
-                }
-            }
-
+            let (icon_path, icon_place) = parse_icon_and_text(node);
             let text = node.text_contents().trim().to_string();
             Some(HtmlWidgetNode::Button(
                 Button {
@@ -608,6 +586,24 @@ fn parse_html_node(
                 HtmlID::default(),
             ))
         }
+
+        "toggle" => {
+            let (icon_path, icon_place) = parse_icon_and_text(node);
+            let text = node.text_contents().trim().to_string();
+            Some(HtmlWidgetNode::ToggleButton(
+                ToggleButton {
+                    label: text.clone(),
+                    icon_path,
+                    icon_place,
+                    ..default()
+                },
+                meta,
+                states,
+                functions,
+                widget.clone(),
+                HtmlID::default(),
+            ))
+        }
         _ => None,
     }
 }
@@ -659,4 +655,31 @@ fn with_default_css_first(
     css.insert(0, default);
 
     css
+}
+
+fn parse_icon_and_text(node: &NodeRef) -> (Option<String>, IconPlace) {
+    let mut icon_path = None;
+    let mut icon_place = IconPlace::Left;
+    let mut found_text = false;
+
+    for child in node.children() {
+        if let Some(el) = child.as_element() {
+            if el.name.local.eq("icon") {
+                if let Some(src) = el.attributes.borrow().get("src") {
+                    icon_path = Some(src.to_string());
+                    if found_text {
+                        icon_place = IconPlace::Right;
+                    }
+                }
+            }
+        } else if child
+            .as_text()
+            .map(|t| !t.borrow().trim().is_empty())
+            .unwrap_or(false)
+        {
+            found_text = true;
+        }
+    }
+
+    (icon_path, icon_place)
 }

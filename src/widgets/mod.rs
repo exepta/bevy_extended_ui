@@ -89,6 +89,7 @@ pub enum WidgetKind {
     Paragraph,
     RadioButton,
     Slider,
+    ToggleButton,
 }
 
 pub struct ExtendedWidgetPlugin;
@@ -564,7 +565,7 @@ pub struct RadioButton {
 
 impl Default for RadioButton {
     fn default() -> Self {
-        let entry = RADIO_ID_POOL.lock().unwrap().acquire();
+        let entry = RADIO_BUTTON_ID_POOL.lock().unwrap().acquire();
 
         Self {
             entry,
@@ -600,6 +601,37 @@ impl Default for Slider {
             step: 1.0,
             min: 0.0,
             max: 100.0,
+        }
+    }
+}
+
+// ===============================================
+//                   Toggle Button
+// ===============================================
+
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+#[require(UIGenID, UIWidgetState, Widget)]
+pub struct ToggleButton {
+    pub entry: usize,
+    pub label: String,
+    pub value: String,
+    pub icon_place: IconPlace,
+    pub icon_path: Option<String>,
+    pub selected: bool,
+}
+
+impl Default for ToggleButton {
+    fn default() -> Self {
+        let entry = TOGGLE_BUTTON_ID_POOL.lock().unwrap().acquire();
+
+        Self {
+            entry,
+            label: String::from("label"),
+            value: String::from(""),
+            icon_path: None,
+            icon_place: IconPlace::default(),
+            selected: false,
         }
     }
 }

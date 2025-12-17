@@ -118,7 +118,7 @@ impl FontWeight {
 }
 
 /// Placement of an icon relative to text.
-#[derive(Reflect, Debug, Clone, PartialEq)]
+#[derive(Reflect, Debug, Clone, Copy, PartialEq)]
 pub enum IconPlace {
     Left,
     Right,

@@ -144,7 +144,8 @@ fn collect_html_ids(nodes: &Vec<HtmlWidgetNode>, ids: &mut Vec<HtmlID>) {
             | HtmlWidgetNode::Input(_, _, _, _, _, id)
             | HtmlWidgetNode::Paragraph(_, _, _, _, _, id)
             | HtmlWidgetNode::RadioButton(_, _, _, _, _, id)
-            | HtmlWidgetNode::Slider(_, _, _, _, _, id) => {
+            | HtmlWidgetNode::Slider(_, _, _, _, _, id)
+            | HtmlWidgetNode::ToggleButton(_, _, _, _, _, id)=> {
                 ids.push(id.clone());
             }
             HtmlWidgetNode::Div(_, _, _, children, _, _, id) => {
@@ -194,17 +195,15 @@ fn spawn_widget_node(
             widget,
             id,
         ),
-        HtmlWidgetNode::ChoiceBox(choice_box, meta, states, functions, widget, id) => {
-            spawn_with_meta(
-                commands,
-                choice_box.clone(),
-                meta,
-                states,
-                functions,
-                widget,
-                id,
-            )
-        }
+        HtmlWidgetNode::ChoiceBox(choice_box, meta, states, functions, widget, id) => spawn_with_meta(
+            commands,
+            choice_box.clone(),
+            meta,
+            states,
+            functions,
+            widget,
+            id,
+        ),
         HtmlWidgetNode::Div(div, meta, states, children, functions, widget, id) => {
             let entity =
                 spawn_with_meta(commands, div.clone(), meta, states, functions, widget, id);
@@ -248,37 +247,54 @@ fn spawn_widget_node(
             widget,
             id,
         ),
-        HtmlWidgetNode::Img(img, meta, states, functions, widget, id) => {
-            spawn_with_meta(commands, img.clone(), meta, states, functions, widget, id)
-        }
-        HtmlWidgetNode::Input(input, meta, states, functions, widget, id) => {
-            spawn_with_meta(commands, input.clone(), meta, states, functions, widget, id)
-        }
-        HtmlWidgetNode::Paragraph(paragraph, meta, states, functions, widget, id) => {
-            spawn_with_meta(
-                commands,
-                paragraph.clone(),
-                meta,
-                states,
-                functions,
-                widget,
-                id,
-            )
-        }
-        HtmlWidgetNode::RadioButton(radio_button, meta, states, functions, widget, id) => {
-            spawn_with_meta(
-                commands,
-                radio_button.clone(),
-                meta,
-                states,
-                functions,
-                widget,
-                id,
-            )
-        }
+        HtmlWidgetNode::Img(img, meta, states, functions, widget, id) => spawn_with_meta(
+            commands,
+            img.clone(),
+            meta,
+            states,
+            functions,
+            widget,
+            id
+        ),
+        HtmlWidgetNode::Input(input, meta, states, functions, widget, id) => spawn_with_meta(
+            commands,
+            input.clone(),
+            meta,
+            states,
+            functions,
+            widget,
+            id
+        ),
+        HtmlWidgetNode::Paragraph(paragraph, meta, states, functions, widget, id) => spawn_with_meta(
+            commands,
+            paragraph.clone(),
+            meta,
+            states,
+            functions,
+            widget,
+            id,
+        ),
+        HtmlWidgetNode::RadioButton(radio_button, meta, states, functions, widget, id) => spawn_with_meta(
+            commands,
+            radio_button.clone(),
+            meta,
+            states,
+            functions,
+            widget,
+            id,
+        ),
         HtmlWidgetNode::Slider(slider, meta, states, functions, widget, id) => spawn_with_meta(
             commands,
             slider.clone(),
+            meta,
+            states,
+            functions,
+            widget,
+            id,
+        ),
+        HtmlWidgetNode::ToggleButton(toggle_button, meta, states, functions, widget, id) => spawn_with_meta(
+            commands,
+            toggle_button.clone(),
             meta,
             states,
             functions,
