@@ -1,8 +1,8 @@
-use bevy::camera::visibility::RenderLayers;
-use bevy::prelude::*;
-use crate::{CurrentWidgetState, ExtendedUiConfiguration};
 use crate::styles::{CssSource, TagName};
 use crate::widgets::{Body, UIGenID, UIWidgetState, WidgetId, WidgetKind};
+use crate::{CurrentWidgetState, ExtendedUiConfiguration};
+use bevy::camera::visibility::RenderLayers;
+use bevy::prelude::*;
 
 #[derive(Component)]
 struct BodyBase;
@@ -18,7 +18,7 @@ impl Plugin for BodyWidget {
 fn internal_node_creation_system(
     mut commands: Commands,
     query: Query<(Entity, &Body, Option<&CssSource>), (With<Body>, Without<BodyBase>)>,
-    config: Res<ExtendedUiConfiguration>
+    config: Res<ExtendedUiConfiguration>,
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
 
@@ -33,27 +33,29 @@ fn internal_node_creation_system(
             html_id = id;
         }
 
-        commands.entity(entity).insert((
-            Name::new(format!("Body-{}-{}", html_id, body.entry)),
-            Node::default(),
-            WidgetId {
-                id: body.entry,
-                kind: WidgetKind::Body
-            },
-            BackgroundColor::default(),
-            ImageNode::default(),
-            ZIndex::default(),
-            Pickable::default(),
-            css_source,
-            TagName("body".to_string()),
-            RenderLayers::layer(*layer),
-            BodyBase,
-        )).observe(on_internal_click)
+        commands
+            .entity(entity)
+            .insert((
+                Name::new(format!("Body-{}-{}", html_id, body.entry)),
+                Node::default(),
+                WidgetId {
+                    id: body.entry,
+                    kind: WidgetKind::Body,
+                },
+                BackgroundColor::default(),
+                ImageNode::default(),
+                ZIndex::default(),
+                Pickable::default(),
+                css_source,
+                TagName("body".to_string()),
+                RenderLayers::layer(*layer),
+                BodyBase,
+            ))
+            .observe(on_internal_click)
             .observe(on_internal_cursor_entered)
             .observe(on_internal_cursor_leave);
     }
 }
-
 
 /// Event handler that activates when an internal body node is clicked.
 ///
@@ -67,7 +69,7 @@ fn internal_node_creation_system(
 fn on_internal_click(
     mut trigger: On<Pointer<Click>>,
     mut query: Query<(&mut UIWidgetState, &UIGenID), With<Body>>,
-    mut current_widget_state: ResMut<CurrentWidgetState>
+    mut current_widget_state: ResMut<CurrentWidgetState>,
 ) {
     if let Ok((mut state, gen_id)) = query.get_mut(trigger.event_target()) {
         state.focused = true;

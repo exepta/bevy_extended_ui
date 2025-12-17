@@ -1,11 +1,11 @@
-use std::collections::HashMap;
+use crate::styles::paint::Colored;
+use crate::styles::{Background, FontVal, Radius, Style};
 use bevy::prelude::*;
 use lightningcss::rules::CssRule;
 use lightningcss::stylesheet::{ParserOptions, PrinterOptions, StyleSheet};
 use lightningcss::traits::ToCss;
 use regex::Regex;
-use crate::styles::{Background, FontVal, Radius, Style};
-use crate::styles::paint::Colored;
+use std::collections::HashMap;
 
 /// Loads a CSS file and parses it into a [`HashMap`] of selectors to [`Style`] structs.
 ///
@@ -46,7 +46,10 @@ pub fn load_css(css: &str) -> HashMap<String, Style> {
 
     for rule in &stylesheet.rules.0 {
         if let CssRule::Style(style_rule) = rule {
-            let selector = match style_rule.selectors.to_css_string(PrinterOptions::default()) {
+            let selector = match style_rule
+                .selectors
+                .to_css_string(PrinterOptions::default())
+            {
                 Ok(s) => s,
                 Err(_) => continue,
             };
@@ -76,9 +79,7 @@ pub fn load_css(css: &str) -> HashMap<String, Style> {
                 };
 
                 let mut resolved = value.clone();
-                if let Some(var_name) = value
-                    .strip_prefix("var(")
-                    .and_then(|s| s.strip_suffix(')'))
+                if let Some(var_name) = value.strip_prefix("var(").and_then(|s| s.strip_suffix(')'))
                 {
                     if let Some(var_value) = css_vars.get(var_name.trim()) {
                         resolved = var_value.clone();
@@ -155,50 +156,54 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
         "display" => style.display = convert_to_display(value.to_string()),
         "position" => style.position_type = convert_to_position(value.to_string()),
         "gap" => style.gap = convert_to_val(value.to_string()),
-        "justify-content" => style.justify_content = convert_to_bevy_justify_content(value.to_string()),
+        "justify-content" => {
+            style.justify_content = convert_to_bevy_justify_content(value.to_string())
+        }
         "align-items" => style.align_items = convert_to_bevy_align_items(value.to_string()),
-        "flex-direction" => style.flex_direction = convert_to_bevy_flex_direction(value.to_string()),
+        "flex-direction" => {
+            style.flex_direction = convert_to_bevy_flex_direction(value.to_string())
+        }
         "flex-grow" => style.flex_grow = value.trim().parse::<f32>().ok(),
         "flex-shrink" => style.flex_shrink = value.trim().parse::<f32>().ok(),
         "flex-basis" => style.flex_basis = convert_to_val(value.to_string()),
         "flex-wrap" => {
             style.flex_wrap = convert_to_bevy_flex_wrap(value.to_string());
-        },
+        }
 
         "grid-row" => {
             style.grid_row = convert_to_bevy_grid_placement(value.to_string());
-        },
+        }
         "grid-column" => {
             style.grid_column = convert_to_bevy_grid_placement(value.to_string());
-        },
+        }
         "grid-auto-flow" => {
             style.grid_auto_flow = convert_to_bevy_grid_flow(value.to_string());
-        },
+        }
         "grid-template-rows" => {
             style.grid_template_rows = convert_to_bevy_grid_template(value.to_string());
-        },
+        }
         "grid-template-columns" => {
             style.grid_template_columns = convert_to_bevy_grid_template(value.to_string());
-        },
+        }
         "grid-auto-rows" => {
             style.grid_auto_rows = convert_to_bevy_grid_track(value.to_string());
-        },
+        }
         "grid-auto-columns" => {
             style.grid_auto_columns = convert_to_bevy_grid_track(value.to_string());
-        },
+        }
 
         "background-color" => {
             style.background = Some(Background {
                 color: convert_to_color(value.to_string()).unwrap_or(Color::WHITE),
                 ..default()
             });
-        },
+        }
         "background" => {
             style.background = convert_to_background(value.to_string(), true);
-        },
+        }
         "background-image" => {
             style.background = convert_to_background(value.to_string(), false);
-        },
+        }
 
         "font-size" => style.font_size = convert_to_font_size(value.to_string()),
 
@@ -447,11 +452,14 @@ pub fn convert_to_background(value: String, all_types: bool) -> Option<Backgroun
 
     if trimmed.starts_with("url(") {
         let url = trimmed.trim_start_matches("url(").trim_end_matches(")");
-        Some(Background { image: Some(url.to_string().replace("\"", "")), ..default() })
+        Some(Background {
+            image: Some(url.to_string().replace("\"", "")),
+            ..default()
+        })
     } else {
         if all_types {
             let color = convert_to_color(value.to_string()).unwrap_or_default();
-            return Some(Background { color, ..default() })
+            return Some(Background { color, ..default() });
         }
 
         None
@@ -484,11 +492,11 @@ pub fn convert_to_background(value: String, all_types: bool) -> Option<Backgroun
 pub fn convert_to_display(value: String) -> Option<Display> {
     let trimmed = value.trim();
     match trimmed {
-        "flex" => { Some(Display::Flex) },
-        "grid" => { Some(Display::Grid) },
-        "block" => { Some(Display::Block) },
-        "none" => { Some(Display::None) },
-        _ => { Some(Display::Block) },
+        "flex" => Some(Display::Flex),
+        "grid" => Some(Display::Grid),
+        "block" => Some(Display::Block),
+        "none" => Some(Display::None),
+        _ => Some(Display::Block),
     }
 }
 
@@ -517,7 +525,7 @@ pub fn convert_to_position(value: String) -> Option<PositionType> {
     match trimmed {
         "relative" => Some(PositionType::Relative),
         "absolute" => Some(PositionType::Absolute),
-        _ => { Some(PositionType::Relative) },
+        _ => Some(PositionType::Relative),
     }
 }
 
@@ -546,7 +554,12 @@ pub fn convert_to_radius(value: String) -> Option<Radius> {
     let vals = parse_radius_values(&value)?;
 
     let (top_left, top_right, bottom_right, bottom_left) = match vals.len() {
-        1 => (vals[0].clone(), vals[0].clone(), vals[0].clone(), vals[0].clone()),
+        1 => (
+            vals[0].clone(),
+            vals[0].clone(),
+            vals[0].clone(),
+            vals[0].clone(),
+        ),
         2 => (
             vals[0].clone(), // top-left
             vals[0].clone(), // top-right
@@ -557,7 +570,7 @@ pub fn convert_to_radius(value: String) -> Option<Radius> {
             vals[0].clone(),
             vals[1].clone(),
             Val::Px(0.0),
-            vals[2].clone()
+            vals[2].clone(),
         ),
         4 => (
             vals[0].clone(),
@@ -601,7 +614,12 @@ pub fn convert_to_ui_rect(value: String) -> Option<UiRect> {
     let vals = parse_radius_values(&value)?;
 
     let (left, right, top, bottom) = match vals.len() {
-        1 => (vals[0].clone(), vals[0].clone(), vals[0].clone(), vals[0].clone()),
+        1 => (
+            vals[0].clone(),
+            vals[0].clone(),
+            vals[0].clone(),
+            vals[0].clone(),
+        ),
         2 => (
             vals[1].clone(), // left
             vals[1].clone(), // right
@@ -612,7 +630,7 @@ pub fn convert_to_ui_rect(value: String) -> Option<UiRect> {
             vals[0].clone(),
             vals[1].clone(),
             vals[2].clone(),
-            Val::Px(0.0)
+            Val::Px(0.0),
         ),
         4 => (
             vals[0].clone(),
@@ -670,24 +688,32 @@ pub fn convert_to_bevy_box_shadow(value: String) -> Option<BoxShadow> {
         } else if trimmed.ends_with('%') {
             let number = trimmed.trim_end_matches('%').parse::<f32>().ok()?;
             vals.push(Val::Percent(number));
-        } else if trimmed.starts_with("#") || trimmed.starts_with("rgb(") || trimmed.starts_with("rgba(") {
+        } else if trimmed.starts_with("#")
+            || trimmed.starts_with("rgb(")
+            || trimmed.starts_with("rgba(")
+        {
             color = convert_to_color(trimmed.to_string())?;
         }
     }
 
     let (x, y, blur, spread) = match vals.len() {
-        1 => (vals[0].clone(), vals[0].clone(), vals[0].clone(), vals[0].clone()),
+        1 => (
+            vals[0].clone(),
+            vals[0].clone(),
+            vals[0].clone(),
+            vals[0].clone(),
+        ),
         2 => (
             vals[0].clone(), // x
             vals[1].clone(), // y
-            Val::Px(0.), // blur
-            Val::Px(0.), // spread
+            Val::Px(0.),     // blur
+            Val::Px(0.),     // spread
         ),
         3 => (
             vals[0].clone(),
             vals[1].clone(),
             vals[2].clone(),
-            Val::Px(0.0)
+            Val::Px(0.0),
         ),
         4 => (
             vals[0].clone(),
@@ -698,13 +724,7 @@ pub fn convert_to_bevy_box_shadow(value: String) -> Option<BoxShadow> {
         _ => return None,
     };
 
-    Some(BoxShadow::new(
-        color,
-        x,
-        y,
-        spread,
-        blur,
-    ))
+    Some(BoxShadow::new(color, x, y, spread, blur))
 }
 
 /// Parses a CSS border shorthand string into a [`UiRect`] for border widths and a [`Color`].
@@ -731,9 +751,17 @@ pub fn convert_to_bevy_box_shadow(value: String) -> Option<BoxShadow> {
 pub fn convert_css_border(value: String) -> Option<(UiRect, Color)> {
     fn parse_val(input: &str) -> Option<Val> {
         if input.ends_with("px") {
-            input.trim_end_matches("px").parse::<f32>().ok().map(Val::Px)
+            input
+                .trim_end_matches("px")
+                .parse::<f32>()
+                .ok()
+                .map(Val::Px)
         } else if input.ends_with('%') {
-            input.trim_end_matches('%').parse::<f32>().ok().map(Val::Percent)
+            input
+                .trim_end_matches('%')
+                .parse::<f32>()
+                .ok()
+                .map(Val::Percent)
         } else if input == "0" {
             Some(Val::Px(0.0))
         } else {
@@ -770,16 +798,16 @@ pub fn convert_css_border(value: String) -> Option<(UiRect, Color)> {
 pub fn convert_to_bevy_justify_content(value: String) -> Option<JustifyContent> {
     let trimmed = value.trim();
     match trimmed {
-        "start" => { Some(JustifyContent::Start) },
-        "flex-start" => { Some(JustifyContent::FlexStart) },
-        "end" => { Some(JustifyContent::End) },
-        "flex-end" => { Some(JustifyContent::FlexStart) },
-        "center" => { Some(JustifyContent::Center) },
-        "space-between" => { Some(JustifyContent::SpaceBetween) },
-        "space-around" => { Some(JustifyContent::SpaceAround) },
-        "space-evenly" => { Some(JustifyContent::SpaceEvenly) },
-        "stretch" => { Some(JustifyContent::Stretch) },
-        _ => { Some(JustifyContent::default()) }
+        "start" => Some(JustifyContent::Start),
+        "flex-start" => Some(JustifyContent::FlexStart),
+        "end" => Some(JustifyContent::End),
+        "flex-end" => Some(JustifyContent::FlexStart),
+        "center" => Some(JustifyContent::Center),
+        "space-between" => Some(JustifyContent::SpaceBetween),
+        "space-around" => Some(JustifyContent::SpaceAround),
+        "space-evenly" => Some(JustifyContent::SpaceEvenly),
+        "stretch" => Some(JustifyContent::Stretch),
+        _ => Some(JustifyContent::default()),
     }
 }
 
@@ -795,14 +823,14 @@ pub fn convert_to_bevy_justify_content(value: String) -> Option<JustifyContent> 
 pub fn convert_to_bevy_align_items(value: String) -> Option<AlignItems> {
     let trimmed = value.trim();
     match trimmed {
-        "start" => { Some(AlignItems::Start) },
-        "flex-start" => { Some(AlignItems::FlexStart) },
-        "end" => { Some(AlignItems::End) },
-        "flex-end" => { Some(AlignItems::FlexStart) },
-        "center" => { Some(AlignItems::Center) },
-        "baseline" => { Some(AlignItems::Baseline) },
-        "stretch" => { Some(AlignItems::Stretch) },
-        _ => { Some(AlignItems::default()) }
+        "start" => Some(AlignItems::Start),
+        "flex-start" => Some(AlignItems::FlexStart),
+        "end" => Some(AlignItems::End),
+        "flex-end" => Some(AlignItems::FlexStart),
+        "center" => Some(AlignItems::Center),
+        "baseline" => Some(AlignItems::Baseline),
+        "stretch" => Some(AlignItems::Stretch),
+        _ => Some(AlignItems::default()),
     }
 }
 
@@ -817,11 +845,11 @@ pub fn convert_to_bevy_align_items(value: String) -> Option<AlignItems> {
 pub fn convert_to_bevy_flex_direction(value: String) -> Option<FlexDirection> {
     let trimmed = value.trim();
     match trimmed {
-        "row" => { Some(FlexDirection::Row) },
-        "column" => { Some(FlexDirection::Column) },
-        "row-reverse" => { Some(FlexDirection::RowReverse) },
-        "column-reverse" => { Some(FlexDirection::ColumnReverse) },
-        _ => { Some(FlexDirection::default()) }
+        "row" => Some(FlexDirection::Row),
+        "column" => Some(FlexDirection::Column),
+        "row-reverse" => Some(FlexDirection::RowReverse),
+        "column-reverse" => Some(FlexDirection::ColumnReverse),
+        _ => Some(FlexDirection::default()),
     }
 }
 
@@ -836,10 +864,10 @@ pub fn convert_to_bevy_flex_direction(value: String) -> Option<FlexDirection> {
 pub fn convert_to_bevy_flex_wrap(value: String) -> Option<FlexWrap> {
     let trimmed = value.trim();
     match trimmed {
-        "wrap" => { Some(FlexWrap::Wrap) },
-        "nowrap" => { Some(FlexWrap::NoWrap) },
-        "wrap-reverse" => { Some(FlexWrap::WrapReverse) },
-        _ => { Some(FlexWrap::default()) }
+        "wrap" => Some(FlexWrap::Wrap),
+        "nowrap" => Some(FlexWrap::NoWrap),
+        "wrap-reverse" => Some(FlexWrap::WrapReverse),
+        _ => Some(FlexWrap::default()),
     }
 }
 
@@ -854,11 +882,11 @@ pub fn convert_to_bevy_flex_wrap(value: String) -> Option<FlexWrap> {
 pub fn convert_to_bevy_line_break(value: String) -> Option<LineBreak> {
     let trimmed = value.trim();
     match trimmed {
-        "wrap" | "stable" => { Some(LineBreak::WordOrCharacter) },
-        "nowrap" => { Some(LineBreak::NoWrap) },
-        "pretty" | "balance" => { Some(LineBreak::WordBoundary) },
-        "unset" => { Some(LineBreak::AnyCharacter) },
-        _=> { Some(LineBreak::default()) }
+        "wrap" | "stable" => Some(LineBreak::WordOrCharacter),
+        "nowrap" => Some(LineBreak::NoWrap),
+        "pretty" | "balance" => Some(LineBreak::WordBoundary),
+        "unset" => Some(LineBreak::AnyCharacter),
+        _ => Some(LineBreak::default()),
     }
 }
 
@@ -888,8 +916,8 @@ pub fn convert_to_bevy_line_break(value: String) -> Option<LineBreak> {
 pub fn convert_to_bevy_pick_able(value: String) -> Option<Pickable> {
     let trimmed = value.trim();
     match trimmed {
-        "none" => { Some(Pickable::IGNORE) }
-        _=> { Some(Pickable::default()) }
+        "none" => Some(Pickable::IGNORE),
+        _ => Some(Pickable::default()),
     }
 }
 
@@ -904,11 +932,11 @@ pub fn convert_to_bevy_pick_able(value: String) -> Option<Pickable> {
 pub fn convert_to_bevy_grid_flow(value: String) -> Option<GridAutoFlow> {
     let trimmed = value.trim();
     match trimmed {
-        "row" => { Some(GridAutoFlow::Row) }
-        "column" => { Some(GridAutoFlow::Column) }
-        "row-dense" => { Some(GridAutoFlow::RowDense) }
-        "column-dense" => { Some(GridAutoFlow::ColumnDense) }
-        _ => { Some(GridAutoFlow::default()) }
+        "row" => Some(GridAutoFlow::Row),
+        "column" => Some(GridAutoFlow::Column),
+        "row-dense" => Some(GridAutoFlow::RowDense),
+        "column-dense" => Some(GridAutoFlow::ColumnDense),
+        _ => Some(GridAutoFlow::default()),
     }
 }
 
@@ -992,7 +1020,10 @@ pub fn convert_to_bevy_grid_template(value: String) -> Option<Vec<RepeatedGridTr
     let input = value.trim();
     let mut result = Vec::new();
 
-    if let Some(content) = input.strip_prefix("repeat(").and_then(|s| s.strip_suffix(')')) {
+    if let Some(content) = input
+        .strip_prefix("repeat(")
+        .and_then(|s| s.strip_suffix(')'))
+    {
         let mut parts = content.splitn(2, ',').map(str::trim);
         let count = parts.next()?.parse::<u16>().ok()?;
         let track_def = parts.next()?;
@@ -1007,7 +1038,10 @@ pub fn convert_to_bevy_grid_template(value: String) -> Option<Vec<RepeatedGridTr
 
     for token in input.split_whitespace() {
         if let Some(track) = parse_single_grid_track(token) {
-            result.push(RepeatedGridTrack::repeat_many(GridTrackRepetition::Count(1), vec![track]));
+            result.push(RepeatedGridTrack::repeat_many(
+                GridTrackRepetition::Count(1),
+                vec![track],
+            ));
         } else {
             return None;
         }
@@ -1140,19 +1174,28 @@ fn parse_max_sizing(input: &str) -> Option<MaxTrackSizingFunction> {
 pub fn convert_overflow(value: String, which: &str) -> Option<Overflow> {
     let trimmed = value.trim();
     let overflow_axis = match trimmed {
-        "hidden" => { OverflowAxis::Hidden },
-        "scroll" => { OverflowAxis::Scroll },
-        "clip" => { OverflowAxis::Clip },
-        "visible" => { OverflowAxis::Visible },
-        _ => { OverflowAxis::default() }
+        "hidden" => OverflowAxis::Hidden,
+        "scroll" => OverflowAxis::Scroll,
+        "clip" => OverflowAxis::Clip,
+        "visible" => OverflowAxis::Visible,
+        _ => OverflowAxis::default(),
     };
 
     if which == "*" || which == "all" || which == "both" {
-        Some(Overflow { x: overflow_axis, y: overflow_axis })
+        Some(Overflow {
+            x: overflow_axis,
+            y: overflow_axis,
+        })
     } else if which == "y" {
-        Some(Overflow { y: overflow_axis, ..default() })
+        Some(Overflow {
+            y: overflow_axis,
+            ..default()
+        })
     } else if which == "x" {
-        Some(Overflow { x: overflow_axis, ..default() })
+        Some(Overflow {
+            x: overflow_axis,
+            ..default()
+        })
     } else {
         return None;
     }

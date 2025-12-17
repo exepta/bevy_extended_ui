@@ -1,11 +1,11 @@
 use bevy::input::common_conditions::input_toggle_active;
 use bevy::prelude::*;
 use bevy::window::WindowResolution;
-use bevy_inspector_egui::bevy_egui::EguiPlugin;
-use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_extended_ui::ExtendedUiPlugin;
 use bevy_extended_ui::html::HtmlSource;
 use bevy_extended_ui::io::HtmlAsset;
+use bevy_inspector_egui::bevy_egui::EguiPlugin;
+use bevy_inspector_egui::quick::WorldInspectorPlugin;
 
 fn main() {
     App::new()
@@ -18,7 +18,9 @@ fn main() {
             ..default()
         }))
         .add_plugins(EguiPlugin::default())
-        .add_plugins(WorldInspectorPlugin::default().run_if(input_toggle_active(false, KeyCode::F1)))
+        .add_plugins(
+            WorldInspectorPlugin::default().run_if(input_toggle_active(false, KeyCode::F1)),
+        )
         .add_plugins(ExtendedUiPlugin)
         .add_systems(Startup, load_main_html)
         .run();

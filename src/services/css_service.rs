@@ -5,9 +5,9 @@ use bevy::prelude::*;
 use once_cell::sync::Lazy;
 
 use crate::io::CssAsset;
-use crate::styles::{CssClass, CssID, CssSource, ExistingCssIDs, Style, TagName};
 use crate::styles::components::UiStyle;
 use crate::styles::parser::load_css;
+use crate::styles::{CssClass, CssID, CssSource, ExistingCssIDs, Style, TagName};
 
 // Marks entities as needing CSS re-apply on hot reload
 use crate::html::reload::CssDirty;
@@ -38,9 +38,7 @@ impl Plugin for CssService {
     }
 }
 
-fn invalidate_css_cache_on_asset_change(
-    mut ev: MessageReader<AssetEvent<CssAsset>>,
-) {
+fn invalidate_css_cache_on_asset_change(mut ev: MessageReader<AssetEvent<CssAsset>>) {
     for e in ev.read() {
         match e {
             AssetEvent::Modified { id } | AssetEvent::Removed { id } => {
@@ -78,17 +76,25 @@ fn apply_css_to_entities(
     css_users: Res<CssUsers>,
 
     // CHANGED: include entities that got CssDirty added
-    query_changed_source: Query<(
-        Entity,
-        &CssSource,
+    query_changed_source: Query<
+        (
+            Entity,
+            &CssSource,
+            Option<&CssID>,
+            Option<&CssClass>,
+            Option<&TagName>,
+            Option<&ChildOf>,
+            Option<&CssDirty>,
+        ),
+        Or<(Changed<CssSource>, Added<CssSource>, Added<CssDirty>)>,
+    >,
+
+    parent_query: Query<(
         Option<&CssID>,
         Option<&CssClass>,
         Option<&TagName>,
         Option<&ChildOf>,
-        Option<&CssDirty>,
-    ), Or<(Changed<CssSource>, Added<CssSource>, Added<CssDirty>)>>,
-
-    parent_query: Query<(Option<&CssID>, Option<&CssClass>, Option<&TagName>, Option<&ChildOf>)>,
+    )>,
 
     style_query: Query<Option<&UiStyle>>,
 ) {
@@ -170,7 +176,12 @@ fn load_and_merge_styles_from_assets(
     class: Option<&CssClass>,
     tag: Option<&TagName>,
     parent: Option<&ChildOf>,
-    parent_query: &Query<(Option<&CssID>, Option<&CssClass>, Option<&TagName>, Option<&ChildOf>)>,
+    parent_query: &Query<(
+        Option<&CssID>,
+        Option<&CssClass>,
+        Option<&TagName>,
+        Option<&ChildOf>,
+    )>,
 ) -> HashMap<String, Style> {
     let mut merged: HashMap<String, Style> = HashMap::new();
 
@@ -215,7 +226,12 @@ fn matches_selector_chain(
     class_opt: Option<&CssClass>,
     tag_opt: Option<&TagName>,
     parent_opt: Option<&ChildOf>,
-    parent_query: &Query<(Option<&CssID>, Option<&CssClass>, Option<&TagName>, Option<&ChildOf>)>,
+    parent_query: &Query<(
+        Option<&CssID>,
+        Option<&CssClass>,
+        Option<&TagName>,
+        Option<&ChildOf>,
+    )>,
 ) -> bool {
     if selectors.is_empty() {
         return true;

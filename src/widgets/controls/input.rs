@@ -4,14 +4,14 @@ use std::time::Duration;
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
 
-use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
-use crate::styles::{Background, CssClass, CssSource, FontVal, TagName};
 use crate::styles::components::UiStyle;
 use crate::styles::paint::Colored;
+use crate::styles::{Background, CssClass, CssSource, FontVal, TagName};
 use crate::utils::keycode_to_char;
 use crate::widgets::{
     BindToID, InputCap, InputField, InputType, UIGenID, UIWidgetState, WidgetId, WidgetKind,
 };
+use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
 
 #[derive(Component)]
 struct InputFieldBase;
@@ -159,7 +159,10 @@ fn internal_node_creation_system(
                         BindToID(id.0),
                         children![(
                             Name::new(format!("Icon-{}", field.entry)),
-                            ImageNode { image: handle, ..default() },
+                            ImageNode {
+                                image: handle,
+                                ..default()
+                            },
                             ZIndex::default(),
                             UIWidgetState::default(),
                             css_source.clone(),
@@ -267,7 +270,15 @@ fn internal_node_creation_system(
 fn update_cursor_visibility(
     time: Res<Time>,
     mut cursor_blink_timer: ResMut<CursorBlinkTimer>,
-    mut cursor_query: Query<(&mut Visibility, &mut BackgroundColor, &mut UiStyle, &BindToID), With<InputCursor>>,
+    mut cursor_query: Query<
+        (
+            &mut Visibility,
+            &mut BackgroundColor,
+            &mut UiStyle,
+            &BindToID,
+        ),
+        With<InputCursor>,
+    >,
     input_field_query: Query<(&InputField, &UIWidgetState, &UIGenID), With<InputFieldBase>>,
     mut text_query: Query<(&mut Text, &BindToID), With<InputFieldText>>,
 ) {
@@ -301,7 +312,9 @@ fn update_cursor_visibility(
         };
 
         if field.focused {
-            let alpha = (cursor_blink_timer.timer.elapsed_secs() * 2.0 * std::f32::consts::PI).sin() * 0.5 + 0.5;
+            let alpha =
+                (cursor_blink_timer.timer.elapsed_secs() * 2.0 * std::f32::consts::PI).sin() * 0.5
+                    + 0.5;
             background.0.set_alpha(alpha);
 
             for (_, style) in styles.styles.iter_mut() {
@@ -361,7 +374,10 @@ fn update_cursor_visibility(
 fn update_cursor_position(
     mut key_repeat: ResMut<KeyRepeatTimers>,
     mut cursor_query: Query<(&mut Node, &mut UiStyle, &BindToID), With<InputCursor>>,
-    mut text_field_query: Query<(&mut InputField, &UIGenID), (With<InputField>, Without<InputCursor>)>,
+    mut text_field_query: Query<
+        (&mut InputField, &UIGenID),
+        (With<InputField>, Without<InputCursor>),
+    >,
     text_query: Query<(&TextFont, &BindToID), (With<InputFieldText>, Without<InputCursor>)>,
     keyboard_input: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
@@ -394,7 +410,8 @@ fn update_cursor_position(
 
         // Arrow right
         if keyboard_input.just_pressed(KeyCode::ArrowRight) {
-            text_field.cursor_position = (text_field.cursor_position + 1).min(text_field.text.len());
+            text_field.cursor_position =
+                (text_field.cursor_position + 1).min(text_field.text.len());
             key_repeat.timers.insert(
                 KeyCode::ArrowRight,
                 Timer::from_seconds(initial_delay, TimerMode::Once),
@@ -408,10 +425,12 @@ fn update_cursor_position(
                     if timer.is_finished() {
                         match key {
                             KeyCode::ArrowLeft => {
-                                text_field.cursor_position = text_field.cursor_position.saturating_sub(1);
+                                text_field.cursor_position =
+                                    text_field.cursor_position.saturating_sub(1);
                             }
                             KeyCode::ArrowRight => {
-                                text_field.cursor_position = (text_field.cursor_position + 1).min(text_field.text.len());
+                                text_field.cursor_position =
+                                    (text_field.cursor_position + 1).min(text_field.text.len());
                             }
                             _ => {}
                         }
@@ -423,9 +442,12 @@ fn update_cursor_position(
             }
         }
 
-        let Some(text_font) = fonts.get(&bind_id.0) else { continue; };
+        let Some(text_font) = fonts.get(&bind_id.0) else {
+            continue;
+        };
 
-        let cursor_x_position = calculate_cursor_x_position(&text_field, text_field.cursor_position, text_font);
+        let cursor_x_position =
+            calculate_cursor_x_position(&text_field, text_field.cursor_position, text_font);
         cursor_node.left = Val::Px(cursor_x_position);
 
         for (_, style) in styles.styles.iter_mut() {
@@ -433,7 +455,9 @@ fn update_cursor_position(
         }
     }
 
-    key_repeat.timers.retain(|key, _| keyboard_input.pressed(*key));
+    key_repeat
+        .timers
+        .retain(|key, _| keyboard_input.pressed(*key));
 }
 
 /// Adjusts the width of the input text container when the input field or style changes.
@@ -461,7 +485,9 @@ fn calculate_correct_text_container_width(
                 continue;
             }
 
-            let Some(active) = style.active_style.clone() else { continue; };
+            let Some(active) = style.active_style.clone() else {
+                continue;
+            };
 
             let current = match active.width.unwrap_or_default() {
                 Val::Percent(percent) => percent,
@@ -554,7 +580,16 @@ fn handle_typing(
     mut key_repeat: ResMut<KeyRepeatTimers>,
     mut query: Query<(&mut InputField, &mut UIWidgetState, &UiStyle, &UIGenID)>,
     keyboard: Res<ButtonInput<KeyCode>>,
-    mut text_query: Query<(&mut Text, &mut TextColor, &UiStyle, &ComputedNode, &BindToID), (With<InputFieldText>, With<BindToID>)>,
+    mut text_query: Query<
+        (
+            &mut Text,
+            &mut TextColor,
+            &UiStyle,
+            &ComputedNode,
+            &BindToID,
+        ),
+        (With<InputFieldText>, With<BindToID>),
+    >,
 ) {
     let shift = keyboard.pressed(KeyCode::ShiftLeft) || keyboard.pressed(KeyCode::ShiftRight);
     let alt = keyboard.pressed(KeyCode::AltLeft) || keyboard.pressed(KeyCode::AltRight);
@@ -570,7 +605,9 @@ fn handle_typing(
             continue;
         }
 
-        for (mut text, mut text_color, widget_style, computed_node, bind_id) in text_query.iter_mut() {
+        for (mut text, mut text_color, widget_style, computed_node, bind_id) in
+            text_query.iter_mut()
+        {
             if bind_id.0 != ui_id.0 {
                 continue;
             }
@@ -609,7 +646,9 @@ fn handle_typing(
 
             // Character insertion + repeat.
             for key in &pressed {
-                let Some(ch) = keycode_to_char(*key, shift, alt) else { continue; };
+                let Some(ch) = keycode_to_char(*key, shift, alt) else {
+                    continue;
+                };
 
                 if !in_field.input_type.is_valid_char(ch) {
                     // Do not abort the entire system; just skip this character.
@@ -647,10 +686,9 @@ fn handle_typing(
                     set_visible_text(&in_field, &mut text);
 
                     text_color.0 = get_active_text_color(widget_style);
-                    key_repeat.timers.insert(
-                        *key,
-                        Timer::from_seconds(initial_delay, TimerMode::Once),
-                    );
+                    key_repeat
+                        .timers
+                        .insert(*key, Timer::from_seconds(initial_delay, TimerMode::Once));
                     continue;
                 }
 
@@ -706,9 +744,18 @@ fn handle_typing(
 /// It also adjusts the label's horizontal position if the input field has an icon,
 /// shifting the label right to avoid overlapping the icon.
 fn handle_overlay_label(
-    query: Query<(&UIWidgetState, &UIGenID, &InputField, &UiStyle, &Children), (With<InputField>, Without<OverlayLabel>)>,
-    mut label_query: Query<(&BindToID, &mut Node, &mut TextFont, &mut UiStyle), (With<OverlayLabel>, Without<InputField>)>,
-    icon_container_query: Query<(&UiStyle, &BindToID), (With<InputFieldIcon>, Without<OverlayLabel>)>,
+    query: Query<
+        (&UIWidgetState, &UIGenID, &InputField, &UiStyle, &Children),
+        (With<InputField>, Without<OverlayLabel>),
+    >,
+    mut label_query: Query<
+        (&BindToID, &mut Node, &mut TextFont, &mut UiStyle),
+        (With<OverlayLabel>, Without<InputField>),
+    >,
+    icon_container_query: Query<
+        (&UiStyle, &BindToID),
+        (With<InputFieldIcon>, Without<OverlayLabel>),
+    >,
 ) {
     // Cache icon widths per UI id.
     let mut icon_widths: HashMap<usize, f32> = HashMap::new();
@@ -721,7 +768,9 @@ fn handle_overlay_label(
     }
 
     for (state, gen_id, in_field, in_style, children) in query.iter() {
-        let Some(active_style) = in_style.active_style.clone() else { continue; };
+        let Some(active_style) = in_style.active_style.clone() else {
+            continue;
+        };
 
         let height = match active_style.height.unwrap_or_default() {
             Val::Px(px) => px,
@@ -729,7 +778,8 @@ fn handle_overlay_label(
         };
 
         for child in children.iter() {
-            let Ok((bind_to, mut node, mut text_font, mut styles)) = label_query.get_mut(child) else {
+            let Ok((bind_to, mut node, mut text_font, mut styles)) = label_query.get_mut(child)
+            else {
                 continue;
             };
 
@@ -777,7 +827,11 @@ fn handle_overlay_label(
 // ===============================================
 
 /// Calculates the horizontal pixel position of the cursor within the input text.
-fn calculate_cursor_x_position(text_field: &InputField, cursor_pos: usize, style: &TextFont) -> f32 {
+fn calculate_cursor_x_position(
+    text_field: &InputField,
+    cursor_pos: usize,
+    style: &TextFont,
+) -> f32 {
     if text_field.text.is_empty() || cursor_pos == 0 {
         return 0.0;
     }

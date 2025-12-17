@@ -1,13 +1,16 @@
+use crate::services::image_service::{DEFAULT_CHOICE_BOX_KEY, get_or_load_image};
+use crate::styles::components::UiStyle;
+use crate::styles::paint::Colored;
+use crate::styles::{CssClass, CssSource, FontVal, TagName};
+use crate::widgets::{
+    BindToID, ChoiceBox, ChoiceOption, IgnoreParentState, UIGenID, UIWidgetState, WidgetId,
+    WidgetKind,
+};
+use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
 use bevy::camera::visibility::RenderLayers;
 use bevy::ecs::relationship::RelatedSpawnerCommands;
 use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
 use bevy::prelude::*;
-use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
-use crate::services::image_service::{get_or_load_image, DEFAULT_CHOICE_BOX_KEY};
-use crate::styles::{CssClass, CssSource, FontVal, TagName};
-use crate::styles::components::UiStyle;
-use crate::styles::paint::Colored;
-use crate::widgets::{BindToID, ChoiceBox, ChoiceOption, IgnoreParentState, UIGenID, UIWidgetState, WidgetId, WidgetKind};
 
 #[derive(Component)]
 struct ChoiceBase;
@@ -31,12 +34,16 @@ pub struct ChoiceBoxWidget;
 
 impl Plugin for ChoiceBoxWidget {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (
-            update_content_box_visibility,
-            internal_node_creation_system,
-            handle_scroll_events,
-            handle_overlay_label
-        ).chain());
+        app.add_systems(
+            Update,
+            (
+                update_content_box_visibility,
+                internal_node_creation_system,
+                handle_scroll_events,
+                handle_overlay_label,
+            )
+                .chain(),
+        );
     }
 }
 
@@ -75,7 +82,10 @@ impl Plugin for ChoiceBoxWidget {
 /// - `images`: Asset container for Bevy `Image`s.
 fn internal_node_creation_system(
     mut commands: Commands,
-    query: Query<(Entity, &UIGenID, &ChoiceBox, Option<&CssSource>), (With<ChoiceBox>, Without<ChoiceBase>)>,
+    query: Query<
+        (Entity, &UIGenID, &ChoiceBox, Option<&CssSource>),
+        (With<ChoiceBox>, Without<ChoiceBase>),
+    >,
     config: Res<ExtendedUiConfiguration>,
     asset_server: Res<AssetServer>,
     mut image_cache: ResMut<ImageCache>,
@@ -88,29 +98,37 @@ fn internal_node_creation_system(
             css_source = source.clone();
         }
 
-        commands.entity(entity).insert((
-            Name::new(format!("Choice-Box-{}", choice_box.entry)),
-            Node::default(),
-            WidgetId {
-                id: choice_box.entry,
-                kind: WidgetKind::ChoiceBox
-            },
-            BackgroundColor::default(),
-            ImageNode::default(),
-            BorderColor::default(),
-            BorderRadius::default(),
-            BoxShadow::new(Colored::TRANSPARENT, Val::Px(0.), Val::Px(0.), Val::Px(0.), Val::Px(0.)),
-            ZIndex::default(),
-            Pickable::default(),
-            css_source.clone(),
-            TagName("select".to_string()),
-            RenderLayers::layer(*layer),
-            ChoiceBase
-        )).observe(on_internal_click)
+        commands
+            .entity(entity)
+            .insert((
+                Name::new(format!("Choice-Box-{}", choice_box.entry)),
+                Node::default(),
+                WidgetId {
+                    id: choice_box.entry,
+                    kind: WidgetKind::ChoiceBox,
+                },
+                BackgroundColor::default(),
+                ImageNode::default(),
+                BorderColor::default(),
+                BorderRadius::default(),
+                BoxShadow::new(
+                    Colored::TRANSPARENT,
+                    Val::Px(0.),
+                    Val::Px(0.),
+                    Val::Px(0.),
+                    Val::Px(0.),
+                ),
+                ZIndex::default(),
+                Pickable::default(),
+                css_source.clone(),
+                TagName("select".to_string()),
+                RenderLayers::layer(*layer),
+                ChoiceBase,
+            ))
+            .observe(on_internal_click)
             .observe(on_internal_cursor_entered)
             .observe(on_internal_cursor_leave)
             .with_children(|builder| {
-
                 // Overlay label
                 builder.spawn((
                     Name::new(format!("Select-Label-{}", choice_box.entry)),
@@ -126,34 +144,49 @@ fn internal_node_creation_system(
                     Pickable::IGNORE,
                     RenderLayers::layer(*layer),
                     OverlayLabel,
-                    BindToID(id.0)
+                    BindToID(id.0),
                 ));
 
-                generate_child_selected_option(builder, &css_source.clone(), choice_box, layer, &id.0, &mut *image_cache, &mut images, &asset_server);
+                generate_child_selected_option(
+                    builder,
+                    &css_source.clone(),
+                    choice_box,
+                    layer,
+                    &id.0,
+                    &mut *image_cache,
+                    &mut images,
+                    &asset_server,
+                );
 
-                builder.spawn((
-                    Name::new(format!("Choice-Content-{}", choice_box.entry)),
-                    Node::default(),
-                    BackgroundColor::default(),
-                    ImageNode::default(),
-                    BorderColor::default(),
-                    BorderRadius::default(),
-                    BoxShadow::new(Colored::TRANSPARENT, Val::Px(0.), Val::Px(0.), Val::Px(0.), Val::Px(0.)),
-                    ZIndex::default(),
-                    UIWidgetState::default(),
-                    css_source.clone(),
-                    CssClass(vec![String::from("choice-content-box")]),
-                    RenderLayers::layer(*layer),
-                    Visibility::Hidden,
-                    ChoiceLayoutBoxBase,
-                    BindToID(id.0)
-                ))
+                builder
+                    .spawn((
+                        Name::new(format!("Choice-Content-{}", choice_box.entry)),
+                        Node::default(),
+                        BackgroundColor::default(),
+                        ImageNode::default(),
+                        BorderColor::default(),
+                        BorderRadius::default(),
+                        BoxShadow::new(
+                            Colored::TRANSPARENT,
+                            Val::Px(0.),
+                            Val::Px(0.),
+                            Val::Px(0.),
+                            Val::Px(0.),
+                        ),
+                        ZIndex::default(),
+                        UIWidgetState::default(),
+                        css_source.clone(),
+                        CssClass(vec![String::from("choice-content-box")]),
+                        RenderLayers::layer(*layer),
+                        Visibility::Hidden,
+                        ChoiceLayoutBoxBase,
+                        BindToID(id.0),
+                    ))
                     .insert(ScrollPosition::default())
                     .with_children(|builder| {
                         let mut selected_assigned = false;
 
                         for option in choice_box.options.iter() {
-
                             let is_selected = if !selected_assigned {
                                 if !choice_box.value.internal_value.is_empty() {
                                     choice_box.value.internal_value == option.internal_value
@@ -175,78 +208,81 @@ fn internal_node_creation_system(
                                 ..default()
                             };
 
-                        builder.spawn((
-                            Name::new(format!("Option-{}", choice_box.entry)),
-                            Node::default(),
-                            BackgroundColor::default(),
-                            ImageNode::default(),
-                            BorderColor::default(),
-                            BorderRadius::default(),
-                            ZIndex::default(),
-                            state.clone(),
-                            IgnoreParentState,
-                            option.clone(),
-                            css_source.clone(),
-                            CssClass(vec![String::from("choice-option")]),
-                            RenderLayers::layer(*layer),
-                            ChoiceOptionBase,
-                            BindToID(id.0)
-                        )).observe(on_internal_option_click)
-                            .observe(on_internal_option_cursor_entered)
-                            .observe(on_internal_option_cursor_leave)
-                            .with_children(|builder| {
+                            builder
+                                .spawn((
+                                    Name::new(format!("Option-{}", choice_box.entry)),
+                                    Node::default(),
+                                    BackgroundColor::default(),
+                                    ImageNode::default(),
+                                    BorderColor::default(),
+                                    BorderRadius::default(),
+                                    ZIndex::default(),
+                                    state.clone(),
+                                    IgnoreParentState,
+                                    option.clone(),
+                                    css_source.clone(),
+                                    CssClass(vec![String::from("choice-option")]),
+                                    RenderLayers::layer(*layer),
+                                    ChoiceOptionBase,
+                                    BindToID(id.0),
+                                ))
+                                .observe(on_internal_option_click)
+                                .observe(on_internal_option_cursor_entered)
+                                .observe(on_internal_option_cursor_leave)
+                                .with_children(|builder| {
+                                    if let Some(icon_path) = option.icon_path.as_deref() {
+                                        let handle = get_or_load_image(
+                                            icon_path,
+                                            &mut image_cache,
+                                            &mut images,
+                                            &asset_server,
+                                        );
 
-                                if let Some(icon_path) = option.icon_path.as_deref() {
-                                    let handle = get_or_load_image(
-                                        icon_path,
-                                        &mut image_cache,
-                                        &mut images,
-                                        &asset_server,
-                                    );
+                                        builder.spawn((
+                                            Name::new(format!("Option-Icon-{}", choice_box.entry)),
+                                            ImageNode {
+                                                image: handle,
+                                                ..default()
+                                            },
+                                            ZIndex::default(),
+                                            state.clone(),
+                                            IgnoreParentState,
+                                            css_source.clone(),
+                                            CssClass(vec![
+                                                String::from("option-icon"),
+                                                String::from("option-text"),
+                                            ]),
+                                            Pickable::IGNORE,
+                                            RenderLayers::layer(*layer),
+                                            BindToID(id.0),
+                                        ));
+                                    }
+
+                                    let text;
+                                    if option.text.trim().is_empty() {
+                                        text = Text::new("Select...");
+                                    } else {
+                                        text = Text::new(option.text.clone());
+                                    }
 
                                     builder.spawn((
-                                        Name::new(format!("Option-Icon-{}", choice_box.entry)),
-                                        ImageNode {
-                                            image: handle,
-                                            ..default()
-                                        },
+                                        Name::new(format!("Option-Text-{}", choice_box.entry)),
+                                        text,
+                                        TextColor::default(),
+                                        TextFont::default(),
+                                        TextLayout::default(),
                                         ZIndex::default(),
                                         state.clone(),
                                         IgnoreParentState,
                                         css_source.clone(),
-                                        CssClass(vec![String::from("option-icon"), String::from("option-text")]),
+                                        CssClass(vec![String::from("option-text")]),
                                         Pickable::IGNORE,
                                         RenderLayers::layer(*layer),
-                                        BindToID(id.0)
+                                        BindToID(id.0),
                                     ));
-                                }
-
-                                let text;
-                                if option.text.trim().is_empty() {
-                                    text = Text::new("Select...");
-                                } else {
-                                    text = Text::new(option.text.clone());
-                                }
-
-                                builder.spawn((
-                                    Name::new(format!("Option-Text-{}", choice_box.entry)),
-                                    text,
-                                    TextColor::default(),
-                                    TextFont::default(),
-                                    TextLayout::default(),
-                                    ZIndex::default(),
-                                    state.clone(),
-                                    IgnoreParentState,
-                                    css_source.clone(),
-                                    CssClass(vec![String::from("option-text")]),
-                                    Pickable::IGNORE,
-                                    RenderLayers::layer(*layer),
-                                    BindToID(id.0)
-                                ));
-                            });
-                    }
-                });
-
+                                });
+                        }
+                    });
             });
     }
 }
@@ -361,13 +397,16 @@ fn update_content_box_visibility(
 /// - `WidgetStyle::top`
 fn handle_scroll_events(
     mut scroll_events: MessageReader<MouseWheel>,
-    mut layout_query: Query<(
-        Entity,
-        &Visibility,
-        &Children,
-        &mut ScrollPosition,
-        &ComputedNode,
-    ), With<ChoiceLayoutBoxBase>>,
+    mut layout_query: Query<
+        (
+            Entity,
+            &Visibility,
+            &Children,
+            &mut ScrollPosition,
+            &ComputedNode,
+        ),
+        With<ChoiceLayoutBoxBase>,
+    >,
     option_query: Query<(&ComputedNode, &ChildOf), With<ChoiceOptionBase>>,
     time: Res<Time>,
 ) {
@@ -382,7 +421,9 @@ fn handle_scroll_events(
         // Wheel down -> scroll down -> increase scroll.y
         let delta = -raw;
 
-        for (layout_entity, visibility, children, mut scroll, layout_computed) in layout_query.iter_mut() {
+        for (layout_entity, visibility, children, mut scroll, layout_computed) in
+            layout_query.iter_mut()
+        {
             let is_visible = matches!(*visibility, Visibility::Visible | Visibility::Inherited);
             if !is_visible {
                 continue;
@@ -422,7 +463,6 @@ fn handle_scroll_events(
         }
     }
 }
-
 
 // ===============================================
 //                   Intern Events
@@ -518,18 +558,33 @@ fn on_internal_cursor_leave(
 /// - Optional: `UIWidgetState::focused`
 fn on_internal_option_click(
     trigger: On<Pointer<Click>>,
-    mut option_query: Query<(Entity, &mut UIWidgetState, &ChoiceOption, &BindToID, &Children), (With<ChoiceOptionBase>, Without<ChoiceBox>)>,
-    mut parent_query: Query<(Entity, &mut UIWidgetState, &UIGenID, &mut ChoiceBox), (With<ChoiceBox>, Without<ChoiceOptionBase>)>,
+    mut option_query: Query<
+        (
+            Entity,
+            &mut UIWidgetState,
+            &ChoiceOption,
+            &BindToID,
+            &Children,
+        ),
+        (With<ChoiceOptionBase>, Without<ChoiceBox>),
+    >,
+    mut parent_query: Query<
+        (Entity, &mut UIWidgetState, &UIGenID, &mut ChoiceBox),
+        (With<ChoiceBox>, Without<ChoiceOptionBase>),
+    >,
     mut selected_query: Query<(&BindToID, &Children), With<SelectedOptionBase>>,
     mut text_query: Query<&mut Text>,
-    mut inner_query: Query<&mut UIWidgetState, (Without<ChoiceOptionBase>,  Without<ChoiceBox>)>,
+    mut inner_query: Query<&mut UIWidgetState, (Without<ChoiceOptionBase>, Without<ChoiceBox>)>,
 ) {
     let clicked_entity = trigger.entity;
 
-
     let (clicked_parent_id, clicked_option_text, clicked_option_icon) =
         if let Ok((_, _, option, bind_id, _)) = option_query.get(clicked_entity) {
-            (bind_id.0.clone(), option.text.clone(), option.icon_path.clone())
+            (
+                bind_id.0.clone(),
+                option.text.clone(),
+                option.icon_path.clone(),
+            )
         } else {
             return;
         };
@@ -551,7 +606,6 @@ fn on_internal_option_click(
             choice_box.value.text = clicked_option_text.clone();
             choice_box.value.icon_path = clicked_option_icon.clone();
             parent_state.open = false;
-
 
             if clicked_option_text.is_empty() && clicked_option_icon.is_none() {
                 if let Ok((_, mut state, _, _, _)) = option_query.get_mut(clicked_entity) {
@@ -660,84 +714,88 @@ fn generate_child_selected_option(
     builder: &mut RelatedSpawnerCommands<ChildOf>,
     css_source: &CssSource,
     choice_box: &ChoiceBox,
-    layer: &usize, id: &usize,
+    layer: &usize,
+    id: &usize,
     image_cache: &mut ImageCache,
     images: &mut ResMut<Assets<Image>>,
     asset_server: &Res<AssetServer>,
 ) {
-
     // Selected Container
-    builder.spawn((
-        Name::new(format!("Option-Selected-{}", choice_box.entry)),
-        Node::default(),
-        BackgroundColor::default(),
-        ImageNode::default(),
-        BorderColor::default(),
-        BorderRadius::default(),
-        UIWidgetState::default(),
-        css_source.clone(),
-        CssClass(vec![String::from("option-selected")]),
-        RenderLayers::layer(*layer),
-        Pickable::IGNORE,
-        BindToID(*id),
-        SelectedOptionBase
-    )).with_children(|builder| {
-
-        // Selected Text
-        builder.spawn((
-            Name::new(format!("Option-Sel-Text-{}", choice_box.entry)),
-            Text::new(choice_box.value.text.clone()),
-            TextColor::default(),
-            TextFont::default(),
-            TextLayout::default(),
-            ZIndex::default(),
-            UIWidgetState::default(),
-            IgnoreParentState,
-            css_source.clone(),
-            CssClass(vec![String::from("option-sel-text")]),
-            Pickable::IGNORE,
-            RenderLayers::layer(*layer),
-            BindToID(*id)
-        ));
-    });
-
-    builder.spawn((
-        Name::new(format!("Arrow-Box-{}", choice_box.entry)),
-        Node::default(),
-        BackgroundColor::default(),
-        ImageNode::default(),
-        BorderColor::default(),
-        BorderRadius::default(),
-        UIWidgetState::default(),
-        css_source.clone(),
-        CssClass(vec![String::from("option-drop-box")]),
-        RenderLayers::layer(*layer),
-        Pickable::IGNORE,
-        BindToID(*id),
-        DropBase
-    )).with_children(|builder| {
-
-        let handle = get_or_load_image(
-            choice_box.icon_path.as_deref().unwrap_or(DEFAULT_CHOICE_BOX_KEY),
-            image_cache,
-            images,
-            &asset_server,
-        );
-
-        builder.spawn((
-            Name::new(format!("Drop-Icon-{}", choice_box.entry)),
-            ImageNode {
-                image: handle,
-                ..default()
-            },
-            ZIndex::default(),
+    builder
+        .spawn((
+            Name::new(format!("Option-Selected-{}", choice_box.entry)),
+            Node::default(),
+            BackgroundColor::default(),
+            ImageNode::default(),
+            BorderColor::default(),
+            BorderRadius::default(),
             UIWidgetState::default(),
             css_source.clone(),
-            CssClass(vec![String::from("option-drop-icon")]),
-            Pickable::IGNORE,
+            CssClass(vec![String::from("option-selected")]),
             RenderLayers::layer(*layer),
-            BindToID(*id)
-        ));
+            Pickable::IGNORE,
+            BindToID(*id),
+            SelectedOptionBase,
+        ))
+        .with_children(|builder| {
+            // Selected Text
+            builder.spawn((
+                Name::new(format!("Option-Sel-Text-{}", choice_box.entry)),
+                Text::new(choice_box.value.text.clone()),
+                TextColor::default(),
+                TextFont::default(),
+                TextLayout::default(),
+                ZIndex::default(),
+                UIWidgetState::default(),
+                IgnoreParentState,
+                css_source.clone(),
+                CssClass(vec![String::from("option-sel-text")]),
+                Pickable::IGNORE,
+                RenderLayers::layer(*layer),
+                BindToID(*id),
+            ));
+        });
 
-    });
+    builder
+        .spawn((
+            Name::new(format!("Arrow-Box-{}", choice_box.entry)),
+            Node::default(),
+            BackgroundColor::default(),
+            ImageNode::default(),
+            BorderColor::default(),
+            BorderRadius::default(),
+            UIWidgetState::default(),
+            css_source.clone(),
+            CssClass(vec![String::from("option-drop-box")]),
+            RenderLayers::layer(*layer),
+            Pickable::IGNORE,
+            BindToID(*id),
+            DropBase,
+        ))
+        .with_children(|builder| {
+            let handle = get_or_load_image(
+                choice_box
+                    .icon_path
+                    .as_deref()
+                    .unwrap_or(DEFAULT_CHOICE_BOX_KEY),
+                image_cache,
+                images,
+                &asset_server,
+            );
+
+            builder.spawn((
+                Name::new(format!("Drop-Icon-{}", choice_box.entry)),
+                ImageNode {
+                    image: handle,
+                    ..default()
+                },
+                ZIndex::default(),
+                UIWidgetState::default(),
+                css_source.clone(),
+                CssClass(vec![String::from("option-drop-icon")]),
+                Pickable::IGNORE,
+                RenderLayers::layer(*layer),
+                BindToID(*id),
+            ));
+        });
 }

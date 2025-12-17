@@ -1,16 +1,16 @@
 mod body;
-mod div;
-mod controls;
 mod content;
+mod controls;
+mod div;
 
-use std::fmt;
-use bevy::prelude::*;
 use crate::registry::*;
 use crate::styles::IconPlace;
 use crate::widgets::body::BodyWidget;
-use crate::widgets::div::DivWidget;
 use crate::widgets::content::ExtendedContentWidgets;
 use crate::widgets::controls::ExtendedControlWidgets;
+use crate::widgets::div::DivWidget;
+use bevy::prelude::*;
+use std::fmt;
 
 /// Marker component for UI elements that should ignore the parent widget state.
 ///
@@ -26,7 +26,6 @@ pub struct IgnoreParentState;
 pub struct UIGenID(usize);
 
 impl Default for UIGenID {
-
     /// Generates a new unique `UIGenID` using a global atomic counter.
     fn default() -> Self {
         Self(UI_ID_GENERATE.lock().unwrap().acquire())
@@ -175,7 +174,6 @@ impl Default for Button {
     }
 }
 
-
 // ===============================================
 //                     CheckBox
 // ===============================================
@@ -266,7 +264,7 @@ impl ChoiceOption {
 #[require(UIGenID, UIWidgetState, Widget)]
 pub struct Divider {
     pub entry: usize,
-    pub alignment: DividerAlignment
+    pub alignment: DividerAlignment,
 }
 
 impl Default for Divider {
@@ -283,7 +281,7 @@ impl Default for Divider {
 pub enum DividerAlignment {
     #[default]
     Vertical,
-    Horizontal
+    Horizontal,
 }
 
 impl DividerAlignment {
@@ -317,7 +315,7 @@ pub struct FieldSet {
     pub entry: usize,
     pub kind: Option<FieldKind>,
     pub field_mode: FieldMode,
-    pub allow_none: bool
+    pub allow_none: bool,
 }
 
 impl Default for FieldSet {
@@ -327,7 +325,7 @@ impl Default for FieldSet {
             entry,
             kind: None,
             field_mode: FieldMode::Single,
-            allow_none: false
+            allow_none: false,
         }
     }
 }
@@ -342,7 +340,7 @@ pub enum FieldKind {
 pub enum FieldMode {
     Multi,
     Single,
-    Count(u8)
+    Count(u8),
 }
 
 impl FieldMode {
@@ -376,17 +374,16 @@ pub struct FieldSelectionMulti(pub Vec<Entity>);
 pub struct Headline {
     pub entry: usize,
     pub text: String,
-    pub h_type: HeadlineType
+    pub h_type: HeadlineType,
 }
 
 impl Default for Headline {
-
     fn default() -> Self {
         let entry = HEADLINE_ID_POOL.lock().unwrap().acquire();
         Self {
             entry,
             text: String::from("Headline"),
-            h_type: HeadlineType::H3
+            h_type: HeadlineType::H3,
         }
     }
 }
@@ -457,7 +454,7 @@ pub struct InputField {
     pub clear_after_focus_lost: bool,
     pub icon_path: Option<String>,
     pub input_type: InputType,
-    pub cap_text_at: InputCap
+    pub cap_text_at: InputCap,
 }
 
 impl Default for InputField {
@@ -485,7 +482,7 @@ pub enum InputType {
     Email,
     Date,
     Password,
-    Number
+    Number,
 }
 
 impl InputType {
@@ -494,7 +491,7 @@ impl InputType {
             InputType::Text | InputType::Password => true,
             InputType::Number => c.is_ascii_digit() || "+-*/() ".contains(c),
             InputType::Email => c.is_ascii_alphanumeric() || c == '@' || c == '.' || c == '-',
-            InputType::Date => c.is_ascii_digit() || c == '/' || c == '-' || c == '.'
+            InputType::Date => c.is_ascii_digit() || c == '/' || c == '-' || c == '.',
         }
     }
 
@@ -505,7 +502,7 @@ impl InputType {
             "number" => Some(InputType::Number),
             "email" => Some(InputType::Email),
             "date" => Some(InputType::Date),
-            _ => None
+            _ => None,
         }
     }
 }
@@ -523,7 +520,7 @@ impl InputCap {
         match self {
             Self::CapAt(value) => *value,
             Self::NoCap => 0,
-            Self::CapAtNodeSize => 0
+            Self::CapAtNodeSize => 0,
         }
     }
 }
@@ -588,7 +585,7 @@ pub struct Slider {
     pub value: f32,
     pub step: f32,
     pub min: f32,
-    pub max: f32
+    pub max: f32,
 }
 
 impl Default for Slider {

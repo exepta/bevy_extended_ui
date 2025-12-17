@@ -1,11 +1,11 @@
-use bevy::prelude::*;
-use crate::html::HtmlStyle;
 use crate::ImageCache;
+use crate::html::HtmlStyle;
 use crate::services::image_service::get_or_load_image;
 use crate::services::state_service::update_widget_states;
-use crate::styles::components::UiStyle;
 use crate::styles::Style;
+use crate::styles::components::UiStyle;
 use crate::widgets::UIWidgetState;
+use bevy::prelude::*;
 
 pub struct StyleService;
 
@@ -19,12 +19,15 @@ impl Plugin for StyleService {
 }
 
 pub fn update_widget_styles_system(
-    mut query: Query<(
-        Entity,
-        Option<&UIWidgetState>,
-        Option<&HtmlStyle>,
-        &mut UiStyle,
-    ), Or<(Changed<UiStyle>, Changed<HtmlStyle>, Changed<UIWidgetState>)>>,
+    mut query: Query<
+        (
+            Entity,
+            Option<&UIWidgetState>,
+            Option<&HtmlStyle>,
+            &mut UiStyle,
+        ),
+        Or<(Changed<UiStyle>, Changed<HtmlStyle>, Changed<UIWidgetState>)>,
+    >,
     mut style_query: Query<(
         Option<&mut Node>,
         Option<&mut BackgroundColor>,
@@ -36,7 +39,7 @@ pub fn update_widget_styles_system(
         Option<&mut TextLayout>,
         Option<&mut ImageNode>,
         Option<&mut ZIndex>,
-        Option<&mut Pickable>
+        Option<&mut Pickable>,
     )>,
     asset_server: Res<AssetServer>,
     mut image_cache: ResMut<ImageCache>,
@@ -81,14 +84,27 @@ pub fn update_widget_styles_system(
         }
 
         if let Ok((
-                      node, background, border_color, border_radius, box_shadow,
-                      text_color, text_font, text_layout, image_node, z_index, pick_able
-                  )) = style_query.get_mut(entity)
+            node,
+            background,
+            border_color,
+            border_radius,
+            box_shadow,
+            text_color,
+            text_font,
+            text_layout,
+            image_node,
+            z_index,
+            pick_able,
+        )) = style_query.get_mut(entity)
         {
             apply_style_to_node(&final_style, node);
 
             if let Some(mut bg) = background {
-                bg.0 = final_style.background.clone().map(|b| b.color).unwrap_or(Color::NONE);
+                bg.0 = final_style
+                    .background
+                    .clone()
+                    .map(|b| b.color)
+                    .unwrap_or(Color::NONE);
             }
 
             if let Some(mut br) = border_radius {

@@ -1,10 +1,10 @@
+use crate::styles::paint::Colored;
+use crate::styles::{CssClass, CssSource, IconPlace, TagName};
+use crate::widgets::{BindToID, Button, UIGenID, UIWidgetState, WidgetId, WidgetKind};
+use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache, widgets};
 use bevy::camera::visibility::RenderLayers;
 use bevy::ecs::relationship::RelatedSpawnerCommands;
 use bevy::prelude::*;
-use crate::{widgets, CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
-use crate::styles::{CssClass, CssSource, IconPlace, TagName};
-use crate::styles::paint::Colored;
-use crate::widgets::{BindToID, Button, UIGenID, UIWidgetState, WidgetId, WidgetKind};
 
 #[derive(Component)]
 struct ButtonBase;
@@ -47,7 +47,10 @@ impl Plugin for ButtonWidget {
 /// - Observers for click and hover events
 fn internal_node_creation_system(
     mut commands: Commands,
-    query: Query<(Entity, &UIGenID, &Button, Option<&CssSource>), (With<Button>, Without<ButtonBase>)>,
+    query: Query<
+        (Entity, &UIGenID, &Button, Option<&CssSource>),
+        (With<Button>, Without<ButtonBase>),
+    >,
     config: Res<ExtendedUiConfiguration>,
     asset_server: Res<AssetServer>,
     mut image_cache: ResMut<ImageCache>,
@@ -59,49 +62,75 @@ fn internal_node_creation_system(
             css_source = source.clone();
         }
 
-        commands.entity(entity).insert((
-            Name::new(format!("Button-{}", button.entry)),
-            Node::default(),
-            WidgetId {
-                id: button.entry,
-                kind: WidgetKind::Button
-            },
-            BackgroundColor::default(),
-            ImageNode::default(),
-            BorderColor::default(),
-            BorderRadius::default(),
-            BoxShadow::new(Colored::TRANSPARENT, Val::Px(0.), Val::Px(0.), Val::Px(0.), Val::Px(0.)),
-            ZIndex::default(),
-            Pickable::default(),
-            css_source.clone(),
-            TagName("button".to_string()),
-            RenderLayers::layer(*layer),
-            ButtonBase
-        )).with_children(|builder| {
-            if button.icon_place == IconPlace::Left {
-                place_icon(builder, button, &asset_server, &mut image_cache, id.0, *layer, css_source.clone());
-            }
-
-            builder.spawn((
-                Name::new(format!("Button-Text-{}", button.entry)),
-                Text::new(button.text.clone()),
-                TextColor::default(),
-                TextFont::default(),
-                TextLayout::default(),
-                css_source.clone(),
-                UIWidgetState::default(),
+        commands
+            .entity(entity)
+            .insert((
+                Name::new(format!("Button-{}", button.entry)),
+                Node::default(),
+                WidgetId {
+                    id: button.entry,
+                    kind: WidgetKind::Button,
+                },
+                BackgroundColor::default(),
+                ImageNode::default(),
+                BorderColor::default(),
+                BorderRadius::default(),
+                BoxShadow::new(
+                    Colored::TRANSPARENT,
+                    Val::Px(0.),
+                    Val::Px(0.),
+                    Val::Px(0.),
+                    Val::Px(0.),
+                ),
                 ZIndex::default(),
-                CssClass(vec!["button-text".to_string()]),
-                Pickable::IGNORE,
-                BindToID(id.0),
+                Pickable::default(),
+                css_source.clone(),
+                TagName("button".to_string()),
                 RenderLayers::layer(*layer),
-                ButtonText
-            ));
+                ButtonBase,
+            ))
+            .with_children(|builder| {
+                if button.icon_place == IconPlace::Left {
+                    place_icon(
+                        builder,
+                        button,
+                        &asset_server,
+                        &mut image_cache,
+                        id.0,
+                        *layer,
+                        css_source.clone(),
+                    );
+                }
 
-            if button.icon_place == IconPlace::Right {
-                place_icon(builder, button, &asset_server, &mut image_cache, id.0, *layer, css_source.clone());
-            }
-        }).observe(on_internal_click)
+                builder.spawn((
+                    Name::new(format!("Button-Text-{}", button.entry)),
+                    Text::new(button.text.clone()),
+                    TextColor::default(),
+                    TextFont::default(),
+                    TextLayout::default(),
+                    css_source.clone(),
+                    UIWidgetState::default(),
+                    ZIndex::default(),
+                    CssClass(vec!["button-text".to_string()]),
+                    Pickable::IGNORE,
+                    BindToID(id.0),
+                    RenderLayers::layer(*layer),
+                    ButtonText,
+                ));
+
+                if button.icon_place == IconPlace::Right {
+                    place_icon(
+                        builder,
+                        button,
+                        &asset_server,
+                        &mut image_cache,
+                        id.0,
+                        *layer,
+                        css_source.clone(),
+                    );
+                }
+            })
+            .observe(on_internal_click)
             .observe(on_internal_cursor_entered)
             .observe(on_internal_cursor_leave);
     }
@@ -123,7 +152,7 @@ fn internal_node_creation_system(
 fn on_internal_click(
     mut trigger: On<Pointer<Click>>,
     mut query: Query<(&mut UIWidgetState, &UIGenID), With<Button>>,
-    mut current_widget_state: ResMut<CurrentWidgetState>
+    mut current_widget_state: ResMut<CurrentWidgetState>,
 ) {
     if let Ok((mut state, gen_id)) = query.get_mut(trigger.entity) {
         state.focused = true;
@@ -176,7 +205,9 @@ fn place_icon(
 ) {
     if let Some(icon) = btn.icon_path.clone() {
         let owned_icon = icon.to_string();
-        let handle = image_cache.map.entry(icon.clone())
+        let handle = image_cache
+            .map
+            .entry(icon.clone())
             .or_insert_with(|| asset_server.load(owned_icon.clone()))
             .clone();
 
@@ -190,7 +221,7 @@ fn place_icon(
             css_source.clone(),
             CssClass(vec!["button-text".to_string()]),
             BindToID(id),
-            ZIndex(1)
+            ZIndex(1),
         ));
     }
 }

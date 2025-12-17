@@ -4,7 +4,6 @@ use bevy::prelude::*;
 pub struct Colored;
 
 impl Colored {
-
     pub const TRANSPARENT: Color = Color::NONE;
 
     pub const ALICE_BLUE: Color = Color::Srgba(Srgba::new(0.941, 0.973, 1.0, 1.0));
@@ -132,18 +131,18 @@ impl Colored {
     pub const SEA_SHELL: Color = Color::Srgba(Srgba::new(1.0, 0.961, 0.933, 1.0));
 
     pub const TAN: Color = Color::Srgba(Srgba::new(0.824, 0.706, 0.549, 1.0));
-    pub const TEAL: Color = Color::Srgba(Srgba::new(0.0,   0.502, 0.502, 1.0));
+    pub const TEAL: Color = Color::Srgba(Srgba::new(0.0, 0.502, 0.502, 1.0));
     pub const THISTLE: Color = Color::Srgba(Srgba::new(0.847, 0.749, 0.847, 1.0));
-    pub const TOMATO: Color = Color::Srgba(Srgba::new(1.0,   0.388, 0.278, 1.0));
+    pub const TOMATO: Color = Color::Srgba(Srgba::new(1.0, 0.388, 0.278, 1.0));
     pub const TURQUOISE: Color = Color::Srgba(Srgba::new(0.251, 0.878, 0.816, 1.0));
 
     pub const VIOLET: Color = Color::Srgba(Srgba::new(0.933, 0.510, 0.933, 1.0));
 
     pub const WHEAT: Color = Color::Srgba(Srgba::new(0.961, 0.871, 0.702, 1.0));
-    pub const WHITE: Color = Color::Srgba(Srgba::new(1.0,   1.0,   1.0,   1.0));
+    pub const WHITE: Color = Color::Srgba(Srgba::new(1.0, 1.0, 1.0, 1.0));
     pub const WHITE_SMOKE: Color = Color::Srgba(Srgba::new(0.961, 0.961, 0.961, 1.0));
 
-    pub const YELLOW: Color = Color::Srgba(Srgba::new(1.0,   1.0,   0.0,   1.0));
+    pub const YELLOW: Color = Color::Srgba(Srgba::new(1.0, 1.0, 0.0, 1.0));
     pub const YELLOW_GREEN: Color = Color::Srgba(Srgba::new(0.604, 0.804, 0.196, 1.0));
 
     pub fn hex_to_color(hex: &str) -> Color {
@@ -157,15 +156,26 @@ impl Colored {
 
         // If the length is 3, expand it to 6 (e.g. "fff" -> "ffffff")
         let hex = match hex.len() {
-            3 => format!("{}{}{}{}{}{}",
-                         &hex[0..1], &hex[0..1],
-                         &hex[1..2], &hex[1..2],
-                         &hex[2..3], &hex[2..3]),
-            4 => format!("{}{}{}{}{}{}{}{}",
-                         &hex[0..1], &hex[0..1],
-                         &hex[1..2], &hex[1..2],
-                         &hex[2..3], &hex[2..3],
-                         &hex[3..4], &hex[3..4]),
+            3 => format!(
+                "{}{}{}{}{}{}",
+                &hex[0..1],
+                &hex[0..1],
+                &hex[1..2],
+                &hex[1..2],
+                &hex[2..3],
+                &hex[2..3]
+            ),
+            4 => format!(
+                "{}{}{}{}{}{}{}{}",
+                &hex[0..1],
+                &hex[0..1],
+                &hex[1..2],
+                &hex[1..2],
+                &hex[2..3],
+                &hex[2..3],
+                &hex[3..4],
+                &hex[3..4]
+            ),
             6 | 8 => hex.to_string(),
             _ => unreachable!(),
         };

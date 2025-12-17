@@ -1,6 +1,6 @@
-use bevy::prelude::*;
 use crate::CurrentWidgetState;
 use crate::widgets::{BindToID, IgnoreParentState, UIGenID, UIWidgetState};
+use bevy::prelude::*;
 
 pub struct StateService;
 
@@ -8,10 +8,13 @@ impl Plugin for StateService {
     fn build(&self, app: &mut App) {
         app.register_type::<Pickable>();
         app.add_systems(Update, update_widget_states);
-        app.add_systems(Update, (
-            internal_state_check.run_if(resource_changed::<CurrentWidgetState>),
-            handle_tab_focus
-        ));
+        app.add_systems(
+            Update,
+            (
+                internal_state_check.run_if(resource_changed::<CurrentWidgetState>),
+                handle_tab_focus,
+            ),
+        );
     }
 }
 
@@ -33,7 +36,10 @@ impl Plugin for StateService {
 /// will also be marked as focused.
 pub fn update_widget_states(
     main_query: Query<(&UIGenID, &UIWidgetState), (Changed<UIWidgetState>, With<UIGenID>)>,
-    mut inner_query: Query<(&BindToID, &mut UIWidgetState), (Without<UIGenID>, Without<IgnoreParentState>)>,
+    mut inner_query: Query<
+        (&BindToID, &mut UIWidgetState),
+        (Without<UIGenID>, Without<IgnoreParentState>),
+    >,
 ) {
     for (id, state) in main_query.iter() {
         for (bind_to, mut inner_state) in inner_query.iter_mut() {
@@ -64,7 +70,7 @@ pub fn update_widget_states(
 /// Otherwise, it clears `focused = false` on all widgets except the one with the matching ID.
 fn internal_state_check(
     current_state_element: Res<CurrentWidgetState>,
-    mut query: Query<(&mut UIWidgetState, &UIGenID), With<UIGenID>>
+    mut query: Query<(&mut UIWidgetState, &UIGenID), With<UIGenID>>,
 ) {
     for (mut state, gen_id) in query.iter_mut() {
         if gen_id.get() == current_state_element.widget_id {
@@ -97,7 +103,7 @@ fn internal_state_check(
 /// When the user presses Tab while focused on widget `#2`, focus will move to widget `#3`.
 fn handle_tab_focus(
     mut query: Query<(Entity, &mut UIWidgetState, &UIGenID)>,
-    keyboard: Res<ButtonInput<KeyCode>>
+    keyboard: Res<ButtonInput<KeyCode>>,
 ) {
     let mut sorted_ui_elements: Vec<_> = query.iter_mut().collect();
     sorted_ui_elements.sort_by_key(|(_, _, id)| id.get());

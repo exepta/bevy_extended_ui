@@ -1,5 +1,5 @@
-pub mod converter;
 pub mod builder;
+pub mod converter;
 pub mod reload;
 
 use std::collections::HashMap;
@@ -12,9 +12,12 @@ use crate::html::converter::HtmlConverterSystem;
 use crate::html::reload::HtmlReloadPlugin;
 
 use crate::io::{CssAsset, HtmlAsset};
-use crate::styles::parser::apply_property_to_style;
 use crate::styles::Style;
-use crate::widgets::{Button, Body, Div, Widget, CheckBox, Headline, Paragraph, Img, InputField, ChoiceBox, Slider, Divider, FieldSet, RadioButton};
+use crate::styles::parser::apply_property_to_style;
+use crate::widgets::{
+    Body, Button, CheckBox, ChoiceBox, Div, Divider, FieldSet, Headline, Img, InputField,
+    Paragraph, RadioButton, Slider, Widget,
+};
 
 pub static HTML_ID_COUNTER: AtomicUsize = AtomicUsize::new(1);
 
@@ -119,31 +122,118 @@ pub struct HtmlStates {
 #[derive(Debug, Clone)]
 pub enum HtmlWidgetNode {
     /// The root `<body>` element of the HTML structure.
-    Body(Body, HtmlMeta, HtmlStates, Vec<HtmlWidgetNode>, HtmlEventBindings, Widget, HtmlID),
+    Body(
+        Body,
+        HtmlMeta,
+        HtmlStates,
+        Vec<HtmlWidgetNode>,
+        HtmlEventBindings,
+        Widget,
+        HtmlID,
+    ),
     /// A `<div>` container element with nested child nodes.
-    Div(Div, HtmlMeta, HtmlStates, Vec<HtmlWidgetNode>, HtmlEventBindings, Widget, HtmlID),
+    Div(
+        Div,
+        HtmlMeta,
+        HtmlStates,
+        Vec<HtmlWidgetNode>,
+        HtmlEventBindings,
+        Widget,
+        HtmlID,
+    ),
     /// A `<divider>` element.
-    Divider(Divider, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
+    Divider(
+        Divider,
+        HtmlMeta,
+        HtmlStates,
+        HtmlEventBindings,
+        Widget,
+        HtmlID,
+    ),
     /// A `<button>` element.
-    Button(Button, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
+    Button(
+        Button,
+        HtmlMeta,
+        HtmlStates,
+        HtmlEventBindings,
+        Widget,
+        HtmlID,
+    ),
     /// A checkbox `<checkbox>`.
-    CheckBox(CheckBox, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
+    CheckBox(
+        CheckBox,
+        HtmlMeta,
+        HtmlStates,
+        HtmlEventBindings,
+        Widget,
+        HtmlID,
+    ),
     /// A dropdown or select box.
-    ChoiceBox(ChoiceBox, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
+    ChoiceBox(
+        ChoiceBox,
+        HtmlMeta,
+        HtmlStates,
+        HtmlEventBindings,
+        Widget,
+        HtmlID,
+    ),
     /// A `<fieldset>` container element with nested child nodes from type `<radio> and <toggle>`.
-    FieldSet(FieldSet, HtmlMeta, HtmlStates, Vec<HtmlWidgetNode>, HtmlEventBindings, Widget, HtmlID),
+    FieldSet(
+        FieldSet,
+        HtmlMeta,
+        HtmlStates,
+        Vec<HtmlWidgetNode>,
+        HtmlEventBindings,
+        Widget,
+        HtmlID,
+    ),
     /// A heading element (`<h1>`-`<h6>`).
-    Headline(Headline, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
+    Headline(
+        Headline,
+        HtmlMeta,
+        HtmlStates,
+        HtmlEventBindings,
+        Widget,
+        HtmlID,
+    ),
     /// A img element (`<img>`).
     Img(Img, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
     /// An `<input type="text">` field.
-    Input(InputField, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
+    Input(
+        InputField,
+        HtmlMeta,
+        HtmlStates,
+        HtmlEventBindings,
+        Widget,
+        HtmlID,
+    ),
     /// A paragraph `<p>`.
-    Paragraph(Paragraph, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
+    Paragraph(
+        Paragraph,
+        HtmlMeta,
+        HtmlStates,
+        HtmlEventBindings,
+        Widget,
+        HtmlID,
+    ),
     /// A radio-button `<radio>`.
-    RadioButton(RadioButton, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
+    RadioButton(
+        RadioButton,
+        HtmlMeta,
+        HtmlStates,
+        HtmlEventBindings,
+        Widget,
+        HtmlID,
+    ),
     /// A slider input (range).
-    Slider(Slider, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
+    Slider(
+        Slider,
+        HtmlMeta,
+        HtmlStates,
+        HtmlEventBindings,
+        Widget,
+        HtmlID,
+    ),
 }
 
 /// Stores all parsed HTML structures keyed by `<meta name="...">`.
@@ -212,10 +302,6 @@ impl Plugin for ExtendedUiHtmlPlugin {
         app.register_type::<HtmlSource>();
         app.register_type::<HtmlStyle>();
 
-        app.add_plugins((
-            HtmlConverterSystem,
-            HtmlBuilderSystem,
-            HtmlReloadPlugin,
-        ));
+        app.add_plugins((HtmlConverterSystem, HtmlBuilderSystem, HtmlReloadPlugin));
     }
 }

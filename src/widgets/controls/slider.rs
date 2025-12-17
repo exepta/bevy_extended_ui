@@ -4,11 +4,11 @@ use bevy::prelude::*;
 use bevy::ui::RelativeCursorPosition;
 use bevy::window::PrimaryWindow;
 
-use crate::{CurrentWidgetState, ExtendedUiConfiguration};
-use crate::styles::{CssClass, CssSource, TagName};
 use crate::styles::components::UiStyle;
 use crate::styles::paint::Colored;
+use crate::styles::{CssClass, CssSource, TagName};
 use crate::widgets::{BindToID, Slider, UIGenID, UIWidgetState, WidgetId, WidgetKind};
+use crate::{CurrentWidgetState, ExtendedUiConfiguration};
 
 #[derive(Component)]
 struct SliderBase;
@@ -49,7 +49,10 @@ impl Plugin for SliderWidget {
 
 fn internal_node_creation_system(
     mut commands: Commands,
-    query: Query<(Entity, &UIGenID, &Slider, Option<&CssSource>), (With<Slider>, Without<SliderBase>)>,
+    query: Query<
+        (Entity, &UIGenID, &Slider, Option<&CssSource>),
+        (With<Slider>, Without<SliderBase>),
+    >,
     config: Res<ExtendedUiConfiguration>,
 ) {
     let layer = *config.render_layers.first().unwrap_or(&1);
@@ -61,7 +64,10 @@ fn internal_node_creation_system(
             .entity(entity)
             .insert((
                 Node::default(),
-                WidgetId { id: slider.entry, kind: WidgetKind::Slider },
+                WidgetId {
+                    id: slider.entry,
+                    kind: WidgetKind::Slider,
+                },
                 BackgroundColor::default(),
                 BorderColor::default(),
                 BorderRadius::default(),
@@ -76,7 +82,13 @@ fn internal_node_creation_system(
             ))
             .insert((
                 ImageNode::default(),
-                BoxShadow::new(Colored::TRANSPARENT, Val::Px(0.), Val::Px(0.), Val::Px(0.), Val::Px(0.)),
+                BoxShadow::new(
+                    Colored::TRANSPARENT,
+                    Val::Px(0.),
+                    Val::Px(0.),
+                    Val::Px(0.),
+                    Val::Px(0.),
+                ),
             ))
             .insert(Name::new(format!("Slider-{}", slider.entry)))
             .observe(on_internal_click)
@@ -141,12 +153,20 @@ fn internal_node_creation_system(
                                 CssClass(vec!["thumb".to_string()]),
                                 RenderLayers::layer(layer),
                                 Pickable::default(),
-                                SliderThumb { current_center_x: 0.0 },
+                                SliderThumb {
+                                    current_center_x: 0.0,
+                                },
                                 BindToID(id.0),
                             ))
                             .insert((
                                 ImageNode::default(),
-                                BoxShadow::new(Colored::TRANSPARENT, Val::Px(0.), Val::Px(0.), Val::Px(0.), Val::Px(0.)),
+                                BoxShadow::new(
+                                    Colored::TRANSPARENT,
+                                    Val::Px(0.),
+                                    Val::Px(0.),
+                                    Val::Px(0.),
+                                    Val::Px(0.),
+                                ),
                             ))
                             .observe(on_thumb_drag);
                     });
@@ -195,16 +215,28 @@ fn on_track_click(
     track_q: Query<(&ComputedNode, &BindToID, &RelativeCursorPosition), With<SliderTrackContainer>>,
     thumb_size_q: Query<(&ComputedNode, &BindToID), With<SliderThumb>>,
 
-    mut fill_q: Query<(&mut Node, &BindToID, &mut UiStyle), (With<SliderTrackFill>, Without<SliderThumb>)>,
-    mut thumb_q: Query<(&mut Node, &mut SliderThumb, &BindToID, &mut UiStyle), (With<SliderThumb>, Without<SliderTrackFill>)>,
+    mut fill_q: Query<
+        (&mut Node, &BindToID, &mut UiStyle),
+        (With<SliderTrackFill>, Without<SliderThumb>),
+    >,
+    mut thumb_q: Query<
+        (&mut Node, &mut SliderThumb, &BindToID, &mut UiStyle),
+        (With<SliderThumb>, Without<SliderTrackFill>),
+    >,
 ) {
-    let Ok(window) = window_q.single() else { return; };
+    let Ok(window) = window_q.single() else {
+        return;
+    };
     let sf = window.scale_factor() * ui_scale.0;
 
-    let Ok((track_node, bind, rel)) = track_q.get(trigger.entity) else { return; };
+    let Ok((track_node, bind, rel)) = track_q.get(trigger.entity) else {
+        return;
+    };
 
     let track_width = (track_node.size().x / sf).max(1.0);
-    let Some(thumb_width) = find_bound_width(bind.0, &thumb_size_q, sf) else { return; };
+    let Some(thumb_width) = find_bound_width(bind.0, &thumb_size_q, sf) else {
+        return;
+    };
 
     let Some(n) = rel.normalized else {
         info!("RelativeCursorPosition.normalized is None (cursor unknown)");
@@ -236,8 +268,14 @@ fn on_thumb_drag(
     track_q: Query<(&ComputedNode, &BindToID), With<SliderTrackContainer>>,
     thumb_node_q: Query<&ComputedNode, With<SliderThumb>>,
     mut slider_q: Query<(&mut Slider, &UIGenID), With<Slider>>,
-    mut fill_q: Query<(&mut Node, &BindToID, &mut UiStyle), (With<SliderTrackFill>, Without<SliderThumb>)>,
-    mut thumb_q: Query<(&mut Node, &mut SliderThumb, &BindToID, &mut UiStyle), (With<SliderThumb>, Without<SliderTrackFill>)>,
+    mut fill_q: Query<
+        (&mut Node, &BindToID, &mut UiStyle),
+        (With<SliderTrackFill>, Without<SliderThumb>),
+    >,
+    mut thumb_q: Query<
+        (&mut Node, &mut SliderThumb, &BindToID, &mut UiStyle),
+        (With<SliderThumb>, Without<SliderTrackFill>),
+    >,
     window_q: Query<&Window, With<PrimaryWindow>>,
     ui_scale: Res<UiScale>,
 ) {
@@ -255,13 +293,17 @@ fn on_thumb_drag(
 
     let track_width = (track_node.size().x / sf).max(1.0);
 
-    let Ok(thumb_node) = thumb_node_q.get(event.entity) else { return; };
+    let Ok(thumb_node) = thumb_node_q.get(event.entity) else {
+        return;
+    };
     let thumb_width = (thumb_node.size().x / sf).max(1.0);
     let half = thumb_width * 0.5;
 
     let dx = event.event.delta.x / sf;
 
-    let Ok((_, thumb, _, _)) = thumb_q.get(event.entity) else { return; };
+    let Ok((_, thumb, _, _)) = thumb_q.get(event.entity) else {
+        return;
+    };
     let current_left = thumb.current_center_x - half;
 
     apply_from_track_left_x(
@@ -281,8 +323,14 @@ fn apply_from_track_left_x(
     track_width: f32,
     thumb_width: f32,
     slider_q: &mut Query<(&mut Slider, &UIGenID), With<Slider>>,
-    fill_q: &mut Query<(&mut Node, &BindToID, &mut UiStyle), (With<SliderTrackFill>, Without<SliderThumb>)>,
-    thumb_q: &mut Query<(&mut Node, &mut SliderThumb, &BindToID, &mut UiStyle), (With<SliderThumb>, Without<SliderTrackFill>)>,
+    fill_q: &mut Query<
+        (&mut Node, &BindToID, &mut UiStyle),
+        (With<SliderTrackFill>, Without<SliderThumb>),
+    >,
+    thumb_q: &mut Query<
+        (&mut Node, &mut SliderThumb, &BindToID, &mut UiStyle),
+        (With<SliderThumb>, Without<SliderTrackFill>),
+    >,
 ) {
     for (mut slider, ui_id) in slider_q.iter_mut() {
         if ui_id.0 != target_ui_id {
@@ -306,8 +354,14 @@ fn apply_slider_from_thumb_left(
     track_width: f32,
     thumb_width: f32,
     ui_id: &UIGenID,
-    fill_q: &mut Query<(&mut Node, &BindToID, &mut UiStyle), (With<SliderTrackFill>, Without<SliderThumb>)>,
-    thumb_q: &mut Query<(&mut Node, &mut SliderThumb, &BindToID, &mut UiStyle), (With<SliderThumb>, Without<SliderTrackFill>)>,
+    fill_q: &mut Query<
+        (&mut Node, &BindToID, &mut UiStyle),
+        (With<SliderTrackFill>, Without<SliderThumb>),
+    >,
+    thumb_q: &mut Query<
+        (&mut Node, &mut SliderThumb, &BindToID, &mut UiStyle),
+        (With<SliderThumb>, Without<SliderTrackFill>),
+    >,
 ) {
     let track_width = track_width.max(1.0);
     let thumb_width = thumb_width.max(1.0);
@@ -354,11 +408,25 @@ fn apply_slider_from_thumb_left(
 
 fn detect_change_slider_values(
     keyboard: Res<ButtonInput<KeyCode>>,
-    mut slider_q: Query<(&mut Slider, &UIWidgetState, &UIGenID, &mut PreviousSliderValue), With<Slider>>,
+    mut slider_q: Query<
+        (
+            &mut Slider,
+            &UIWidgetState,
+            &UIGenID,
+            &mut PreviousSliderValue,
+        ),
+        With<Slider>,
+    >,
     track_q: Query<(&ComputedNode, &BindToID), With<SliderTrackContainer>>,
     thumb_size_q: Query<(&ComputedNode, &BindToID), With<SliderThumb>>,
-    mut fill_q: Query<(&mut Node, &BindToID, &mut UiStyle), (With<SliderTrackFill>, Without<SliderThumb>)>,
-    mut thumb_q: Query<(&mut Node, &mut SliderThumb, &BindToID, &mut UiStyle), (With<SliderThumb>, Without<SliderTrackFill>)>,
+    mut fill_q: Query<
+        (&mut Node, &BindToID, &mut UiStyle),
+        (With<SliderTrackFill>, Without<SliderThumb>),
+    >,
+    mut thumb_q: Query<
+        (&mut Node, &mut SliderThumb, &BindToID, &mut UiStyle),
+        (With<SliderThumb>, Without<SliderTrackFill>),
+    >,
     window_q: Query<&Window, With<PrimaryWindow>>,
     ui_scale: Res<UiScale>,
 ) {
@@ -371,7 +439,11 @@ fn detect_change_slider_values(
 
     for (mut slider, state, ui_id, mut prev) in slider_q.iter_mut() {
         if state.focused {
-            let step = if shift { slider.step * 10.0 } else { slider.step };
+            let step = if shift {
+                slider.step * 10.0
+            } else {
+                slider.step
+            };
             if keyboard.just_pressed(KeyCode::ArrowRight) {
                 slider.value = (slider.value + step).min(slider.max);
             }
@@ -386,13 +458,23 @@ fn detect_change_slider_values(
         **prev = slider.value;
 
         let track_width = find_bound_width(ui_id.0, &track_q, sf).unwrap_or(1.0);
-        let Some(thumb_width) = find_bound_width(ui_id.0, &thumb_size_q, sf) else { continue; };
+        let Some(thumb_width) = find_bound_width(ui_id.0, &thumb_size_q, sf) else {
+            continue;
+        };
 
         let max_left = (track_width - thumb_width).max(0.0);
         let percent = ((slider.value - slider.min) / (slider.max - slider.min)).clamp(0.0, 1.0);
         let left = percent * max_left;
 
-        apply_slider_from_thumb_left(left, &mut slider, track_width, thumb_width, ui_id, &mut fill_q, &mut thumb_q);
+        apply_slider_from_thumb_left(
+            left,
+            &mut slider,
+            track_width,
+            thumb_width,
+            ui_id,
+            &mut fill_q,
+            &mut thumb_q,
+        );
     }
 }
 
@@ -401,8 +483,14 @@ fn initialize_slider_visual_state(
     mut slider_q: Query<(Entity, &mut Slider, &UIGenID, Option<&SliderNeedInit>), With<Slider>>,
     track_q: Query<(&ComputedNode, &BindToID), With<SliderTrackContainer>>,
     thumb_size_q: Query<(&ComputedNode, &BindToID), With<SliderThumb>>,
-    mut fill_q: Query<(&mut Node, &BindToID, &mut UiStyle), (With<SliderTrackFill>, Without<SliderThumb>)>,
-    mut thumb_q: Query<(&mut Node, &mut SliderThumb, &BindToID, &mut UiStyle), (With<SliderThumb>, Without<SliderTrackFill>)>,
+    mut fill_q: Query<
+        (&mut Node, &BindToID, &mut UiStyle),
+        (With<SliderTrackFill>, Without<SliderThumb>),
+    >,
+    mut thumb_q: Query<
+        (&mut Node, &mut SliderThumb, &BindToID, &mut UiStyle),
+        (With<SliderThumb>, Without<SliderTrackFill>),
+    >,
     window_q: Query<&Window, With<PrimaryWindow>>,
     ui_scale: Res<UiScale>,
 ) {
@@ -417,13 +505,23 @@ fn initialize_slider_visual_state(
         }
 
         let track_width = find_bound_width(ui_id.0, &track_q, sf).unwrap_or(1.0);
-        let Some(thumb_width) = find_bound_width(ui_id.0, &thumb_size_q, sf) else { continue; };
+        let Some(thumb_width) = find_bound_width(ui_id.0, &thumb_size_q, sf) else {
+            continue;
+        };
 
         let max_left = (track_width - thumb_width).max(0.0);
         let percent = ((slider.value - slider.min) / (slider.max - slider.min)).clamp(0.0, 1.0);
         let left = percent * max_left;
 
-        apply_slider_from_thumb_left(left, &mut slider, track_width, thumb_width, ui_id, &mut fill_q, &mut thumb_q);
+        apply_slider_from_thumb_left(
+            left,
+            &mut slider,
+            track_width,
+            thumb_width,
+            ui_id,
+            &mut fill_q,
+            &mut thumb_q,
+        );
 
         commands.entity(entity).remove::<SliderNeedInit>();
     }

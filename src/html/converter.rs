@@ -2,8 +2,7 @@ use std::collections::HashMap;
 
 use bevy::asset::AssetEvent;
 use bevy::prelude::*;
-use bevy_inspector_egui::egui::TextBuffer;
-use kuchiki::{traits::TendrilSink, NodeRef};
+use kuchiki::{NodeRef, traits::TendrilSink};
 
 use crate::html::{
     HtmlDirty, HtmlEventBindings, HtmlID, HtmlMeta, HtmlSource, HtmlStates, HtmlStructureMap,
@@ -11,7 +10,8 @@ use crate::html::{
 };
 use crate::io::{CssAsset, HtmlAsset};
 use crate::styles::IconPlace;
-use crate::widgets::{Body, Button, CheckBox, ChoiceBox, ChoiceOption, Div, Divider, DividerAlignment, FieldMode, FieldSet, Headline, HeadlineType, Img, InputCap, InputField, InputType, Paragraph, RadioButton, Slider, Widget};
+use crate::widgets::Button;
+use crate::widgets::*;
 
 pub const DEFAULT_UI_CSS: &str = "default/extended_ui.css";
 
@@ -61,7 +61,9 @@ fn update_html_ui(
     }
 
     for entity in dirty_entities {
-        let Ok((_entity, html)) = query_all.get(entity) else { continue };
+        let Ok((_entity, html)) = query_all.get(entity) else {
+            continue;
+        };
 
         let Some(html_asset) = html_assets.get(&html.handle) else {
             // Asset isn't ready yet.
@@ -85,7 +87,12 @@ fn update_html_ui(
         let meta_controller = document
             .select_first("head meta[controller]")
             .ok()
-            .and_then(|m| m.attributes.borrow().get("controller").map(|s| s.to_string()))
+            .and_then(|m| {
+                m.attributes
+                    .borrow()
+                    .get("controller")
+                    .map(|s| s.to_string())
+            })
             .unwrap_or_default();
 
         // Load all CSS handles from <link rel="stylesheet" href="...">
@@ -220,30 +227,50 @@ fn parse_html_node(
                             }
                         }
                     }
-                } else if child.as_text().map(|t| !t.borrow().trim().is_empty()).unwrap_or(false) {
+                } else if child
+                    .as_text()
+                    .map(|t| !t.borrow().trim().is_empty())
+                    .unwrap_or(false)
+                {
                     found_text = true;
                 }
             }
 
             let text = node.text_contents().trim().to_string();
-            Some(HtmlWidgetNode::Button(Button {
-                text,
-                icon_path,
-                icon_place,
-                ..default()
-            }, meta, states, functions, widget.clone(), HtmlID::default()))
+            Some(HtmlWidgetNode::Button(
+                Button {
+                    text,
+                    icon_path,
+                    icon_place,
+                    ..default()
+                },
+                meta,
+                states,
+                functions,
+                widget.clone(),
+                HtmlID::default(),
+            ))
         }
 
         "checkbox" => {
             // Checkbox with label and optional icon
             let label = node.text_contents().trim().to_string();
-            let icon_path = attributes.get("icon").unwrap_or("extended_ui/icons/check-mark.png");
+            let icon_path = attributes
+                .get("icon")
+                .unwrap_or("extended_ui/icons/check-mark.png");
             let icon = Some(String::from(icon_path));
-            Some(HtmlWidgetNode::CheckBox(CheckBox {
-                label,
-                icon_path: icon,
-                ..default()
-            }, meta, states, functions, widget.clone(), HtmlID::default()))
+            Some(HtmlWidgetNode::CheckBox(
+                CheckBox {
+                    label,
+                    icon_path: icon,
+                    ..default()
+                },
+                meta,
+                states,
+                functions,
+                widget.clone(),
+                HtmlID::default(),
+            ))
         }
 
         "div" => {
@@ -272,11 +299,17 @@ fn parse_html_node(
                     alignment: DividerAlignment::from_str(alignment).unwrap_or_default(),
                     ..default()
                 },
-                meta, states, functions, widget.clone(), HtmlID::default()))
+                meta,
+                states,
+                functions,
+                widget.clone(),
+                HtmlID::default(),
+            ))
         }
-        
+
         "fieldset" => {
-            let allow_none = attributes.get("allow-none").map(|s| s.to_string()) == Some("true".to_string());
+            let allow_none =
+                attributes.get("allow-none").map(|s| s.to_string()) == Some("true".to_string());
             let mode = attributes.get("mode").unwrap_or("single").to_string();
             let mut children = Vec::new();
             for child in node.children() {
@@ -284,14 +317,19 @@ fn parse_html_node(
                     children.push(parsed);
                 }
             }
-            
+
             Some(HtmlWidgetNode::FieldSet(
                 FieldSet {
                     allow_none,
                     field_mode: FieldMode::from_str(mode.as_str()).unwrap_or(FieldMode::Single),
                     ..default()
                 },
-                meta, states, children, functions, widget.clone(), HtmlID::default()
+                meta,
+                states,
+                children,
+                functions,
+                widget.clone(),
+                HtmlID::default(),
             ))
         }
 
@@ -314,7 +352,12 @@ fn parse_html_node(
                     h_type,
                     ..default()
                 },
-                meta, states, functions, widget.clone(), HtmlID::default()))
+                meta,
+                states,
+                functions,
+                widget.clone(),
+                HtmlID::default(),
+            ))
         }
 
         "img" => {
@@ -324,7 +367,10 @@ fn parse_html_node(
             let src_resolved = if src_raw.trim().is_empty() {
                 None
             } else {
-                Some(resolve_relative_asset_path(&html.get_source_path(), &src_raw))
+                Some(resolve_relative_asset_path(
+                    &html.get_source_path(),
+                    &src_raw,
+                ))
             };
 
             Some(HtmlWidgetNode::Img(
@@ -353,7 +399,11 @@ fn parse_html_node(
             let placeholder = attributes.get("placeholder").unwrap_or("").to_string();
             let input_type = attributes.get("type").unwrap_or("text").to_string();
             let icon_path = attributes.get("icon").unwrap_or("");
-            let icon: Option<String> = if !icon_path.is_empty() { Some(String::from(icon_path)) } else { None };
+            let icon: Option<String> = if !icon_path.is_empty() {
+                Some(String::from(icon_path))
+            } else {
+                None
+            };
             let cap = match attributes.get("maxlength") {
                 Some(value) if value.trim().eq_ignore_ascii_case("auto") => InputCap::CapAtNodeSize,
                 Some(value) if value.trim().is_empty() => InputCap::NoCap,
@@ -364,40 +414,54 @@ fn parse_html_node(
                 None => InputCap::NoCap,
             };
 
-            Some(HtmlWidgetNode::Input(InputField {
-                label,
-                placeholder,
-                text,
-                input_type: InputType::from_str(&input_type).unwrap_or_default(),
-                icon_path: icon,
-                cap_text_at: cap,
-                ..default()
-            }, meta, states, functions, widget.clone(), HtmlID::default()))
+            Some(HtmlWidgetNode::Input(
+                InputField {
+                    label,
+                    placeholder,
+                    text,
+                    input_type: InputType::from_str(&input_type).unwrap_or_default(),
+                    icon_path: icon,
+                    cap_text_at: cap,
+                    ..default()
+                },
+                meta,
+                states,
+                functions,
+                widget.clone(),
+                HtmlID::default(),
+            ))
         }
 
         "p" => {
             let text = node.text_contents().trim().to_string();
             Some(HtmlWidgetNode::Paragraph(
-                Paragraph {
-                    text,
-                    ..default()
-                },
-                meta, states, functions, widget.clone(), HtmlID::default()))
+                Paragraph { text, ..default() },
+                meta,
+                states,
+                functions,
+                widget.clone(),
+                HtmlID::default(),
+            ))
         }
 
         "radio" => {
             let value = attributes.get("value").unwrap_or("").to_string();
             let label = node.text_contents().trim().to_string();
-            
-            if attributes.contains("selected") {
-                
-            }
-            
-            Some(HtmlWidgetNode::RadioButton(RadioButton {
-                label,
-                value,
-                ..default()
-            }, meta, states, functions, widget.clone(), HtmlID::default()))
+
+            if attributes.contains("selected") {}
+
+            Some(HtmlWidgetNode::RadioButton(
+                RadioButton {
+                    label,
+                    value,
+                    ..default()
+                },
+                meta,
+                states,
+                functions,
+                widget.clone(),
+                HtmlID::default(),
+            ))
         }
 
         "select" => {
@@ -413,7 +477,11 @@ fn parse_html_node(
                         let icon = attrs.get("icon").unwrap_or("").to_string();
                         let text = child.text_contents().trim().to_string();
 
-                        let icon_path = if icon.trim().is_empty() { None } else { Some(icon) };
+                        let icon_path = if icon.trim().is_empty() {
+                            None
+                        } else {
+                            Some(icon)
+                        };
 
                         let option = ChoiceOption {
                             text: text.clone(),
@@ -430,9 +498,8 @@ fn parse_html_node(
                 }
             }
 
-            let value = selected_value.unwrap_or_else(|| {
-                options.first().cloned().unwrap_or_default()
-            });
+            let value =
+                selected_value.unwrap_or_else(|| options.first().cloned().unwrap_or_default());
 
             Some(HtmlWidgetNode::ChoiceBox(
                 ChoiceBox {
@@ -440,7 +507,12 @@ fn parse_html_node(
                     options,
                     ..default()
                 },
-                meta, states, functions, widget.clone(), HtmlID::default()))
+                meta,
+                states,
+                functions,
+                widget.clone(),
+                HtmlID::default(),
+            ))
         }
 
         "slider" => {
@@ -473,7 +545,12 @@ fn parse_html_node(
                     step,
                     ..default()
                 },
-                meta, states, functions, widget.clone(), HtmlID::default()))
+                meta,
+                states,
+                functions,
+                widget.clone(),
+                HtmlID::default(),
+            ))
         }
         _ => None,
     }
@@ -510,9 +587,7 @@ pub fn resolve_relative_asset_path(html_path: &str, href: &str) -> String {
         .parent()
         .unwrap_or(std::path::Path::new(""));
 
-    base.join(href)
-        .to_string_lossy()
-        .replace('\\', "/")
+    base.join(href).to_string_lossy().replace('\\', "/")
 }
 
 fn with_default_css_first(

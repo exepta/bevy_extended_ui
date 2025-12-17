@@ -1,9 +1,9 @@
-use std::fs;
-use std::path::Path;
+use crate::{ExtendedUiConfiguration, ImageCache};
 use bevy::asset::RenderAssetUsages;
 use bevy::image::{CompressedImageFormats, ImageSampler, ImageType};
 use bevy::prelude::*;
-use crate::{ExtendedUiConfiguration, ImageCache};
+use std::fs;
+use std::path::Path;
 pub const DEFAULT_CHECK_MARK_KEY: &str = "extended_ui/icons/check-mark.png";
 pub const DEFAULT_CHOICE_BOX_KEY: &str = "extended_ui/icons/drop-arrow.png";
 
@@ -11,7 +11,10 @@ pub struct ImageCacheService;
 
 impl Plugin for ImageCacheService {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, cleanup_unused_images_full.run_if(resource_changed::<ImageCache>));
+        app.add_systems(
+            Update,
+            cleanup_unused_images_full.run_if(resource_changed::<ImageCache>),
+        );
         app.add_systems(Startup, pre_load_assets);
     }
 }
@@ -77,10 +80,13 @@ pub fn get_or_load_image(
             true,
             ImageSampler::default(),
             RenderAssetUsages::MAIN_WORLD,
-        ).expect("Failed to create image from embedded PNG");
+        )
+        .expect("Failed to create image from embedded PNG");
 
         let fallback_handle = images.add(image);
-        image_cache.map.insert(path.to_string(), fallback_handle.clone());
+        image_cache
+            .map
+            .insert(path.to_string(), fallback_handle.clone());
         return fallback_handle;
     }
 
@@ -96,7 +102,10 @@ pub fn pre_load_assets(
     let folder = extended_ui_configuration.assets_path.clone();
     let folder = Path::new(&folder);
     if !folder.exists() {
-        warn!("pre_load_assets: Folder '{}' does not exist", folder.display());
+        warn!(
+            "pre_load_assets: Folder '{}' does not exist",
+            folder.display()
+        );
         return;
     }
 

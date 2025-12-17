@@ -1,27 +1,24 @@
-use std::collections::HashMap;
-use std::sync::RwLock;
-use bevy::prelude::*;
-use once_cell::sync::Lazy;
 use crate::io::CssAsset;
 use crate::styles::parser::load_css;
 use crate::styles::{CssClass, CssID, Style, TagName};
+use bevy::prelude::*;
+use once_cell::sync::Lazy;
+use std::collections::HashMap;
+use std::sync::RwLock;
 
-static CSS_CACHE: Lazy<RwLock<HashMap<AssetId<CssAsset>, HashMap<String, Style>>>> = Lazy::new(|| RwLock::new(HashMap::new()));
+static CSS_CACHE: Lazy<RwLock<HashMap<AssetId<CssAsset>, HashMap<String, Style>>>> =
+    Lazy::new(|| RwLock::new(HashMap::new()));
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
 pub struct UiStyle {
     pub css: Handle<CssAsset>,
     pub styles: HashMap<String, Style>,
-    pub active_style: Option<Style>
+    pub active_style: Option<Style>,
 }
 
 impl UiStyle {
-
-    pub fn from_asset_handle(
-        css: Handle<CssAsset>,
-        css_assets: &Assets<CssAsset>
-    ) -> Self {
+    pub fn from_asset_handle(css: Handle<CssAsset>, css_assets: &Assets<CssAsset>) -> Self {
         let id = css.id();
 
         if let Some(cached) = CSS_CACHE
@@ -32,7 +29,7 @@ impl UiStyle {
             return Self {
                 css,
                 styles: cached,
-                active_style: None
+                active_style: None,
             };
         }
 
@@ -40,7 +37,7 @@ impl UiStyle {
             return Self {
                 css,
                 styles: HashMap::new(),
-                active_style: None
+                active_style: None,
             };
         };
 
@@ -53,7 +50,7 @@ impl UiStyle {
         Self {
             css,
             styles: parsed,
-            active_style: None
+            active_style: None,
         }
     }
 
@@ -110,7 +107,11 @@ impl UiStyle {
 
         if let Some(classes) = classes {
             for class in &classes.0 {
-                let normalized = if class.starts_with('.') { class.clone() } else { format!(".{class}") };
+                let normalized = if class.starts_with('.') {
+                    class.clone()
+                } else {
+                    format!(".{class}")
+                };
                 insert_with_pseudo(&normalized, 2);
             }
         }

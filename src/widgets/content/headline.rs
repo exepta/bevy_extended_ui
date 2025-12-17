@@ -1,8 +1,8 @@
-use bevy::camera::visibility::RenderLayers;
-use bevy::prelude::*;
-use crate::{CurrentWidgetState, ExtendedUiConfiguration};
 use crate::styles::{CssSource, TagName};
 use crate::widgets::{Headline, UIGenID, UIWidgetState, WidgetId, WidgetKind};
+use crate::{CurrentWidgetState, ExtendedUiConfiguration};
+use bevy::camera::visibility::RenderLayers;
+use bevy::prelude::*;
 
 #[derive(Component)]
 struct HeadlineBase;
@@ -40,7 +40,7 @@ impl Plugin for HeadlineWidget {
 fn internal_node_creation_system(
     mut commands: Commands,
     query: Query<(Entity, &Headline, Option<&CssSource>), (With<Headline>, Without<HeadlineBase>)>,
-    config: Res<ExtendedUiConfiguration>
+    config: Res<ExtendedUiConfiguration>,
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
     for (entity, headline, source_opt) in query.iter() {
@@ -49,24 +49,31 @@ fn internal_node_creation_system(
             css_source = source.clone();
         }
 
-        commands.entity(entity).insert((
-            Name::new(format!("{}-{}", headline.h_type.to_string().to_uppercase(), headline.entry)),
-            Node::default(),
-            WidgetId {
-                id: headline.entry,
-                kind: WidgetKind::Headline
-            },
-            Text::new(headline.text.clone()),
-            TextColor::default(),
-            TextFont::default(),
-            TextLayout::default(),
-            ZIndex::default(),
-            Pickable::default(),
-            css_source,
-            TagName(format!("{}", headline.h_type.to_string())),
-            RenderLayers::layer(*layer),
-            HeadlineBase
-        )).observe(on_internal_click)
+        commands
+            .entity(entity)
+            .insert((
+                Name::new(format!(
+                    "{}-{}",
+                    headline.h_type.to_string().to_uppercase(),
+                    headline.entry
+                )),
+                Node::default(),
+                WidgetId {
+                    id: headline.entry,
+                    kind: WidgetKind::Headline,
+                },
+                Text::new(headline.text.clone()),
+                TextColor::default(),
+                TextFont::default(),
+                TextLayout::default(),
+                ZIndex::default(),
+                Pickable::default(),
+                css_source,
+                TagName(format!("{}", headline.h_type.to_string())),
+                RenderLayers::layer(*layer),
+                HeadlineBase,
+            ))
+            .observe(on_internal_click)
             .observe(on_internal_cursor_entered)
             .observe(on_internal_cursor_leave);
     }
@@ -106,7 +113,7 @@ fn update_text(mut query: Query<(&mut Text, &Headline), With<Headline>>) {
 fn on_internal_click(
     mut trigger: On<Pointer<Click>>,
     mut query: Query<(&mut UIWidgetState, &UIGenID), With<Headline>>,
-    mut current_widget_state: ResMut<CurrentWidgetState>
+    mut current_widget_state: ResMut<CurrentWidgetState>,
 ) {
     if let Ok((mut state, gen_id)) = query.get_mut(trigger.entity) {
         state.focused = true;

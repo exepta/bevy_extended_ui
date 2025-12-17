@@ -1,11 +1,11 @@
-use std::path::{Path, PathBuf};
-use bevy::asset::{AssetLoader, LoadContext};
 use bevy::asset::io::Reader;
+use bevy::asset::{AssetLoader, LoadContext};
 use bevy::prelude::*;
+use std::path::{Path, PathBuf};
 
 #[derive(Asset, TypePath, Debug, Clone)]
 pub struct CssAsset {
-    pub text: String
+    pub text: String,
 }
 
 #[derive(Asset, TypePath, Debug, Clone)]
@@ -21,11 +21,9 @@ pub struct CssLoader;
 pub struct HtmlLoader;
 
 impl AssetLoader for CssLoader {
-
     type Asset = CssAsset;
     type Settings = ();
     type Error = std::io::Error;
-
 
     async fn load(
         &self,
@@ -35,7 +33,9 @@ impl AssetLoader for CssLoader {
     ) -> Result<CssAsset, Self::Error> {
         let mut bytes = Vec::new();
         reader.read_to_end(&mut bytes).await?;
-        Ok(CssAsset { text: String::from_utf8_lossy(&bytes).to_string() })
+        Ok(CssAsset {
+            text: String::from_utf8_lossy(&bytes).to_string(),
+        })
     }
 
     fn extensions(&self) -> &[&str] {
@@ -58,7 +58,11 @@ impl AssetLoader for HtmlLoader {
         reader.read_to_end(&mut bytes).await?;
         let html = String::from_utf8_lossy(&bytes).to_string();
 
-        let base_dir = load_context.path().parent().unwrap_or(Path::new("")).to_path_buf();
+        let base_dir = load_context
+            .path()
+            .parent()
+            .unwrap_or(Path::new(""))
+            .to_path_buf();
 
         let css_paths = extract_css_links_lenient(&html);
 
@@ -104,11 +108,11 @@ fn extract_css_links_lenient(html: &str) -> Vec<String> {
             || tag.contains("ref=\"text/css\"")
             || tag.contains("ref='text/css'");
 
-        if !rel_ok { continue; }
+        if !rel_ok {
+            continue;
+        }
 
-        if let Some(v) = extract_attr(tag, "href")
-            .or_else(|| extract_attr(tag, "src"))
-        {
+        if let Some(v) = extract_attr(tag, "href").or_else(|| extract_attr(tag, "src")) {
             out.push(v);
         }
     }
@@ -121,7 +125,9 @@ fn extract_attr(tag: &str, name: &str) -> Option<String> {
     let idx = tag.find(&needle)?;
     let rest = &tag[idx + needle.len()..].trim_start();
     let quote = rest.chars().next()?;
-    if quote != '"' && quote != '\'' { return None; }
+    if quote != '"' && quote != '\'' {
+        return None;
+    }
     let end = rest[1..].find(quote)?;
-    Some(rest[1..1+end].to_string())
+    Some(rest[1..1 + end].to_string())
 }

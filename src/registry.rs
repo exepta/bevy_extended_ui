@@ -1,6 +1,6 @@
+use once_cell::sync::Lazy;
 use std::collections::VecDeque;
 use std::sync::Mutex;
-use once_cell::sync::Lazy;
 
 pub static UI_ID_GENERATE: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
 pub static BODY_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));

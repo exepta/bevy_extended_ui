@@ -1,10 +1,10 @@
+use crate::services::image_service::{DEFAULT_CHECK_MARK_KEY, get_or_load_image};
+use crate::styles::paint::Colored;
+use crate::styles::{CssClass, CssSource, TagName};
+use crate::widgets::{BindToID, CheckBox, UIGenID, UIWidgetState, WidgetId, WidgetKind};
+use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
-use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
-use crate::services::image_service::{get_or_load_image, DEFAULT_CHECK_MARK_KEY};
-use crate::styles::{CssClass, CssSource, TagName};
-use crate::styles::paint::Colored;
-use crate::widgets::{BindToID, CheckBox, UIGenID, UIWidgetState, WidgetId, WidgetKind};
 
 #[derive(Component)]
 struct CheckBoxBase;
@@ -47,8 +47,11 @@ impl Plugin for CheckBoxWidget {
 /// - Sets up input handlers with `.observe(...)` for click and hover behavior.
 fn internal_node_creation_system(
     mut commands: Commands,
-    query: Query<(Entity, &UIGenID, &CheckBox, Option<&CssSource>), (With<CheckBox>, Without<CheckBoxBase>)>,
-    config: Res<ExtendedUiConfiguration>
+    query: Query<
+        (Entity, &UIGenID, &CheckBox, Option<&CssSource>),
+        (With<CheckBox>, Without<CheckBoxBase>),
+    >,
+    config: Res<ExtendedUiConfiguration>,
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
     for (entity, id, checkbox, source_opt) in query.iter() {
@@ -57,71 +60,86 @@ fn internal_node_creation_system(
             css_source = source.clone();
         }
 
-        commands.entity(entity).insert((
-            Name::new(format!("CheckBox-{}", checkbox.entry)),
-            Node {
-                width: Val::Px(200.0),
-                height: Val::Px(40.0),
-                display: Display::Flex,
-                justify_content: JustifyContent::Start,
-                align_items: AlignItems::Start,
-                ..default()
-            },
-            WidgetId {
-                id: checkbox.entry,
-                kind: WidgetKind::CheckBox
-            },
-            BackgroundColor::default(),
-            ImageNode::default(),
-            BorderColor::default(),
-            BorderRadius::default(),
-            BoxShadow::new(Colored::TRANSPARENT, Val::Px(0.), Val::Px(0.), Val::Px(0.), Val::Px(0.)),
-            ZIndex::default(),
-            Pickable::default(),
-            css_source.clone(),
-            TagName(String::from("checkbox")),
-            RenderLayers::layer(*layer),
-            CheckBoxBase,
-            children![
-                (
-                    Name::new(format!("Check-Mark-{}", checkbox.entry)),
-                    Node {
-                      display: Display::Flex,
-                      justify_content: JustifyContent::Center,
-                      align_items: AlignItems::Center,
-                      ..default()
-                    },
-                    BackgroundColor::default(),
-                    ImageNode::default(),
-                    BorderColor::default(),
-                    BorderRadius::default(),
-                    BoxShadow::new(Colored::TRANSPARENT, Val::Px(0.), Val::Px(0.), Val::Px(0.), Val::Px(0.)),
-                    ZIndex::default(),
-                    css_source.clone(),
-                    UIWidgetState::default(),
-                    CssClass(vec!["mark-box".to_string()]),
-                    Pickable::IGNORE,
-                    BindToID(id.0),
-                    RenderLayers::layer(*layer),
-                    CheckBoxMark,
+        commands
+            .entity(entity)
+            .insert((
+                Name::new(format!("CheckBox-{}", checkbox.entry)),
+                Node {
+                    width: Val::Px(200.0),
+                    height: Val::Px(40.0),
+                    display: Display::Flex,
+                    justify_content: JustifyContent::Start,
+                    align_items: AlignItems::Start,
+                    ..default()
+                },
+                WidgetId {
+                    id: checkbox.entry,
+                    kind: WidgetKind::CheckBox,
+                },
+                BackgroundColor::default(),
+                ImageNode::default(),
+                BorderColor::default(),
+                BorderRadius::default(),
+                BoxShadow::new(
+                    Colored::TRANSPARENT,
+                    Val::Px(0.),
+                    Val::Px(0.),
+                    Val::Px(0.),
+                    Val::Px(0.),
                 ),
-                (
-                    Name::new(format!("Check-Label-{}", checkbox.entry)),
-                    Text::new(checkbox.label.clone()),
-                    TextColor::default(),
-                    TextFont::default(),
-                    TextLayout::default(),
-                    ZIndex::default(),
-                    css_source.clone(),
-                    UIWidgetState::default(),
-                    CssClass(vec!["check-text".to_string()]),
-                    Pickable::IGNORE,
-                    BindToID(id.0),
-                    RenderLayers::layer(*layer),
-                    CheckBoxLabel
-                )
-            ]
-        )).observe(on_internal_click)
+                ZIndex::default(),
+                Pickable::default(),
+                css_source.clone(),
+                TagName(String::from("checkbox")),
+                RenderLayers::layer(*layer),
+                CheckBoxBase,
+                children![
+                    (
+                        Name::new(format!("Check-Mark-{}", checkbox.entry)),
+                        Node {
+                            display: Display::Flex,
+                            justify_content: JustifyContent::Center,
+                            align_items: AlignItems::Center,
+                            ..default()
+                        },
+                        BackgroundColor::default(),
+                        ImageNode::default(),
+                        BorderColor::default(),
+                        BorderRadius::default(),
+                        BoxShadow::new(
+                            Colored::TRANSPARENT,
+                            Val::Px(0.),
+                            Val::Px(0.),
+                            Val::Px(0.),
+                            Val::Px(0.)
+                        ),
+                        ZIndex::default(),
+                        css_source.clone(),
+                        UIWidgetState::default(),
+                        CssClass(vec!["mark-box".to_string()]),
+                        Pickable::IGNORE,
+                        BindToID(id.0),
+                        RenderLayers::layer(*layer),
+                        CheckBoxMark,
+                    ),
+                    (
+                        Name::new(format!("Check-Label-{}", checkbox.entry)),
+                        Text::new(checkbox.label.clone()),
+                        TextColor::default(),
+                        TextFont::default(),
+                        TextLayout::default(),
+                        ZIndex::default(),
+                        css_source.clone(),
+                        UIWidgetState::default(),
+                        CssClass(vec!["check-text".to_string()]),
+                        Pickable::IGNORE,
+                        BindToID(id.0),
+                        RenderLayers::layer(*layer),
+                        CheckBoxLabel
+                    )
+                ],
+            ))
+            .observe(on_internal_click)
             .observe(on_internal_cursor_entered)
             .observe(on_internal_cursor_leave);
     }
@@ -176,31 +194,38 @@ fn on_internal_click(
             if state.checked {
                 let mut child = None;
                 commands.entity(entity).with_children(|builder| {
-                    let in_child = builder.spawn((
-                        Name::new(format!("Mark-{}", checkbox.entry)),
-                        Node {
-                            width: Val::Px(width),
-                            height: Val::Px(height),
-                            ..default()
-                        },
-                        Pickable::IGNORE,
-                        css_source.clone(),
-                        UIWidgetState::default(),
-                        CssClass(vec!["mark".to_string()]),
-                        RenderLayers::layer(*layer),
-                    )).id();
+                    let in_child = builder
+                        .spawn((
+                            Name::new(format!("Mark-{}", checkbox.entry)),
+                            Node {
+                                width: Val::Px(width),
+                                height: Val::Px(height),
+                                ..default()
+                            },
+                            Pickable::IGNORE,
+                            css_source.clone(),
+                            UIWidgetState::default(),
+                            CssClass(vec!["mark".to_string()]),
+                            RenderLayers::layer(*layer),
+                        ))
+                        .id();
                     child = Some(in_child);
                 });
 
                 if let Some(child) = child {
                     let handle = get_or_load_image(
-                        checkbox.icon_path.as_deref().unwrap_or(DEFAULT_CHECK_MARK_KEY),
+                        checkbox
+                            .icon_path
+                            .as_deref()
+                            .unwrap_or(DEFAULT_CHECK_MARK_KEY),
                         &mut image_cache,
                         &mut images,
                         &asset_server,
                     );
-                    
-                    commands.entity(child).insert(ImageNode::new(handle.clone()));
+
+                    commands
+                        .entity(child)
+                        .insert(ImageNode::new(handle.clone()));
                 }
             } else {
                 if let Some(children) = children_opt {

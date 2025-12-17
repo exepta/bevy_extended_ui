@@ -1,9 +1,12 @@
+use crate::styles::paint::Colored;
+use crate::styles::{CssClass, CssSource, TagName};
+use crate::widgets::{
+    BindToID, FieldMode, FieldSet, FiledSelectionSingle, RadioButton, UIGenID,
+    UIWidgetState, WidgetId, WidgetKind,
+};
+use crate::{CurrentWidgetState, ExtendedUiConfiguration};
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
-use crate::{CurrentWidgetState, ExtendedUiConfiguration};
-use crate::styles::{CssClass, CssSource, TagName};
-use crate::styles::paint::Colored;
-use crate::widgets::{BindToID, FieldMode, FieldSet, RadioButton, UIGenID, UIWidgetState, WidgetId, WidgetKind};
 
 #[derive(Component)]
 struct RadioButtonBase;
@@ -28,7 +31,10 @@ impl Plugin for RadioButtonWidget {
 
 fn internal_node_creation_system(
     mut commands: Commands,
-    query: Query<(Entity, &UIGenID, &RadioButton, Option<&CssSource>), (With<RadioButton>, Without<RadioButtonBase>)>,
+    query: Query<
+        (Entity, &UIGenID, &RadioButton, Option<&CssSource>),
+        (With<RadioButton>, Without<RadioButtonBase>),
+    >,
     parents: Query<&ChildOf>,
     fieldset_q: Query<(), With<FieldSet>>,
     config: Res<ExtendedUiConfiguration>,
@@ -37,16 +43,15 @@ fn internal_node_creation_system(
     let layer = config.render_layers.first().unwrap_or(&1);
 
     for (entity, id, radio_button, source_opt) in query.iter() {
-
         if !has_fieldset_parent(entity, &parents, &fieldset_q) {
             if !warned.0 {
                 warn!(
-                "RadioButton widgets must be placed inside a <fieldset>. \
+                    "RadioButton widgets must be placed inside a <fieldset>. \
                  Orphan RadioButtons will be ignored."
-            );
+                );
                 warned.0 = true;
             }
-            
+
             continue;
         }
 
@@ -56,94 +61,118 @@ fn internal_node_creation_system(
             css_source = source.clone();
         }
 
-        commands.entity(entity).insert((
-            Name::new(format!("RadioButton-{}", radio_button.entry)),
-            Node::default(),
-            WidgetId {
-                id: radio_button.entry,
-                kind: WidgetKind::RadioButton
-            },
-            BackgroundColor::default(),
-            ImageNode::default(),
-            BorderColor::default(),
-            BorderRadius::default(),
-            BoxShadow::new(Colored::TRANSPARENT, Val::Px(0.), Val::Px(0.), Val::Px(0.), Val::Px(0.)),
-            ZIndex::default(),
-            Pickable::default(),
-            css_source.clone(),
-            TagName(String::from("radio")),
-            RenderLayers::layer(*layer),
-            RadioButtonBase,
-            children![
-                (
-                    Name::new(format!("Radio-Dot-{}", radio_button.entry)),
-                    Node::default(),
-                    BackgroundColor::default(),
-                    ImageNode::default(),
-                    BorderColor::default(),
-                    BorderRadius::default(),
-                    BoxShadow::new(Colored::TRANSPARENT, Val::Px(0.), Val::Px(0.), Val::Px(0.), Val::Px(0.)),
-                    ZIndex::default(),
-                    css_source.clone(),
-                    UIWidgetState::default(),
-                    CssClass(vec!["radio-dot".to_string()]),
-                    Pickable::IGNORE,
-                    BindToID(id.0),
-                    RenderLayers::layer(*layer),
-                    RadioButtonDot,
+        commands
+            .entity(entity)
+            .insert((
+                Name::new(format!("RadioButton-{}", radio_button.entry)),
+                Node::default(),
+                WidgetId {
+                    id: radio_button.entry,
+                    kind: WidgetKind::RadioButton,
+                },
+                BackgroundColor::default(),
+                ImageNode::default(),
+                BorderColor::default(),
+                BorderRadius::default(),
+                BoxShadow::new(
+                    Colored::TRANSPARENT,
+                    Val::Px(0.),
+                    Val::Px(0.),
+                    Val::Px(0.),
+                    Val::Px(0.),
                 ),
-                (
-                    Name::new(format!("Radio-Label-{}", radio_button.entry)),
-                    Text::new(radio_button.label.clone()),
-                    TextColor::default(),
-                    TextFont::default(),
-                    TextLayout::default(),
-                    ZIndex::default(),
-                    css_source.clone(),
-                    UIWidgetState::default(),
-                    CssClass(vec!["radio-text".to_string()]),
-                    Pickable::IGNORE,
-                    BindToID(id.0),
-                    RenderLayers::layer(*layer),
-                    RadioButtonLabel
-                )
-            ]
-        ))
+                ZIndex::default(),
+                Pickable::default(),
+                css_source.clone(),
+                TagName(String::from("radio")),
+                RenderLayers::layer(*layer),
+                RadioButtonBase,
+                children![
+                    (
+                        Name::new(format!("Radio-Dot-{}", radio_button.entry)),
+                        Node::default(),
+                        BackgroundColor::default(),
+                        ImageNode::default(),
+                        BorderColor::default(),
+                        BorderRadius::default(),
+                        BoxShadow::new(
+                            Colored::TRANSPARENT,
+                            Val::Px(0.),
+                            Val::Px(0.),
+                            Val::Px(0.),
+                            Val::Px(0.)
+                        ),
+                        ZIndex::default(),
+                        css_source.clone(),
+                        UIWidgetState::default(),
+                        CssClass(vec!["radio-dot".to_string()]),
+                        Pickable::IGNORE,
+                        BindToID(id.0),
+                        RenderLayers::layer(*layer),
+                        RadioButtonDot,
+                    ),
+                    (
+                        Name::new(format!("Radio-Label-{}", radio_button.entry)),
+                        Text::new(radio_button.label.clone()),
+                        TextColor::default(),
+                        TextFont::default(),
+                        TextLayout::default(),
+                        ZIndex::default(),
+                        css_source.clone(),
+                        UIWidgetState::default(),
+                        CssClass(vec!["radio-text".to_string()]),
+                        Pickable::IGNORE,
+                        BindToID(id.0),
+                        RenderLayers::layer(*layer),
+                        RadioButtonLabel
+                    )
+                ],
+            ))
             .observe(on_internal_click)
             .observe(on_internal_cursor_entered)
             .observe(on_internal_cursor_leave);
     }
 }
 
-
 fn on_internal_click(
     mut trigger: On<Pointer<Click>>,
     mut commands: Commands,
 
-    mut radio_q: Query<(Entity, &mut UIWidgetState, &UIGenID, &RadioButton, &CssSource), With<RadioButton>>,
+    mut radio_q: Query<
+        (
+            Entity,
+            &mut UIWidgetState,
+            &UIGenID,
+            &RadioButton,
+            &CssSource,
+        ),
+        With<RadioButton>,
+    >,
     dot_q: Query<(Entity, &BindToID, Option<&Children>, &ComputedNode), With<RadioButtonDot>>,
 
     parents: Query<&ChildOf>,
-    fieldset_q: Query<&FieldSet>,            // FieldSet data
-    fieldset_tag_q: Query<(), With<FieldSet>>, // quick "is FieldSet"
+    mut fieldset_q: Query<(&FieldSet, Option<&mut FiledSelectionSingle>)>,
+    fieldset_tag_q: Query<(), With<FieldSet>>,
     mut current_widget_state: ResMut<CurrentWidgetState>,
     config: Res<ExtendedUiConfiguration>,
 ) {
     let clicked = trigger.entity;
 
-    // 1) Must be inside a FieldSet, otherwise do nothing
     let Some(fieldset_entity) = find_fieldset_ancestor(clicked, &parents, &fieldset_tag_q) else {
         trigger.propagate(false);
         return;
     };
 
-    let Ok(fieldset) = fieldset_q.get(fieldset_entity) else {
+    let Ok((fieldset, selection_single)) = fieldset_q.get_mut(fieldset_entity) else {
         trigger.propagate(false);
         return;
     };
 
-    // 2) Decide what the click means for the clicked radio (allow_none matters)
-    // We'll compute should_check / should_uncheck based on the current state.
+    if fieldset.field_mode != FieldMode::Single {
+        trigger.propagate(false);
+        return;
+    }
+
     let (gen_id, radio_entry, css_source, should_check, should_uncheck) = {
         let Ok((_e, mut st, gen_id, rb, css)) = radio_q.get_mut(clicked) else {
             trigger.propagate(false);
@@ -152,25 +181,19 @@ fn on_internal_click(
 
         current_widget_state.widget_id = gen_id.0;
 
-        // Radio semantics:
-        // - Single mode typically means "click selects"
-        // - if allow_none == true, clicking an already checked one can uncheck it
         if st.checked {
             if fieldset.allow_none {
                 st.checked = false;
                 (gen_id.0, rb.entry, css.clone(), false, true)
             } else {
-                // already selected; no change
                 (gen_id.0, rb.entry, css.clone(), false, false)
             }
         } else {
             st.checked = true;
             (gen_id.0, rb.entry, css.clone(), true, false)
         }
-        // IMPORTANT: borrow of radio_q ends here because we exit this block
     };
 
-    // Update dot for clicked (spawn or despawn)
     if should_check {
         add_checked_dot_to_radio(
             gen_id,
@@ -184,9 +207,19 @@ fn on_internal_click(
         remove_checked_dot_by_bind_id(gen_id, &dot_q, &mut commands);
     }
 
-    // 3) If FieldMode::Single, and we just checked clicked -> uncheck all other radios in the same FieldSet
-    if fieldset.field_mode == FieldMode::Single && should_check {
-        // Collect candidates without mutating radio_q
+    if should_check {
+        if let Some(mut selection) = selection_single {
+            selection.0 = Some(clicked);
+        }
+    } else if should_uncheck {
+        if let Some(mut selection) = selection_single {
+            if selection.0 == Some(clicked) {
+                selection.0 = None;
+            }
+        }
+    }
+
+    if should_check {
         let radio_entities: Vec<Entity> = radio_q.iter().map(|(e, _, _, _, _)| e).collect();
 
         for e in radio_entities {
@@ -194,8 +227,12 @@ fn on_internal_click(
                 continue;
             }
 
-            let Some(fs) = find_fieldset_ancestor(e, &parents, &fieldset_tag_q) else { continue; };
-            if fs != fieldset_entity { continue; }
+            let Some(fs) = find_fieldset_ancestor(e, &parents, &fieldset_tag_q) else {
+                continue;
+            };
+            if fs != fieldset_entity {
+                continue;
+            }
 
             if let Ok((_re, mut st, other_gen_id, _rb, _css)) = radio_q.get_mut(e) {
                 if st.checked {
@@ -255,7 +292,9 @@ fn find_fieldset_ancestor(
     // climb up until root
     loop {
         // parent of current?
-        let Ok(p) = parents.get(entity) else { return None; };
+        let Ok(p) = parents.get(entity) else {
+            return None;
+        };
         let parent = p.parent();
 
         if fieldsets.get(parent).is_ok() {
@@ -277,7 +316,9 @@ fn add_checked_dot_to_radio(
     let layer = config.render_layers.first().unwrap_or(&1);
 
     for (dot_entity, bind, _children, computed) in dot_q.iter() {
-        if bind.0 != gen_id { continue; }
+        if bind.0 != gen_id {
+            continue;
+        }
 
         let width = computed.size.x / 1.5;
         let height = computed.size.y / 1.5;
@@ -285,7 +326,11 @@ fn add_checked_dot_to_radio(
         commands.entity(dot_entity).with_children(|b| {
             b.spawn((
                 Name::new(format!("CheckedDot-{}", radio_entry)),
-                Node { width: Val::Px(width), height: Val::Px(height), ..default() },
+                Node {
+                    width: Val::Px(width),
+                    height: Val::Px(height),
+                    ..default()
+                },
                 BackgroundColor::default(),
                 BorderColor::default(),
                 BorderRadius::default(),
@@ -308,7 +353,9 @@ fn remove_checked_dot_by_bind_id(
     commands: &mut Commands,
 ) {
     for (_, bind, children_opt, _computed) in dot_q.iter() {
-        if bind.0 != gen_id { continue; }
+        if bind.0 != gen_id {
+            continue;
+        }
 
         if let Some(children) = children_opt {
             for child in children.iter() {
@@ -327,7 +374,9 @@ fn has_fieldset_parent(
     fieldsets: &Query<(), With<FieldSet>>,
 ) -> bool {
     loop {
-        let Ok(p) = parents.get(entity) else { return false; };
+        let Ok(p) = parents.get(entity) else {
+            return false;
+        };
         let parent = p.parent();
 
         if fieldsets.get(parent).is_ok() {

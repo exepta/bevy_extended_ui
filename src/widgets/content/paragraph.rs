@@ -1,8 +1,8 @@
-use bevy::camera::visibility::RenderLayers;
-use bevy::prelude::*;
-use crate::{CurrentWidgetState, ExtendedUiConfiguration};
 use crate::styles::{CssSource, TagName};
 use crate::widgets::{Paragraph, UIGenID, UIWidgetState, WidgetId, WidgetKind};
+use crate::{CurrentWidgetState, ExtendedUiConfiguration};
+use bevy::camera::visibility::RenderLayers;
+use bevy::prelude::*;
 
 #[derive(Component)]
 struct ParagraphBase;
@@ -26,8 +26,11 @@ impl Plugin for ParagraphWidget {
 /// - `config`: UI configuration resource containing render layers.
 fn internal_node_creation_system(
     mut commands: Commands,
-    query: Query<(Entity, &Paragraph, Option<&CssSource>), (With<Paragraph>, Without<ParagraphBase>)>,
-    config: Res<ExtendedUiConfiguration>
+    query: Query<
+        (Entity, &Paragraph, Option<&CssSource>),
+        (With<Paragraph>, Without<ParagraphBase>),
+    >,
+    config: Res<ExtendedUiConfiguration>,
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
     for (entity, paragraph, source_opt) in query.iter() {
@@ -36,24 +39,27 @@ fn internal_node_creation_system(
             css_source = source.clone();
         }
 
-        commands.entity(entity).insert((
-            Name::new(format!("Paragraph-{}", paragraph.entry)),
-            Node::default(),
-            WidgetId {
-                id: paragraph.entry,
-                kind: WidgetKind::Paragraph
-            },
-            Text::new(paragraph.text.clone()),
-            TextColor::default(),
-            TextFont::default(),
-            TextLayout::default(),
-            ZIndex::default(),
-            Pickable::default(),
-            css_source,
-            TagName("p".to_string()),
-            RenderLayers::layer(*layer),
-            ParagraphBase
-        )).observe(on_internal_click)
+        commands
+            .entity(entity)
+            .insert((
+                Name::new(format!("Paragraph-{}", paragraph.entry)),
+                Node::default(),
+                WidgetId {
+                    id: paragraph.entry,
+                    kind: WidgetKind::Paragraph,
+                },
+                Text::new(paragraph.text.clone()),
+                TextColor::default(),
+                TextFont::default(),
+                TextLayout::default(),
+                ZIndex::default(),
+                Pickable::default(),
+                css_source,
+                TagName("p".to_string()),
+                RenderLayers::layer(*layer),
+                ParagraphBase,
+            ))
+            .observe(on_internal_click)
             .observe(on_internal_cursor_entered)
             .observe(on_internal_cursor_leave);
     }
@@ -61,7 +67,7 @@ fn internal_node_creation_system(
 
 /// Updates the `Text` components of all entities with a `Paragraph` component.
 ///
-/// This system iterates over all entities that have both a `Text` and `Paragraph` component 
+/// This system iterates over all entities that have both a `Text` and `Paragraph` component
 /// and sets the content of the `Text` to match the `text` field of the `Paragraph`.
 ///
 /// # Parameters
@@ -90,7 +96,7 @@ fn update_text(mut query: Query<(&mut Text, &Paragraph), With<Paragraph>>) {
 fn on_internal_click(
     mut trigger: On<Pointer<Click>>,
     mut query: Query<(&mut UIWidgetState, &UIGenID), With<Paragraph>>,
-    mut current_widget_state: ResMut<CurrentWidgetState>
+    mut current_widget_state: ResMut<CurrentWidgetState>,
 ) {
     if let Ok((mut state, gen_id)) = query.get_mut(trigger.entity) {
         state.focused = true;

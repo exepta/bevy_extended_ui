@@ -2,11 +2,11 @@ use bevy::asset::LoadState;
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
 
-use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
 use crate::services::image_service::get_or_load_image;
 use crate::styles::paint::Colored;
 use crate::styles::{CssSource, TagName};
 use crate::widgets::{Img, UIGenID, UIWidgetState, WidgetId, WidgetKind};
+use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
 
 #[derive(Component)]
 struct ImageBase;
@@ -186,7 +186,9 @@ fn update_src(
     mut image_cache: ResMut<ImageCache>,
     mut images: ResMut<Assets<Image>>,
 ) {
-    for (entity, mut image_node, mut state, img, alt_child, mut fb_state, mut cached) in query.iter_mut() {
+    for (entity, mut image_node, mut state, img, alt_child, mut fb_state, mut cached) in
+        query.iter_mut()
+    {
         let existing_child = alt_child.map(|c| c.0);
 
         // Always update the image handle if src is non-empty.
@@ -200,7 +202,8 @@ fn update_src(
 
         // If src is empty -> show alt immediately (and mark state).
         if is_src_empty(img) {
-            let child = spawn_or_update_alt_text_child(&mut commands, entity, existing_child, &img.alt);
+            let child =
+                spawn_or_update_alt_text_child(&mut commands, entity, existing_child, &img.alt);
             if let Some(child) = child {
                 commands.entity(entity).insert(AltTextChild(child));
                 set_cached_alt_if_changed(&mut commands, entity, &mut cached, &img.alt);
@@ -256,12 +259,22 @@ fn sync_alt_text_with_image_state(
             Some(LoadState::Failed(_)) => {
                 // Only do work if alt is NOT currently shown.
                 if *fb_state != ImgFallbackState::AltShown {
-                    let child = spawn_or_update_alt_text_child(&mut commands, entity, existing_child, &img.alt);
+                    let child = spawn_or_update_alt_text_child(
+                        &mut commands,
+                        entity,
+                        existing_child,
+                        &img.alt,
+                    );
                     if let Some(child) = child {
                         commands.entity(entity).insert(AltTextChild(child));
                         // Cache alt to avoid pointless text inserts later.
                         let mut cached_local = cached.clone();
-                        set_cached_alt_if_changed(&mut commands, entity, &mut cached_local, &img.alt);
+                        set_cached_alt_if_changed(
+                            &mut commands,
+                            entity,
+                            &mut cached_local,
+                            &img.alt,
+                        );
                     }
                     commands.entity(entity).insert(ImgFallbackState::AltShown);
                     // Log only on transition/action.
@@ -270,8 +283,12 @@ fn sync_alt_text_with_image_state(
                     // Alt already shown. Only update text if alt actually changed.
                     if cached.0 != img.alt.trim() {
                         if let Some(child) = existing_child {
-                            commands.entity(child).insert(Text::new(img.alt.trim().to_string()));
-                            commands.entity(entity).insert(AltTextCached(img.alt.trim().to_string()));
+                            commands
+                                .entity(child)
+                                .insert(Text::new(img.alt.trim().to_string()));
+                            commands
+                                .entity(entity)
+                                .insert(AltTextCached(img.alt.trim().to_string()));
                             debug!("Alt text changed, updating child for Img: {:?}", entity);
                         }
                     }
@@ -299,9 +316,11 @@ fn assign_image_from_src(
     }
 }
 
-
 fn is_src_empty(img: &Img) -> bool {
-    img.src.as_ref().map(|s| s.trim().is_empty()).unwrap_or(true)
+    img.src
+        .as_ref()
+        .map(|s| s.trim().is_empty())
+        .unwrap_or(true)
 }
 
 fn set_cached_alt_if_changed(

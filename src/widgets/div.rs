@@ -1,9 +1,9 @@
+use crate::styles::paint::Colored;
+use crate::styles::{CssSource, TagName};
+use crate::widgets::{Div, UIGenID, UIWidgetState, WidgetId, WidgetKind};
+use crate::{CurrentWidgetState, ExtendedUiConfiguration};
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
-use crate::{CurrentWidgetState, ExtendedUiConfiguration};
-use crate::styles::{CssSource, TagName};
-use crate::styles::paint::Colored;
-use crate::widgets::{Div, UIGenID, UIWidgetState, WidgetId, WidgetKind};
 
 #[derive(Component)]
 struct DivBase;
@@ -39,7 +39,7 @@ impl Plugin for DivWidget {
 fn internal_node_creation_system(
     mut commands: Commands,
     query: Query<(Entity, &Div, Option<&CssSource>), (With<Div>, Without<DivBase>)>,
-    config: Res<ExtendedUiConfiguration>
+    config: Res<ExtendedUiConfiguration>,
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
     for (entity, div, source_opt) in query.iter() {
@@ -48,25 +48,34 @@ fn internal_node_creation_system(
             css_source = source.clone();
         }
 
-        commands.entity(entity).insert((
-            Name::new(format!("Div-{}", div.0)),
-            Node::default(),
-            WidgetId {
-                id: div.0,
-                kind: WidgetKind::Div
-            },
-            ImageNode::default(),
-            BackgroundColor::default(),
-            BorderColor::default(),
-            BorderRadius::default(),
-            BoxShadow::new(Colored::TRANSPARENT, Val::Px(0.), Val::Px(0.), Val::Px(0.), Val::Px(0.)),
-            ZIndex::default(),
-            Pickable::default(),
-            css_source,
-            TagName("div".to_string()),
-            RenderLayers::layer(*layer),
-            DivBase
-        )).observe(on_internal_click)
+        commands
+            .entity(entity)
+            .insert((
+                Name::new(format!("Div-{}", div.0)),
+                Node::default(),
+                WidgetId {
+                    id: div.0,
+                    kind: WidgetKind::Div,
+                },
+                ImageNode::default(),
+                BackgroundColor::default(),
+                BorderColor::default(),
+                BorderRadius::default(),
+                BoxShadow::new(
+                    Colored::TRANSPARENT,
+                    Val::Px(0.),
+                    Val::Px(0.),
+                    Val::Px(0.),
+                    Val::Px(0.),
+                ),
+                ZIndex::default(),
+                Pickable::default(),
+                css_source,
+                TagName("div".to_string()),
+                RenderLayers::layer(*layer),
+                DivBase,
+            ))
+            .observe(on_internal_click)
             .observe(on_internal_cursor_entered)
             .observe(on_internal_cursor_leave);
     }
@@ -86,7 +95,7 @@ fn internal_node_creation_system(
 fn on_internal_click(
     mut trigger: On<Pointer<Click>>,
     mut query: Query<(&mut UIWidgetState, &UIGenID), With<Div>>,
-    mut current_widget_state: ResMut<CurrentWidgetState>
+    mut current_widget_state: ResMut<CurrentWidgetState>,
 ) {
     if let Ok((mut state, gen_id)) = query.get_mut(trigger.entity) {
         state.focused = true;
