@@ -590,11 +590,13 @@ fn parse_html_node(
         "toggle" => {
             let (icon_path, icon_place) = parse_icon_and_text(node);
             let text = node.text_contents().trim().to_string();
+            let selected_attr = attributes.contains("selected");
             Some(HtmlWidgetNode::ToggleButton(
                 ToggleButton {
                     label: text.clone(),
                     icon_path,
                     icon_place,
+                    selected: selected_attr,
                     ..default()
                 },
                 meta,

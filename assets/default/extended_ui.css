@@ -420,3 +420,25 @@ slider .slider-track .thumb {
 }
 
 /* Toggle Button */
+toggle {
+    background: #bcbcbc;
+    min-width: 45px;
+    min-height: 45px;
+    border-radius: 6px;
+    border: none;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+toggle:hover {
+    background: #909090;
+}
+
+toggle:checked {
+    background: #909090;
+}
+
+toggle .button-text {
+    color: #303039;
+}
