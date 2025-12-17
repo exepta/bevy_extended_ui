@@ -1,18 +1,25 @@
 use crate::ExtendedUiConfiguration;
 use crate::styles::paint::Colored;
 use crate::styles::{CssSource, TagName};
-use crate::widgets::{FieldSelectionMulti, FieldSet, FiledSelectionSingle, WidgetId, WidgetKind};
+use crate::widgets::{CheckBox, FieldKind, FieldSelectionMulti, FieldSet, FiledSelectionSingle, RadioButton, WidgetId, WidgetKind};
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
 
 #[derive(Component)]
 struct FieldSetBase;
 
+#[derive(Component, Default)]
+struct FieldSetWarned {
+    mixed: bool,
+    unsupported: bool,
+}
+
 pub struct FieldSetWidget;
 
 impl Plugin for FieldSetWidget {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, internal_node_creation_system);
+        app.add_systems(Update, detect_fieldset_kind_system);
     }
 }
 
@@ -54,8 +61,84 @@ fn internal_node_creation_system(
                 TagName("fieldset".to_string()),
                 RenderLayers::layer(*layer),
                 FieldSetBase,
+                FieldSetWarned::default(),
             ))
             .insert(FiledSelectionSingle::default())
             .insert(FieldSelectionMulti::default());
+    }
+}
+
+fn detect_fieldset_kind_system(
+    mut commands: Commands,
+    mut fieldsets: Query<(Entity, &mut FieldSet, Option<&Children>, &mut FieldSetWarned)>,
+    radio_q: Query<(), With<RadioButton>>,
+    toggle_q: Query<(), With<CheckBox>>,
+) {
+    for (fs_entity, mut fs, direct_children, mut warned) in fieldsets.iter_mut() {
+        let mut radios = 0;
+        let mut toggles = 0;
+        let mut mixed_found = false;
+        let mut unsupported_found = false;
+
+        let mut to_hide: Vec<Entity> = Vec::new();
+
+        if let Some(children) = direct_children {
+            for child in children.iter() {
+                let is_radio = radio_q.get(child).is_ok();
+                let is_toggle = toggle_q.get(child).is_ok();
+
+                if is_radio || is_toggle {
+                    if is_radio {
+                        radios += 1;
+                    }
+                    if is_toggle {
+                        toggles += 1;
+                    }
+                } else {
+                    unsupported_found = true;
+                    to_hide.push(child);
+                }
+            }
+        }
+
+        if radios > 0 && toggles > 0 {
+            mixed_found = true;
+            // Hide all direct radio/toggle children in mixed case
+            if let Some(children) = direct_children {
+                for child in children.iter() {
+                    if radio_q.get(child).is_ok() || toggle_q.get(child).is_ok() {
+                        to_hide.push(child);
+                    }
+                }
+            }
+        }
+
+        for e in to_hide {
+            commands.entity(e).insert(Visibility::Hidden);
+        }
+
+        match (radios > 0, toggles > 0, mixed_found, unsupported_found) {
+            (true, false, false, _) => fs.kind = Some(FieldKind::Radio),
+            (false, true, false, _) => fs.kind = Some(FieldKind::Toggle),
+            (_, _, true, _) => {
+                if !warned.mixed {
+                    warn!(
+                        "FieldSet {:?} has mixed supported children (Radio/Toggle); they were hidden.",
+                        fs_entity
+                    );
+                    warned.mixed = true;
+                }
+            }
+            (false, false, false, true) => {
+                if !warned.unsupported {
+                    warn!(
+                        "FieldSet {:?} has unsupported direct children; they were hidden.",
+                        fs_entity
+                    );
+                    warned.unsupported = true;
+                }
+            }
+            _ => {}
+        }
     }
 }

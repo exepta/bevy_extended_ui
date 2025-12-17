@@ -1,9 +1,6 @@
 use crate::styles::paint::Colored;
 use crate::styles::{CssClass, CssSource, TagName};
-use crate::widgets::{
-    BindToID, FieldMode, FieldSet, FiledSelectionSingle, RadioButton, UIGenID,
-    UIWidgetState, WidgetId, WidgetKind,
-};
+use crate::widgets::{BindToID, FieldMode, FieldSet, FiledSelectionSingle, InFieldSet, RadioButton, UIGenID, UIWidgetState, WidgetId, WidgetKind};
 use crate::{CurrentWidgetState, ExtendedUiConfiguration};
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
@@ -43,7 +40,7 @@ fn internal_node_creation_system(
     let layer = config.render_layers.first().unwrap_or(&1);
 
     for (entity, id, radio_button, source_opt) in query.iter() {
-        if !has_fieldset_parent(entity, &parents, &fieldset_q) {
+        let Some(fieldset_entity) = find_fieldset_ancestor(entity, &parents, &fieldset_q) else {
             if !warned.0 {
                 warn!(
                     "RadioButton widgets must be placed inside a <fieldset>. \
@@ -51,9 +48,8 @@ fn internal_node_creation_system(
                 );
                 warned.0 = true;
             }
-
             continue;
-        }
+        };
 
         // --- normal build path ---
         let mut css_source = CssSource::default();
@@ -63,6 +59,7 @@ fn internal_node_creation_system(
 
         commands
             .entity(entity)
+            .insert(InFieldSet(fieldset_entity))
             .insert((
                 Name::new(format!("RadioButton-{}", radio_button.entry)),
                 Node::default(),
@@ -365,24 +362,5 @@ fn remove_checked_dot_by_bind_id(
             }
         }
         break;
-    }
-}
-
-fn has_fieldset_parent(
-    mut entity: Entity,
-    parents: &Query<&ChildOf>,
-    fieldsets: &Query<(), With<FieldSet>>,
-) -> bool {
-    loop {
-        let Ok(p) = parents.get(entity) else {
-            return false;
-        };
-        let parent = p.parent();
-
-        if fieldsets.get(parent).is_ok() {
-            return true;
-        }
-
-        entity = parent;
     }
 }
