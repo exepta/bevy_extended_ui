@@ -312,7 +312,51 @@ fn parse_html_node(
                 attributes.get("allow-none").map(|s| s.to_string()) == Some("true".to_string());
             let mode = attributes.get("mode").unwrap_or("single").to_string();
             let mut children = Vec::new();
+
+            let mut selected_assigned = false;
+            let mut first_radio_seen = false;
+
             for child in node.children() {
+                if let Some(el) = child.as_element() {
+                    if el.name.local.eq("radio") {
+                        let radio_attrs = el.attributes.borrow();
+                        let value = radio_attrs.get("value").unwrap_or("").to_string();
+                        let label = child.text_contents().trim().to_string();
+                        let mut selected = radio_attrs.contains("selected");
+
+                        if selected_assigned && selected {
+                            selected = false;
+                        }
+                        if !selected_assigned && !selected && !allow_none && !first_radio_seen {
+                            selected = true;
+                        }
+                        if selected {
+                            selected_assigned = true;
+                        }
+                        first_radio_seen = true;
+
+                        children.push(HtmlWidgetNode::RadioButton(
+                            RadioButton {
+                                label,
+                                value,
+                                selected,
+                                ..default()
+                            },
+                            HtmlMeta {
+                                css: meta.css.clone(),
+                                id: meta.id.clone(),
+                                class: meta.class.clone(),
+                                style: meta.style.clone(),
+                            },
+                            states.clone(),
+                            functions.clone(),
+                            widget.clone(),
+                            HtmlID::default(),
+                        ));
+                        continue;
+                    }
+                }
+
                 if let Some(parsed) = parse_html_node(&child, css_sources, label_map, key, html) {
                     children.push(parsed);
                 }
@@ -447,13 +491,13 @@ fn parse_html_node(
         "radio" => {
             let value = attributes.get("value").unwrap_or("").to_string();
             let label = node.text_contents().trim().to_string();
-
-            if attributes.contains("selected") {}
+            let selected_attr = attributes.contains("selected");
 
             Some(HtmlWidgetNode::RadioButton(
                 RadioButton {
                     label,
                     value,
+                    selected: selected_attr,
                     ..default()
                 },
                 meta,

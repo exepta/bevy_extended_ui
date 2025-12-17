@@ -23,6 +23,7 @@ impl Plugin for RadioButtonWidget {
     fn build(&self, app: &mut App) {
         app.init_resource::<RadioMissingFieldSetWarned>();
         app.add_systems(Update, internal_node_creation_system);
+        app.add_systems(Update, ensure_checked_dots_system);
     }
 }
 
@@ -33,14 +34,15 @@ fn internal_node_creation_system(
         (With<RadioButton>, Without<RadioButtonBase>),
     >,
     parents: Query<&ChildOf>,
-    fieldset_q: Query<(), With<FieldSet>>,
+    fieldset_tag_q: Query<(), With<FieldSet>>,
+    mut selection_q: Query<Option<&mut FiledSelectionSingle>, With<FieldSet>>,
     config: Res<ExtendedUiConfiguration>,
     mut warned: ResMut<RadioMissingFieldSetWarned>,
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
 
     for (entity, id, radio_button, source_opt) in query.iter() {
-        let Some(fieldset_entity) = find_fieldset_ancestor(entity, &parents, &fieldset_q) else {
+        let Some(fieldset_entity) = find_fieldset_ancestor(entity, &parents, &fieldset_tag_q) else {
             if !warned.0 {
                 warn!(
                     "RadioButton widgets must be placed inside a <fieldset>. \
@@ -51,10 +53,24 @@ fn internal_node_creation_system(
             continue;
         };
 
-        // --- normal build path ---
         let mut css_source = CssSource::default();
         if let Some(source) = source_opt {
             css_source = source.clone();
+        }
+
+        // initial checked state from parsed `selected`
+        commands.entity(entity).insert(UIWidgetState {
+            checked: radio_button.selected,
+            ..default()
+        });
+
+        // track initial selection in FieldSet (single)
+        if radio_button.selected {
+            if let Ok(Some(mut sel)) = selection_q.get_mut(fieldset_entity) {
+                if sel.0.is_none() {
+                    sel.0 = Some(entity);
+                }
+            }
         }
 
         commands
@@ -140,7 +156,7 @@ fn on_internal_click(
             Entity,
             &mut UIWidgetState,
             &UIGenID,
-            &RadioButton,
+            &mut RadioButton,
             &CssSource,
         ),
         With<RadioButton>,
@@ -171,7 +187,7 @@ fn on_internal_click(
     }
 
     let (gen_id, radio_entry, css_source, should_check, should_uncheck) = {
-        let Ok((_e, mut st, gen_id, rb, css)) = radio_q.get_mut(clicked) else {
+        let Ok((_e, mut st, gen_id, mut rb, css)) = radio_q.get_mut(clicked) else {
             trigger.propagate(false);
             return;
         };
@@ -181,12 +197,14 @@ fn on_internal_click(
         if st.checked {
             if fieldset.allow_none {
                 st.checked = false;
+                rb.selected = false;
                 (gen_id.0, rb.entry, css.clone(), false, true)
             } else {
                 (gen_id.0, rb.entry, css.clone(), false, false)
             }
         } else {
             st.checked = true;
+            rb.selected = true;
             (gen_id.0, rb.entry, css.clone(), true, false)
         }
     };
@@ -231,9 +249,10 @@ fn on_internal_click(
                 continue;
             }
 
-            if let Ok((_re, mut st, other_gen_id, _rb, _css)) = radio_q.get_mut(e) {
+            if let Ok((_re, mut st, other_gen_id, mut other_rb, _css)) = radio_q.get_mut(e) {
                 if st.checked {
                     st.checked = false;
+                    other_rb.selected = false;
                     remove_checked_dot_by_bind_id(other_gen_id.0, &dot_q, &mut commands);
                 }
             }
@@ -362,5 +381,34 @@ fn remove_checked_dot_by_bind_id(
             }
         }
         break;
+    }
+}
+
+fn ensure_checked_dots_system(
+    mut commands: Commands,
+    radio_q: Query<(&UIGenID, &RadioButton, &CssSource, &UIWidgetState)>,
+    dot_q: Query<(Entity, &BindToID, Option<&Children>, &ComputedNode), With<RadioButtonDot>>,
+    config: Res<ExtendedUiConfiguration>,
+) {
+    for (gen_id, rb, css, state) in radio_q.iter() {
+        if !state.checked {
+            continue;
+        }
+        // Skip if a checked-dot already exists
+        let mut has_child = false;
+        for (_dot_entity, bind, children_opt, _computed) in dot_q.iter() {
+            if bind.0 != gen_id.0 {
+                continue;
+            }
+            if let Some(children) = children_opt {
+                if !children.is_empty() {
+                    has_child = true;
+                }
+            }
+            if !has_child {
+                add_checked_dot_to_radio(gen_id.0, rb.entry, css, &dot_q, &mut commands, &config);
+            }
+            break;
+        }
     }
 }

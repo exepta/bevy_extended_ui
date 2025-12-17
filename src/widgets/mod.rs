@@ -559,6 +559,7 @@ pub struct RadioButton {
     pub entry: usize,
     pub label: String,
     pub value: String,
+    pub selected: bool,
 }
 
 impl Default for RadioButton {
@@ -569,6 +570,7 @@ impl Default for RadioButton {
             entry,
             label: String::from("label"),
             value: String::from(""),
+            selected: false,
         }
     }
 }
