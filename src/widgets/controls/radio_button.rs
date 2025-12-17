@@ -24,6 +24,7 @@ impl Plugin for RadioButtonWidget {
         app.init_resource::<RadioMissingFieldSetWarned>();
         app.add_systems(Update, internal_node_creation_system);
         app.add_systems(Update, ensure_checked_dots_system);
+        app.add_systems(Update, ensure_fieldset_selection_system);
     }
 }
 
@@ -409,6 +410,27 @@ fn ensure_checked_dots_system(
                 add_checked_dot_to_radio(gen_id.0, rb.entry, css, &dot_q, &mut commands, &config);
             }
             break;
+        }
+    }
+}
+
+fn ensure_fieldset_selection_system(
+    radios: Query<(Entity, &InFieldSet, &UIWidgetState), With<RadioButton>>,
+    mut fieldsets: Query<(&FieldSet, Option<&mut FiledSelectionSingle>)>,
+) {
+    for (radio_entity, in_fs, state) in radios.iter() {
+        if !state.checked {
+            continue;
+        }
+        if let Ok((fieldset, selection_opt)) = fieldsets.get_mut(in_fs.0) {
+            if fieldset.field_mode != FieldMode::Single {
+                continue;
+            }
+            if let Some(mut selection) = selection_opt {
+                if selection.0.is_none() {
+                    selection.0 = Some(radio_entity);
+                }
+            }
         }
     }
 }

@@ -313,53 +313,65 @@ fn parse_html_node(
             let mode = attributes.get("mode").unwrap_or("single").to_string();
             let mut children = Vec::new();
 
-            let mut selected_assigned = false;
-            let mut first_radio_seen = false;
-
+            let mut radio_nodes: Vec<(NodeRef, bool)> = Vec::new();
             for child in node.children() {
                 if let Some(el) = child.as_element() {
                     if el.name.local.eq("radio") {
-                        let radio_attrs = el.attributes.borrow();
-                        let value = radio_attrs.get("value").unwrap_or("").to_string();
-                        let label = child.text_contents().trim().to_string();
-                        let mut selected = radio_attrs.contains("selected");
-
-                        if selected_assigned && selected {
-                            selected = false;
-                        }
-                        if !selected_assigned && !selected && !allow_none && !first_radio_seen {
-                            selected = true;
-                        }
-                        if selected {
-                            selected_assigned = true;
-                        }
-                        first_radio_seen = true;
-
-                        children.push(HtmlWidgetNode::RadioButton(
-                            RadioButton {
-                                label,
-                                value,
-                                selected,
-                                ..default()
-                            },
-                            HtmlMeta {
-                                css: meta.css.clone(),
-                                id: meta.id.clone(),
-                                class: meta.class.clone(),
-                                style: meta.style.clone(),
-                            },
-                            states.clone(),
-                            functions.clone(),
-                            widget.clone(),
-                            HtmlID::default(),
-                        ));
+                        let selected_attr = el.attributes.borrow().contains("selected");
+                        radio_nodes.push((child.clone(), selected_attr));
                         continue;
                     }
                 }
-
                 if let Some(parsed) = parse_html_node(&child, css_sources, label_map, key, html) {
                     children.push(parsed);
                 }
+            }
+
+            let any_selected_attr = radio_nodes.iter().any(|(_, sel)| *sel);
+            let mut selected_used = false;
+            let mut first_radio_seen = false;
+
+            for (radio_node, had_selected_attr) in radio_nodes {
+                let element = radio_node.as_element().unwrap();
+                let attrs = element.attributes.borrow();
+
+                let value = attrs.get("value").unwrap_or("").to_string();
+                let label = radio_node.text_contents().trim().to_string();
+
+                let selected = if any_selected_attr {
+                    if had_selected_attr && !selected_used {
+                        selected_used = true;
+                        true
+                    } else {
+                        false
+                    }
+                } else if !selected_used && !allow_none && !first_radio_seen {
+                    selected_used = true;
+                    true
+                } else {
+                    false
+                };
+
+                first_radio_seen = true;
+
+                children.push(HtmlWidgetNode::RadioButton(
+                    RadioButton {
+                        label,
+                        value,
+                        selected,
+                        ..default()
+                    },
+                    HtmlMeta {
+                        css: meta.css.clone(),
+                        id: meta.id.clone(),
+                        class: meta.class.clone(),
+                        style: meta.style.clone(),
+                    },
+                    states.clone(),
+                    functions.clone(),
+                    widget.clone(),
+                    HtmlID::default(),
+                ));
             }
 
             Some(HtmlWidgetNode::FieldSet(

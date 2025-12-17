@@ -9,11 +9,11 @@ What will come in the next version?
 - [x] Slider reworked and bug fixes.
 - [ ] More Widgets:
     - [x] Divider Widget
-    - [ ] Button Group Widget
-    - [ ] Progress Bar Widget
-    - [ ] Radio Button Widget
+    - [x] FieldSet Widget
+    - [x] Radio Button Widget
     - [ ] Toggle Button Widget
     - [ ] Switch Button Widget
+    - [ ] Progress Bar Widget
 - [ ] Widgets will become scrollable with a scroll bar.
 - [ ] More CSS support.
 - [ ] Refactored Bind system for HTML.
