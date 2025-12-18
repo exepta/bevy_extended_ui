@@ -450,6 +450,7 @@ switch .switch-track {
 
 switch:checked .switch-track {
     background: #a163f9;
+    justify-content: end;
 }
 
 switch .switch-track .switch-dot {
@@ -458,11 +459,6 @@ switch .switch-track .switch-dot {
     height: 28px;
     border-radius: 50%;
     background: #6a00ff;
-    left: 0;
-}
-
-switch:checked .switch-track .switch-dot {
-    right: 0;
 }
 
 /* Toggle Button */

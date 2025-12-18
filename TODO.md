@@ -12,7 +12,7 @@ What will come in the next version?
     - [x] FieldSet Widget
     - [x] Radio Button Widget
     - [x] Toggle Button Widget
-    - [ ] Switch Button Widget
+    - [x] Switch Button Widget
     - [ ] Progress Bar Widget
 - [ ] Widgets will become scrollable with a scroll bar.
 - [ ] More CSS support.

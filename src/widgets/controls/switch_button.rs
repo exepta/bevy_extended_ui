@@ -24,7 +24,6 @@ pub struct SwitchButtonWidget;
 impl Plugin for SwitchButtonWidget {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, internal_node_creation_system);
-        app.add_systems(Update, update_switch_dot_position);
     }
 }
 
@@ -89,9 +88,6 @@ fn internal_node_creation_system(
                     (
                         Name::new(format!("Switch-Track-{}", switch_button.entry)),
                         Node {
-                            display: Display::Flex,
-                            align_items: AlignItems::Center,
-                            justify_content: JustifyContent::Start,
                             ..default()
                         },
                         BackgroundColor::default(),
@@ -155,23 +151,6 @@ fn on_internal_click(
         current_widget_state.widget_id = gen_id.0;
     }
     trigger.propagate(false);
-}
-
-fn update_switch_dot_position(
-    switch_q: Query<(&UIWidgetState, &UIGenID), With<SwitchButton>>,
-    mut track_q: Query<(&BindToID, &mut Node), With<SwitchButtonTrack>>,
-) {
-    for (sw_state, sw_gen) in switch_q.iter() {
-        for (bind, mut node) in track_q.iter_mut() {
-            if bind.0 == sw_gen.0 {
-                node.justify_content = if sw_state.checked {
-                    JustifyContent::End
-                } else {
-                    JustifyContent::Start
-                };
-            }
-        }
-    }
 }
 
 fn on_internal_cursor_entered(
