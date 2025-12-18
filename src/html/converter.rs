@@ -587,6 +587,29 @@ fn parse_html_node(
             ))
         }
 
+        "switch" => {
+            let text = node.text_contents().trim().to_string();
+            let icon_attr = attributes.get("icon").unwrap_or("");
+            let icon = if icon_attr.is_empty() {
+                None
+            } else {
+                Some(icon_attr.to_string())
+            };
+
+            Some(HtmlWidgetNode::SwitchButton(
+                SwitchButton {
+                    label: text,
+                    icon,
+                    ..default()
+                },
+                meta,
+                states,
+                functions,
+                widget.clone(),
+                HtmlID::default(),
+            ))
+        }
+
         "toggle" => {
             let (icon_path, icon_place) = parse_icon_and_text(node);
             let text = node.text_contents().trim().to_string();

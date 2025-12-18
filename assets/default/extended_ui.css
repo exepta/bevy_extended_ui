@@ -419,6 +419,52 @@ slider .slider-track .thumb {
     box-shadow: 0 0 3px 3px #303033;
 }
 
+/* Switch Button */
+
+switch {
+    width: 75px;
+    height: 30px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    gap: 10px;
+}
+
+switch .switch-text {
+    font-size: 11px;
+    font-weight: 200;
+    color: #303039;
+}
+
+switch .switch-track {
+    width: 50px;
+    height: 24px;
+    border-radius: 13px;
+    background: #d4d4f3;
+    position: relative;
+    display: flex;
+    justify-content: start;
+    align-items: center;
+}
+
+switch:checked .switch-track {
+    background: #a163f9;
+}
+
+switch .switch-track .switch-dot {
+    position: absolute;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #6a00ff;
+    left: 0;
+}
+
+switch:checked .switch-track .switch-dot {
+    right: 0;
+}
+
 /* Toggle Button */
 toggle {
     background: #bcbcbc;

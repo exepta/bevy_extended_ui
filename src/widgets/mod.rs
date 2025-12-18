@@ -89,6 +89,7 @@ pub enum WidgetKind {
     Paragraph,
     RadioButton,
     Slider,
+    SwitchButton,
     ToggleButton,
 }
 
@@ -601,6 +602,31 @@ impl Default for Slider {
             step: 1.0,
             min: 0.0,
             max: 100.0,
+        }
+    }
+}
+
+// ===============================================
+//                   Switch Button
+// ===============================================
+
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+#[require(UIGenID, UIWidgetState, Widget)]
+pub struct SwitchButton {
+    pub entry: usize,
+    pub label: String,
+    pub icon: Option<String>,
+}
+
+impl Default for SwitchButton {
+    fn default() -> Self {
+        let entry = SWITCH_BUTTON_ID_POOL.lock().unwrap().acquire();
+
+        Self {
+            entry,
+            label: String::from(""),
+            icon: None,
         }
     }
 }

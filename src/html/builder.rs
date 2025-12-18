@@ -145,6 +145,7 @@ fn collect_html_ids(nodes: &Vec<HtmlWidgetNode>, ids: &mut Vec<HtmlID>) {
             | HtmlWidgetNode::Paragraph(_, _, _, _, _, id)
             | HtmlWidgetNode::RadioButton(_, _, _, _, _, id)
             | HtmlWidgetNode::Slider(_, _, _, _, _, id)
+            | HtmlWidgetNode::SwitchButton(_, _, _, _, _, id)
             | HtmlWidgetNode::ToggleButton(_, _, _, _, _, id)=> {
                 ids.push(id.clone());
             }
@@ -286,6 +287,15 @@ fn spawn_widget_node(
         HtmlWidgetNode::Slider(slider, meta, states, functions, widget, id) => spawn_with_meta(
             commands,
             slider.clone(),
+            meta,
+            states,
+            functions,
+            widget,
+            id,
+        ),
+        HtmlWidgetNode::SwitchButton(switch_button, meta, states, functions, widget, id) => spawn_with_meta(
+            commands,
+            switch_button.clone(),
             meta,
             states,
             functions,
