@@ -72,7 +72,7 @@ pub fn get_or_load_image(
     if handle.path().is_none() {
         warn!("Image not found at '{}', using embedded fallback.", path);
 
-        let embedded_png = include_bytes!("../../../../../assets/extended_ui/icons/check-mark.png");
+        let embedded_png = include_bytes!("../../assets/extended_ui/icons/check-mark.png");
         let image = Image::from_buffer(
             embedded_png,
             ImageType::Extension("png"),

@@ -11,7 +11,7 @@ What will come in the next version?
     - [x] Divider Widget
     - [x] FieldSet Widget
     - [x] Radio Button Widget
-    - [ ] Toggle Button Widget
+    - [x] Toggle Button Widget
     - [ ] Switch Button Widget
     - [ ] Progress Bar Widget
 - [ ] Widgets will become scrollable with a scroll bar.
