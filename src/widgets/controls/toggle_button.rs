@@ -40,12 +40,12 @@ fn internal_node_creation_system(
         if let Some(source) = source_opt {
             css_source = source.clone();
         }
-        
+
         commands.entity(entity).insert(UIWidgetState {
             checked: toggle_button.selected,
             ..default()
         });
-        
+
         let fs_entity_opt = find_fieldset_ancestor_optional(entity, &parents, &fieldset_q);
         if let Some(fs_ent) = fs_entity_opt {
             commands.entity(entity).insert(InFieldSet(fs_ent));
@@ -55,9 +55,9 @@ fn internal_node_creation_system(
                         sel.0 = Some(entity);
                     }
                 }
-                if let Ok(Some(mut selm)) = multi_sel_q.get_mut(fs_ent) {
-                    if !selm.0.contains(&entity) {
-                        selm.0.push(entity);
+                if let Ok(Some(mut selection_multi)) = multi_sel_q.get_mut(fs_ent) {
+                    if !selection_multi.0.contains(&entity) {
+                        selection_multi.0.push(entity);
                     }
                 }
             }
