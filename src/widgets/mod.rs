@@ -87,6 +87,7 @@ pub enum WidgetKind {
     Img,
     InputField,
     Paragraph,
+    ProgressBar,
     RadioButton,
     Slider,
     SwitchButton,
@@ -546,6 +547,33 @@ impl Default for Paragraph {
         Self {
             entry,
             text: String::from(""),
+        }
+    }
+}
+
+// ===============================================
+//                    ProgressBar
+// ===============================================
+
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+#[require(UIGenID, UIWidgetState, InheritedVisibility, Widget)]
+pub struct ProgressBar {
+    pub entry: usize,
+    pub value: f32,
+    pub min: f32,
+    pub max: f32,
+}
+
+impl Default for ProgressBar {
+    fn default() -> Self {
+        let entry = PROGRESS_BAR_ID_POOL.lock().unwrap().acquire();
+
+        Self {
+            entry,
+            value: 0.0,
+            max: 100.0,
+            min: 0.0,
         }
     }
 }

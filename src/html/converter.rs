@@ -478,6 +478,31 @@ fn parse_html_node(
             ))
         }
 
+        "progressbar" => {
+            let min = attributes
+                .get("min")
+                .and_then(|v| v.parse::<f32>().ok())
+                .unwrap_or(0.0);
+
+            let max = attributes
+                .get("max")
+                .and_then(|v| v.parse::<f32>().ok())
+                .unwrap_or(100.0);
+
+            let value = attributes
+                .get("value")
+                .and_then(|v| v.parse::<f32>().ok())
+                .unwrap_or(min);
+
+            Some(HtmlWidgetNode::ProgressBar(
+                ProgressBar {
+                    value,
+                    min,
+                    max,
+                    ..default()
+                }, meta, states, functions, widget.clone(), HtmlID::default()))
+        }
+
         "radio" => {
             let value = attributes.get("value").unwrap_or("").to_string();
             let label = node.text_contents().trim().to_string();

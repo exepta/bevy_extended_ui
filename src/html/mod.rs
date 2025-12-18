@@ -14,7 +14,7 @@ use crate::html::reload::HtmlReloadPlugin;
 use crate::io::{CssAsset, HtmlAsset};
 use crate::styles::Style;
 use crate::styles::parser::apply_property_to_style;
-use crate::widgets::{Body, Button, CheckBox, ChoiceBox, Div, Divider, FieldSet, Headline, Img, InputField, Paragraph, RadioButton, Slider, SwitchButton, ToggleButton, Widget};
+use crate::widgets::{Body, Button, CheckBox, ChoiceBox, Div, Divider, FieldSet, Headline, Img, InputField, Paragraph, ProgressBar, RadioButton, Slider, SwitchButton, ToggleButton, Widget};
 
 pub static HTML_ID_COUNTER: AtomicUsize = AtomicUsize::new(1);
 
@@ -207,6 +207,15 @@ pub enum HtmlWidgetNode {
     /// A paragraph `<p>`.
     Paragraph(
         Paragraph,
+        HtmlMeta,
+        HtmlStates,
+        HtmlEventBindings,
+        Widget,
+        HtmlID,
+    ),
+    /// A progressbar `<progressbar>`.
+    ProgressBar(
+        ProgressBar,
         HtmlMeta,
         HtmlStates,
         HtmlEventBindings,

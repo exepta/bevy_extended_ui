@@ -143,6 +143,7 @@ fn collect_html_ids(nodes: &Vec<HtmlWidgetNode>, ids: &mut Vec<HtmlID>) {
             | HtmlWidgetNode::Img(_, _, _, _, _, id)
             | HtmlWidgetNode::Input(_, _, _, _, _, id)
             | HtmlWidgetNode::Paragraph(_, _, _, _, _, id)
+            | HtmlWidgetNode::ProgressBar(_, _, _, _, _, id)
             | HtmlWidgetNode::RadioButton(_, _, _, _, _, id)
             | HtmlWidgetNode::Slider(_, _, _, _, _, id)
             | HtmlWidgetNode::SwitchButton(_, _, _, _, _, id)
@@ -269,6 +270,15 @@ fn spawn_widget_node(
         HtmlWidgetNode::Paragraph(paragraph, meta, states, functions, widget, id) => spawn_with_meta(
             commands,
             paragraph.clone(),
+            meta,
+            states,
+            functions,
+            widget,
+            id,
+        ),
+        HtmlWidgetNode::ProgressBar(progress_bar, meta, states, functions, widget, id) => spawn_with_meta(
+            commands,
+            progress_bar.clone(),
             meta,
             states,
             functions,
