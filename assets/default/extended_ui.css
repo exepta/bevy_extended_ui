@@ -57,6 +57,18 @@ checkbox .check-text {
     font-size: 13px;
 }
 
+/* Div */
+
+div {
+    position: relative;
+}
+
+div scroll {
+    position: absolute;
+    right: 0;
+    top: 0;
+}
+
 /* Divider */
 
 divider {
