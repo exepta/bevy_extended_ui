@@ -13,6 +13,7 @@ use crate::styles::{CssClass, CssSource, IconPlace};
 use crate::widgets::controls::toggle_button::ToggleButtonWidget;
 use crate::widgets::{BindToID, UIWidgetState};
 use crate::widgets::controls::progress_bar::ProgressBarWidget;
+use crate::widgets::controls::scroll_bar::ScrollWidget;
 use crate::widgets::controls::switch_button::SwitchButtonWidget;
 
 pub mod button;
@@ -25,6 +26,7 @@ pub mod slider;
 pub mod toggle_button;
 pub mod switch_button;
 mod progress_bar;
+mod scroll_bar;
 
 #[derive(Component)]
 pub struct ButtonImage;
@@ -41,6 +43,7 @@ impl Plugin for ExtendedControlWidgets {
             InputWidget,
             ProgressBarWidget,
             RadioButtonWidget,
+            ScrollWidget,
             SliderWidget,
             SwitchButtonWidget,
             ToggleButtonWidget,

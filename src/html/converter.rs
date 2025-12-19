@@ -523,6 +523,19 @@ fn parse_html_node(
             ))
         }
 
+        "scroll" => {
+            Some(HtmlWidgetNode::Scrollbar(
+                Scrollbar {
+                    ..default()
+                },
+                meta,
+                states,
+                functions,
+                widget.clone(),
+                HtmlID::default(),
+            ))
+        }
+
         "select" => {
             // Parse dropdown options and selected value
             let mut options = Vec::new();

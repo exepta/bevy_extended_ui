@@ -145,6 +145,7 @@ fn collect_html_ids(nodes: &Vec<HtmlWidgetNode>, ids: &mut Vec<HtmlID>) {
             | HtmlWidgetNode::Paragraph(_, _, _, _, _, id)
             | HtmlWidgetNode::ProgressBar(_, _, _, _, _, id)
             | HtmlWidgetNode::RadioButton(_, _, _, _, _, id)
+            | HtmlWidgetNode::Scrollbar(_, _, _, _, _, id)
             | HtmlWidgetNode::Slider(_, _, _, _, _, id)
             | HtmlWidgetNode::SwitchButton(_, _, _, _, _, id)
             | HtmlWidgetNode::ToggleButton(_, _, _, _, _, id)=> {
@@ -288,6 +289,15 @@ fn spawn_widget_node(
         HtmlWidgetNode::RadioButton(radio_button, meta, states, functions, widget, id) => spawn_with_meta(
             commands,
             radio_button.clone(),
+            meta,
+            states,
+            functions,
+            widget,
+            id,
+        ),
+        HtmlWidgetNode::Scrollbar(scroll_bar, meta, states, functions, widget, id) => spawn_with_meta(
+            commands,
+            scroll_bar.clone(),
             meta,
             states,
             functions,

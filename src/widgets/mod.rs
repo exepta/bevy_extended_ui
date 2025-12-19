@@ -89,6 +89,7 @@ pub enum WidgetKind {
     Paragraph,
     ProgressBar,
     RadioButton,
+    Scrollbar,
     Slider,
     SwitchButton,
     ToggleButton,
@@ -601,6 +602,40 @@ impl Default for RadioButton {
             label: String::from("label"),
             value: String::from(""),
             selected: false,
+        }
+    }
+}
+
+// ===============================================
+//                     Scrollbar
+// ===============================================
+
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+#[require(UIGenID, UIWidgetState, Widget)]
+pub struct Scrollbar {
+    pub entry: usize,
+    pub entity: Option<Entity>,
+    pub scroll_pos: Option<ScrollPosition>,
+    pub value: f32,
+    pub min: f32,
+    pub max: f32,
+    pub step: f32,
+    pub vertical: bool,
+}
+
+impl Default for Scrollbar {
+    fn default() -> Self {
+        let entry = SCROLL_ID_POOL.lock().unwrap().acquire();
+        Self {
+            entry,
+            entity: None,
+            scroll_pos: None,
+            value: 0.0,
+            min: 0.0,
+            max: 1000.0,
+            step: 10.0,
+            vertical: true,
         }
     }
 }

@@ -3,6 +3,7 @@ use crate::styles::{CssSource, TagName};
 use crate::widgets::{Div, UIGenID, UIWidgetState, WidgetId, WidgetKind};
 use crate::{CurrentWidgetState, ExtendedUiConfiguration};
 use bevy::camera::visibility::RenderLayers;
+use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
 use bevy::prelude::*;
 
 #[derive(Component)]
@@ -12,7 +13,10 @@ pub struct DivWidget;
 
 impl Plugin for DivWidget {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, internal_node_creation_system);
+        app.add_systems(Update, (
+            internal_node_creation_system,
+            handle_div_scroll_wheel,
+        ));
     }
 }
 
@@ -75,9 +79,65 @@ fn internal_node_creation_system(
                 RenderLayers::layer(*layer),
                 DivBase,
             ))
+            .insert(ScrollPosition::default())
             .observe(on_internal_click)
             .observe(on_internal_cursor_entered)
             .observe(on_internal_cursor_leave);
+    }
+}
+
+fn handle_div_scroll_wheel(
+    mut wheel_events: MessageReader<MouseWheel>,
+    mut div_q: Query<
+        (
+            &Visibility,
+            &Node,
+            &ComputedNode,
+            &mut ScrollPosition,
+            &UIWidgetState,
+        ),
+        With<Div>,
+    >,
+    time: Res<Time>,
+) {
+    // Optional smoothing like in your ChoiceBox
+    let smooth_factor = 30.0;
+
+    for event in wheel_events.read() {
+        // Wheel down -> scroll down -> increase scroll.y
+        let raw = match event.unit {
+            MouseScrollUnit::Line => event.y * 25.0,
+            MouseScrollUnit::Pixel => event.y,
+        };
+        let delta = -raw;
+
+        for (vis, node, computed, mut scroll, _state) in div_q.iter_mut() {
+            if !matches!(*vis, Visibility::Visible | Visibility::Inherited) {
+                continue;
+            }
+            if node.overflow.y != OverflowAxis::Scroll {
+                continue;
+            }
+
+            // Optional: only scroll when hovered (depends on your UI model)
+            // if !state.hovered { continue; }
+
+            // Viewport height (visible area)
+            let viewport_h = computed.size().y.max(1.0);
+
+            // Content height (what Bevy actually laid out)
+            let content_h = computed.content_size.y.max(viewport_h);
+
+            // Maximum scroll range
+            let max_scroll = (content_h - viewport_h).max(0.0);
+
+            // Clamp so 0.0 is always the very top (Hello1 must be reachable)
+            let target = (scroll.y + delta).clamp(0.0, max_scroll);
+
+            // Smooth interpolation (like your ChoiceBox)
+            let smoothed = scroll.y + (target - scroll.y) * smooth_factor * time.delta_secs();
+            scroll.y = smoothed.clamp(0.0, max_scroll);
+        }
     }
 }
 
