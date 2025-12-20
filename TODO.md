@@ -16,6 +16,10 @@ What will come in the next version?
     - [x] Progress Bar Widget
 - [ ] Widgets will become scrollable with a scroll bar.
 - [ ] More CSS support.
+    - [ ] right, left, top, bottom support 0 without a pixel.
+    - [ ] Flexbox support optimizing.
+    - [ ] `!important` support for CSS.
+    - [ ] style tag support for HTML.
 - [ ] Refactored Bind system for HTML.
 - [ ] More examples
 - [ ] Better documentation

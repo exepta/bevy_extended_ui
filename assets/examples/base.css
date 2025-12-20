@@ -44,6 +44,6 @@ body {
     height: 200px;
     display: flex;
     flex-direction: column;
-    overflow-y: auto;
+    overflow-y: scroll;
     overflow-x: hidden;
 }

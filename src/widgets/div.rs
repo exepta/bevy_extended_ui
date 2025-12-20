@@ -20,7 +20,6 @@ struct DivContentRoot(Entity);
 #[derive(Component, Deref)]
 struct DivScrollbar(Entity);
 
-/// Allows the content-layer to update hover/focus state of the owning div wrapper.
 #[derive(Component, Deref)]
 struct DivContentOwner(Entity);
 
@@ -80,18 +79,12 @@ fn internal_node_creation_system(
                 DivBase,
                 UIWidgetState::default(),
             ))
-            // Wrapper events (may not fire if pointer is over children; we'll mirror from content)
             .observe(on_div_click)
             .observe(on_div_cursor_entered)
             .observe(on_div_cursor_leave);
     }
 }
 
-/// Ensure wrapper + scroll-content + overlay scrollbar structure.
-///
-/// Rule:
-/// - If the div's Node requests overflow-y: Scroll -> build structure.
-/// - Once built, we KEEP it (Latch gegen Styling-Flackern).
 fn ensure_div_scroll_structure(
     mut commands: Commands,
     mut div_q: Query<
@@ -110,7 +103,7 @@ fn ensure_div_scroll_structure(
     >,
     parent_q: Query<&ChildOf>,
     mut content_node_q: Query<&mut Node, (With<DivScrollContent>, Without<DivBase>)>,
-    has_scrollpos_q: Query<(), With<ScrollPosition>>,
+    has_scroll_pos_q: Query<(), With<ScrollPosition>>,
 ) {
     for (
         div_entity,
@@ -124,7 +117,7 @@ fn ensure_div_scroll_structure(
         sb_opt,
     ) in div_q.iter_mut()
     {
-        // Latch: wenn Struktur schon existiert, bleibt sie aktiv
+        // We latch based on structure existence OR node overflow (requested by your css->node system)
         let wants_scroll = root_opt.is_some() || div_node.overflow.y == OverflowAxis::Scroll;
         if !wants_scroll {
             continue;
@@ -136,7 +129,6 @@ fn ensure_div_scroll_structure(
         } else {
             let css_source = source_opt.cloned().unwrap_or_default();
 
-            // Content Node: only scroller basics. CSS decides layout (flex-direction etc).
             let mut content_node = Node::default();
             content_node.width = Val::Percent(100.0);
             content_node.height = Val::Percent(100.0);
@@ -163,7 +155,6 @@ fn ensure_div_scroll_structure(
                     ScrollPosition::default(),
                     UIWidgetState::default(),
                 ))
-                // Mirror hover to wrapper (so wheel works even when over children)
                 .observe(on_content_cursor_entered)
                 .observe(on_content_cursor_leave)
                 .observe(on_content_click)
@@ -183,9 +174,22 @@ fn ensure_div_scroll_structure(
         if sb_opt.is_none() {
             let css_source = source_opt.cloned().unwrap_or_default();
 
+            // IMPORTANT: make it a right-side absolute overlay
+            let mut sb_node = Node::default();
+            sb_node.position_type = PositionType::Absolute;
+            sb_node.left = Val::Auto;
+            sb_node.right = Val::Px(0.0);
+            sb_node.top = Val::Px(0.0);
+            sb_node.bottom = Val::Px(0.0);
+            sb_node.width = Val::Px(12.0);
+
             let sb_entity = commands
                 .spawn((
+                    Name::new(format!("Div-Scrollbar-{}", div.0)),
+                    sb_node,
                     css_source,
+                    CssClass(vec!["scrollbar".to_string(), "scrollbar-vertical".to_string()]),
+                    TagName("scroll".to_string()),
                     Scrollbar {
                         vertical: true,
                         min: 0.0,
@@ -194,7 +198,15 @@ fn ensure_div_scroll_structure(
                         step: 1.0,
                         entity: Some(content_entity),
                         ..default()
-                    }
+                    },
+                    UIWidgetState::default(),
+                    ZIndex(10),
+                    // Optional: add visuals if your scrollbar widget expects these on the root
+                    ImageNode::default(),
+                    BackgroundColor::default(),
+                    BorderColor::default(),
+                    BorderRadius::default(),
+                    Pickable::default(),
                 ))
                 .id();
 
@@ -229,9 +241,9 @@ fn ensure_div_scroll_structure(
             }
         }
 
-        // 4) Wrapper clippt, but does not scroll
-        div_node.overflow.y = OverflowAxis::Hidden;
-        div_node.overflow.x = OverflowAxis::Hidden;
+        // Wrapper clips, but does not scroll (prevents scrollbar being part of scrolled content)
+        div_node.overflow.y = OverflowAxis::Clip;
+        div_node.overflow.x = OverflowAxis::Clip;
 
         // 5) Ensure content remains scrollable even if some system overwrote it
         if let Ok(mut node) = content_node_q.get_mut(content_entity) {
@@ -242,7 +254,7 @@ fn ensure_div_scroll_structure(
         }
 
         // 6) Safety: ensure ScrollPosition exists
-        if has_scrollpos_q.get(content_entity).is_err() {
+        if has_scroll_pos_q.get(content_entity).is_err() {
             commands.entity(content_entity).insert(ScrollPosition::default());
         }
     }
@@ -269,7 +281,6 @@ fn handle_div_scroll_wheel(
                 continue;
             }
 
-            // This now works because content mirrors hover into wrapper state
             if !state.hovered {
                 continue;
             }
@@ -294,12 +305,13 @@ fn handle_div_scroll_wheel(
     }
 }
 
-/// Sync scrollbar range/value from the content's layout each frame.
+/// Sync scrollbar range/value + show only if it makes sense (max_scroll > 0)
 fn sync_scrollbar_from_content(
     div_q: Query<(Option<&DivContentRoot>, Option<&DivScrollbar>), With<Div>>,
     content_q: Query<&ComputedNode, With<DivScrollContent>>,
     mut scroll_q: Query<&mut Scrollbar>,
     target_pos_q: Query<&ScrollPosition>,
+    mut sb_node_q: Query<&mut Node, With<Scrollbar>>,
 ) {
     for (root_opt, sb_opt) in div_q.iter() {
         let (Some(root), Some(sb)) = (root_opt, sb_opt) else { continue; };
@@ -310,8 +322,13 @@ fn sync_scrollbar_from_content(
         let content_h = content_comp.content_size.y.max(viewport_h);
         let max_scroll = (content_h - viewport_h).max(0.0);
 
-        let Ok(mut scrollbar) = scroll_q.get_mut(**sb) else { continue; };
+        // show only if needed (Plan change: even for overflow-y: scroll)
+        let show = max_scroll > 0.0;
+        if let Ok(mut sb_node) = sb_node_q.get_mut(**sb) {
+            sb_node.display = if show { Display::Flex } else { Display::None };
+        }
 
+        let Ok(mut scrollbar) = scroll_q.get_mut(**sb) else { continue; };
         scrollbar.min = 0.0;
         scrollbar.max = max_scroll;
 
@@ -369,7 +386,6 @@ fn on_content_cursor_entered(
             state.hovered = true;
         }
     }
-    // don't stop propagation; we just mirror state
 }
 
 fn on_content_cursor_leave(
@@ -394,5 +410,4 @@ fn on_content_click(
             state.focused = true;
         }
     }
-    // don't stop propagation
 }

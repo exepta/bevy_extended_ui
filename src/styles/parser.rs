@@ -1175,7 +1175,7 @@ pub fn convert_overflow(value: String, which: &str) -> Option<Overflow> {
     let trimmed = value.trim();
     let overflow_axis = match trimmed {
         "hidden" => OverflowAxis::Hidden,
-        "scroll" => OverflowAxis::Scroll,
+        "scroll" | "auto" => OverflowAxis::Scroll,
         "clip" => OverflowAxis::Clip,
         "visible" => OverflowAxis::Visible,
         _ => OverflowAxis::default(),
