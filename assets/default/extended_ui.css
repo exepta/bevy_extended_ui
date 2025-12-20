@@ -65,7 +65,7 @@ div {
 
 div scroll {
     position: absolute;
-    right: 0;
+    right: 1px;
     top: 0;
 }
 
@@ -280,11 +280,10 @@ radio .radio-text {
 /* Scrollbar */
 scroll {
     width: 10px;
-    height: 90%;
+    height: 100%;
     background: #bcbcbc;
     border-radius: 5px;
     position: relative;
-    padding: 10px 0;
 }
 
 scroll .scroll-track {

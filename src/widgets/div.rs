@@ -181,45 +181,20 @@ fn ensure_div_scroll_structure(
 
         // 2) Ensure overlay scrollbar child (sibling of content)
         if sb_opt.is_none() {
-            let sb_entry = div.0.saturating_mul(10_000).saturating_add(1);
-
-            let mut sb_node = Node::default();
-            sb_node.position_type = PositionType::Absolute;
-            sb_node.right = Val::Px(0.0);
-            sb_node.top = Val::Px(0.0);
-            sb_node.bottom = Val::Px(0.0);
-            sb_node.width = Val::Px(12.0);
-
             let css_source = source_opt.cloned().unwrap_or_default();
 
             let sb_entity = commands
                 .spawn((
-                    Name::new(format!("Div-Scrollbar-{}", div.0)),
-                    sb_node,
                     css_source,
-                    CssClass(vec!["scrollbar".to_string(), "scrollbar-vertical".to_string()]),
-                    TagName("scroll".to_string()),
                     Scrollbar {
-                        entry: sb_entry,
                         vertical: true,
                         min: 0.0,
                         max: 0.0,
                         value: 0.0,
                         step: 1.0,
                         entity: Some(content_entity),
-                        ..Default::default()
-                    },
-                    UIWidgetState::default(),
-                    WidgetId {
-                        id: sb_entry,
-                        kind: WidgetKind::Scrollbar,
-                    },
-                    ImageNode::default(),
-                    BackgroundColor::default(),
-                    BorderColor::default(),
-                    BorderRadius::default(),
-                    ZIndex(10),
-                    Pickable::default(),
+                        ..default()
+                    }
                 ))
                 .id();
 
