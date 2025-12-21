@@ -52,7 +52,6 @@ fn internal_node_creation_system(
         let mut class = CssClass(vec![]);
         if !scroll.vertical {
             class = CssClass(vec!["scroll-horizontal".into()]);
-            info!("Class: {:?}", class);
         }
         commands
             .entity(entity)

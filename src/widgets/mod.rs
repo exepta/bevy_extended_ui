@@ -617,7 +617,7 @@ pub struct Scrollbar {
     pub entry: usize,
     pub entity: Option<Entity>,
     pub scroll_pos: Option<ScrollPosition>,
-    pub value: f32,
+    pub value: f32, // 3.146675432...............
     pub min: f32,
     pub max: f32,
     pub step: f32,
