@@ -168,6 +168,7 @@ impl FontVal {
 #[derive(Reflect, Default, Debug, Clone, PartialEq)]
 pub struct Style {
     pub display: Option<Display>,
+    pub box_sizing: Option<BoxSizing>,
     pub position_type: Option<PositionType>,
     pub width: Option<Val>,
     pub min_width: Option<Val>,
@@ -212,6 +213,7 @@ pub struct Style {
     pub text_wrap: Option<LineBreak>,
     pub z_index: Option<i32>,
     pub pointer_events: Option<Pickable>,
+    pub scrollbar_width: Option<f32>,
 }
 
 impl Style {
@@ -224,6 +226,9 @@ impl Style {
     pub fn merge(&mut self, other: &Style) {
         if other.display.is_some() {
             self.display = other.display.clone();
+        }
+        if other.box_sizing.is_some() {
+            self.box_sizing = other.box_sizing.clone();
         }
         if other.position_type.is_some() {
             self.position_type = other.position_type.clone();
@@ -356,6 +361,9 @@ impl Style {
         }
         if other.pointer_events.is_some() {
             self.pointer_events = other.pointer_events.clone();
+        }
+        if other.scrollbar_width.is_some() {
+            self.scrollbar_width = other.scrollbar_width.clone();
         }
     }
 }

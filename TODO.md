@@ -23,6 +23,7 @@ What will come in the next version?
 - [ ] Refactored Bind system for HTML.
 - [ ] Fix bugs
     - [ ] Div has no content if there is a scroll content in another one.
+    - [x] Scrollbar flickering when clicking around.
     - [ ] Hotreload HTML can crash look file `error.log`.
 - [ ] More examples
 - [ ] Better documentation

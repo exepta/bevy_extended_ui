@@ -60,7 +60,7 @@ checkbox .check-text {
 /* Div */
 
 div {
-    position: relative;
+    scroll-width: 10;
 }
 
 div scroll {

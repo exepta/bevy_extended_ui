@@ -50,8 +50,8 @@ body {
 
 .test6 {
     background: #7799ce;
-    width: 200px;
-    height: 200px;
+    width: 160px;
+    height: 160px;
     display: flex;
     flex-direction: column;
     overflow-y: scroll;

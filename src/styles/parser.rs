@@ -155,6 +155,8 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
 
         "display" => style.display = convert_to_display(value.to_string()),
         "position" => style.position_type = convert_to_position(value.to_string()),
+        "box-sizing" => style.box_sizing = convert_to_box_sizing(value.to_string()),
+        "scroll-width" => style.scrollbar_width = convert_to_f32(value.to_string()),
         "gap" => style.gap = convert_to_val(value.to_string()),
         "justify-content" => {
             style.justify_content = convert_to_bevy_justify_content(value.to_string())
@@ -325,6 +327,11 @@ pub fn convert_to_i32(value: String) -> Option<i32> {
     } else {
         None
     }
+}
+
+pub fn convert_to_f32(value: String) -> Option<f32> {
+    let trimmed = value.trim();
+    trimmed.parse::<f32>().ok()
 }
 
 /// Converts a CSS font-size string into a [`FontVal`] (custom type).
@@ -528,6 +535,15 @@ pub fn convert_to_position(value: String) -> Option<PositionType> {
         "relative" => Some(PositionType::Relative),
         "absolute" => Some(PositionType::Absolute),
         _ => Some(PositionType::Relative),
+    }
+}
+
+pub fn convert_to_box_sizing(value: String) -> Option<BoxSizing> {
+    let trimmed = value.trim();
+    match trimmed {
+        "border-box" => Some(BoxSizing::BorderBox),
+        "content-box" => Some(BoxSizing::ContentBox),
+        _ => Some(BoxSizing::BorderBox),
     }
 }
 

@@ -467,6 +467,7 @@ fn sync_scrollbar_from_content(
     mut scroll_q: Query<&mut Scrollbar>,
     target_pos_q: Query<&ScrollPosition, With<DivScrollContent>>,
     mut sb_node_q: Query<&mut Node, With<Scrollbar>>,
+    mut sb_vis_q: Query<&mut Visibility, With<Scrollbar>>,
 ) {
     for (root_opt, sb_y_opt, sb_x_opt) in div_q.iter() {
         let Some(root) = root_opt else { continue; };
@@ -483,7 +484,7 @@ fn sync_scrollbar_from_content(
             let content_h = content.y.max(viewport_h);
             let max_scroll = (content_h - viewport_h).max(0.0);
 
-            test(&mut sb_node_q, sb, max_scroll);
+            check_scroll_bar_state(&mut sb_node_q, &mut sb_vis_q, sb, max_scroll);
 
             if let Ok(mut scrollbar) = scroll_q.get_mut(**sb) {
                 scrollbar.min = 0.0;
@@ -499,7 +500,7 @@ fn sync_scrollbar_from_content(
             let content_w = content.x.max(viewport_w);
             let max_scroll = (content_w - viewport_w).max(0.0);
 
-            test(&mut sb_node_q, sb, max_scroll);
+            check_scroll_bar_state(&mut sb_node_q, &mut sb_vis_q, sb, max_scroll);
 
             if let Ok(mut scrollbar) = scroll_q.get_mut(**sb) {
                 scrollbar.min = 0.0;
@@ -511,12 +512,26 @@ fn sync_scrollbar_from_content(
     }
 }
 
-fn test<T>(sb_node_q: &mut Query<&mut Node, With<Scrollbar>>, sb: &T, max_scroll: f32)
-where
-    T: std::ops::Deref<Target=Entity>,
+fn check_scroll_bar_state<T>(
+    sb_node_q: &mut Query<&mut Node, With<Scrollbar>>,
+    sb_vis_q: &mut Query<&mut Visibility, With<Scrollbar>>,
+    sb: &T,
+    max_scroll: f32,
+) where
+    T: std::ops::Deref<Target = Entity>,
 {
     if let Ok(mut sb_node) = sb_node_q.get_mut(**sb) {
-        sb_node.display = if max_scroll > 0.0 { Display::Flex } else { Display::None };
+        if sb_node.display != Display::Flex {
+            sb_node.display = Display::Flex;
+        }
+    }
+
+    if let Ok(mut vis) = sb_vis_q.get_mut(**sb) {
+        let want_visible = max_scroll > 0.5;
+        let new_vis = if want_visible { Visibility::Visible } else { Visibility::Hidden };
+        if *vis != new_vis {
+            *vis = new_vis;
+        }
     }
 }
 // -------------------- Events --------------------
