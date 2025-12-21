@@ -49,6 +49,11 @@ fn internal_node_creation_system(
     for (entity, scroll, source_opt) in query.iter() {
         let css_source = source_opt.cloned().unwrap_or_default();
 
+        let mut class = CssClass(vec![]);
+        if !scroll.vertical {
+            class = CssClass(vec!["scroll-horizontal".into()]);
+            info!("Class: {:?}", class);
+        }
         commands
             .entity(entity)
             .insert((
@@ -63,15 +68,16 @@ fn internal_node_creation_system(
                 BorderRadius::default(),
                 ZIndex::default(),
                 css_source.clone(),
+                class,
                 PreviousScrollValue(scroll.value),
                 TagName(String::from("scroll")),
                 RenderLayers::layer(layer),
-                ScrollNeedInit,
-                ScrollBase,
                 Pickable::default(),
                 UIWidgetState::default(),
             ))
             .insert((
+                ScrollNeedInit,
+                ScrollBase,
                 ImageNode::default(),
                 BoxShadow::new(
                     Colored::TRANSPARENT,
@@ -96,7 +102,9 @@ fn internal_node_creation_system(
                         UIWidgetState::default(),
                         RelativeCursorPosition::default(),
                         css_source.clone(),
-                        CssClass(vec!["scroll-track".to_string()]),
+                        CssClass(vec![
+                            "scroll-track".to_string(),
+                        ]),
                         RenderLayers::layer(layer),
                         Pickable::default(),
                         ScrollTrack,
@@ -115,7 +123,14 @@ fn internal_node_creation_system(
                                 ZIndex::default(),
                                 UIWidgetState::default(),
                                 css_source.clone(),
-                                CssClass(vec!["scroll-thumb".to_string()]),
+                                CssClass(vec![
+                                    "scroll-thumb".to_string(),
+                                    if scroll.vertical {
+                                        "vertical".into()
+                                    } else {
+                                        "horizontal".into()
+                                    },
+                                ]),
                                 RenderLayers::layer(layer),
                                 Pickable::default(),
                                 ScrollThumb { current_center: 0.0 },
@@ -186,23 +201,28 @@ fn on_track_click(
 
     let Ok((track_node, bind, rel)) = track_q.get(trigger.entity) else { return; };
 
-    let track_height = (track_node.size().y / sf).max(1.0);
-    let Some(thumb_h) = find_bound_height(bind.0, &thumb_q, sf) else { return; };
+    let Some(vertical) = scroll_orientation(bind.0, &mut scroll_q) else {
+        trigger.propagate(false);
+        return;
+    };
+
+    let track_extent = track_extent(vertical, track_node.size(), sf);
+    let Some(thumb_extent) = find_bound_extent(bind.0, &thumb_q, sf, vertical) else { return; };
 
     let Some(n) = rel.normalized else {
         trigger.propagate(false);
         return;
     };
 
-    let t = (n.y + 0.5).clamp(0.0, 1.0);
-    let click_y = t * track_height;
-    let desired_top = click_y - thumb_h * 0.5;
+    let t = if vertical { (n.y + 0.5).clamp(0.0, 1.0) } else { (n.x + 0.5).clamp(0.0, 1.0) };
+    let click_pos = t * track_extent;
+    let desired_offset = click_pos - thumb_extent * 0.5;
 
     apply_from_track_top_uid(
         bind.0,
-        desired_top,
-        track_height,
-        thumb_h,
+        desired_offset,
+        track_extent,
+        thumb_extent,
         &mut scroll_q,
         &mut thumb_node_q,
         &mut target_scroll_q,
@@ -228,22 +248,24 @@ fn on_thumb_drag(
     let Ok(parent) = parent_q.get(event.entity) else { return; };
     let Ok((track_node, bind)) = track_q.get(parent.parent()) else { return; };
 
-    let track_height = (track_node.size().y / sf).max(1.0);
+    let Some(vertical) = scroll_orientation(bind.0, &mut scroll_q) else { return; };
+
+    let track_extent = track_extent(vertical, track_node.size(), sf);
 
     let Ok(thumb_node) = thumb_node_q.get(event.entity) else { return; };
-    let thumb_h = (thumb_node.size().y / sf).max(1.0);
-    let half = thumb_h * 0.5;
+    let thumb_extent = axis_size(vertical, thumb_node.size(), sf);
+    let half = thumb_extent * 0.5;
 
-    let dy = event.event.delta.y / sf;
+    let delta = if vertical { event.event.delta.y / sf } else { event.event.delta.x / sf };
 
     let Ok((_, thumb, _, _)) = thumb_q.get(event.entity) else { return; };
-    let current_top = thumb.current_center - half;
+    let current_offset = thumb.current_center - half;
 
     apply_from_track_top_uid(
         bind.0,
-        current_top + dy,
-        track_height,
-        thumb_h,
+        current_offset + delta,
+        track_extent,
+        thumb_extent,
         &mut scroll_q,
         &mut thumb_q,
         &mut target_scroll_q,
@@ -275,11 +297,18 @@ fn apply_from_track_top_scroll(
             continue;
         }
         thumb.current_center = center;
-        node.top = Val::Px(top);
+        if scroll.vertical {
+            node.top = Val::Px(top);
+        } else {
+            node.left = Val::Px(top);
+        }
 
         for (_, s) in style.styles.iter_mut() {
-            s.top = Some(node.top);
-            s.left = Some(node.left);
+            if scroll.vertical {
+                s.top = Some(node.top);
+            } else {
+                s.left = Some(node.left);
+            }
         }
     }
 
@@ -308,7 +337,6 @@ fn apply_from_track_top_uid(
     thumb_q: &mut Query<(&mut Node, &mut ScrollThumb, &BindToID, &mut UiStyle), With<ScrollThumb>>,
     target_scroll_q: &mut Query<&mut ScrollPosition>,
 ) {
-    // Finde den Scrollbar mit entry == target_entry
     for mut scroll in scroll_q.iter_mut() {
         if scroll.entry != target_entry {
             continue;
@@ -341,11 +369,20 @@ fn detect_change_scroll_values(
     for (mut scroll, state, mut prev) in scroll_q.iter_mut() {
         if state.focused {
             let step = if shift { scroll.step * 10.0 } else { scroll.step };
-            if keyboard.just_pressed(KeyCode::ArrowUp) {
-                scroll.value = (scroll.value - step).max(scroll.min);
-            }
-            if keyboard.just_pressed(KeyCode::ArrowDown) {
-                scroll.value = (scroll.value + step).min(scroll.max);
+            if scroll.vertical {
+                if keyboard.just_pressed(KeyCode::ArrowUp) {
+                    scroll.value = (scroll.value - step).max(scroll.min);
+                }
+                if keyboard.just_pressed(KeyCode::ArrowDown) {
+                    scroll.value = (scroll.value + step).min(scroll.max);
+                }
+            } else {
+                if keyboard.just_pressed(KeyCode::ArrowLeft) {
+                    scroll.value = (scroll.value - step).max(scroll.min);
+                }
+                if keyboard.just_pressed(KeyCode::ArrowRight) {
+                    scroll.value = (scroll.value + step).min(scroll.max);
+                }
             }
         }
 
@@ -354,10 +391,10 @@ fn detect_change_scroll_values(
         }
         **prev = scroll.value;
 
-        let track_h = find_bound_height(scroll.entry, &track_q, sf).unwrap_or(1.0);
-        let Some(thumb_h) = find_bound_height(scroll.entry, &thumb_q, sf) else { continue; };
+        let track_extent = find_bound_extent(scroll.entry, &track_q, sf, scroll.vertical).unwrap_or(1.0);
+        let Some(thumb_extent) = find_bound_extent(scroll.entry, &thumb_q, sf, scroll.vertical) else { continue; };
 
-        let max_top = (track_h - thumb_h).max(0.0);
+        let max_top = (track_extent - thumb_extent).max(0.0);
         let denom = (scroll.max - scroll.min).max(f32::EPSILON);
         let percent = ((scroll.value - scroll.min) / denom).clamp(0.0, 1.0);
         let top = percent * max_top;
@@ -365,8 +402,8 @@ fn detect_change_scroll_values(
         apply_from_track_top_scroll(
             &mut scroll,
             top,
-            track_h,
-            thumb_h,
+            track_extent,
+            thumb_extent,
             &mut thumb_node_q,
             &mut target_scroll_q,
         );
@@ -391,10 +428,10 @@ fn initialize_scroll_visual_state(
             continue;
         }
 
-        let track_h = find_bound_height(scroll.entry, &track_q, sf).unwrap_or(1.0);
-        let Some(thumb_h) = find_bound_height(scroll.entry, &thumb_q, sf) else { continue; };
+        let track_extent = find_bound_extent(scroll.entry, &track_q, sf, scroll.vertical).unwrap_or(1.0);
+        let Some(thumb_extent) = find_bound_extent(scroll.entry, &thumb_q, sf, scroll.vertical) else { continue; };
 
-        let max_top = (track_h - thumb_h).max(0.0);
+        let max_top = (track_extent - thumb_extent).max(0.0);
         let denom = (scroll.max - scroll.min).max(f32::EPSILON);
         let percent = ((scroll.value - scroll.min) / denom).clamp(0.0, 1.0);
         let top = percent * max_top;
@@ -402,8 +439,8 @@ fn initialize_scroll_visual_state(
         apply_from_track_top_scroll(
             &mut scroll,
             top,
-            track_h,
-            thumb_h,
+            track_extent,
+            thumb_extent,
             &mut thumb_node_q,
             &mut target_scroll_q,
         );
@@ -412,10 +449,11 @@ fn initialize_scroll_visual_state(
     }
 }
 
-fn find_bound_height<Q>(
+fn find_bound_extent<Q>(
     entry: usize,
     query: &Query<(&ComputedNode, &BindToID), Q>,
     scale_factor: f32,
+    vertical: bool,
 ) -> Option<f32>
 where
     Q: QueryFilter,
@@ -423,5 +461,26 @@ where
     query
         .iter()
         .find(|(_, bind)| bind.0 == entry)
-        .map(|(computed, _)| (computed.size().y / scale_factor).max(1.0))
+        .map(|(computed, _)| axis_size(vertical, computed.size(), scale_factor))
+}
+
+fn axis_size(vertical: bool, size: Vec2, scale: f32) -> f32 {
+    if vertical {
+        (size.y / scale).max(1.0)
+    } else {
+        (size.x / scale).max(1.0)
+    }
+}
+
+fn track_extent(vertical: bool, size: Vec2, scale: f32) -> f32 {
+    axis_size(vertical, size, scale)
+}
+
+fn scroll_orientation(entry: usize, scroll_q: &mut Query<&mut Scrollbar, With<Scrollbar>>) -> Option<bool> {
+    for scroll in scroll_q.iter_mut() {
+        if scroll.entry == entry {
+            return Some(scroll.vertical);
+        }
+    }
+    None
 }

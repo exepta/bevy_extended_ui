@@ -524,8 +524,12 @@ fn parse_html_node(
         }
 
         "scroll" => {
+            let alignment = attributes.get("alignment").unwrap_or("vertical");
+            let mut vertical = true;
+            if alignment.eq_ignore_ascii_case("horizontal") { vertical = false; }
             Some(HtmlWidgetNode::Scrollbar(
                 Scrollbar {
+                    vertical,
                     ..default()
                 },
                 meta,
