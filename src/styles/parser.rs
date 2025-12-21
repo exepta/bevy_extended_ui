@@ -294,6 +294,8 @@ pub fn convert_to_val(value: String) -> Option<Val> {
     } else if trimmed.ends_with("%") {
         let count = trimmed.replace("%", "").parse::<f32>().ok()?;
         val = Some(Val::Percent(count));
+    } else if trimmed == "0" || trimmed == "0.0" || trimmed == "-0" || trimmed == "-0.0" {
+        val = Some(Val::Px(0.0));
     }
     val
 }

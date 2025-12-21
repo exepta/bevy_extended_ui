@@ -14,12 +14,15 @@ What will come in the next version?
     - [x] Toggle Button Widget
     - [x] Switch Button Widget
     - [x] Progress Bar Widget
-- [ ] Widgets will become scrollable with a scroll bar.
+- [x] Widget Div will become scrollable with a scroll bar.
 - [ ] More CSS support.
-    - [ ] right, left, top, bottom support 0 without a pixel.
+    - [x] right, left, top, bottom support 0 without a pixel.
     - [ ] Flexbox support optimizing.
     - [ ] `!important` support for CSS.
     - [ ] style tag support for HTML.
 - [ ] Refactored Bind system for HTML.
+- [ ] Fix bugs
+    - [ ] Div has no content if there is a scroll content in another one.
+    - [ ] Hotreload HTML can crash look file `error.log`.
 - [ ] More examples
 - [ ] Better documentation

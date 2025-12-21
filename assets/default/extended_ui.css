@@ -65,13 +65,12 @@ div {
 
 div scroll {
     position: absolute;
-    right: 1px;
-    top: 0;
+    right: 0;
 }
 
 div .scroll-horizontal {
-    bottom: 1px;
-    left: 1px;
+    bottom: 0;
+    left: 0;
 }
 
 /* Divider */
