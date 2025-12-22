@@ -105,7 +105,7 @@ pub struct HtmlMeta {
     pub css: Vec<Handle<CssAsset>>,
     pub id: Option<String>,
     pub class: Option<Vec<String>>,
-    pub style: Option<String>,
+    pub style: Option<HtmlStyle>,
 }
 
 #[derive(Debug, Clone, Default)]

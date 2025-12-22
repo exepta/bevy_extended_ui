@@ -369,6 +369,10 @@ fn spawn_with_meta<T: Component>(
         ))
         .id();
 
+    if let Some(inline_style) = &meta.style {
+        commands.entity(entity).insert(inline_style.clone());
+    }
+    
     if states.hidden {
         commands.entity(entity).insert(NeedHidden);
     }

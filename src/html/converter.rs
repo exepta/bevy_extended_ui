@@ -4,10 +4,7 @@ use bevy::asset::AssetEvent;
 use bevy::prelude::*;
 use kuchiki::{NodeRef, traits::TendrilSink};
 
-use crate::html::{
-    HtmlDirty, HtmlEventBindings, HtmlID, HtmlMeta, HtmlSource, HtmlStates, HtmlStructureMap,
-    HtmlWidgetNode,
-};
+use crate::html::{HtmlDirty, HtmlEventBindings, HtmlID, HtmlMeta, HtmlSource, HtmlStates, HtmlStructureMap, HtmlStyle, HtmlWidgetNode};
 use crate::io::{CssAsset, HtmlAsset};
 use crate::styles::IconPlace;
 use crate::widgets::Button;
@@ -172,7 +169,7 @@ fn parse_html_node(
         class: attributes
             .get("class")
             .map(|s| s.split_whitespace().map(str::to_string).collect()),
-        style: attributes.get("style").map(|s| s.to_string()),
+        style: attributes.get("style").map(HtmlStyle::from_str),
     };
 
     let states = HtmlStates {

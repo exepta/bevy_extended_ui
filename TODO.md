@@ -17,9 +17,9 @@ What will come in the next version?
 - [x] Widget Div will become scrollable with a scroll bar.
 - [ ] More CSS support.
     - [x] right, left, top, bottom support 0 without a pixel.
-    - [ ] Flexbox support optimizing.
+    - [x] Flexbox support optimizing.
     - [ ] `!important` support for CSS.
-    - [ ] style tag support for HTML.
+    - [x] style tag support for HTML.
 - [ ] Refactored Bind system for HTML.
 - [ ] Fix bugs
     - [ ] Div has no content if there is a scroll content in another one.
