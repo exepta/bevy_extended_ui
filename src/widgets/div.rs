@@ -177,6 +177,10 @@ fn ensure_div_scroll_structure(
                     TagName("div".to_string()),
                     DivScrollContent,
                     DivContentOwner(div_entity),
+                    Visibility::Inherited,
+                    InheritedVisibility::default(),
+                    Transform::default(),
+                    GlobalTransform::default(),
                     ScrollPosition::default(),
                     UIWidgetState::default(),
                     Pickable::default(),
@@ -192,6 +196,9 @@ fn ensure_div_scroll_structure(
 
             content_entity
         };
+
+        let mut sb_y_entity = sb_y_opt.map(|s| **s);
+        let mut sb_x_entity = sb_x_opt.map(|s| **s);
 
         // 2a) Ensure vertical scrollbar
         if wants_scroll_y && sb_y_opt.is_none() {
@@ -238,6 +245,7 @@ fn ensure_div_scroll_structure(
 
             commands.entity(div_entity).add_child(sb_entity);
             commands.entity(div_entity).insert(DivScrollbar(sb_entity));
+            sb_y_entity = Some(sb_entity);
         }
 
         // 2b) Ensure horizontal scrollbar
@@ -289,6 +297,7 @@ fn ensure_div_scroll_structure(
 
             commands.entity(div_entity).add_child(sb_entity);
             commands.entity(div_entity).insert(DivScrollbarH(sb_entity));
+            sb_x_entity = Some(sb_entity);
         }
 
         // 3) Reparent wrapper children under content (only if needed)
@@ -315,6 +324,30 @@ fn ensure_div_scroll_structure(
             }
         }
 
+        // 3b) Ensure the div's direct children order keeps scroll content first
+        // This mirrors the manual reordering workaround observed in the inspector.
+        if let Some(children) = children_opt {
+            let mut rest: Vec<Entity> = children
+                .iter()
+                .clone()
+                .filter(|c| *c != content_entity && Some(*c) != sb_y_opt.map(|s| **s) && Some(*c) != sb_x_opt.map(|s| **s))
+                .collect();
+
+            let mut desired = Vec::with_capacity(children.len());
+            desired.push(content_entity);
+            if let Some(sb) = sb_y_entity {
+                desired.push(sb);
+            }
+            if let Some(sb) = sb_x_entity {
+                desired.push(sb);
+            }
+            desired.append(&mut rest);
+
+            if !children.iter().clone().eq(desired.iter().copied()) {
+                commands.entity(div_entity).add_children(&desired);
+            }
+        }
+
         // Wrapper clips but does not scroll
         div_node.overflow.y = OverflowAxis::Clip;
         div_node.overflow.x = OverflowAxis::Clip;
@@ -330,6 +363,15 @@ fn ensure_div_scroll_structure(
         if has_scroll_pos_q.get(content_entity).is_err() {
             commands.entity(content_entity).insert(ScrollPosition::default());
         }
+
+        commands
+            .entity(content_entity)
+            .insert((
+                Transform::default(),
+                GlobalTransform::default(),
+                Visibility::Inherited,
+                InheritedVisibility::default(),
+            ));
     }
 }
 
@@ -338,6 +380,7 @@ fn route_hover_from_pointer_messages(
     mut over: MessageReader<Pointer<Over>>,
     mut out: MessageReader<Pointer<Out>>,
     parents: Query<&ChildOf>,
+    is_div_q: Query<(), With<Div>>,
     scroll_owner_q: Query<&DivContentOwner, With<DivScrollContent>>,
     sb_owner_q: Query<&DivScrollbarOwner>,
     is_scroll_content_q: Query<(), With<DivScrollContent>>,
@@ -347,6 +390,7 @@ fn route_hover_from_pointer_messages(
     fn find_owner_div(
         mut e: Entity,
         parents: &Query<&ChildOf>,
+        is_div_q: &Query<(), With<Div>>,
         is_scroll_content_q: &Query<(), With<DivScrollContent>>,
         scroll_owner_q: &Query<&DivContentOwner, With<DivScrollContent>>,
         sb_owner_q: &Query<&DivScrollbarOwner>,
@@ -354,6 +398,10 @@ fn route_hover_from_pointer_messages(
         loop {
             if let Ok(owner) = sb_owner_q.get(e) {
                 return Some(**owner);
+            }
+
+            if is_div_q.get(e).is_ok() {
+                return Some(e);
             }
 
             if is_scroll_content_q.get(e).is_ok() {
@@ -374,6 +422,7 @@ fn route_hover_from_pointer_messages(
         let Some(div) = find_owner_div(
             msg.entity,
             &parents,
+            &is_div_q,
             &is_scroll_content_q,
             &scroll_owner_q,
             &sb_owner_q,
@@ -394,6 +443,7 @@ fn route_hover_from_pointer_messages(
         let Some(div) = find_owner_div(
             msg.entity,
             &parents,
+            &is_div_q,
             &is_scroll_content_q,
             &scroll_owner_q,
             &sb_owner_q,

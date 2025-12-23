@@ -15,6 +15,7 @@ What will come in the next version?
     - [x] Switch Button Widget
     - [x] Progress Bar Widget
 - [x] Widget Div will become scrollable with a scroll bar.
+  - [ ] Scrollbar thumb width needs to be optimized.
 - [x] More CSS support.
     - [x] right, left, top, bottom support 0 without a pixel.
     - [x] Flexbox support optimizing.
@@ -22,8 +23,8 @@ What will come in the next version?
     - [x] style tag support for HTML.
 - [x] Refactored Bind system for HTML.
 - [x] Refactor UIRegistry.
-- [ ] Fix bugs
-    - [ ] Div has no content if there is a scroll content in another one.
+- [x] Fix bugs
+    - [x] Div has no content if there is a scroll content in another one.
     - [x] Scrollbar flickering when clicking around.
     - [x] Hotreload HTML can crash look file `error.log`.
 - [ ] More examples
