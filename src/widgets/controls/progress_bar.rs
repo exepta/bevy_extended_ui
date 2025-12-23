@@ -106,7 +106,7 @@ fn update_progress_bars(
                 }
                 node.width = Val::Px(fill_width);
                 for (_, styles) in style.styles.iter_mut() {
-                    styles.width = Some(Val::Px(fill_width));
+                    styles.normal.width = Some(Val::Px(fill_width));
                 }
             }
         }
@@ -143,7 +143,7 @@ fn initialize_progress_bar_visual_state(
                 }
                 node.width = Val::Px(fill_width);
                 for (_, styles) in style.styles.iter_mut() {
-                    styles.width = Some(Val::Px(fill_width));
+                    styles.normal.width = Some(Val::Px(fill_width));
                 }
             }
         }

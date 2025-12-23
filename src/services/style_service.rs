@@ -67,16 +67,37 @@ pub fn update_widget_styles_system(
 
         let mut final_style = Style::default();
 
+        // 1) base normal
         for (sel, _) in &base_styles {
-            final_style.merge(&ui_style.styles[*sel]);
+            if let Some(pair) = ui_style.styles.get(*sel) {
+                final_style.merge(&pair.normal);
+            }
         }
 
+        // 2) base important
+        for (sel, _) in &base_styles {
+            if let Some(pair) = ui_style.styles.get(*sel) {
+                final_style.merge(&pair.important);
+            }
+        }
+
+        // 3) inline html
         if let Some(html_style) = html_style_opt {
             final_style.merge(&html_style.0);
         }
 
+        // 4) pseudo normal
         for (sel, _) in &pseudo_styles {
-            final_style.merge(&ui_style.styles[*sel]);
+            if let Some(pair) = ui_style.styles.get(*sel) {
+                final_style.merge(&pair.normal);
+            }
+        }
+
+        // 5) pseudo important
+        for (sel, _) in &pseudo_styles {
+            if let Some(pair) = ui_style.styles.get(*sel) {
+                final_style.merge(&pair.important);
+            }
         }
 
         if ui_style.active_style.as_ref() != Some(&final_style) {

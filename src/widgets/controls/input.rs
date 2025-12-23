@@ -318,7 +318,7 @@ fn update_cursor_visibility(
             background.0.set_alpha(alpha);
 
             for (_, style) in styles.styles.iter_mut() {
-                style.background = Some(Background {
+                style.normal.background = Some(Background {
                     color: background.0,
                     ..default()
                 });
@@ -451,7 +451,7 @@ fn update_cursor_position(
         cursor_node.left = Val::Px(cursor_x_position);
 
         for (_, style) in styles.styles.iter_mut() {
-            style.left = Some(cursor_node.left);
+            style.normal.left = Some(cursor_node.left);
         }
     }
 
@@ -503,7 +503,7 @@ fn calculate_correct_text_container_width(
             }
 
             for (_, value) in style.styles.iter_mut() {
-                value.width = Some(Val::Percent((current - 15.0).max(0.0)));
+                value.normal.width = Some(Val::Percent((current - 15.0).max(0.0)));
             }
         }
     }
@@ -814,9 +814,9 @@ fn handle_overlay_label(
             }
 
             for (_, style) in styles.styles.iter_mut() {
-                style.top = Some(node.top);
-                style.left = Some(node.left);
-                style.font_size = Some(FontVal::Px(text_font.font_size));
+                style.normal.top = Some(node.top);
+                style.normal.left = Some(node.left);
+                style.normal.font_size = Some(FontVal::Px(text_font.font_size));
             }
         }
     }

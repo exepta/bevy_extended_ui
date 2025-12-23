@@ -165,8 +165,9 @@ impl FontVal {
 }
 
 #[derive(Reflect, Default, Debug, Clone, PartialEq)]
-pub struct StyleOptions {
-    pub important: bool,
+pub struct StylePair {
+    pub important: Style,
+    pub normal: Style,
 }
 
 /// Comprehensive style properties for UI elements.

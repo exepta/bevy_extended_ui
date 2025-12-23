@@ -7,12 +7,12 @@ use once_cell::sync::Lazy;
 use crate::io::CssAsset;
 use crate::styles::components::UiStyle;
 use crate::styles::parser::load_css;
-use crate::styles::{CssClass, CssID, CssSource, ExistingCssIDs, Style, TagName};
+use crate::styles::{CssClass, CssID, CssSource, ExistingCssIDs, StylePair, TagName};
 
 // Marks entities as needing CSS re-apply on hot reload
 use crate::html::reload::CssDirty;
 
-static PARSED_CSS_CACHE: Lazy<RwLock<HashMap<AssetId<CssAsset>, HashMap<String, Style>>>> =
+static PARSED_CSS_CACHE: Lazy<RwLock<HashMap<AssetId<CssAsset>, HashMap<String, StylePair>>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
 
 #[derive(Resource, Default)]
@@ -182,8 +182,8 @@ fn load_and_merge_styles_from_assets(
         Option<&TagName>,
         Option<&ChildOf>,
     )>,
-) -> HashMap<String, Style> {
-    let mut merged: HashMap<String, Style> = HashMap::new();
+) -> HashMap<String, StylePair> {
+    let mut merged: HashMap<String, StylePair> = HashMap::new();
 
     for handle in sources {
         let asset_id = handle.id();
@@ -211,7 +211,10 @@ fn load_and_merge_styles_from_assets(
             if matches_selector_chain(&selector_parts, id, class, tag, parent, parent_query) {
                 merged
                     .entry(selector.clone())
-                    .and_modify(|existing| existing.merge(new_style))
+                    .and_modify(|existing| {
+                        existing.normal.merge(&new_style.normal);
+                        existing.important.merge(&new_style.important);
+                    })
                     .or_insert_with(|| new_style.clone());
             }
         }

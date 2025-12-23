@@ -333,8 +333,8 @@ fn handle_overlay_label(
                 }
 
                 for (_, style) in styles.styles.iter_mut() {
-                    style.top = Some(node.top);
-                    style.font_size = Some(FontVal::Px(text_font.font_size));
+                    style.normal.top = Some(node.top);
+                    style.normal.font_size = Some(FontVal::Px(text_font.font_size));
                 }
             }
         }

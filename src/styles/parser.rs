@@ -1,5 +1,5 @@
 use crate::styles::paint::Colored;
-use crate::styles::{Background, FontVal, Radius, Style};
+use crate::styles::{Background, FontVal, Radius, Style, StylePair};
 use bevy::prelude::*;
 use lightningcss::rules::CssRule;
 use lightningcss::stylesheet::{ParserOptions, PrinterOptions, StyleSheet};
@@ -32,7 +32,7 @@ use std::collections::HashMap;
 /// - This uses [`grass_compiler::StyleSheet`] to parse the file.
 /// - Supports standard properties like `width`, `height`, `padding`, `color`, `background`, `font-size`, `z-index`, etc.
 /// - Ignores unsupported or malformed declarations silently.
-pub fn load_css(css: &str) -> HashMap<String, Style> {
+pub fn load_css(css: &str) -> HashMap<String, StylePair> {
     let stylesheet = match StyleSheet::parse(css, ParserOptions::default()) {
         Ok(stylesheet) => stylesheet,
         Err(err) => {
@@ -54,7 +54,7 @@ pub fn load_css(css: &str) -> HashMap<String, Style> {
                 Err(_) => continue,
             };
 
-            let mut style = Style::default();
+            let mut style = StylePair::default();
             let decls = &style_rule.declarations;
 
             if selector.trim() == ":root" {
@@ -81,7 +81,7 @@ pub fn load_css(css: &str) -> HashMap<String, Style> {
                 };
 
                 let resolved = resolve_var(&value, &css_vars);
-                apply_property_to_style(&mut style, name, &resolved);
+                apply_property_to_style(&mut style.normal, name, &resolved);
             }
 
             for property in &decls.important_declarations {
@@ -94,7 +94,7 @@ pub fn load_css(css: &str) -> HashMap<String, Style> {
                 };
 
                 let resolved = resolve_var(&value, &css_vars);
-                apply_property_to_style(&mut style, name, &resolved);
+                apply_property_to_style(&mut style.important, name, &resolved);
             }
 
             style_map.insert(selector, style);

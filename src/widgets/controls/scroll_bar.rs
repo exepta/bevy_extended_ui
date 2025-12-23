@@ -304,9 +304,9 @@ fn apply_from_track_top_scroll(
 
         for (_, s) in style.styles.iter_mut() {
             if scroll.vertical {
-                s.top = Some(node.top);
+                s.normal.top = Some(node.top);
             } else {
-                s.left = Some(node.left);
+                s.normal.left = Some(node.left);
             }
         }
     }

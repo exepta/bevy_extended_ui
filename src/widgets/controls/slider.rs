@@ -384,8 +384,8 @@ fn apply_slider_from_thumb_left(
         node.left = Val::Px(left);
 
         for (_, s) in style.styles.iter_mut() {
-            s.left = Some(node.left);
-            s.top = Some(node.top);
+            s.normal.left = Some(node.left);
+            s.normal.top = Some(node.top);
         }
     }
 
@@ -395,7 +395,7 @@ fn apply_slider_from_thumb_left(
         }
         node.width = Val::Px(fill_width);
         for (_, s) in style.styles.iter_mut() {
-            s.width = Some(node.width);
+            s.normal.width = Some(node.width);
         }
     }
 

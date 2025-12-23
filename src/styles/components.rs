@@ -1,19 +1,19 @@
 use crate::io::CssAsset;
 use crate::styles::parser::load_css;
-use crate::styles::{CssClass, CssID, Style, TagName};
+use crate::styles::{CssClass, CssID, Style, StylePair, TagName};
 use bevy::prelude::*;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::sync::RwLock;
 
-static CSS_CACHE: Lazy<RwLock<HashMap<AssetId<CssAsset>, HashMap<String, Style>>>> =
+static CSS_CACHE: Lazy<RwLock<HashMap<AssetId<CssAsset>, HashMap<String, StylePair>>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
 pub struct UiStyle {
     pub css: Handle<CssAsset>,
-    pub styles: HashMap<String, Style>,
+    pub styles: HashMap<String, StylePair>,
     pub active_style: Option<Style>,
 }
 
