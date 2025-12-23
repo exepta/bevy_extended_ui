@@ -6,6 +6,7 @@ use bevy_extended_ui::html::HtmlSource;
 use bevy_extended_ui::io::HtmlAsset;
 use bevy_inspector_egui::bevy_egui::EguiPlugin;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
+use bevy_extended_ui_macros::html_fn;
 
 fn main() {
     App::new()
@@ -29,4 +30,19 @@ fn main() {
 fn load_main_html(mut commands: Commands, asset_server: Res<AssetServer>) {
     let handle: Handle<HtmlAsset> = asset_server.load("examples/test.html");
     commands.spawn(HtmlSource::from_handle(handle));
+}
+
+#[html_fn("test_fn")]
+fn test_fn(mut _commands: Commands) {
+    info!("Test fn called!");
+}
+
+#[html_fn("test_fn2")]
+fn test_fn2(mut _commands: Commands) {
+    info!("Test fn over!");
+}
+
+#[html_fn("test_fn3")]
+fn test_fn3(mut _commands: Commands) {
+    info!("Test fn out!");
 }

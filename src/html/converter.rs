@@ -180,10 +180,8 @@ fn parse_html_node(
 
     let functions = HtmlEventBindings {
         onclick: attributes.get("onclick").map(|s| s.to_string()),
-        onmouseenter: attributes.get("onmouseenter").map(|s| s.to_string()),
-        onmouseleave: attributes.get("onmouseleave").map(|s| s.to_string()),
-        onupdate: attributes.get("onupdate").map(|s| s.to_string()),
-        onload: attributes.get("onload").map(|s| s.to_string()),
+        onmouseover: attributes.get("onmouseenter").map(|s| s.to_string()),
+        onmouseout: attributes.get("onmouseleave").map(|s| s.to_string()),
     };
 
     let widget = Widget(html.controller.clone());

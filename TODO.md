@@ -20,7 +20,7 @@ What will come in the next version?
     - [x] Flexbox support optimizing.
     - [x] `!important` support for CSS.
     - [x] style tag support for HTML.
-- [ ] Refactored Bind system for HTML.
+- [x] Refactored Bind system for HTML.
 - [ ] Fix bugs
     - [ ] Div has no content if there is a scroll content in another one.
     - [x] Scrollbar flickering when clicking around.

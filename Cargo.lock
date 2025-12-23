@@ -797,10 +797,20 @@ version = "1.0.0-beta.1"
 dependencies = [
  "bevy",
  "bevy-inspector-egui",
+ "bevy_extended_ui_macros",
+ "inventory",
  "kuchiki",
  "lightningcss",
  "once_cell",
  "regex",
+]
+
+[[package]]
+name = "bevy_extended_ui_macros"
+version = "0.1.0"
+dependencies = [
+ "quote",
+ "syn 2.0.103",
 ]
 
 [[package]]
