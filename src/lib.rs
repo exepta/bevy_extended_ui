@@ -8,6 +8,7 @@ use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
 use bevy::render::view::Hdr;
 use std::collections::HashMap;
+use crate::registry::ExtendedRegistryPlugin;
 
 pub mod html;
 pub mod io;
@@ -85,6 +86,7 @@ impl Plugin for ExtendedUiPlugin {
         app.init_resource::<CurrentWidgetState>();
         app.register_type::<Camera>();
         app.add_plugins((
+            ExtendedRegistryPlugin,
             ExtendedWidgetPlugin,
             ExtendedServicePlugin,
             ExtendedStylingPlugin,

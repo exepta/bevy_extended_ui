@@ -6,6 +6,7 @@ use bevy_extended_ui::html::HtmlSource;
 use bevy_extended_ui::io::HtmlAsset;
 use bevy_inspector_egui::bevy_egui::EguiPlugin;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
+use bevy_extended_ui::registry::UiRegistry;
 use bevy_extended_ui_macros::html_fn;
 
 fn main() {
@@ -27,9 +28,9 @@ fn main() {
         .run();
 }
 
-fn load_main_html(mut commands: Commands, asset_server: Res<AssetServer>) {
+fn load_main_html(mut reg: ResMut<UiRegistry>, asset_server: Res<AssetServer>) {
     let handle: Handle<HtmlAsset> = asset_server.load("examples/test.html");
-    commands.spawn(HtmlSource::from_handle(handle));
+    reg.add_and_use("test".to_string(), HtmlSource::from_handle(handle));
 }
 
 #[html_fn("test_fn")]
