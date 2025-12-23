@@ -4,6 +4,10 @@ body {
     height: 100%;
 }
 
+button {
+    background: #a163f9;
+}
+
 .test {
     background: #59cc59;
     width: 300px;

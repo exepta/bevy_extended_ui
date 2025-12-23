@@ -54,11 +54,13 @@ pub fn load_css(css: &str) -> HashMap<String, Style> {
                 Err(_) => continue,
             };
 
+            let mut style = Style::default();
+            let decls = &style_rule.declarations;
+
             if selector.trim() == ":root" {
-                for property in &style_rule.declarations.declarations {
+                for property in decls.declarations.iter().chain(decls.important_declarations.iter()) {
                     let property_id = property.property_id();
                     let name = property_id.name();
-
                     if name.starts_with("--") {
                         if let Ok(value) = property.value_to_css_string(PrinterOptions::default()) {
                             css_vars.insert(name.to_string(), value);
@@ -68,8 +70,8 @@ pub fn load_css(css: &str) -> HashMap<String, Style> {
                 continue;
             }
 
-            let mut style = Style::default();
-            for property in &style_rule.declarations.declarations {
+            // 1) normale Declarations
+            for property in &decls.declarations {
                 let property_id = property.property_id();
                 let name = property_id.name();
 
@@ -78,14 +80,20 @@ pub fn load_css(css: &str) -> HashMap<String, Style> {
                     Err(_) => continue,
                 };
 
-                let mut resolved = value.clone();
-                if let Some(var_name) = value.strip_prefix("var(").and_then(|s| s.strip_suffix(')'))
-                {
-                    if let Some(var_value) = css_vars.get(var_name.trim()) {
-                        resolved = var_value.clone();
-                    }
-                }
+                let resolved = resolve_var(&value, &css_vars);
+                apply_property_to_style(&mut style, name, &resolved);
+            }
 
+            for property in &decls.important_declarations {
+                let property_id = property.property_id();
+                let name = property_id.name();
+
+                let value = match property.value_to_css_string(PrinterOptions::default()) {
+                    Ok(v) => v,
+                    Err(_) => continue,
+                };
+
+                let resolved = resolve_var(&value, &css_vars);
                 apply_property_to_style(&mut style, name, &resolved);
             }
 
@@ -94,6 +102,15 @@ pub fn load_css(css: &str) -> HashMap<String, Style> {
     }
 
     style_map
+}
+
+fn resolve_var(value: &str, css_vars: &HashMap<String, String>) -> String {
+    if let Some(var_name) = value.strip_prefix("var(").and_then(|s| s.strip_suffix(')')) {
+        if let Some(var_value) = css_vars.get(var_name.trim()) {
+            return var_value.clone();
+        }
+    }
+    value.to_string()
 }
 
 /// Applies a single CSS property to a mutable [`Style`] object.

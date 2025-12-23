@@ -1,7 +1,7 @@
 /* Button */
 
 button {
-    background: #bcbcbc;
+    background: #bcbcbc !important;
     width: 140px;
     height: 45px;
     border-radius: 6px;

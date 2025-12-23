@@ -164,6 +164,11 @@ impl FontVal {
     }
 }
 
+#[derive(Reflect, Default, Debug, Clone, PartialEq)]
+pub struct StyleOptions {
+    pub important: bool,
+}
+
 /// Comprehensive style properties for UI elements.
 #[derive(Reflect, Default, Debug, Clone, PartialEq)]
 pub struct Style {
@@ -224,147 +229,77 @@ impl Style {
      * @param other The other style to merge from.
      */
     pub fn merge(&mut self, other: &Style) {
-        if other.display.is_some() {
-            self.display = other.display.clone();
-        }
-        if other.box_sizing.is_some() {
-            self.box_sizing = other.box_sizing.clone();
-        }
-        if other.position_type.is_some() {
-            self.position_type = other.position_type.clone();
-        }
-        if other.width.is_some() {
-            self.width = other.width.clone();
-        }
-        if other.min_width.is_some() {
-            self.min_width = other.min_width.clone();
-        }
-        if other.max_width.is_some() {
-            self.max_width = other.max_width.clone();
-        }
-        if other.height.is_some() {
-            self.height = other.height.clone();
-        }
-        if other.min_height.is_some() {
-            self.min_height = other.min_height.clone();
-        }
-        if other.max_height.is_some() {
-            self.max_height = other.max_height.clone();
-        }
-        if other.left.is_some() {
-            self.left = other.left.clone();
-        }
-        if other.top.is_some() {
-            self.top = other.top.clone();
-        }
-        if other.right.is_some() {
-            self.right = other.right.clone();
-        }
-        if other.bottom.is_some() {
-            self.bottom = other.bottom.clone();
-        }
-        if other.padding.is_some() {
-            self.padding = other.padding.clone();
-        }
-        if other.margin.is_some() {
-            self.margin = other.margin.clone();
-        }
-        if other.border.is_some() {
-            self.border = other.border.clone();
-        }
-        if other.overflow.is_some() {
-            self.overflow = other.overflow.clone();
-        }
-        if other.color.is_some() {
-            self.color = other.color.clone();
-        }
-        if other.background.is_some() {
-            self.background = other.background.clone();
-        }
-        if other.border_color.is_some() {
-            self.border_color = other.border_color.clone();
-        }
-        if other.border_width.is_some() {
-            self.border_width = other.border_width.clone();
-        }
-        if other.border_radius.is_some() {
-            self.border_radius = other.border_radius.clone();
-        }
-        if other.font_size.is_some() {
-            self.font_size = other.font_size.clone();
-        }
-        if other.box_shadow.is_some() {
-            self.box_shadow = other.box_shadow.clone();
-        }
-        if other.justify_content.is_some() {
-            self.justify_content = other.justify_content.clone();
-        }
-        if other.justify_items.is_some() {
-            self.justify_items = other.justify_items.clone();
-        }
-        if other.justify_self.is_some() {
-            self.justify_self = other.justify_self.clone();
-        }
-        if other.align_content.is_some() {
-            self.align_content = other.align_content.clone();
-        }
-        if other.align_items.is_some() {
-            self.align_items = other.align_items.clone();
-        }
-        if other.align_self.is_some() {
-            self.align_self = other.align_self.clone();
-        }
-        if other.flex_direction.is_some() {
-            self.flex_direction = other.flex_direction.clone();
-        }
-        if other.flex_grow.is_some() {
-            self.flex_grow = other.flex_grow.clone();
-        }
-        if other.flex_shrink.is_some() {
-            self.flex_shrink = other.flex_shrink.clone();
-        }
-        if other.flex_basis.is_some() {
-            self.flex_basis = other.flex_basis.clone();
-        }
-        if other.flex_wrap.is_some() {
-            self.flex_wrap = other.flex_wrap.clone();
-        }
-        if other.grid_row.is_some() {
-            self.grid_row = other.grid_row.clone();
-        }
-        if other.grid_column.is_some() {
-            self.grid_column = other.grid_column.clone();
-        }
-        if other.grid_auto_flow.is_some() {
-            self.grid_auto_flow = other.grid_auto_flow.clone();
-        }
-        if other.grid_template_rows.is_some() {
-            self.grid_template_rows = other.grid_template_rows.clone();
-        }
-        if other.grid_template_columns.is_some() {
-            self.grid_template_columns = other.grid_template_columns.clone();
-        }
-        if other.grid_auto_rows.is_some() {
-            self.grid_auto_rows = other.grid_auto_rows.clone();
-        }
-        if other.grid_auto_columns.is_some() {
-            self.grid_auto_columns = other.grid_auto_columns.clone();
-        }
-        if other.gap.is_some() {
-            self.gap = other.gap.clone();
-        }
-        if other.text_wrap.is_some() {
-            self.text_wrap = other.text_wrap.clone();
-        }
-        if other.z_index.is_some() {
-            self.z_index = other.z_index.clone();
-        }
-        if other.pointer_events.is_some() {
-            self.pointer_events = other.pointer_events.clone();
-        }
-        if other.scrollbar_width.is_some() {
-            self.scrollbar_width = other.scrollbar_width.clone();
-        }
+        merge_opt(&mut self.display, &other.display);
+        merge_opt(&mut self.box_sizing, &other.box_sizing);
+        merge_opt(&mut self.position_type, &other.position_type);
+
+        merge_opt(&mut self.width, &other.width);
+        merge_opt(&mut self.min_width, &other.min_width);
+        merge_opt(&mut self.max_width, &other.max_width);
+
+        merge_opt(&mut self.height, &other.height);
+        merge_opt(&mut self.min_height, &other.min_height);
+        merge_opt(&mut self.max_height, &other.max_height);
+
+        merge_opt(&mut self.left, &other.left);
+        merge_opt(&mut self.top, &other.top);
+        merge_opt(&mut self.right, &other.right);
+        merge_opt(&mut self.bottom, &other.bottom);
+
+        merge_opt(&mut self.padding, &other.padding);
+        merge_opt(&mut self.margin, &other.margin);
+        merge_opt(&mut self.border, &other.border);
+
+        merge_opt(&mut self.overflow, &other.overflow);
+
+        merge_opt(&mut self.color, &other.color);
+        merge_opt(&mut self.background, &other.background);
+
+        merge_opt(&mut self.border_color, &other.border_color);
+        merge_opt(&mut self.border_width, &other.border_width);
+        merge_opt(&mut self.border_radius, &other.border_radius);
+
+        merge_opt(&mut self.font_size, &other.font_size);
+        merge_opt(&mut self.box_shadow, &other.box_shadow);
+
+        merge_opt(&mut self.justify_content, &other.justify_content);
+        merge_opt(&mut self.justify_items, &other.justify_items);
+        merge_opt(&mut self.justify_self, &other.justify_self);
+
+        merge_opt(&mut self.align_content, &other.align_content);
+        merge_opt(&mut self.align_items, &other.align_items);
+        merge_opt(&mut self.align_self, &other.align_self);
+
+        merge_opt(&mut self.flex_direction, &other.flex_direction);
+        merge_opt(&mut self.flex_wrap, &other.flex_wrap);
+        merge_opt(&mut self.flex_grow, &other.flex_grow);
+        merge_opt(&mut self.flex_shrink, &other.flex_shrink);
+        merge_opt(&mut self.flex_basis, &other.flex_basis);
+
+        merge_opt(&mut self.grid_row, &other.grid_row);
+        merge_opt(&mut self.grid_column, &other.grid_column);
+        merge_opt(&mut self.grid_auto_flow, &other.grid_auto_flow);
+
+        merge_opt(&mut self.grid_template_rows, &other.grid_template_rows);
+        merge_opt(&mut self.grid_template_columns, &other.grid_template_columns);
+        merge_opt(&mut self.grid_auto_rows, &other.grid_auto_rows);
+        merge_opt(&mut self.grid_auto_columns, &other.grid_auto_columns);
+
+        merge_opt(&mut self.gap, &other.gap);
+
+        merge_opt(&mut self.text_wrap, &other.text_wrap);
+
+        merge_opt(&mut self.z_index, &other.z_index);
+        merge_opt(&mut self.pointer_events, &other.pointer_events);
+
+        merge_opt(&mut self.scrollbar_width, &other.scrollbar_width);
+    }
+}
+
+#[inline]
+fn merge_opt<T: Clone>(dst: &mut Option<T>, src: &Option<T>) {
+    if let Some(v) = src.as_ref() {
+        *dst = Some(v.clone());
     }
 }
 
