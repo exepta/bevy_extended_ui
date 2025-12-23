@@ -21,9 +21,10 @@ What will come in the next version?
     - [x] `!important` support for CSS.
     - [x] style tag support for HTML.
 - [x] Refactored Bind system for HTML.
+- [ ] Refactor UIRegistry.
 - [ ] Fix bugs
     - [ ] Div has no content if there is a scroll content in another one.
     - [x] Scrollbar flickering when clicking around.
-    - [ ] Hotreload HTML can crash look file `error.log`.
+    - [x] Hotreload HTML can crash look file `error.log`.
 - [ ] More examples
 - [ ] Better documentation
