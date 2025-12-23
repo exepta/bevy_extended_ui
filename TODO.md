@@ -15,10 +15,10 @@ What will come in the next version?
     - [x] Switch Button Widget
     - [x] Progress Bar Widget
 - [x] Widget Div will become scrollable with a scroll bar.
-- [ ] More CSS support.
+- [x] More CSS support.
     - [x] right, left, top, bottom support 0 without a pixel.
     - [x] Flexbox support optimizing.
-    - [ ] `!important` support for CSS.
+    - [x] `!important` support for CSS.
     - [x] style tag support for HTML.
 - [ ] Refactored Bind system for HTML.
 - [ ] Fix bugs
