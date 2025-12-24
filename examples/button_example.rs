@@ -19,7 +19,7 @@ fn main() {
 }
 
 #[html_fn("click_me_btn")]
-fn click_me_btn(mut query: Query<(&mut UIWidgetState, &CssID, &mut bevy_extended_ui::widgets::Button), With<CssID>>) {
+fn click_me_btn(In(_target): In<Entity>, mut query: Query<(&mut UIWidgetState, &CssID, &mut bevy_extended_ui::widgets::Button), With<CssID>>) {
     for (mut state, id, mut button) in query.iter_mut() {
         if id.0.eq("fn_q_key") {
             state.disabled = !state.disabled;
@@ -29,18 +29,18 @@ fn click_me_btn(mut query: Query<(&mut UIWidgetState, &CssID, &mut bevy_extended
 }
 
 #[html_fn("enter_me_btn")]
-fn enter_me_btn(mut query: Query<(&CssID, &mut bevy_extended_ui::widgets::Button), With<CssID>>) {
-    for (id, mut button) in query.iter_mut() {
-        if id.0.eq("icon_key") {
+fn enter_me_btn(In(target): In<Entity>, mut query: Query<(Entity, &mut bevy_extended_ui::widgets::Button), With<CssID>>) {
+    for (entity, mut button) in query.iter_mut() {
+        if entity.eq(&target) {
             button.icon_place = IconPlace::Right;
         }
     }
 }
 
 #[html_fn("leave_me_btn")]
-fn leave_me_btn(mut query: Query<(&CssID, &mut bevy_extended_ui::widgets::Button), With<CssID>>) {
-    for (id, mut button) in query.iter_mut() {
-        if id.0.eq("icon_key") {
+fn leave_me_btn(In(target): In<Entity>, mut query: Query<(Entity, &mut bevy_extended_ui::widgets::Button), With<CssID>>) {
+    for (entity, mut button) in query.iter_mut() {
+        if entity.eq(&target) {
             button.icon_place = IconPlace::Left;
         }
     }

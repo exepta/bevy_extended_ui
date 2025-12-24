@@ -36,7 +36,7 @@ pub fn html_fn(attr: TokenStream, item: TokenStream) -> TokenStream {
         #input_fn
 
         #[doc(hidden)]
-        fn #builder_ident(world: &mut bevy::prelude::World) -> bevy::ecs::system::SystemId<(), ()> {
+        fn #builder_ident(world: &mut bevy::prelude::World) -> bevy::ecs::system::SystemId<bevy::prelude::In<bevy::prelude::Entity>, ()> {
             world.register_system(#fn_ident)
         }
 

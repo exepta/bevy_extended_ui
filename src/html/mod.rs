@@ -299,16 +299,16 @@ impl Default for HtmlID {
 
 pub struct HtmlFnRegistration {
     pub name: &'static str,
-    pub build: fn(&mut World) -> SystemId,
+    pub build: fn(&mut World) -> SystemId<In<Entity>, ()>,
 }
 
 inventory::collect!(HtmlFnRegistration);
 
 #[derive(Default, Resource)]
 pub struct HtmlFunctionRegistry {
-    pub click: HashMap<String, SystemId>,
-    pub over: HashMap<String, SystemId>,
-    pub out: HashMap<String, SystemId>,
+    pub click: HashMap<String, SystemId<In<Entity>>>,
+    pub over: HashMap<String, SystemId<In<Entity>>>,
+    pub out: HashMap<String, SystemId<In<Entity>>>,
 }
 
 #[derive(Component, Reflect, Default, Clone, Debug)]
@@ -370,7 +370,7 @@ impl Plugin for ExtendedUiHtmlPlugin {
 }
 
 pub fn register_html_fns(world: &mut World) {
-    let mut to_insert: Vec<(String, SystemId)> = Vec::new();
+    let mut to_insert: Vec<(String, SystemId<In<Entity>>)> = Vec::new();
 
     for item in inventory::iter::<HtmlFnRegistration> {
         let id = (item.build)(world);

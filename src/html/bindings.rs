@@ -31,7 +31,7 @@ pub(crate) fn on_html_click(
     let Some(name) = bindings.onclick.as_deref() else { return };
 
     if let Some(&sys_id) = reg.click.get(name) {
-        commands.run_system(sys_id);
+        commands.run_system_with(sys_id, entity);
     } else {
         warn!("onclick binding '{name}' not registered via #[html_fn(...)]");
     }
@@ -66,7 +66,7 @@ pub(crate) fn on_html_mouse_over(
     let Some(name) = bindings.onmouseover.as_deref() else { return };
 
     if let Some(&sys_id) = reg.over.get(name) {
-        commands.run_system(sys_id);
+        commands.run_system_with(sys_id, entity);
     } else {
         warn!("onmouseover binding '{name}' not registered via #[html_fn(...)]");
     }
@@ -101,7 +101,7 @@ pub(crate) fn on_html_mouse_out(
     let Some(name) = bindings.onmouseout.as_deref() else { return };
 
     if let Some(&sys_id) = reg.out.get(name) {
-        commands.run_system(sys_id);
+        commands.run_system_with(sys_id, entity);
     } else {
         warn!("onmouseout binding '{name}' not registered via #[html_fn(...)]");
     }
