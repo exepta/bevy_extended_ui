@@ -3,6 +3,7 @@ use crate::styles::{CssClass, CssSource, IconPlace, TagName};
 use crate::widgets::{BindToID, Button, UIGenID, UIWidgetState, WidgetId, WidgetKind};
 use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
 use bevy::camera::visibility::RenderLayers;
+use bevy::ecs::relationship::RelatedSpawnerCommands;
 use bevy::prelude::*;
 use crate::widgets::controls::place_icon_if;
 
@@ -16,7 +17,7 @@ pub struct ButtonWidget;
 
 impl Plugin for ButtonWidget {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, internal_node_creation_system);
+        app.add_systems(Update, (internal_node_creation_system, update_button_system));
     }
 }
 
@@ -87,54 +88,107 @@ fn internal_node_creation_system(
                 ButtonBase,
             ))
             .with_children(|builder| {
-                place_icon_if(
-                    builder,
-                    button.icon_place,
-                    IconPlace::Left,
-                    &button.icon_path,
-                    button.entry,
-                    &asset_server,
-                    &mut image_cache,
-                    vec!["button-text".to_string()],
-                    id.0,
-                    *layer,
-                    css_source.clone(),
-                );
-
-                builder.spawn((
-                    Name::new(format!("Button-Text-{}", button.entry)),
-                    Text::new(button.text.clone()),
-                    TextColor::default(),
-                    TextFont::default(),
-                    TextLayout::default(),
-                    css_source.clone(),
-                    UIWidgetState::default(),
-                    ZIndex::default(),
-                    CssClass(vec!["button-text".to_string()]),
-                    Pickable::IGNORE,
-                    BindToID(id.0),
-                    RenderLayers::layer(*layer),
-                    ButtonText,
-                ));
-
-                place_icon_if(
-                    builder,
-                    button.icon_place,
-                    IconPlace::Right,
-                    &button.icon_path,
-                    button.entry,
-                    &asset_server,
-                    &mut image_cache,
-                    vec!["button-text".to_string()],
-                    id.0,
-                    *layer,
-                    css_source.clone(),
-                );
+                spawn_button_children(builder, button, id, *layer, css_source.clone(), &asset_server, &mut image_cache);
             })
             .observe(on_internal_click)
             .observe(on_internal_cursor_entered)
             .observe(on_internal_cursor_leave);
     }
+}
+
+fn update_button_system(
+    mut commands: Commands,
+    query: Query<
+        (Entity, &UIGenID, &Button, Option<&CssSource>, Option<&Children>),
+        (With<Button>, With<ButtonBase>, Changed<Button>),
+    >,
+    text_q: Query<(), With<ButtonText>>,
+    image_q: Query<(), With<crate::widgets::controls::ButtonImage>>,
+    config: Res<ExtendedUiConfiguration>,
+    asset_server: Res<AssetServer>,
+    mut image_cache: ResMut<ImageCache>,
+) {
+    let layer = config.render_layers.first().unwrap_or(&1);
+    for (entity, id, button, source_opt, children_opt) in query.iter() {
+        let mut css_source = CssSource::default();
+        if let Some(source) = source_opt {
+            css_source = source.clone();
+        }
+
+        if let Some(children) = children_opt {
+            for child in children.iter() {
+                if text_q.get(child).is_ok() || image_q.get(child).is_ok() {
+                    commands.entity(child).despawn();
+                }
+            }
+        }
+
+        commands.entity(entity).with_children(|builder| {
+            spawn_button_children(
+                builder,
+                button,
+                id,
+                *layer,
+                css_source.clone(),
+                &asset_server,
+                &mut image_cache,
+            );
+        });
+    }
+}
+
+fn spawn_button_children(
+    builder: &mut RelatedSpawnerCommands<ChildOf>,
+    button: &Button,
+    id: &UIGenID,
+    layer: usize,
+    css_source: CssSource,
+    asset_server: &Res<AssetServer>,
+    image_cache: &mut ResMut<ImageCache>,
+) {
+    place_icon_if(
+        builder,
+        button.icon_place,
+        IconPlace::Left,
+        &button.icon_path,
+        button.entry,
+        asset_server,
+        image_cache,
+        vec!["button-text".to_string()],
+        id.0,
+        layer,
+        css_source.clone(),
+    );
+
+    builder.spawn((
+        Name::new(format!("Button-Text-{}", button.entry)),
+        Text::new(button.text.clone()),
+        TextColor::default(),
+        TextFont::default(),
+        TextLayout::default(),
+        css_source.clone(),
+        UIWidgetState::default(),
+        ZIndex::default(),
+        CssClass(vec!["button-text".to_string()]),
+        Pickable::IGNORE,
+        BindToID(id.0),
+        RenderLayers::layer(layer),
+        ButtonText,
+    ));
+
+    place_icon_if(
+        builder,
+        button.icon_place,
+        IconPlace::Right,
+        &button.icon_path,
+        button.entry,
+        asset_server,
+        image_cache,
+        vec!["button-text".to_string()],
+        id.0,
+        layer,
+        css_source.clone(),
+    );
 }
 
 /// Helper function that spawns an icon image as a child of a button node.
