@@ -117,7 +117,9 @@ fn update_button_system(
 
         if let Some(children) = children_opt {
             for child in children.iter() {
-                if text_q.get(child).is_ok() || image_q.get(child).is_ok() {
+                if commands.get_entity(child).is_ok()
+                    && (text_q.get(child).is_ok() || image_q.get(child).is_ok())
+                {
                     commands.entity(child).despawn();
                 }
             }

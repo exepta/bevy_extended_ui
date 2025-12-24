@@ -28,8 +28,9 @@ What will come in the next version?
     - [x] Scrollbar flickering when clicking around.
     - [x] Hotreload HTML can crash look file `error.log`.
     - [x] Button is not refreshable.
-    - [ ] :disabled is not every time above :hover styles. 
+    - [x] :disabled is not every time above :hover styles.
 - [x] Ui Default Theme
+- [ ] Include disabled and read-only ui style.
 - [ ] Better examples.
 - [ ] Better documentation.
 - [ ] Test library in an external project.

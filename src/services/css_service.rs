@@ -1,6 +1,5 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::RwLock;
-
 use bevy::prelude::*;
 use once_cell::sync::Lazy;
 
@@ -156,16 +155,19 @@ fn apply_css_to_entities(
 
         match style_query.get(entity) {
             Ok(Some(existing)) if existing.styles != final_style.styles => {
-                commands.entity(entity).insert(final_style);
+                commands.entity(entity).queue_silenced(move |mut ew: EntityWorldMut| {
+                    ew.insert(final_style);
+                    ew.remove::<CssDirty>();
+                });
             }
             Ok(None) => {
-                commands.entity(entity).insert(final_style);
+                commands.entity(entity).queue_silenced(move |mut ew: EntityWorldMut| {
+                    ew.insert(final_style);
+                    ew.remove::<CssDirty>();
+                });
             }
             _ => {}
         }
-
-        // CHANGED: clear dirty marker so it doesn't constantly re-trigger
-        commands.entity(entity).remove::<CssDirty>();
     }
 }
 
