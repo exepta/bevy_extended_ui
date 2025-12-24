@@ -17,6 +17,7 @@ pub mod services;
 pub mod styles;
 pub mod utils;
 pub mod widgets;
+pub mod example_utils;
 
 /// A cache mapping image paths to their loaded handles,
 /// preventing duplicate loads and allowing cleanup of unused images.

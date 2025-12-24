@@ -1,8 +1,20 @@
+:root {
+    --primary: #ef7545;
+    --primary-hover: #fa8354;
+    --primary-disabled: #754e44;
+    --primary-transparent-layer: rgba(239, 117, 69, 0.35);
+    --headline: #b9b9c6;
+    --headline-sec: #aaaabc;
+    --text-color: #e8e8fd;
+    --text-color-dark: #b4b4c1;
+    --gray-background: #323436;
+}
+
 /* Button */
 
 button {
-    background: #bcbcbc;
-    width: 140px;
+    background: var(--primary);
+    min-width: 140px;
     height: 45px;
     border-radius: 6px;
     border: none;
@@ -10,14 +22,23 @@ button {
     justify-content: center;
     align-items: center;
     gap: 10px;
+    padding: 0 15px;
+}
+
+button:disabled {
+    background: var(--primary-disabled);
 }
 
 button:hover {
-    background: #a9a9a9;
+    background: var(--primary-hover);
 }
 
 button .button-text {
-    color: #303039;
+    color: var(--text-color);
+}
+
+button:disabled .button-text {
+    color: var(--text-color-dark);
 }
 
 /* CheckBox */
@@ -38,19 +59,20 @@ checkbox .mark-box {
     display: flex;
     justify-content: center;
     align-items: center;
-    border-radius: 2px;
-    border: 2px white;
+    border-radius: 4px;
+    border: 2px;
+    border-color: var(--text-color);
 }
 
 checkbox .mark-box .mark {
-    color: #ffffff;
+    color: var(--text-color);
     width: 16px;
     height: 16px;
 }
 
 checkbox:checked .mark-box {
-    border-color: #a163f9;
-    background: #a163f9;
+    border-color: var(--primary);
+    background: var(--primary);
 }
 
 checkbox .check-text {
@@ -76,7 +98,7 @@ div .scroll-horizontal {
 /* Divider */
 
 divider {
-    background: #d4d4f3;
+    background: var(--text-color-dark);
     margin: 5px;
 }
 
@@ -100,7 +122,6 @@ fieldset {
     justify-content: start;
     align-items: start;
     flex-direction: row;
-    background: #a163f9;
     min-height: 50px;
     min-width: 200px;
     gap: 5px;
@@ -117,42 +138,42 @@ img {
 h1 {
     font-size: 48px;
     font-weight: 600;
-    color: #000000;
+    color: var(--headline);
     margin: 16px;
 }
 
 h2 {
     font-size: 40px;
     font-weight: 600;
-    color: #000000;
+    color: var(--headline);
     margin: 16px;
 }
 
 h3 {
     font-size: 32px;
     font-weight: 600;
-    color: #000000;
+    color: var(--headline);
     margin: 16px;
 }
 
 h4 {
     font-size: 24px;
     font-weight: 600;
-    color: #000000;
+    color: var(--headline-sec);
     margin: 16px;
 }
 
 h5 {
     font-size: 20px;
     font-weight: 600;
-    color: #000000;
+    color: var(--headline-sec);
     margin: 16px;
 }
 
 h6 {
     font-size: 16px;
     font-weight: 600;
-    color: #000000;
+    color: var(--headline-sec);
     margin: 16px;
 }
 
@@ -162,15 +183,16 @@ input {
     width: 350px;
     height: 55px;
     border-radius: 5px;
-    border: 2px white;
+    border: 2px;
+    border-color: var(--text-color-dark);
 }
 
 input:hover {
-    border-color: #a163f9;
+    border-color: var(--primary-hover);
 }
 
 input:focus {
-    border-color: #a163f9;
+    border-color: var(--primary);
 }
 
 input .input-label {
@@ -204,11 +226,11 @@ input .in-text-container {
 }
 
 input:hover .input-label {
-    color: #a163f9;
+    color: var(--primary-hover);
 }
 
 input:focus .input-label {
-    color: #a163f9;
+    color: var(--primary);
 }
 
 input .in-text-container .input-text {
@@ -220,14 +242,14 @@ input .in-text-container .input-text {
 input .in-text-container .input-cursor {
     width: 2px;
     height: 20px;
-    background: white;
+    background: var(--text-color);
 }
 
 /* Paragraph */
 p {
     margin: 8px;
     font-size: 12px;
-    color: #000000;
+    color: var(--text-color);
 }
 
 /* Progress Bar */
@@ -235,14 +257,14 @@ progressbar {
     min-width: 220px;
     width: 100%;
     min-height: 10px;
-    background: rgba(106, 0, 255, 0.2);
     border-radius: 5px;
+    background: var(--primary-transparent-layer);
 }
 
 progressbar .progress {
     width: 0;
     height: 100%;
-    background: #6a00ff;
+    background: var(--primary-hover);
     border-radius: 5px;
 }
 
@@ -262,30 +284,39 @@ radio .radio-dot {
     width: 25px;
     height: 25px;
     border-radius: 50%;
-    border: 2px #323436;
+    border: 2px;
+    border-color: var(--text-color);
     display: flex;
     justify-content: center;
     align-items: center;
-    background: white;
+    background: transparent;
+}
+
+radio:hover .radio-dot {
+    border-color: var(--primary-hover);
+}
+
+radio:checked .radio-dot {
+    border-color: var(--primary);
 }
 
 radio .radio-dot .checked-dot {
     width: 17px;
     height: 17px;
-    background: #6a00ff;
+    background: var(--primary);
     border-radius: 50%;
 }
 
 radio .radio-text {
     font-size: 13px;
-    color: #323436;
+    color: var(--text-color);
 }
 
 /* Scrollbar */
 scroll {
     width: 10px;
     height: 95%;
-    background: #bcbcbc;
+    background: var(--primary-transparent-layer);
     border-radius: 5px;
     position: relative;
 }
@@ -304,7 +335,7 @@ scroll .scroll-track .scroll-thumb {
     position: absolute;
     width: 100%;
     min-height: 50px;
-    background: #a163f9;
+    background: var(--primary);
     border-radius: 5px;
 }
 
@@ -321,33 +352,34 @@ select {
     width: 350px;
     height: 55px;
     border-radius: 5px 0;
-    border: 2px #d4d4f3;
-    color: #d4d4f3;
+    border: 2px;
+    border-color: var(--text-color);
+    color: var(--text-color);
     z-index: 1;
 }
 
 select:hover {
-    border-color: #a163f9;
+    border-color: var( --primary-hover);
 }
 
 select:focus {
-    border-color: #a163f9;
+    border-color: var( --primary);
 }
 
 select .select-label {
     position: absolute;
     left: 10px;
     top: 19px;
-    color: white;
+    color: var(--text-color);
     font-size: 14px;
 }
 
 select:hover .select-label {
-    color: #a163f9;
+    color: var(--primary-hover);
 }
 
 select:focus .select-label {
-    color: #a163f9;
+    color: var(--primary);
 }
 
 
@@ -361,16 +393,16 @@ select .option-drop-box {
 }
 
 select .option-drop-box .option-drop-icon {
-    color: white;
+    color: var(--text-color);
     font-size: 14px;
 }
 
 .option-drop-box .option-drop-icon:hover {
-    color: #a163f9;
+    color: var(--primary-hover);
 }
 
 .option-drop-box .option-drop-icon:focus {
-    color: #a163f9;
+    color: var(--primary);
 }
 
 select .option-selected {
@@ -386,7 +418,7 @@ select .option-selected {
 }
 
 select .option-selected .option-sel-text {
-    color: white;
+    color: var(--text-color);
     font-size: 14px;
 }
 
@@ -402,7 +434,7 @@ select .choice-content-box {
     justify-content: flex-start;
     align-items: flex-start;
     flex-direction: column;
-    background: white;
+    background: var(--gray-background);
     overflow-x: hidden;
     overflow-y: scroll;
 }
@@ -419,30 +451,30 @@ select .choice-content-box .choice-option {
     flex-direction: row;
     gap: 10px;
     flex-grow: 1;
-    background: white;
+    background: var(--gray-background);
 }
 
 select .choice-content-box .choice-option .option-text {
-    color: rgb(50, 52, 54);
+    color: var(--text-color);
     font-size: 14px;
 }
 
 
 select .choice-content-box .choice-option:hover {
-    background: #a163f9;
+    background: var(--primary-hover);
 }
 
 
 select .choice-content-box .choice-option .option-text:hover {
-    color: white;
+    color: var(--text-color);
 }
 
 select .choice-content-box .choice-option:checked {
-    background: #a163f9;
+    background: var(--primary);
 }
 
 select .choice-content-box .choice-option .option-text:checked {
-    color: white;
+    color: var(--text-color);
 }
 
 /* Slider */
@@ -457,7 +489,7 @@ slider {
 slider .slider-track {
     width: 100%;
     height: 10px;
-    background: #fcfcfc;
+    background: var(--primary-transparent-layer);
     border-radius: 5px;
     position: relative;
     overflow: visible;
@@ -472,17 +504,17 @@ slider .slider-track .track-fill {
     top: 0;
     height: 100%;
     width: 0;
-    background: #a163f9;
+    background: var(--primary);
     border-radius: 5px;
 }
 
 slider .slider-track .thumb {
     width: 16px;
     height: 16px;
-    background: #fcfcfc;
+    background: var(--primary);
     border-radius: 50%;
     position: absolute;
-    box-shadow: 0 0 3px 3px #303033;
+    box-shadow: 0 0 1px 1px #303033;
 }
 
 /* Switch Button */
@@ -507,7 +539,7 @@ switch .switch-track {
     width: 50px;
     height: 24px;
     border-radius: 13px;
-    background: #d4d4f3;
+    background: var(--gray-background);
     position: relative;
     display: flex;
     justify-content: start;
@@ -515,7 +547,7 @@ switch .switch-track {
 }
 
 switch:checked .switch-track {
-    background: #a163f9;
+    background: var(--primary-hover);
     justify-content: end;
 }
 
@@ -524,12 +556,12 @@ switch .switch-track .switch-dot {
     width: 28px;
     height: 28px;
     border-radius: 50%;
-    background: #6a00ff;
+    background: var(--primary);
 }
 
 /* Toggle Button */
 toggle {
-    background: #bcbcbc;
+    background: var(--primary);
     min-width: 45px;
     min-height: 45px;
     border-radius: 6px;
@@ -540,13 +572,13 @@ toggle {
 }
 
 toggle:hover {
-    background: #909090;
+    background: var(--primary-hover);
 }
 
 toggle:checked {
-    background: #909090;
+    background: var(--primary-hover);
 }
 
 toggle .button-text {
-    color: #303039;
+    color: var(--text-color);
 }
