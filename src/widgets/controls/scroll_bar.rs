@@ -211,13 +211,17 @@ fn on_track_click(
 
     let Ok((track_node, bind, rel)) = track_q.get(trigger.entity) else { return; };
 
-    let Some(vertical) = scroll_orientation(bind.0, &mut scroll_q) else {
+    let Some((vertical, viewport_extent, content_extent, min, max)) =
+        scroll_metrics(bind.0, &mut scroll_q)
+    else {
         trigger.propagate(false);
         return;
     };
 
     let track_extent = track_extent(vertical, track_node.size(), sf);
-    let Some(thumb_extent) = find_bound_extent(bind.0, &thumb_q, sf, vertical) else { return; };
+    let Some(fallback_extent) = find_bound_extent(bind.0, &thumb_q, sf, vertical) else { return; };
+    let thumb_extent =
+        compute_thumb_extent_from_metrics(viewport_extent, content_extent, max - min, track_extent, fallback_extent);
 
     let Some(n) = rel.normalized else {
         trigger.propagate(false);
@@ -258,12 +262,16 @@ fn on_thumb_drag(
     let Ok(parent) = parent_q.get(event.entity) else { return; };
     let Ok((track_node, bind)) = track_q.get(parent.parent()) else { return; };
 
-    let Some(vertical) = scroll_orientation(bind.0, &mut scroll_q) else { return; };
+    let Some((vertical, viewport_extent, content_extent, min, max)) = scroll_metrics(bind.0, &mut scroll_q) else {
+        return;
+    };
 
     let track_extent = track_extent(vertical, track_node.size(), sf);
 
     let Ok(thumb_node) = thumb_node_q.get(event.entity) else { return; };
-    let thumb_extent = axis_size(vertical, thumb_node.size(), sf);
+    let fallback_extent = axis_size(vertical, thumb_node.size(), sf);
+    let thumb_extent =
+        compute_thumb_extent_from_metrics(viewport_extent, content_extent, max - min, track_extent, fallback_extent);
     let half = thumb_extent * 0.5;
 
     let delta = if vertical { event.event.delta.y / sf } else { event.event.delta.x / sf };
@@ -332,7 +340,14 @@ fn apply_from_track_top_scroll(
     let range = (scroll.max - scroll.min).max(0.0);
     let raw = scroll.min + percent * range;
     let step = scroll.step.max(f32::EPSILON);
-    scroll.value = (raw / step).round() * step;
+    if percent <= f32::EPSILON {
+        scroll.value = scroll.min;
+    } else if percent >= 1.0 - f32::EPSILON {
+        scroll.value = scroll.max;
+    } else {
+        scroll.value = (raw / step).round() * step;
+        scroll.value = scroll.value.clamp(scroll.min, scroll.max);
+    }
 
     if let Some(target) = scroll.entity {
         if let Ok(mut pos) = target_scroll_q.get_mut(target) {
@@ -512,8 +527,32 @@ fn track_extent(vertical: bool, size: Vec2, scale: f32) -> f32 {
 }
 
 fn compute_thumb_extent(scroll: &Scrollbar, track_extent: f32, fallback_extent: f32) -> f32 {
-    if scroll.content_extent > 0.0 && scroll.viewport_extent > 0.0 {
-        let ratio = (scroll.viewport_extent / scroll.content_extent).clamp(0.0, 1.0);
+    compute_thumb_extent_from_metrics(
+        scroll.viewport_extent,
+        scroll.content_extent,
+        scroll.max - scroll.min,
+        track_extent,
+        fallback_extent,
+    )
+}
+
+fn compute_thumb_extent_from_metrics(
+    viewport_extent: f32,
+    content_extent: f32,
+    range: f32,
+    track_extent: f32,
+    fallback_extent: f32,
+) -> f32 {
+    let range = range.max(0.0);
+    let viewport_extent = viewport_extent.max(0.0);
+    let content_extent = if viewport_extent > 0.0 && range > 0.0 {
+        viewport_extent + range
+    } else {
+        content_extent.max(0.0)
+    };
+
+    if content_extent > 0.0 && viewport_extent > 0.0 {
+        let ratio = (viewport_extent / content_extent).clamp(0.0, 1.0);
         let min_extent = 12.0_f32.min(track_extent);
         return (track_extent * ratio).clamp(min_extent, track_extent);
     }
@@ -521,10 +560,19 @@ fn compute_thumb_extent(scroll: &Scrollbar, track_extent: f32, fallback_extent: 
     fallback_extent.max(1.0).min(track_extent)
 }
 
-fn scroll_orientation(entry: usize, scroll_q: &mut Query<&mut Scrollbar, With<Scrollbar>>) -> Option<bool> {
+fn scroll_metrics(
+    entry: usize,
+    scroll_q: &mut Query<&mut Scrollbar, With<Scrollbar>>,
+) -> Option<(bool, f32, f32, f32, f32)> {
     for scroll in scroll_q.iter_mut() {
         if scroll.entry == entry {
-            return Some(scroll.vertical);
+            return Some((
+                scroll.vertical,
+                scroll.viewport_extent,
+                scroll.content_extent,
+                scroll.min,
+                scroll.max,
+            ));
         }
     }
     None

@@ -616,7 +616,6 @@ impl Default for RadioButton {
 pub struct Scrollbar {
     pub entry: usize,
     pub entity: Option<Entity>,
-    pub scroll_pos: Option<ScrollPosition>,
     pub value: f32, // 3.146675432...............
     pub min: f32,
     pub max: f32,
@@ -632,7 +631,6 @@ impl Default for Scrollbar {
         Self {
             entry,
             entity: None,
-            scroll_pos: None,
             value: 0.0,
             min: 0.0,
             max: 1000.0,

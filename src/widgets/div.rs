@@ -4,7 +4,7 @@ use bevy::camera::visibility::RenderLayers;
 use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
 use bevy::prelude::*;
 use bevy::ui::ScrollPosition;
-
+use bevy::window::PrimaryWindow;
 use crate::styles::paint::Colored;
 use crate::styles::{CssClass, CssSource, TagName};
 use crate::widgets::{Div, Scrollbar, UIGenID, UIWidgetState, WidgetId, WidgetKind};
@@ -474,11 +474,16 @@ fn handle_div_scroll_wheel(
     hovered: Res<HoveredDivTracker>,
     div_q: Query<(&DivContentRoot, &Visibility), With<Div>>,
     mut content_q: Query<(&Node, &ComputedNode, &mut ScrollPosition), With<DivScrollContent>>,
+    window_q: Query<&Window, With<PrimaryWindow>>,
+    ui_scale: Res<UiScale>,
 ) {
     let Some(active_div) = hovered.last_div else {
         wheel_events.clear();
         return;
     };
+
+    let Ok(window) = window_q.single() else { return; };
+    let sf = window.scale_factor() * ui_scale.0;
 
     let Ok((root, vis)) = div_q.get(active_div) else {
         return;
@@ -491,7 +496,7 @@ fn handle_div_scroll_wheel(
     for event in wheel_events.read() {
         let raw = match event.unit {
             MouseScrollUnit::Line => event.y * 25.0,
-            MouseScrollUnit::Pixel => event.y,
+            MouseScrollUnit::Pixel => event.y / sf,
         };
         let delta = -raw;
 
@@ -503,8 +508,8 @@ fn handle_div_scroll_wheel(
             continue;
         }
 
-        let viewport_h = computed.size().y.max(1.0);
-        let content_h = computed.content_size.y.max(viewport_h);
+        let viewport_h = (computed.size().y / sf).max(1.0);
+        let content_h = (computed.content_size.y / sf).max(viewport_h);
         let max_scroll = (content_h - viewport_h).max(0.0);
 
         scroll.y = (scroll.y + delta).clamp(0.0, max_scroll);
@@ -518,15 +523,20 @@ fn sync_scrollbar_from_content(
     target_pos_q: Query<&ScrollPosition, With<DivScrollContent>>,
     mut sb_node_q: Query<&mut Node, With<Scrollbar>>,
     mut sb_vis_q: Query<&mut Visibility, With<Scrollbar>>,
+    window_q: Query<&Window, With<PrimaryWindow>>,
+    ui_scale: Res<UiScale>,
 ) {
+    let Ok(window) = window_q.single() else { return; };
+    let sf = window.scale_factor() * ui_scale.0;
+
     for (root_opt, sb_y_opt, sb_x_opt) in div_q.iter() {
         let Some(root) = root_opt else { continue; };
 
         let Ok(content_comp) = content_q.get(**root) else { continue; };
         let Ok(scroll_pos) = target_pos_q.get(**root) else { continue; };
 
-        let viewport = content_comp.size();
-        let content = content_comp.content_size;
+        let viewport = content_comp.size() / sf;
+        let content = content_comp.content_size / sf;
 
         // -------- Y --------
         if let Some(sb) = sb_y_opt {
