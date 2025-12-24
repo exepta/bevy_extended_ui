@@ -7,6 +7,7 @@
     --headline-sec: #aaaabc;
     --text-color: #e8e8fd;
     --text-color-dark: #b4b4c1;
+    --disabled-text: #707070;
     --gray-background: #323436;
 }
 
@@ -64,10 +65,19 @@ checkbox .mark-box {
     border-color: var(--text-color);
 }
 
+checkbox:disabled .mark-box {
+    border-color: var(--disabled-text);
+    background: var(--primary-disabled);
+}
+
 checkbox .mark-box .mark {
     color: var(--text-color);
     width: 16px;
     height: 16px;
+}
+
+checkbox:disabled .mark-box .mark {
+    color: var(--disabled-text);
 }
 
 checkbox:checked .mark-box {
@@ -75,8 +85,17 @@ checkbox:checked .mark-box {
     background: var(--primary);
 }
 
+checkbox:disabled .mark-box {
+    border-color: var(--primary-disabled);
+    background: var(--primary-disabled);
+}
+
 checkbox .check-text {
     font-size: 13px;
+}
+
+checkbox:disabled .check-text {
+    color: var(--disabled-text);
 }
 
 /* Div */

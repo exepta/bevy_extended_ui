@@ -219,8 +219,8 @@ fn selector_matches_state(selector: &str, state: &UIWidgetState) -> bool {
             match *pseudo {
                 "read-only" if !state.readonly => return false,
                 "disabled" if !state.disabled => return false,
-                "checked" if !state.checked => return false,
-                "focus" if !state.focused => return false,
+                "checked" if state.disabled || !state.checked => return false,
+                "focus" if state.disabled || !state.focused => return false,
                 "hover" if state.disabled || !state.hovered => return false,
                 _ => {}
             }

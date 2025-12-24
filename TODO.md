@@ -20,7 +20,7 @@ What will come in the next version?
     - [x] right, left, top, bottom support 0 without a pixel.
     - [x] Flexbox support optimizing.
     - [x] `!important` support for CSS.
-    - [x] style tag support for HTML.a
+    - [x] style tag support for HTML.
 - [x] Refactored Bind system for HTML.
 - [x] Refactor UIRegistry.
 - [x] Fix bugs
@@ -29,6 +29,7 @@ What will come in the next version?
     - [x] Hotreload HTML can crash look file `error.log`.
     - [x] Button is not refreshable.
     - [x] :disabled is not every time above :hover styles.
+    - [ ] :disabled doesn't apply to children by init state.
 - [x] Ui Default Theme
 - [ ] Include disabled and read-only ui style.
 - [ ] Better examples.
