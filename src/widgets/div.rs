@@ -539,6 +539,8 @@ fn sync_scrollbar_from_content(
             if let Ok(mut scrollbar) = scroll_q.get_mut(**sb) {
                 scrollbar.min = 0.0;
                 scrollbar.max = max_scroll;
+                scrollbar.viewport_extent = viewport_h;
+                scrollbar.content_extent = content_h;
 
                 scrollbar.value = scroll_pos.y.clamp(0.0, max_scroll);
             }
@@ -555,6 +557,8 @@ fn sync_scrollbar_from_content(
             if let Ok(mut scrollbar) = scroll_q.get_mut(**sb) {
                 scrollbar.min = 0.0;
                 scrollbar.max = max_scroll;
+                scrollbar.viewport_extent = viewport_w;
+                scrollbar.content_extent = content_w;
 
                 scrollbar.value = scroll_pos.x.clamp(0.0, max_scroll);
             }

@@ -622,6 +622,8 @@ pub struct Scrollbar {
     pub max: f32,
     pub step: f32,
     pub vertical: bool,
+    pub viewport_extent: f32,
+    pub content_extent: f32,
 }
 
 impl Default for Scrollbar {
@@ -636,6 +638,8 @@ impl Default for Scrollbar {
             max: 1000.0,
             step: 10.0,
             vertical: true,
+            viewport_extent: 0.0,
+            content_extent: 0.0,
         }
     }
 }

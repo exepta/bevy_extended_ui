@@ -334,16 +334,12 @@ scroll .scroll-track {
 scroll .scroll-track .scroll-thumb {
     position: absolute;
     width: 100%;
-    min-height: 50px;
     background: var(--primary);
     border-radius: 5px;
 }
 
 .scroll-horizontal .scroll-track .scroll-thumb {
     height: 100%;
-    min-height: 100%;
-    width: 50px;
-    min-width: 50px;
 }
 
 /* Select */
