@@ -373,6 +373,11 @@ select {
     z-index: 1;
 }
 
+select:disabled {
+    border-color: var(--disabled-text);
+    color: var(--disabled-text);
+}
+
 select:hover {
     border-color: var( --primary-hover);
 }
@@ -387,6 +392,10 @@ select .select-label {
     top: 19px;
     color: var(--text-color);
     font-size: 14px;
+}
+
+select:disabled .select-label {
+    color: var(--disabled-text);
 }
 
 select:hover .select-label {
@@ -435,6 +444,10 @@ select .option-selected {
 select .option-selected .option-sel-text {
     color: var(--text-color);
     font-size: 14px;
+}
+
+.option-selected:disabled .option-sel-text {
+    color: var(--disabled-text);
 }
 
 select .choice-content-box {

@@ -364,7 +364,11 @@ fn update_content_box_visibility(
                 continue;
             }
 
-            if !state.focused {
+            if !state.disabled {
+                if !state.focused {
+                    state.open = false;
+                }
+            } else {
                 state.open = false;
             }
 
