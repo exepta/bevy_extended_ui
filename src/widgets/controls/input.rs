@@ -23,6 +23,9 @@ struct InputFieldText;
 struct InputFieldIcon;
 
 #[derive(Component)]
+struct InputFieldIconImage;
+
+#[derive(Component)]
 struct InputCursor;
 
 #[derive(Component)]
@@ -62,6 +65,7 @@ impl Plugin for InputWidget {
             Update,
             (
                 internal_node_creation_system,
+                sync_input_field_updates,
                 update_cursor_visibility,
                 update_cursor_position,
                 handle_typing,
@@ -169,6 +173,7 @@ fn internal_node_creation_system(
                             CssClass(vec!["in-icon".to_string()]),
                             Pickable::IGNORE,
                             RenderLayers::layer(layer),
+                            InputFieldIconImage,
                             BindToID(id.0),
                         )],
                     ));
@@ -255,6 +260,118 @@ fn internal_node_creation_system(
     }
 }
 
+fn sync_input_field_updates(
+    mut commands: Commands,
+    config: Res<ExtendedUiConfiguration>,
+    asset_server: Res<AssetServer>,
+    mut image_cache: ResMut<ImageCache>,
+    mut query: Query<
+        (
+            Entity,
+            &mut InputField,
+            &UIGenID,
+            &UIWidgetState,
+            Option<&CssSource>,
+        ),
+        (With<InputFieldBase>, Changed<InputField>),
+    >,
+    mut text_query: Query<(&mut Text, &BindToID), (With<InputFieldText>, Without<OverlayLabel>)>,
+    mut label_query: Query<(&mut Text, &BindToID), (With<OverlayLabel>, Without<InputFieldText>)>,
+    icon_query: Query<(Entity, &BindToID), With<InputFieldIcon>>,
+    mut icon_image_query: Query<(&mut ImageNode, &BindToID), With<InputFieldIconImage>>,
+) {
+    let layer = *config.render_layers.first().unwrap_or(&1);
+
+    let mut icon_entities: HashMap<usize, Entity> = HashMap::new();
+    for (entity, bind) in icon_query.iter() {
+        icon_entities.insert(bind.0, entity);
+    }
+
+    for (entity, mut field, ui_id, state, source_opt) in query.iter_mut() {
+        let css_source = source_opt.cloned().unwrap_or_default();
+
+        field.cursor_position = field.cursor_position.min(field.text.len());
+
+        for (mut text, bind_id) in text_query.iter_mut() {
+            if bind_id.0 != ui_id.0 {
+                continue;
+            }
+
+            if state.focused {
+                set_visible_text(&*field, &mut text);
+            } else if field.text.is_empty() {
+                text.0.clear();
+            } else {
+                set_visible_text(&*field, &mut text);
+            }
+        }
+
+        for (mut label_text, bind_id) in label_query.iter_mut() {
+            if bind_id.0 != ui_id.0 {
+                continue;
+            }
+
+            label_text.0 = field.label.clone();
+        }
+
+        if let Some(icon_path) = field.icon_path.clone() {
+            let owned_icon = icon_path.to_string();
+            let handle = image_cache
+                .map
+                .entry(icon_path.clone())
+                .or_insert_with(|| asset_server.load(owned_icon))
+                .clone();
+
+            if let Some(icon_entity) = icon_entities.get(&ui_id.0).copied() {
+                for (mut image_node, bind_id) in icon_image_query.iter_mut() {
+                    if bind_id.0 != ui_id.0 {
+                        continue;
+                    }
+                    image_node.image = handle.clone();
+                }
+
+                commands.entity(icon_entity).insert(Visibility::Inherited);
+            } else {
+                commands.entity(entity).with_children(|builder| {
+                    builder.spawn((
+                        Name::new(format!("Input-Icon-{}", field.entry)),
+                        Node::default(),
+                        BackgroundColor::default(),
+                        ImageNode::default(),
+                        BorderColor::default(),
+                        BorderRadius::default(),
+                        ZIndex::default(),
+                        UIWidgetState::default(),
+                        css_source.clone(),
+                        CssClass(vec!["in-icon-container".to_string()]),
+                        Pickable::IGNORE,
+                        RenderLayers::layer(layer),
+                        InputFieldIcon,
+                        BindToID(ui_id.0),
+                        children![(
+                            Name::new(format!("Icon-{}", field.entry)),
+                            ImageNode {
+                                image: handle,
+                                ..default()
+                            },
+                            ZIndex::default(),
+                            UIWidgetState::default(),
+                            css_source.clone(),
+                            CssClass(vec!["in-icon".to_string()]),
+                            Pickable::IGNORE,
+                            RenderLayers::layer(layer),
+                            InputFieldIconImage,
+                            BindToID(ui_id.0),
+                        )],
+                    ));
+                });
+            }
+        } else if let Some(icon_entity) = icon_entities.get(&ui_id.0).copied() {
+            commands.entity(icon_entity).despawn();
+        }
+    }
+}
+
 // ===============================================
 //             Internal Functions
 // ===============================================
@@ -288,6 +405,7 @@ fn update_cursor_visibility(
     #[derive(Clone)]
     struct FieldView {
         focused: bool,
+        disabled: bool,
         input_type: InputType,
         text: String,
         placeholder: String,
@@ -299,6 +417,7 @@ fn update_cursor_visibility(
             ui_id.0,
             FieldView {
                 focused: state.focused,
+                disabled: state.disabled,
                 input_type: field.input_type.clone(),
                 text: field.text.clone(),
                 placeholder: field.placeholder.clone(),
@@ -311,7 +430,7 @@ fn update_cursor_visibility(
             continue;
         };
 
-        if field.focused {
+        if field.focused && !field.disabled {
             let alpha =
                 (cursor_blink_timer.timer.elapsed_secs() * 2.0 * std::f32::consts::PI).sin() * 0.5
                     + 0.5;
@@ -375,7 +494,7 @@ fn update_cursor_position(
     mut key_repeat: ResMut<KeyRepeatTimers>,
     mut cursor_query: Query<(&mut Node, &mut UiStyle, &BindToID), With<InputCursor>>,
     mut text_field_query: Query<
-        (&mut InputField, &UIGenID),
+        (&mut InputField, &UIGenID, &UIWidgetState),
         (With<InputField>, Without<InputCursor>),
     >,
     text_query: Query<(&TextFont, &BindToID), (With<InputFieldText>, Without<InputCursor>)>,
@@ -392,12 +511,16 @@ fn update_cursor_position(
     }
 
     for (mut cursor_node, mut styles, bind_id) in cursor_query.iter_mut() {
-        let Some((mut text_field, _ui_id)) = text_field_query
+        let Some((mut text_field, _ui_id, state)) = text_field_query
             .iter_mut()
-            .find(|(_, ui_id)| ui_id.0 == bind_id.0)
+            .find(|(_, ui_id, _)| ui_id.0 == bind_id.0)
         else {
             continue;
         };
+
+        if !state.focused || state.disabled {
+            continue;
+        }
 
         // Arrow left
         if keyboard_input.just_pressed(KeyCode::ArrowLeft) {
@@ -527,7 +650,7 @@ fn handle_input_horizontal_scroll(
     }
 
     for (input_field, ui_id, state) in query.iter() {
-        if !state.focused {
+        if !state.focused || state.disabled  {
             continue;
         }
 
@@ -601,6 +724,11 @@ fn handle_typing(
     let pressed: Vec<KeyCode> = keyboard.get_pressed().copied().collect();
 
     for (mut in_field, mut state, style, ui_id) in query.iter_mut() {
+        if state.disabled {
+            state.focused = false;
+            continue;
+        }
+
         if !state.focused {
             continue;
         }
@@ -875,12 +1003,21 @@ fn set_visible_text(in_field: &InputField, out: &mut Text) {
 fn on_internal_click(
     mut trigger: On<Pointer<Click>>,
     mut query: Query<(&mut UIWidgetState, &UIGenID), With<InputField>>,
+    bind_query: Query<&BindToID>,
     mut current_widget_state: ResMut<CurrentWidgetState>,
 ) {
-    if let Ok((mut state, gen_id)) = query.get_mut(trigger.event_target()) {
+    let target = trigger.event_target();
+    if let Ok((mut state, gen_id)) = query.get_mut(target) {
         if !state.disabled {
             state.focused = true;
             current_widget_state.widget_id = gen_id.0;
+        }
+    } else if let Ok(bind) = bind_query.get(target) {
+        if let Some((mut state, gen_id)) = query.iter_mut().find(|(_, id)| id.0 == bind.0) {
+            if !state.disabled {
+                state.focused = true;
+                current_widget_state.widget_id = gen_id.0;
+            }
         }
     }
 
@@ -890,10 +1027,16 @@ fn on_internal_click(
 /// Handles pointer cursor entering input fields.
 fn on_internal_cursor_entered(
     mut trigger: On<Pointer<Over>>,
-    mut query: Query<&mut UIWidgetState, With<InputField>>,
+    mut query: Query<(&mut UIWidgetState, &UIGenID), With<InputField>>,
+    bind_query: Query<&BindToID>,
 ) {
-    if let Ok(mut state) = query.get_mut(trigger.event_target()) {
+    let target = trigger.event_target();
+    if let Ok((mut state, _)) = query.get_mut(target) {
         state.hovered = true;
+    } else if let Ok(bind) = bind_query.get(target) {
+        if let Some((mut state, _)) = query.iter_mut().find(|(_, id)| id.0 == bind.0) {
+            state.hovered = true;
+        }
     }
 
     trigger.propagate(false);
@@ -902,10 +1045,16 @@ fn on_internal_cursor_entered(
 /// Handles pointer cursor leaving input fields.
 fn on_internal_cursor_leave(
     mut trigger: On<Pointer<Out>>,
-    mut query: Query<&mut UIWidgetState, With<InputField>>,
+    mut query: Query<(&mut UIWidgetState, &UIGenID), With<InputField>>,
+    bind_query: Query<&BindToID>,
 ) {
-    if let Ok(mut state) = query.get_mut(trigger.event_target()) {
+    let target = trigger.event_target();
+    if let Ok((mut state, _)) = query.get_mut(target) {
         state.hovered = false;
+    } else if let Ok(bind) = bind_query.get(target) {
+        if let Some((mut state, _)) = query.iter_mut().find(|(_, id)| id.0 == bind.0) {
+            state.hovered = false;
+        }
     }
 
     trigger.propagate(false);
