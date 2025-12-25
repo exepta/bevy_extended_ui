@@ -137,11 +137,16 @@ fn internal_node_creation_system(
                 InputFieldBase,
             ))
             .with_children(|builder| {
-                if let Some(icon_path) = field.icon_path.clone() {
+                let icon_path = field
+                    .icon_path
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|path| !path.is_empty());
+                if let Some(icon_path) = icon_path {
                     let owned_icon = icon_path.to_string();
                     let handle = image_cache
                         .map
-                        .entry(icon_path.clone())
+                        .entry(owned_icon.clone())
                         .or_insert_with(|| asset_server.load(owned_icon))
                         .clone();
 
@@ -275,6 +280,7 @@ fn sync_input_field_updates(
         ),
         (With<InputFieldBase>, Changed<InputField>),
     >,
+    children_query: Query<&Children, With<InputFieldBase>>,
     mut text_query: Query<(&mut Text, &BindToID), (With<InputFieldText>, Without<OverlayLabel>)>,
     mut label_query: Query<(&mut Text, &BindToID), (With<OverlayLabel>, Without<InputFieldText>)>,
     icon_query: Query<(Entity, &BindToID), With<InputFieldIcon>>,
@@ -314,11 +320,16 @@ fn sync_input_field_updates(
             label_text.0 = field.label.clone();
         }
 
-        if let Some(icon_path) = field.icon_path.clone() {
+        let icon_path = field
+            .icon_path
+            .as_deref()
+            .map(str::trim)
+            .filter(|path| !path.is_empty());
+        if let Some(icon_path) = icon_path {
             let owned_icon = icon_path.to_string();
             let handle = image_cache
                 .map
-                .entry(icon_path.clone())
+                .entry(owned_icon.clone())
                 .or_insert_with(|| asset_server.load(owned_icon))
                 .clone();
 
@@ -332,8 +343,8 @@ fn sync_input_field_updates(
 
                 commands.entity(icon_entity).insert(Visibility::Inherited);
             } else {
-                commands.entity(entity).with_children(|builder| {
-                    builder.spawn((
+                let icon_entity = commands
+                    .spawn((
                         Name::new(format!("Input-Icon-{}", field.entry)),
                         Node::default(),
                         BackgroundColor::default(),
@@ -363,8 +374,13 @@ fn sync_input_field_updates(
                             InputFieldIconImage,
                             BindToID(ui_id.0),
                         )],
-                    ));
-                });
+                    )).id();
+
+                if children_query.get(entity).is_ok() {
+                    commands.entity(entity).insert_children(0, &[icon_entity]);
+                } else {
+                    commands.entity(entity).add_child(icon_entity);
+                }
             }
         } else if let Some(icon_entity) = icon_entities.get(&ui_id.0).copied() {
             commands.entity(icon_entity).despawn();
@@ -929,16 +945,18 @@ fn handle_overlay_label(
                 text_font.font_size = 10.;
             }
 
-            if let Some(w) = icon_widths.get(&gen_id.0).copied() {
-                let expected_left = 5.0 + w;
-                let left_now = match node.left {
-                    Val::Px(px) => px,
-                    _ => 10.,
-                };
+            let expected_left = if let Some(w) = icon_widths.get(&gen_id.0).copied() {
+                5.0 + w
+            } else {
+                10.0
+            };
+            let left_now = match node.left {
+                Val::Px(px) => px,
+                _ => 10.0,
+            };
 
-                if (left_now - expected_left).abs() > f32::EPSILON {
-                    node.left = Val::Px(expected_left);
-                }
+            if (left_now - expected_left).abs() > f32::EPSILON {
+                node.left = Val::Px(expected_left);
             }
 
             for (_, style) in styles.styles.iter_mut() {
