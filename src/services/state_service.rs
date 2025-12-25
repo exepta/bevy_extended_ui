@@ -13,6 +13,7 @@ impl Plugin for StateService {
             (
                 internal_state_check.run_if(resource_changed::<CurrentWidgetState>),
                 handle_tab_focus,
+                unfocus_disabled
             ),
         );
     }
@@ -105,33 +106,46 @@ fn handle_tab_focus(
     mut query: Query<(Entity, &mut UIWidgetState, &UIGenID)>,
     keyboard: Res<ButtonInput<KeyCode>>,
 ) {
-    let mut sorted_ui_elements: Vec<_> = query.iter_mut().collect();
-    sorted_ui_elements.sort_by_key(|(_, _, id)| id.get());
+    if !keyboard.just_pressed(KeyCode::Tab) {
+        return;
+    }
 
-    let mut any_focused = false;
-    if keyboard.just_pressed(KeyCode::Tab) {
-        let len = sorted_ui_elements.len();
-        if len == 0 {
-            return;
+    let mut elems: Vec<_> = query
+        .iter_mut()
+        .filter(|(_, state, _)| !state.disabled)
+        .collect();
+
+    elems.sort_by_key(|(_, _, id)| id.get());
+
+    let len = elems.len();
+    if len == 0 {
+        return;
+    }
+
+    let mut focused_idx = None;
+    for (i, (_, state, _)) in elems.iter().enumerate() {
+        if state.focused {
+            focused_idx = Some(i);
+            break;
         }
+    }
 
-        for i in 0..len {
-            if sorted_ui_elements[i].1.focused {
-                sorted_ui_elements[i].1.focused = false;
-
-                let next = (i + 1) % len;
-
-                if let Some(&mut (_, _, _)) = sorted_ui_elements.get_mut(next) {
-                    sorted_ui_elements[next].1.focused = true;
-                    any_focused = true;
-                }
-
-                break;
-            }
+    match focused_idx {
+        Some(i) => {
+            elems[i].1.focused = false;
+            let next = (i + 1) % len;
+            elems[next].1.focused = true;
         }
+        None => {
+            elems[0].1.focused = true;
+        }
+    }
+}
 
-        if !any_focused && len > 0 {
-            sorted_ui_elements[0].1.focused = true;
+fn unfocus_disabled(mut q: Query<&mut UIWidgetState, Changed<UIWidgetState>>) {
+    for mut s in &mut q {
+        if s.disabled && s.focused {
+            s.focused = false;
         }
     }
 }

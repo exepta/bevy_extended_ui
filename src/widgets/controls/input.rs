@@ -694,7 +694,7 @@ fn handle_input_horizontal_scroll(
 ///
 /// - Handles insertion of characters respecting input caps and input type validations.
 /// - Supports backspace with key repeat functionality.
-/// - Handles Enter key to lose focus and optionally clear input field text.
+/// - Handles an Enter key to lose focus and optionally clear input field text.
 /// - Updates the visible text and cursor position accordingly.
 /// - Masks input with `*` characters if an input type is `Password`.
 /// - Updates text color on changes.
@@ -986,10 +986,10 @@ fn get_active_text_color(style: &UiStyle) -> Color {
 }
 
 fn set_visible_text(in_field: &InputField, out: &mut Text) {
-    if in_field.input_type == InputType::Password {
-        out.0 = "*".repeat(in_field.text.chars().count());
-    } else if in_field.text.is_empty() {
+    if in_field.text.is_empty() {
         out.0 = in_field.placeholder.clone();
+    } else if in_field.input_type == InputType::Password {
+        out.0 = "*".repeat(in_field.text.chars().count());
     } else {
         out.0 = in_field.text.clone();
     }
