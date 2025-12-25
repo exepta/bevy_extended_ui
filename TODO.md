@@ -31,7 +31,7 @@ What will come in the next version?
     - [x] :disabled is not every time above :hover styles.
     - [x] :disabled doesn't apply to children by init state.
 - [x] Ui Default Theme
-- [ ] Include disabled and read-only ui style.
+- [ ] Include disabled ui style.
 - [ ] Better examples.
 - [ ] Better documentation.
 - [ ] Test library in an external project.

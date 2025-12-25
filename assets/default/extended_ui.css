@@ -206,6 +206,10 @@ input {
     border-color: var(--text-color-dark);
 }
 
+input:disabled {
+    border-color: var(--disabled-text);
+}
+
 input:hover {
     border-color: var(--primary-hover);
 }
@@ -219,6 +223,7 @@ input .input-label {
     left: 10px;
     top: 19px;
     font-size: 14px;
+    color: var(--text-color);
 }
 
 input .in-icon-container {
@@ -231,6 +236,7 @@ input .in-icon-container {
 
 .in-icon-container .in-icon {
     font-size: 16px;
+    color: var(--text-color);
 }
 
 input .in-text-container {
@@ -242,6 +248,10 @@ input .in-text-container {
     overflow-y: hidden;
     overflow-x: scroll;
     padding-left: 10px;
+}
+
+input:disabled .input-label {
+    color: var(--disabled-text);
 }
 
 input:hover .input-label {
@@ -256,12 +266,21 @@ input .in-text-container .input-text {
     font-size: 15px;
     width: 100%;
     text-wrap: nowrap;
+    color: var(--text-color);
+}
+
+input:disabled .in-text-container .input-text {
+    color: var(--disabled-text);
 }
 
 input .in-text-container .input-cursor {
     width: 2px;
     height: 20px;
     background: var(--text-color);
+}
+
+input:disabled .in-text-container .input-cursor {
+    background: var(--disabled-text);
 }
 
 /* Paragraph */
