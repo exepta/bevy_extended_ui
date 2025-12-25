@@ -48,13 +48,13 @@ impl Plugin for CheckBoxWidget {
 fn internal_node_creation_system(
     mut commands: Commands,
     query: Query<
-        (Entity, &UIGenID, &CheckBox, Option<&CssSource>),
+        (Entity, &UIGenID, &CheckBox, &UIWidgetState, Option<&CssSource>),
         (With<CheckBox>, Without<CheckBoxBase>),
     >,
     config: Res<ExtendedUiConfiguration>,
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
-    for (entity, id, checkbox, source_opt) in query.iter() {
+    for (entity, id, checkbox, widget_state, source_opt) in query.iter() {
         let mut css_source = CssSource::default();
         if let Some(source) = source_opt {
             css_source = source.clone();
@@ -115,7 +115,7 @@ fn internal_node_creation_system(
                         ),
                         ZIndex::default(),
                         css_source.clone(),
-                        UIWidgetState::default(),
+                        widget_state.clone(),
                         CssClass(vec!["mark-box".to_string()]),
                         Pickable::IGNORE,
                         BindToID(id.0),
@@ -130,7 +130,7 @@ fn internal_node_creation_system(
                         TextLayout::default(),
                         ZIndex::default(),
                         css_source.clone(),
-                        UIWidgetState::default(),
+                        widget_state.clone(),
                         CssClass(vec!["check-text".to_string()]),
                         Pickable::IGNORE,
                         BindToID(id.0),
@@ -182,6 +182,7 @@ fn on_internal_click(
         state.focused = true;
         state.checked = !state.checked;
         current_widget_state.widget_id = gen_id.0;
+        let current_state = state.clone();
 
         for (entity, id, children_opt, computed_node) in inner_query.iter() {
             if gen_id.0 != id.0 {
@@ -191,7 +192,7 @@ fn on_internal_click(
             let width = computed_node.size.x / 1.5;
             let height = computed_node.size.y / 1.5;
 
-            if state.checked {
+            if state.checked && !state.disabled {
                 let mut child = None;
                 commands.entity(entity).with_children(|builder| {
                     let in_child = builder
@@ -204,8 +205,9 @@ fn on_internal_click(
                             },
                             Pickable::IGNORE,
                             css_source.clone(),
-                            UIWidgetState::default(),
+                            current_state.clone(),
                             CssClass(vec!["mark".to_string()]),
+                            BindToID(gen_id.0),
                             RenderLayers::layer(*layer),
                         ))
                         .id();

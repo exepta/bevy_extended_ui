@@ -79,7 +79,9 @@ impl UiStyle {
             for (selector, style) in self.styles.iter() {
                 if selector == base
                     || selector.starts_with(&format!("{base}:"))
+                    || selector.ends_with(base)
                     || selector.contains(&format!("{base} "))
+                    || selector.contains(&format!(" {base}"))
                 {
                     let current = priority_map.get(selector).copied().unwrap_or(u8::MAX);
                     if prio <= current {
@@ -90,7 +92,11 @@ impl UiStyle {
 
                 for pseudo in &pseudo_classes {
                     let full = format!("{base}:{pseudo}");
-                    if selector == &full || selector.contains(&format!("{full} ")) {
+                    if selector == &full
+                        || selector.ends_with(&full)
+                        || selector.contains(&format!("{full} "))
+                        || selector.contains(&format!(" {full}"))
+                    {
                         let current = priority_map.get(selector).copied().unwrap_or(u8::MAX);
                         if prio <= current {
                             filtered.insert(selector.clone(), style.clone());

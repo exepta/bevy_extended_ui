@@ -1,7 +1,7 @@
 use bevy::log::warn;
 use bevy::prelude::*;
 use crate::html::{HtmlClick, HtmlEventBindings, HtmlFunctionRegistry, HtmlMouseOut, HtmlMouseOver};
-
+use crate::widgets::UIWidgetState;
 // =================================================
 //                        Click
 // =================================================
@@ -9,11 +9,14 @@ use crate::html::{HtmlClick, HtmlEventBindings, HtmlFunctionRegistry, HtmlMouseO
 pub(crate) fn emit_html_click_events(
     ev: On<Pointer<Click>>,
     mut commands: Commands,
-    q_bindings: Query<&HtmlEventBindings>,
+    q_bindings: Query<(&HtmlEventBindings, Option<&UIWidgetState>)>,
 ) {
     let entity = ev.event().entity;
 
-    let Ok(bindings) = q_bindings.get(entity) else { return };
+    let Ok((bindings, state_opt)) = q_bindings.get(entity) else { return };
+    if let Some(state) = state_opt {
+        if state.disabled { return; }
+    }
     if bindings.onclick.is_some() {
         commands.trigger(HtmlClick { entity });
     }

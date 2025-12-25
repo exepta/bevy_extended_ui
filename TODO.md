@@ -29,7 +29,7 @@ What will come in the next version?
     - [x] Hotreload HTML can crash look file `error.log`.
     - [x] Button is not refreshable.
     - [x] :disabled is not every time above :hover styles.
-    - [ ] :disabled doesn't apply to children by init state.
+    - [x] :disabled doesn't apply to children by init state.
 - [x] Ui Default Theme
 - [ ] Include disabled and read-only ui style.
 - [ ] Better examples.
