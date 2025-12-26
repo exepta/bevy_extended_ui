@@ -293,7 +293,6 @@ p {
 /* Progress Bar */
 progressbar {
     min-width: 220px;
-    width: 100%;
     min-height: 10px;
     border-radius: 5px;
     background: var(--primary-transparent-layer);
