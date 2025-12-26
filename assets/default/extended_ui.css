@@ -312,6 +312,7 @@ radio {
     justify-content: center;
     align-items: center;
     flex-direction: row;
+    flex-wrap: nowrap;
     gap: 10px;
     min-width: 100px;
     min-height: 50px;

@@ -1,6 +1,6 @@
 use crate::styles::paint::Colored;
 use crate::styles::{CssClass, CssSource, TagName};
-use crate::widgets::{BindToID, FieldMode, FieldSet, FiledSelectionSingle, InFieldSet, RadioButton, UIGenID, UIWidgetState, WidgetId, WidgetKind};
+use crate::widgets::{BindToID, FieldMode, FieldSet, FieldSelectionSingle, InFieldSet, RadioButton, UIGenID, UIWidgetState, WidgetId, WidgetKind};
 use crate::{CurrentWidgetState, ExtendedUiConfiguration};
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
@@ -36,7 +36,7 @@ fn internal_node_creation_system(
     >,
     parents: Query<&ChildOf>,
     fieldset_tag_q: Query<(), With<FieldSet>>,
-    mut selection_q: Query<Option<&mut FiledSelectionSingle>, With<FieldSet>>,
+    mut selection_q: Query<Option<&mut FieldSelectionSingle>, With<FieldSet>>,
     config: Res<ExtendedUiConfiguration>,
     mut warned: ResMut<RadioMissingFieldSetWarned>,
 ) {
@@ -165,7 +165,7 @@ fn on_internal_click(
     dot_q: Query<(Entity, &BindToID, Option<&Children>, &ComputedNode), With<RadioButtonDot>>,
 
     parents: Query<&ChildOf>,
-    mut fieldset_q: Query<(&FieldSet, Option<&mut FiledSelectionSingle>)>,
+    mut fieldset_q: Query<(&FieldSet, Option<&mut FieldSelectionSingle>)>,
     fieldset_tag_q: Query<(), With<FieldSet>>,
     mut current_widget_state: ResMut<CurrentWidgetState>,
     config: Res<ExtendedUiConfiguration>,
@@ -416,7 +416,7 @@ fn ensure_checked_dots_system(
 
 fn ensure_fieldset_selection_system(
     radios: Query<(Entity, &InFieldSet, &UIWidgetState), With<RadioButton>>,
-    mut fieldsets: Query<(&FieldSet, Option<&mut FiledSelectionSingle>)>,
+    mut fieldsets: Query<(&FieldSet, Option<&mut FieldSelectionSingle>)>,
 ) {
     for (radio_entity, in_fs, state) in radios.iter() {
         if !state.checked {

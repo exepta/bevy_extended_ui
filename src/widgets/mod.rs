@@ -363,7 +363,7 @@ impl FieldMode {
 pub struct InFieldSet(pub Entity);
 
 #[derive(Component, Reflect, Debug, Default)]
-pub struct FiledSelectionSingle(pub Option<Entity>);
+pub struct FieldSelectionSingle(pub Option<Entity>);
 
 #[derive(Component, Reflect, Debug, Default)]
 pub struct FieldSelectionMulti(pub Vec<Entity>);

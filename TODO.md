@@ -22,6 +22,8 @@ What will come in the next version?
     - [x] `!important` support for CSS.
     - [x] style tag support for HTML.
 - [x] Refactored Bind system for HTML.
+    - [ ] Support `onchange` event.
+    - [ ] Support `oninit` event.
 - [x] Refactor UIRegistry.
 - [x] Fix bugs
     - [x] Div has no content if there is a scroll content in another one.
@@ -30,6 +32,7 @@ What will come in the next version?
     - [x] Button is not refreshable.
     - [x] :disabled is not every time above :hover styles.
     - [x] :disabled doesn't apply to children by init state.
+    - [ ] Make it easier to use UiStyle.
 - [x] Ui Default Theme
 - [ ] Include disabled ui style.
 - [ ] Better examples.

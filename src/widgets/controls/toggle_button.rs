@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
 use crate::styles::{CssClass, CssSource, IconPlace, TagName};
 use crate::styles::paint::Colored;
-use crate::widgets::{BindToID, FieldMode, FieldSelectionMulti, FieldSet, FiledSelectionSingle, InFieldSet, ToggleButton, UIGenID, UIWidgetState, WidgetId, WidgetKind};
+use crate::widgets::{BindToID, FieldMode, FieldSelectionMulti, FieldSet, FieldSelectionSingle, InFieldSet, ToggleButton, UIGenID, UIWidgetState, WidgetId, WidgetKind};
 use crate::widgets::controls::place_icon_if;
 
 #[derive(Component)]
@@ -28,7 +28,7 @@ fn internal_node_creation_system(
     >,
     parents: Query<&ChildOf>,
     fieldset_q: Query<(), With<FieldSet>>,
-    mut single_sel_q: Query<Option<&mut FiledSelectionSingle>, With<FieldSet>>,
+    mut single_sel_q: Query<Option<&mut FieldSelectionSingle>, With<FieldSet>>,
     mut multi_sel_q: Query<Option<&mut FieldSelectionMulti>, With<FieldSet>>,
     config: Res<ExtendedUiConfiguration>,
     asset_server: Res<AssetServer>,
@@ -156,7 +156,7 @@ fn on_internal_click(
     fieldset_tag_q: Query<(), With<FieldSet>>,
     mut fs_q: Query<(
         &FieldSet,
-        Option<&mut FiledSelectionSingle>,
+        Option<&mut FieldSelectionSingle>,
         Option<&mut FieldSelectionMulti>,
     )>,
     mut current_widget_state: ResMut<CurrentWidgetState>,

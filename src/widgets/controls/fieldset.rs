@@ -1,7 +1,7 @@
 use crate::ExtendedUiConfiguration;
 use crate::styles::paint::Colored;
 use crate::styles::{CssSource, TagName};
-use crate::widgets::{ToggleButton, FieldKind, FieldSelectionMulti, FieldSet, FiledSelectionSingle, RadioButton, WidgetId, WidgetKind};
+use crate::widgets::{ToggleButton, FieldKind, FieldSelectionMulti, FieldSet, FieldSelectionSingle, RadioButton, WidgetId, WidgetKind};
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
 
@@ -63,7 +63,7 @@ fn internal_node_creation_system(
                 FieldSetBase,
                 FieldSetWarned::default(),
             ))
-            .insert(FiledSelectionSingle::default())
+            .insert(FieldSelectionSingle::default())
             .insert(FieldSelectionMulti::default());
     }
 }
