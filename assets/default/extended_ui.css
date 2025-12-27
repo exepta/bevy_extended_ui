@@ -595,7 +595,7 @@ switch {
     width: 75px;
     height: 30px;
     display: flex;
-    justify-content: center;
+    justify-content: start;
     align-items: center;
     position: relative;
     gap: 10px;
@@ -604,7 +604,11 @@ switch {
 switch .switch-text {
     font-size: 11px;
     font-weight: 200;
-    color: #303039;
+    color: var(--text-color);
+}
+
+switch:disabled .switch-text {
+    color: var(--disabled-text);
 }
 
 switch .switch-track {
@@ -623,12 +627,21 @@ switch:checked .switch-track {
     justify-content: end;
 }
 
+switch:disabled .switch-track {
+    background: var(--disabled-text-darker);
+}
+
 switch .switch-track .switch-dot {
     position: absolute;
     width: 28px;
     height: 28px;
     border-radius: 50%;
+    padding: 5px;
     background: var(--primary);
+}
+
+switch:disabled .switch-track .switch-dot {
+    background: var(--disabled-text);
 }
 
 /* Toggle Button */
