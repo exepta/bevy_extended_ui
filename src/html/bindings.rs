@@ -33,8 +33,10 @@ impl Plugin for HtmlEventBindingsPlugin {
 
         // observer (change)
         app.add_systems(Update, emit_checkbox_change.in_set(HtmlSystemSet::Bindings));
+        app.add_systems(Update, emit_choice_box_change.in_set(HtmlSystemSet::Bindings));
         app.add_systems(Update, emit_field_set_change.in_set(HtmlSystemSet::Bindings));
         app.add_systems(Update, emit_input_change.in_set(HtmlSystemSet::Bindings));
+        app.add_systems(Update, emit_slider_change.in_set(HtmlSystemSet::Bindings));
         app.add_observer(on_html_change);
     }
 }
@@ -218,6 +220,16 @@ pub(crate) fn emit_checkbox_change(
     }
 }
 
+/// ChoiceBox
+pub(crate) fn emit_choice_box_change(
+    mut commands: Commands,
+    query: Query<(Entity, &HtmlEventBindings), Changed<ChoiceBox>>,
+) {
+    for (entity, binding) in &query {
+        emit_change_if_bound(&mut commands, binding, entity);
+    }
+}
+
 /// FieldSet
 pub(crate) fn emit_field_set_change(
     mut commands: Commands,
@@ -229,6 +241,16 @@ pub(crate) fn emit_field_set_change(
         )>,
 
     >,
+) {
+    for (entity, binding) in &query {
+        emit_change_if_bound(&mut commands, binding, entity);
+    }
+}
+
+/// Slider
+pub(crate) fn emit_slider_change(
+    mut commands: Commands,
+    query: Query<(Entity, &HtmlEventBindings), Changed<Slider>>,
 ) {
     for (entity, binding) in &query {
         emit_change_if_bound(&mut commands, binding, entity);

@@ -22,7 +22,12 @@ What will come in the next version?
     - [x] `!important` support for CSS.
     - [x] style tag support for HTML.
 - [x] Refactored Bind system for HTML.
-    - [ ] Support `onchange` event.
+    - [x] Support `onchange` event.
+        - [x] Support for `input`.
+        - [x] Support for `check_box`.
+        - [x] Support for `field_set`.
+        - [x] Support for `choice_box`.
+        - [x] Support for `slider`.
     - [x] Support `oninit` event.
 - [x] Refactor UIRegistry.
 - [x] Fix bugs
@@ -33,6 +38,7 @@ What will come in the next version?
     - [x] :disabled is not every time above :hover styles.
     - [x] :disabled doesn't apply to children by init state.
     - [ ] Make it easier to use UiStyle.
+    - [ ] Font support is not working!
 - [x] Ui Default Theme
 - [ ] Include disabled ui style.
 - [ ] Better examples.

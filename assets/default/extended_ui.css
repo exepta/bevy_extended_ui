@@ -8,6 +8,7 @@
     --text-color: #e8e8fd;
     --text-color-dark: #b4b4c1;
     --disabled-text: #707070;
+    --disabled-text-darker: #4e4e4e;
     --gray-background: #323436;
 }
 
@@ -557,6 +558,10 @@ slider .slider-track {
     align-items: center;
 }
 
+slider:disabled .slider-track {
+    background: var(--disabled-text-darker);
+}
+
 slider .slider-track .track-fill {
     position: absolute;
     left: 0;
@@ -567,6 +572,10 @@ slider .slider-track .track-fill {
     border-radius: 5px;
 }
 
+slider:disabled .slider-track .track-fill {
+    background: var(--disabled-text);
+}
+
 slider .slider-track .thumb {
     width: 16px;
     height: 16px;
@@ -574,6 +583,10 @@ slider .slider-track .thumb {
     border-radius: 50%;
     position: absolute;
     box-shadow: 0 0 1px 1px #303033;
+}
+
+slider:disabled .slider-track .thumb {
+    background: var(--disabled-text);
 }
 
 /* Switch Button */
