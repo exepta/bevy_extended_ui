@@ -334,6 +334,10 @@ radio:hover .radio-dot {
     border-color: var(--primary-hover);
 }
 
+radio:disabled .radio-dot {
+    border-color: var(--primary-disabled);
+}
+
 radio:checked .radio-dot {
     border-color: var(--primary);
 }
@@ -345,9 +349,17 @@ radio .radio-dot .checked-dot {
     border-radius: 50%;
 }
 
+radio:disabled .radio-dot .checked-dot {
+    background: var(--primary-disabled);
+}
+
 radio .radio-text {
     font-size: 13px;
     color: var(--text-color);
+}
+
+radio:disabled .radio-text {
+    color: var(--disabled-text);
 }
 
 /* Scrollbar */
