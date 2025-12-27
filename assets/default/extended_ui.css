@@ -10,6 +10,7 @@
     --disabled-text: #707070;
     --disabled-text-darker: #4e4e4e;
     --gray-background: #323436;
+    --gray-background-disabled: #3f4246;
 }
 
 /* Button */
@@ -654,7 +655,7 @@ switch:disabled .switch-track .switch-dot {
 
 /* Toggle Button */
 toggle {
-    background: var(--primary);
+    background: var(--gray-background);
     min-width: 45px;
     min-height: 45px;
     border-radius: 6px;
@@ -662,6 +663,10 @@ toggle {
     display: flex;
     justify-content: center;
     align-items: center;
+}
+
+toggle:disabled {
+    background: var(--gray-background-disabled);
 }
 
 toggle:hover {
@@ -674,4 +679,8 @@ toggle:checked {
 
 toggle .button-text {
     color: var(--text-color);
+}
+
+toggle:disabled .button-text {
+    color: var(--disabled-text);
 }
