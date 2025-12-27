@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use bevy::asset::AssetEvent;
 use bevy::prelude::*;
-use kuchiki::{NodeRef, traits::TendrilSink};
+use kuchiki::{NodeRef, traits::TendrilSink, Attributes};
 
 use crate::html::{HtmlDirty, HtmlEventBindings, HtmlID, HtmlMeta, HtmlSource, HtmlStates, HtmlStructureMap, HtmlStyle, HtmlSystemSet, HtmlWidgetNode};
 use crate::io::{CssAsset, HtmlAsset};
@@ -178,13 +178,7 @@ fn parse_html_node(
         hidden: attributes.contains("hidden"),
     };
 
-    let functions = HtmlEventBindings {
-        onclick: attributes.get("onclick").map(|s| s.to_string()),
-        onmouseover: attributes.get("onmouseenter").map(|s| s.to_string()),
-        onmouseout: attributes.get("onmouseleave").map(|s| s.to_string()),
-        onchange: attributes.get("onchange").map(|s| s.to_string()),
-        oninit: attributes.get("oninit").map(|s| s.to_string()),
-    };
+    let functions = bind_html_func(&attributes);
 
     let widget = Widget(html.controller.clone());
 
@@ -329,6 +323,23 @@ fn parse_html_node(
 
                 first_radio_seen = true;
 
+                let child_meta = HtmlMeta {
+                    css: meta.css.clone(),
+                    id: attrs.get("id").map(|s| s.to_string()),
+                    class: attrs
+                        .get("class")
+                        .map(|s| s.split_whitespace().map(str::to_string).collect()),
+                    style: attrs.get("style").map(HtmlStyle::from_str),
+                };
+
+                let child_states = HtmlStates {
+                    disabled: attrs.contains("disabled"),
+                    readonly: attrs.contains("readonly"),
+                    hidden: attrs.contains("hidden"),
+                };
+
+                let child_functions = bind_html_func(&attrs);
+
                 children.push(HtmlWidgetNode::RadioButton(
                     RadioButton {
                         label,
@@ -336,14 +347,9 @@ fn parse_html_node(
                         selected,
                         ..default()
                     },
-                    HtmlMeta {
-                        css: meta.css.clone(),
-                        id: meta.id.clone(),
-                        class: meta.class.clone(),
-                        style: meta.style.clone(),
-                    },
-                    states.clone(),
-                    functions.clone(),
+                    child_meta,
+                    child_states,
+                    child_functions,
                     widget.clone(),
                     HtmlID::default(),
                 ));
@@ -670,6 +676,17 @@ fn parse_html_node(
         }
         _ => None,
     }
+}
+
+fn bind_html_func(attributes: &Attributes) -> HtmlEventBindings {
+    let functions = HtmlEventBindings {
+        onclick: attributes.get("onclick").map(|s| s.to_string()),
+        onmouseover: attributes.get("onmouseenter").map(|s| s.to_string()),
+        onmouseout: attributes.get("onmouseleave").map(|s| s.to_string()),
+        onchange: attributes.get("onchange").map(|s| s.to_string()),
+        oninit: attributes.get("oninit").map(|s| s.to_string()),
+    };
+    functions
 }
 
 /// Collects mappings from <label for="..."> to its label text.

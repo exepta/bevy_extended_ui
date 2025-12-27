@@ -30,8 +30,14 @@ impl Plugin for RadioButtonWidget {
 
 fn internal_node_creation_system(
     mut commands: Commands,
-    query: Query<
-        (Entity, &UIGenID, &RadioButton, Option<&CssSource>),
+    mut query: Query<
+        (
+            Entity,
+            &UIGenID,
+            &RadioButton,
+            Option<&CssSource>,
+            &mut UIWidgetState,
+        ),
         (With<RadioButton>, Without<RadioButtonBase>),
     >,
     parents: Query<&ChildOf>,
@@ -42,7 +48,7 @@ fn internal_node_creation_system(
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
 
-    for (entity, id, radio_button, source_opt) in query.iter() {
+    for (entity, id, radio_button, source_opt, mut state) in query.iter_mut() {
         let Some(fieldset_entity) = find_fieldset_ancestor(entity, &parents, &fieldset_tag_q) else {
             if !warned.0 {
                 warn!(
@@ -60,10 +66,7 @@ fn internal_node_creation_system(
         }
 
         // initial checked state from parsed `selected`
-        commands.entity(entity).insert(UIWidgetState {
-            checked: radio_button.selected,
-            ..default()
-        });
+        state.checked = radio_button.selected;
 
         // track initial selection in FieldSet (single)
         if radio_button.selected {
@@ -193,6 +196,11 @@ fn on_internal_click(
             return;
         };
 
+        if st.disabled {
+            trigger.propagate(false);
+            return;
+        }
+
         current_widget_state.widget_id = gen_id.0;
 
         if st.checked {
@@ -276,7 +284,11 @@ fn on_internal_cursor_entered(
     mut query: Query<&mut UIWidgetState, With<RadioButton>>,
 ) {
     if let Ok(mut state) = query.get_mut(trigger.entity) {
-        state.hovered = true;
+        if state.disabled {
+            state.hovered = false;
+        } else {
+            state.hovered = true;
+        }
     }
 
     trigger.propagate(false);
