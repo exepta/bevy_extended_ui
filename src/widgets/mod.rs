@@ -450,7 +450,7 @@ impl Default for Img {
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
-#[require(UIGenID, UIWidgetState, Widget)]
+#[require(UIGenID, UIWidgetState, Widget, InputValue)]
 pub struct InputField {
     pub entry: usize,
     pub text: String,
@@ -531,7 +531,7 @@ impl InputCap {
     }
 }
 
-#[derive(Component, Reflect, Debug, Clone)]
+#[derive(Component, Reflect, Debug, Clone, Default)]
 #[reflect(Component)]
 pub struct InputValue(pub String);
 

@@ -35,6 +35,16 @@ body {
     align-items: center;
 }
 
+.display-scroll {
+    background: rgba(255, 215, 196, 0.07);
+    width: 250px;
+    height: 125px;
+    display: flex;
+    overflow: scroll;
+    justify-content: start;
+    align-items: start;
+}
+
 .field-order {
     flex-direction: column;
 }

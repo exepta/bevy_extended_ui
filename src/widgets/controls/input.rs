@@ -8,9 +8,7 @@ use crate::styles::components::UiStyle;
 use crate::styles::paint::Colored;
 use crate::styles::{Background, CssClass, CssSource, FontVal, TagName};
 use crate::utils::keycode_to_char;
-use crate::widgets::{
-    BindToID, InputCap, InputField, InputType, UIGenID, UIWidgetState, WidgetId, WidgetKind,
-};
+use crate::widgets::{BindToID, InputCap, InputField, InputType, InputValue, UIGenID, UIWidgetState, WidgetId, WidgetKind};
 use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
 
 #[derive(Component)]
@@ -135,6 +133,7 @@ fn internal_node_creation_system(
                 TagName(String::from("input")),
                 RenderLayers::layer(layer),
                 InputFieldBase,
+                InputValue(field.text.clone()),
             ))
             .with_children(|builder| {
                 let icon_path = field
@@ -274,6 +273,7 @@ fn sync_input_field_updates(
         (
             Entity,
             &mut InputField,
+            &mut InputValue,
             &UIGenID,
             &UIWidgetState,
             Option<&CssSource>,
@@ -293,10 +293,13 @@ fn sync_input_field_updates(
         icon_entities.insert(bind.0, entity);
     }
 
-    for (entity, mut field, ui_id, state, source_opt) in query.iter_mut() {
+    for (entity, mut field, mut input_value, ui_id, state, source_opt) in query.iter_mut() {
         let css_source = source_opt.cloned().unwrap_or_default();
 
         field.cursor_position = field.cursor_position.min(field.text.len());
+        if input_value.0 != field.text {
+            input_value.0 = field.text.clone();
+        }
 
         for (mut text, bind_id) in text_query.iter_mut() {
             if bind_id.0 != ui_id.0 {
@@ -717,7 +720,7 @@ fn handle_input_horizontal_scroll(
 fn handle_typing(
     time: Res<Time>,
     mut key_repeat: ResMut<KeyRepeatTimers>,
-    mut query: Query<(&mut InputField, &mut UIWidgetState, &UiStyle, &UIGenID)>,
+    mut query: Query<(&mut InputField, &mut InputValue, &mut UIWidgetState, &UiStyle, &UIGenID)>,
     keyboard: Res<ButtonInput<KeyCode>>,
     mut text_query: Query<
         (
@@ -739,7 +742,7 @@ fn handle_typing(
     // Cache pressed keys to avoid repeated iterator calls.
     let pressed: Vec<KeyCode> = keyboard.get_pressed().copied().collect();
 
-    for (mut in_field, mut state, style, ui_id) in query.iter_mut() {
+    for (mut in_field, mut input_value, mut state, style, ui_id) in query.iter_mut() {
         if state.disabled {
             state.focused = false;
             continue;
@@ -762,6 +765,9 @@ fn handle_typing(
                 if in_field.clear_after_focus_lost {
                     in_field.text.clear();
                     text.0 = in_field.text.clone();
+                    if input_value.0 != in_field.text {
+                        input_value.0 = in_field.text.clone();
+                    }
                 }
                 continue;
             }
@@ -774,6 +780,9 @@ fn handle_typing(
                     in_field.text.remove(remove_at);
 
                     set_visible_text(&in_field, &mut text);
+                    if input_value.0 != in_field.text {
+                        input_value.0 = in_field.text.clone();
+                    }
                 }
 
                 if in_field.text.is_empty() {
@@ -830,6 +839,9 @@ fn handle_typing(
                     set_visible_text(&in_field, &mut text);
 
                     text_color.0 = get_active_text_color(widget_style);
+                    if input_value.0 != in_field.text {
+                        input_value.0 = in_field.text.clone();
+                    }
                     key_repeat
                         .timers
                         .insert(*key, Timer::from_seconds(initial_delay, TimerMode::Once));
@@ -845,6 +857,9 @@ fn handle_typing(
                         in_field.cursor_position += 1;
 
                         set_visible_text(&in_field, &mut text);
+                        if input_value.0 != in_field.text {
+                            input_value.0 = in_field.text.clone();
+                        }
 
                         timer.set_duration(Duration::from_secs_f32(repeat_rate));
                         timer.reset();
@@ -863,6 +878,7 @@ fn handle_typing(
                             in_field.text.remove(remove_at);
 
                             set_visible_text(&in_field, &mut text);
+                            input_value.0 = in_field.text.clone();
 
                             timer.set_duration(Duration::from_secs_f32(repeat_rate));
                             timer.reset();

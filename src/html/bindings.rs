@@ -1,7 +1,7 @@
 use bevy::log::warn;
 use bevy::prelude::*;
 use crate::html::*;
-use crate::widgets::{CheckBox, FieldSelectionMulti, FieldSelectionSingle, UIWidgetState};
+use crate::widgets::{CheckBox, FieldSelectionMulti, FieldSelectionSingle, InputValue, UIWidgetState};
 
 pub struct HtmlEventBindingsPlugin;
 
@@ -214,7 +214,6 @@ pub(crate) fn emit_checkbox_change(
     query: Query<(Entity, &HtmlEventBindings), Changed<CheckBox>>,
 ) {
     for (entity, binding) in &query {
-        info!("1");
         emit_change_if_bound(&mut commands, binding, entity);
     }
 }
@@ -238,10 +237,9 @@ pub(crate) fn emit_field_set_change(
 
 pub(crate) fn emit_input_change(
     mut commands: Commands,
-    query: Query<(Entity, &HtmlEventBindings), Changed<InputField>>,
+    query: Query<(Entity, &HtmlEventBindings), Changed<InputValue>>,
 ) {
     for (entity, binding) in &query {
-        info!("1");
         emit_change_if_bound(&mut commands, binding, entity);
     }
 }
