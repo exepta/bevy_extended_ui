@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use crate::html::{
-    AllWidgetsSpawned, HtmlDirty, HtmlEventBindings, HtmlID, HtmlMeta, HtmlStates,
+    HtmlAllWidgetsSpawned, HtmlDirty, HtmlEventBindings, HtmlID, HtmlMeta, HtmlStates,
     HtmlStructureMap, HtmlWidgetNode, NeedHidden, ShowWidgetsTimer,
 };
 use crate::styles::{CssClass, CssID, CssSource};
@@ -12,7 +12,7 @@ pub struct HtmlBuilderSystem;
 
 impl Plugin for HtmlBuilderSystem {
     fn build(&self, app: &mut App) {
-        app.add_message::<AllWidgetsSpawned>();
+        app.add_message::<HtmlAllWidgetsSpawned>();
         app.insert_resource(ShowWidgetsTimer::default());
 
         // Do NOT rely on resource_changed<HtmlStructureMap>().
@@ -35,7 +35,7 @@ pub fn build_html_source(
     structure_map: Res<HtmlStructureMap>,
     mut html_dirty: ResMut<HtmlDirty>,
     asset_server: Res<AssetServer>,
-    mut event_writer: MessageWriter<AllWidgetsSpawned>,
+    mut event_writer: MessageWriter<HtmlAllWidgetsSpawned>,
     body_query: Query<(Entity, &Body)>,
 ) {
     // Only rebuild if marked dirty.
@@ -70,20 +70,20 @@ fn spawn_structure_for_active(
     active: &str,
     structure_map: &Res<HtmlStructureMap>,
     asset_server: &Res<AssetServer>,
-    event_writer: &mut MessageWriter<AllWidgetsSpawned>,
+    event_writer: &mut MessageWriter<HtmlAllWidgetsSpawned>,
 ) {
     if let Some(structure) = structure_map.html_map.get(active) {
         for node in structure {
             spawn_widget_node(commands, node, asset_server, None);
         }
-        event_writer.write(AllWidgetsSpawned);
+        event_writer.write(HtmlAllWidgetsSpawned);
     } else {
         warn!("No structure found for active: {}", active);
     }
 }
 
 fn show_all_widgets_start(
-    mut events: MessageReader<AllWidgetsSpawned>,
+    mut events: MessageReader<HtmlAllWidgetsSpawned>,
     mut timer: ResMut<ShowWidgetsTimer>,
 ) {
     for _event in events.read() {

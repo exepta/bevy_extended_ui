@@ -182,6 +182,8 @@ fn parse_html_node(
         onclick: attributes.get("onclick").map(|s| s.to_string()),
         onmouseover: attributes.get("onmouseenter").map(|s| s.to_string()),
         onmouseout: attributes.get("onmouseleave").map(|s| s.to_string()),
+        onchange: attributes.get("onchange").map(|s| s.to_string()),
+        oninit: attributes.get("oninit").map(|s| s.to_string()),
     };
 
     let widget = Widget(html.controller.clone());

@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use bevy_extended_ui::example_utils::make_app;
-use bevy_extended_ui::html::HtmlSource;
+use bevy_extended_ui::html::{HtmlEvent, HtmlSource};
 use bevy_extended_ui::io::HtmlAsset;
 use bevy_extended_ui::registry::UiRegistry;
 use bevy_extended_ui::styles::CssID;
@@ -18,7 +18,7 @@ fn main() {
 }
 
 #[html_fn("show_h1")]
-fn show_h1(In(_target): In<Entity>, mut query: Query<(&mut Visibility, &CssID), With<CssID>>) {
+fn show_h1(In(_target): In<HtmlEvent>, mut query: Query<(&mut Visibility, &CssID), With<CssID>>) {
     for (mut visibility, id) in query.iter_mut() {
         if id.0.eq("h1") {
             change_visibility(&mut visibility);
@@ -27,7 +27,7 @@ fn show_h1(In(_target): In<Entity>, mut query: Query<(&mut Visibility, &CssID), 
 }
 
 #[html_fn("show_h2")]
-fn show_h2(In(_target): In<Entity>, mut query: Query<(&mut Visibility, &CssID), With<CssID>>) {
+fn show_h2(In(_target): In<HtmlEvent>, mut query: Query<(&mut Visibility, &CssID), With<CssID>>) {
     for (mut visibility, id) in query.iter_mut() {
         if id.0.eq("h2") {
             change_visibility(&mut visibility);

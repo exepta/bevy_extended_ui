@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use bevy::ecs::system::SystemId;
 use bevy::prelude::*;
-use crate::html::bindings::{emit_html_click_events, emit_html_mouse_out_events, emit_html_mouse_over_events, on_html_click, on_html_mouse_out, on_html_mouse_over};
+use crate::html::bindings::HtmlEventBindingsPlugin;
 use crate::html::builder::HtmlBuilderSystem;
 use crate::html::converter::HtmlConverterSystem;
 use crate::html::reload::HtmlReloadPlugin;
@@ -51,7 +51,7 @@ impl HtmlSource {
 }
 
 #[derive(Event, Message)]
-pub struct AllWidgetsSpawned;
+pub struct HtmlAllWidgetsSpawned;
 
 #[derive(Component)]
 pub struct NeedHidden;
@@ -299,16 +299,38 @@ impl Default for HtmlID {
 
 pub struct HtmlFnRegistration {
     pub name: &'static str,
-    pub build: fn(&mut World) -> SystemId<In<Entity>, ()>,
+    pub build: fn(&mut World) -> SystemId<In<HtmlEvent>, ()>,
 }
 
 inventory::collect!(HtmlFnRegistration);
 
+#[derive(Clone, Copy)]
+pub struct HtmlEvent {
+    pub entity: Entity,
+    pub object: HtmlEventObject,
+}
+
+impl HtmlEvent {
+    pub fn target(&self) -> Entity { self.entity }
+
+}
+
+#[derive(Clone, Copy)]
+pub enum HtmlEventObject {
+    Click(HtmlClick),
+    Change(HtmlChange),
+    Init(HtmlInit),
+    MouseOut(HtmlMouseOut),
+    MouseOver(HtmlMouseOver),
+}
+
 #[derive(Default, Resource)]
 pub struct HtmlFunctionRegistry {
-    pub click: HashMap<String, SystemId<In<Entity>>>,
-    pub over: HashMap<String, SystemId<In<Entity>>>,
-    pub out: HashMap<String, SystemId<In<Entity>>>,
+    pub click: HashMap<String, SystemId<In<HtmlEvent>>>,
+    pub over: HashMap<String, SystemId<In<HtmlEvent>>>,
+    pub out: HashMap<String, SystemId<In<HtmlEvent>>>,
+    pub change: HashMap<String, SystemId<In<HtmlEvent>>>,
+    pub init: HashMap<String, SystemId<In<HtmlEvent>>>,
 }
 
 #[derive(Component, Reflect, Default, Clone, Debug)]
@@ -317,6 +339,8 @@ pub struct HtmlEventBindings {
     pub onclick: Option<String>,
     pub onmouseover: Option<String>,
     pub onmouseout: Option<String>,
+    pub onchange: Option<String>,
+    pub oninit: Option<String>,
 }
 
 #[derive(EntityEvent, Clone, Copy)]
@@ -337,6 +361,18 @@ pub struct HtmlMouseOut {
     pub entity: Entity,
 }
 
+#[derive(EntityEvent, Clone, Copy)]
+pub struct HtmlChange {
+    #[event_target]
+    pub entity: Entity,
+}
+
+#[derive(EntityEvent, Clone, Copy)]
+pub struct HtmlInit {
+    #[event_target]
+    pub entity: Entity,
+}
+
 /// Main plugin for HTML UI: converter + builder + reload integration.
 pub struct ExtendedUiHtmlPlugin;
 
@@ -352,25 +388,13 @@ impl Plugin for ExtendedUiHtmlPlugin {
         app.register_type::<HtmlSource>();
         app.register_type::<HtmlStyle>();
 
-        app.add_plugins((HtmlConverterSystem, HtmlBuilderSystem, HtmlReloadPlugin));
+        app.add_plugins((HtmlConverterSystem, HtmlBuilderSystem, HtmlReloadPlugin, HtmlEventBindingsPlugin));
         app.add_systems(Startup, register_html_fns);
-
-        // observer (click)
-        app.add_observer(emit_html_click_events);
-        app.add_observer(on_html_click);
-
-        // observer (click)
-        app.add_observer(emit_html_mouse_over_events);
-        app.add_observer(on_html_mouse_over);
-
-        // observer (click)
-        app.add_observer(emit_html_mouse_out_events);
-        app.add_observer(on_html_mouse_out);
     }
 }
 
 pub fn register_html_fns(world: &mut World) {
-    let mut to_insert: Vec<(String, SystemId<In<Entity>>)> = Vec::new();
+    let mut to_insert: Vec<(String, SystemId<In<HtmlEvent>>)> = Vec::new();
 
     for item in inventory::iter::<HtmlFnRegistration> {
         let id = (item.build)(world);
@@ -379,9 +403,11 @@ pub fn register_html_fns(world: &mut World) {
 
     let mut reg = world.resource_mut::<HtmlFunctionRegistry>();
     for (name, id) in to_insert {
+        reg.change.insert(name.clone(), id);
         reg.click.insert(name.clone(), id);
-        reg.over.insert(name.clone(), id);
+        reg.init.insert(name.clone(), id);
         reg.out.insert(name.clone(), id);
+        reg.over.insert(name.clone(), id);
         debug!("Registered html fn '{name}' with id {id:?}");
     }
 }

@@ -23,7 +23,7 @@ What will come in the next version?
     - [x] style tag support for HTML.
 - [x] Refactored Bind system for HTML.
     - [ ] Support `onchange` event.
-    - [ ] Support `oninit` event.
+    - [x] Support `oninit` event.
 - [x] Refactor UIRegistry.
 - [x] Fix bugs
     - [x] Div has no content if there is a scroll content in another one.

@@ -1,12 +1,13 @@
 use bevy::prelude::*;
 use bevy_extended_ui::example_utils::make_app;
-use bevy_extended_ui::html::HtmlSource;
+use bevy_extended_ui::html::{HtmlEvent, HtmlEventObject, HtmlSource};
 use bevy_extended_ui::io::HtmlAsset;
 use bevy_extended_ui::registry::UiRegistry;
 use bevy_extended_ui::styles::components::UiStyle;
 use bevy_extended_ui::styles::CssID;
 use bevy_extended_ui::styles::paint::Colored;
 use bevy_extended_ui::widgets::{FieldSelectionSingle, Headline, RadioButton};
+use bevy_extended_ui_macros::html_fn;
 
 fn main() {
     let mut app = make_app("Debug Html UI - test");
@@ -16,16 +17,35 @@ fn main() {
         reg.add_and_use("radio_test".to_string(), HtmlSource::from_handle(handle));
     });
 
-    app.add_systems(Update, update_text);
-
     app.run();
 }
 
-fn update_text(
-    check_query: Query<(&CssID, &FieldSelectionSingle), Changed<FieldSelectionSingle>>,
-    mut text_query: Query<(&CssID, &mut UiStyle), With<Headline>>,
+#[html_fn("text_color")]
+fn text_color_from_set(
+    In(event): In<HtmlEvent>,
+    text_query: Query<(&CssID, &mut UiStyle), With<Headline>>,
+    set_q: Query<(&CssID, &FieldSelectionSingle)>,
     radio_q: Query<&RadioButton>,
 ) {
+    match event.object {
+        HtmlEventObject::Change(_) => {
+            apply_selected_radio_color_to_text(text_query, set_q, radio_q, event.entity);
+        }
+        _ => {}
+    }
+}
+
+fn apply_selected_radio_color_to_text(
+    mut text_query: Query<(&CssID, &mut UiStyle), With<Headline>>,
+    set_q: Query<(&CssID, &FieldSelectionSingle)>,
+    radio_q: Query<&RadioButton>,
+    set_entity: Entity,
+) {
+    let Ok((set_id, selection)) = set_q.get(set_entity) else { return };
+    if set_id.0 != "set" {
+        return;
+    }
+    
     let Some((_text_id, mut text_style)) = text_query
         .iter_mut()
         .find(|(id, _)| id.0 == "my-text")
@@ -33,23 +53,14 @@ fn update_text(
         return;
     };
 
-    for (id, selection) in &check_query {
-        if id.0 != "set" {
-            continue;
-        }
+    let Some(sel) = selection.0 else { return };
+    let Ok(radio) = radio_q.get(sel) else { return };
+    let Some(color) = parse_color(radio.value.as_str()) else { return };
 
-        let Some(sel) = selection.0 else { continue };
-        let Ok(radio) = radio_q.get(sel) else { continue };
-        let Some(color) = parse_color(radio.value.as_str()) else { continue };
-
-        for pair in text_style.styles.values_mut() {
-            pair.normal.color = Some(color);
-        }
-
-        text_style.active_style = None;
-
-        break;
+    for pair in text_style.styles.values_mut() {
+        pair.normal.color = Some(color);
     }
+    text_style.active_style = None;
 }
 
 fn parse_color(s: &str) -> Option<Color> {
