@@ -21,6 +21,14 @@ use crate::widgets::{Body, Button, CheckBox, ChoiceBox, Div, Divider, FieldSet, 
 
 pub static HTML_ID_COUNTER: AtomicUsize = AtomicUsize::new(1);
 
+#[derive(SystemSet, Debug, Hash, PartialEq, Eq, Clone)]
+pub enum HtmlSystemSet {
+    Convert,
+    Build,
+    ShowWidgets,
+    Bindings,
+}
+
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
 pub struct HtmlSource {
@@ -52,6 +60,15 @@ impl HtmlSource {
 
 #[derive(Event, Message)]
 pub struct HtmlAllWidgetsSpawned;
+
+#[derive(Event, Message)]
+pub struct HtmlAllWidgetsVisible;
+
+#[derive(Component, Default)]
+pub struct HtmlInitEmitted;
+
+#[derive(Resource, Default)]
+pub struct HtmlInitDelay(pub Option<u8>);
 
 #[derive(Component)]
 pub struct NeedHidden;
@@ -383,12 +400,29 @@ impl Plugin for ExtendedUiHtmlPlugin {
         app.init_resource::<HtmlStructureMap>();
         app.init_resource::<HtmlFunctionRegistry>();
         app.init_resource::<HtmlDirty>();
+        app.init_resource::<HtmlInitDelay>();
 
         app.register_type::<HtmlEventBindings>();
         app.register_type::<HtmlSource>();
         app.register_type::<HtmlStyle>();
 
-        app.add_plugins((HtmlConverterSystem, HtmlBuilderSystem, HtmlReloadPlugin, HtmlEventBindingsPlugin));
+        app.configure_sets(
+            Update,
+            (
+                HtmlSystemSet::Convert,
+                HtmlSystemSet::Build,
+                HtmlSystemSet::ShowWidgets,
+                HtmlSystemSet::Bindings,
+            )
+                .chain(),
+        );
+        app.add_plugins((
+            HtmlConverterSystem,
+            HtmlBuilderSystem,
+            HtmlReloadPlugin,
+            HtmlEventBindingsPlugin,
+        ));
+
         app.add_systems(Startup, register_html_fns);
     }
 }

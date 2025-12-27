@@ -169,7 +169,7 @@ fn internal_node_creation_system(
 fn on_internal_click(
     mut trigger: On<Pointer<Click>>,
     mut commands: Commands,
-    mut query: Query<(&mut UIWidgetState, &UIGenID, &CheckBox, &CssSource), With<CheckBox>>,
+    mut query: Query<(&mut UIWidgetState, &UIGenID, &mut CheckBox, &CssSource), With<CheckBox>>,
     inner_query: Query<(Entity, &BindToID, Option<&Children>, &ComputedNode), With<CheckBoxMark>>,
     mut current_widget_state: ResMut<CurrentWidgetState>,
     config: Res<ExtendedUiConfiguration>,
@@ -178,9 +178,10 @@ fn on_internal_click(
     mut images: ResMut<Assets<Image>>,
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
-    if let Ok((mut state, gen_id, checkbox, css_source)) = query.get_mut(trigger.entity) {
+    if let Ok((mut state, gen_id, mut checkbox, css_source)) = query.get_mut(trigger.entity) {
         state.focused = true;
         state.checked = !state.checked;
+        checkbox.checked = state.checked;
         current_widget_state.widget_id = gen_id.0;
         let current_state = state.clone();
 

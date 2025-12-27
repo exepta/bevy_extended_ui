@@ -1,9 +1,6 @@
 use bevy::prelude::*;
 
-use crate::html::{
-    HtmlAllWidgetsSpawned, HtmlDirty, HtmlEventBindings, HtmlID, HtmlMeta, HtmlStates,
-    HtmlStructureMap, HtmlWidgetNode, NeedHidden, ShowWidgetsTimer,
-};
+use crate::html::{HtmlAllWidgetsSpawned, HtmlAllWidgetsVisible, HtmlDirty, HtmlEventBindings, HtmlID, HtmlMeta, HtmlStates, HtmlStructureMap, HtmlSystemSet, HtmlWidgetNode, NeedHidden, ShowWidgetsTimer};
 use crate::styles::{CssClass, CssID, CssSource};
 use crate::widgets::{Body, UIWidgetState, Widget};
 
@@ -13,15 +10,24 @@ pub struct HtmlBuilderSystem;
 impl Plugin for HtmlBuilderSystem {
     fn build(&self, app: &mut App) {
         app.add_message::<HtmlAllWidgetsSpawned>();
+        app.add_message::<HtmlAllWidgetsVisible>();
         app.insert_resource(ShowWidgetsTimer::default());
 
         // Do NOT rely on resource_changed<HtmlStructureMap>().
         // Use an explicit dirty flag instead.
-        app.add_systems(Update, build_html_source);
-        app.add_systems(Update, show_all_widgets_start.after(build_html_source));
+        app.add_systems(Update, build_html_source.in_set(HtmlSystemSet::Build));
         app.add_systems(
             Update,
-            show_all_widgets_finish.after(show_all_widgets_start),
+            show_all_widgets_start
+                .in_set(HtmlSystemSet::ShowWidgets)
+                .after(build_html_source),
+        );
+
+        app.add_systems(
+            Update,
+            show_all_widgets_finish
+                .in_set(HtmlSystemSet::ShowWidgets)
+                .after(show_all_widgets_start),
         );
     }
 }
@@ -99,6 +105,7 @@ fn show_all_widgets_finish(
     mut query: Query<(&mut Visibility, &HtmlID), (With<Widget>, Without<NeedHidden>)>,
     current_body: Query<&Body>,
     structure_map: Res<HtmlStructureMap>,
+    mut event_writer: MessageWriter<HtmlAllWidgetsVisible>,
 ) {
     if timer.active && timer.timer.tick(time.delta()).is_finished() {
         if let Some(active) = structure_map.active.clone() {
@@ -116,6 +123,7 @@ fn show_all_widgets_finish(
                             }
 
                             timer.active = false;
+                            event_writer.write(HtmlAllWidgetsVisible);
                             debug!(
                                 "All widgets for '{}' are now visible after 100ms delay",
                                 active

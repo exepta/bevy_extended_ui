@@ -189,6 +189,7 @@ pub struct CheckBox {
     pub entry: usize,
     pub label: String,
     pub icon_path: Option<String>,
+    pub checked: bool,
 }
 
 impl Default for CheckBox {
@@ -199,6 +200,7 @@ impl Default for CheckBox {
             entry,
             label: String::from("label"),
             icon_path: Some(String::from("extended_ui/icons/check-mark.png")),
+            checked: false,
         }
     }
 }

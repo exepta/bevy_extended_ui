@@ -4,7 +4,7 @@ use bevy::asset::AssetEvent;
 use bevy::prelude::*;
 use kuchiki::{NodeRef, traits::TendrilSink};
 
-use crate::html::{HtmlDirty, HtmlEventBindings, HtmlID, HtmlMeta, HtmlSource, HtmlStates, HtmlStructureMap, HtmlStyle, HtmlWidgetNode};
+use crate::html::{HtmlDirty, HtmlEventBindings, HtmlID, HtmlMeta, HtmlSource, HtmlStates, HtmlStructureMap, HtmlStyle, HtmlSystemSet, HtmlWidgetNode};
 use crate::io::{CssAsset, HtmlAsset};
 use crate::styles::IconPlace;
 use crate::widgets::Button;
@@ -16,7 +16,7 @@ pub struct HtmlConverterSystem;
 
 impl Plugin for HtmlConverterSystem {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, update_html_ui);
+        app.add_systems(Update, update_html_ui.in_set(HtmlSystemSet::Convert));
     }
 }
 

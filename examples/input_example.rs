@@ -1,8 +1,10 @@
+use bevy_extended_ui::html::HtmlEvent;
 use bevy::prelude::*;
 use bevy_extended_ui::example_utils::make_app;
 use bevy_extended_ui::html::HtmlSource;
 use bevy_extended_ui::io::HtmlAsset;
 use bevy_extended_ui::registry::UiRegistry;
+use bevy_extended_ui_macros::html_fn;
 
 fn main() {
     let mut app = make_app("Debug Html UI - test");
@@ -13,4 +15,9 @@ fn main() {
     });
 
     app.run();
+}
+
+#[html_fn("on_text_change")]
+fn on_text_change(In(event): In<HtmlEvent>) {
+    info!("on_text_change: {:?}", event.entity);
 }

@@ -1,6 +1,6 @@
 use bevy::log::warn;
 use bevy::prelude::*;
-use crate::html::{HtmlChange, HtmlClick, HtmlEvent, HtmlEventBindings, HtmlEventObject, HtmlFunctionRegistry, HtmlInit, HtmlMouseOut, HtmlMouseOver};
+use crate::html::*;
 use crate::widgets::{CheckBox, FieldSelectionMulti, FieldSelectionSingle, UIWidgetState};
 
 pub struct HtmlEventBindingsPlugin;
@@ -20,12 +20,21 @@ impl Plugin for HtmlEventBindingsPlugin {
         app.add_observer(on_html_mouse_out);
 
         // observer (init)
-        app.add_systems(Update, emit_html_init_events);
+        app.add_systems(
+            Update,
+            (
+                track_html_init_visibility,
+                advance_html_init_delay.after(track_html_init_visibility),
+            )
+                .in_set(HtmlSystemSet::Bindings),
+        );
+        app.add_systems(Last, emit_html_init_events);
         app.add_observer(on_html_init);
 
         // observer (change)
-        app.add_systems(Update, emit_checkbox_change);
-        app.add_systems(Update, emit_field_set_change);
+        app.add_systems(Update, emit_checkbox_change.in_set(HtmlSystemSet::Bindings));
+        app.add_systems(Update, emit_field_set_change.in_set(HtmlSystemSet::Bindings));
+        app.add_systems(Update, emit_input_change.in_set(HtmlSystemSet::Bindings));
         app.add_observer(on_html_change);
     }
 }
@@ -144,13 +153,33 @@ pub(crate) fn on_html_mouse_out(
 
 pub(crate) fn emit_html_init_events(
     mut commands: Commands,
-    q_bindings: Query<(Entity, Option<&HtmlEventBindings>), Added<HtmlEventBindings>>,
+    mut pending: ResMut<HtmlInitDelay>,
+    q_bindings: Query<(Entity, &HtmlEventBindings), Without<HtmlInitEmitted>>,
 ) {
+    let Some(0) = pending.0 else { return };
+
     for (entity, bindings) in q_bindings.iter() {
-        if let Some(bindings) = bindings {
-            if bindings.oninit.is_some() {
-                commands.trigger(HtmlInit { entity });
-            }
+        if bindings.oninit.is_some() {
+            commands.trigger(HtmlInit { entity });
+            commands.entity(entity).insert(HtmlInitEmitted);
+        }
+    }
+    pending.0 = None;
+}
+
+fn track_html_init_visibility(
+    mut events: MessageReader<HtmlAllWidgetsVisible>,
+    mut pending: ResMut<HtmlInitDelay>,
+) {
+    if events.read().next().is_some() {
+        pending.0 = Some(10);
+    }
+}
+
+fn advance_html_init_delay(mut pending: ResMut<HtmlInitDelay>) {
+    if let Some(steps) = pending.0.as_mut() {
+        if *steps > 0 {
+            *steps -= 1;
         }
     }
 }
@@ -185,6 +214,7 @@ pub(crate) fn emit_checkbox_change(
     query: Query<(Entity, &HtmlEventBindings), Changed<CheckBox>>,
 ) {
     for (entity, binding) in &query {
+        info!("1");
         emit_change_if_bound(&mut commands, binding, entity);
     }
 }
@@ -194,15 +224,24 @@ pub(crate) fn emit_field_set_change(
     mut commands: Commands,
     query: Query<
         (Entity, &HtmlEventBindings),
-        (
-            Or<(
-                Changed<FieldSelectionSingle>,
-                Changed<FieldSelectionMulti>,
-            )>,
-        ),
+        Or<(
+            Changed<FieldSelectionSingle>,
+            Changed<FieldSelectionMulti>,
+        )>,
+
     >,
 ) {
     for (entity, binding) in &query {
+        emit_change_if_bound(&mut commands, binding, entity);
+    }
+}
+
+pub(crate) fn emit_input_change(
+    mut commands: Commands,
+    query: Query<(Entity, &HtmlEventBindings), Changed<InputField>>,
+) {
+    for (entity, binding) in &query {
+        info!("1");
         emit_change_if_bound(&mut commands, binding, entity);
     }
 }
