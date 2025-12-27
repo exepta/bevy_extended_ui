@@ -5,6 +5,7 @@ use bevy_extended_ui::html::HtmlSource;
 use bevy_extended_ui::io::HtmlAsset;
 use bevy_extended_ui::registry::UiRegistry;
 use bevy_extended_ui::styles::CssID;
+use bevy_extended_ui::widgets::{Headline, UIWidgetState};
 use bevy_extended_ui_macros::html_fn;
 
 fn main() {
@@ -16,4 +17,22 @@ fn main() {
     });
 
     app.run();
+}
+
+#[html_fn("text_click")]
+fn text_click(
+    In(event): In<HtmlEvent>,
+    query: Query<&UIWidgetState>,
+    mut text_query: Query<(&CssID, &mut Headline), With<Headline>>,
+) {
+    let Some((_text_id, mut headline)) = text_query
+        .iter_mut()
+        .find(|(id, _)| id.0 == "check-text")
+    else {
+        return;
+    };
+
+    if let Ok(state) = query.get(event.entity) {
+        headline.text = format!("Value: {}", state.checked);
+    }
 }

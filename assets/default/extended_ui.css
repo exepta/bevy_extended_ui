@@ -636,8 +636,16 @@ switch .switch-track .switch-dot {
     width: 28px;
     height: 28px;
     border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
     padding: 5px;
     background: var(--primary);
+}
+
+switch .switch-track .switch-dot .icon-dot {
+    width: 80%;
+    height: 80%;
 }
 
 switch:disabled .switch-track .switch-dot {

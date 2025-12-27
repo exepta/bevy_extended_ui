@@ -45,16 +45,12 @@ fn internal_node_creation_system(
             css_source = source.clone();
         }
 
-        let dot_icon = if let Some(icon_path) = &switch_button.icon {
-            let handle = image_cache
+        let dot_icon = switch_button.icon.as_ref().map(|icon_path| {
+            image_cache
                 .map
                 .entry(icon_path.clone())
-                .or_insert_with(|| asset_server.load(icon_path.clone()))
-                .clone();
-            Some(ImageNode::new(handle))
-        } else {
-            None
-        };
+                .or_insert_with(|| asset_server.load(icon_path.clone())).clone()
+        });
 
         commands
             .entity(entity)
@@ -84,8 +80,10 @@ fn internal_node_creation_system(
                 TagName(String::from("switch")),
                 RenderLayers::layer(*layer),
                 SwitchButtonBase,
-                children![
-                    (
+            ))
+            .with_children(|builder| {
+                builder
+                    .spawn((
                         Name::new(format!("Switch-Track-{}", switch_button.entry)),
                         Node {
                             ..default()
@@ -100,12 +98,13 @@ fn internal_node_creation_system(
                         BindToID(id.0),
                         RenderLayers::layer(*layer),
                         SwitchButtonTrack,
-                        children![
-                            (
+                    ))
+                    .with_children(|track| {
+                        track
+                            .spawn((
                                 Name::new(format!("Switch-Dot-{}", switch_button.entry)),
                                 Node::default(),
                                 BackgroundColor::default(),
-                                dot_icon.unwrap_or_default(),
                                 BorderColor::default(),
                                 BorderRadius::default(),
                                 css_source.clone(),
@@ -115,25 +114,42 @@ fn internal_node_creation_system(
                                 BindToID(id.0),
                                 RenderLayers::layer(*layer),
                                 SwitchButtonDot,
-                            )
-                        ]
-                    ),
-                    (
-                        Name::new(format!("Switch-Label-{}", switch_button.entry)),
-                        Text::new(switch_button.label.clone()),
-                        TextColor::default(),
-                        TextFont::default(),
-                        TextLayout::default(),
-                        css_source.clone(),
-                        UIWidgetState::default(),
-                        CssClass(vec!["switch-text".to_string()]),
-                        Pickable::IGNORE,
-                        BindToID(id.0),
-                        RenderLayers::layer(*layer),
-                        SwitchButtonLabel,
-                    )
-                ],
-            ))
+                            ))
+                            .with_children(|dot| {
+                                if let Some(handle) = dot_icon.clone() {
+                                    dot.spawn((
+                                        Name::new(format!(
+                                            "Switch-Dot-Icon-{}",
+                                            switch_button.entry
+                                        )),
+                                        ImageNode::new(handle),
+                                        ZIndex::default(),
+                                        UIWidgetState::default(),
+                                        css_source.clone(),
+                                        CssClass(vec!["icon-dot".to_string()]),
+                                        Pickable::IGNORE,
+                                        BindToID(id.0),
+                                        RenderLayers::layer(*layer),
+                                    ));
+                                }
+                            });
+                    });
+
+                builder.spawn((
+                    Name::new(format!("Switch-Label-{}", switch_button.entry)),
+                    Text::new(switch_button.label.clone()),
+                    TextColor::default(),
+                    TextFont::default(),
+                    TextLayout::default(),
+                    css_source.clone(),
+                    UIWidgetState::default(),
+                    CssClass(vec!["switch-text".to_string()]),
+                    Pickable::IGNORE,
+                    BindToID(id.0),
+                    RenderLayers::layer(*layer),
+                    SwitchButtonLabel,
+                ));
+            })
             .observe(on_internal_click)
             .observe(on_internal_cursor_entered)
             .observe(on_internal_cursor_leave);
@@ -146,6 +162,10 @@ fn on_internal_click(
     mut current_widget_state: ResMut<CurrentWidgetState>,
 ) {
     if let Ok((mut state, gen_id)) = switch_q.get_mut(trigger.entity) {
+        if state.disabled {
+            trigger.propagate(false);
+            return;
+        }
         state.checked = !state.checked;
         state.focused = true;
         current_widget_state.widget_id = gen_id.0;
