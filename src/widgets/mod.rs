@@ -531,6 +531,10 @@ impl InputCap {
     }
 }
 
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+pub struct InputValue(pub String);
+
 // ===============================================
 //                     Paragraph
 // ===============================================
