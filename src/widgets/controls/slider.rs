@@ -180,6 +180,10 @@ fn on_internal_click(
     mut current_widget_state: ResMut<CurrentWidgetState>,
 ) {
     if let Ok((mut state, gen_id)) = query.get_mut(trigger.entity) {
+        if state.disabled {
+            trigger.propagate(false);
+            return;
+        }
         state.focused = true;
         current_widget_state.widget_id = gen_id.0;
     }
@@ -212,6 +216,7 @@ fn on_track_click(
     window_q: Query<&Window, With<PrimaryWindow>>,
 
     mut slider_query: Query<(&mut Slider, &UIGenID), With<Slider>>,
+    slider_state_q: Query<(&UIGenID, &UIWidgetState), With<Slider>>,
     track_q: Query<(&ComputedNode, &BindToID, &RelativeCursorPosition), With<SliderTrackContainer>>,
     thumb_size_q: Query<(&ComputedNode, &BindToID), With<SliderThumb>>,
 
@@ -232,6 +237,11 @@ fn on_track_click(
     let Ok((track_node, bind, rel)) = track_q.get(trigger.entity) else {
         return;
     };
+
+    if is_slider_disabled(bind.0, &slider_state_q) {
+        trigger.propagate(false);
+        return;
+    }
 
     let track_width = (track_node.size().x / sf).max(1.0);
     let Some(thumb_width) = find_bound_width(bind.0, &thumb_size_q, sf) else {
@@ -268,6 +278,7 @@ fn on_thumb_drag(
     track_q: Query<(&ComputedNode, &BindToID), With<SliderTrackContainer>>,
     thumb_node_q: Query<&ComputedNode, With<SliderThumb>>,
     mut slider_q: Query<(&mut Slider, &UIGenID), With<Slider>>,
+    slider_state_q: Query<(&UIGenID, &UIWidgetState), With<Slider>>,
     mut fill_q: Query<
         (&mut Node, &BindToID, &mut UiStyle),
         (With<SliderTrackFill>, Without<SliderThumb>),
@@ -290,6 +301,10 @@ fn on_thumb_drag(
     let Ok((track_node, bind)) = track_q.get(parent.parent()) else {
         return;
     };
+
+    if is_slider_disabled(bind.0, &slider_state_q) {
+        return;
+    }
 
     let track_width = (track_node.size().x / sf).max(1.0);
 
@@ -438,7 +453,7 @@ fn detect_change_slider_values(
     let shift = keyboard.pressed(KeyCode::ShiftLeft) || keyboard.pressed(KeyCode::ShiftRight);
 
     for (mut slider, state, ui_id, mut prev) in slider_q.iter_mut() {
-        if state.focused {
+        if state.focused && !state.disabled {
             let step = if shift {
                 slider.step * 10.0
             } else {
@@ -539,4 +554,14 @@ where
         .iter()
         .find(|(_, bind)| bind.0 == ui_id)
         .map(|(computed, _)| (computed.size().x / scale_factor).max(1.0))
+}
+
+fn is_slider_disabled(
+    ui_id: usize,
+    query: &Query<(&UIGenID, &UIWidgetState), With<Slider>>,
+) -> bool {
+    query
+        .iter()
+        .find(|(gen_id, _)| gen_id.0 == ui_id)
+        .is_some_and(|(_, state)| state.disabled)
 }
