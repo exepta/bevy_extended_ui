@@ -2,6 +2,13 @@
 name = "bevy_extended_ui_macros"
 version = "0.1.0"
 edition = "2024"
+authors = ["Daniel Ramke <genshin.exepta@outlook.com>"]
+description = "Macros for the html bind in bevy_extended_ui."
+license = "Apache-2.0"
+repository = "https://github.com/exepta/bevy_extended_ui"
+readme = "../../README.md"
+keywords = ["bevy", "ui", "macro", "html", "bevy_extended_ui"]
+categories = ["gui", "rendering"]
 
 [lib]
 proc-macro = true
