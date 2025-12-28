@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta name="toggle-test">
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <link rel="stylesheet" href="base.css">
+</head>
+<body>
+
+<div class="display-center">
+    <h3 id="my-text">My Text</h3>
+</div>
+
+<fieldset
+        id="set"
+        allow-none="false"
+        class="field-center"
+        mode="multi"
+        onchange="text_format"
+        oninit="text_format"
+>
+    <toggle value="text_size"><icon src="extended_ui/icons/font_size.png"></icon></toggle>
+    <toggle value="test_bold" disabled><icon src="extended_ui/icons/bold.png"></icon></toggle>
+    <toggle value="text_color" selected><icon src="extended_ui/icons/color.png"></icon></toggle>
+</fieldset>
+
+</body>
+</html>

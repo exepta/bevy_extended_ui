@@ -1,72 +1,57 @@
+use crate::styles::{CssSource, TagName};
+use crate::widgets::{Body, UIGenID, UIWidgetState, WidgetId, WidgetKind};
+use crate::{CurrentWidgetState, ExtendedUiConfiguration};
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
-use crate::{CurrentWidgetState, ExtendedUiConfiguration, UIGenID, UIWidgetState};
-use crate::styling::convert::{CssSource, TagName};
-use crate::widgets::{HtmlBody, WidgetId, WidgetKind};
 
 #[derive(Component)]
-struct HtmlBodyBase;
+struct BodyBase;
 
-pub struct HtmlBodyWidget;
+pub struct BodyWidget;
 
-impl Plugin for HtmlBodyWidget {
+impl Plugin for BodyWidget {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, internal_node_creation_system);
     }
 }
 
-/// System that initializes internal UI nodes for HTML body elements.
-///
-/// It sets up a visual and interactive node for each [`HtmlBody`] that hasn't already
-/// been processed (i.e., doesn't have an [`HtmlBodyBase`] tag yet). The node is styled,
-/// observed for interaction, and tagged for future queries.
-///
-/// # Parameters
-/// - `commands`: Commands to spawn or modify entities.
-/// - `query`: A query to find all [`HtmlBody`] entities that haven't been set up yet.
-/// - `config`: Configuration resource providing rendering layers.
-///
-/// # Behavior
-/// Each matching entity gets the following inserted:
-/// - [`Name`] for debugging
-/// - [`Node`], [`BackgroundColor`], [`ImageNode`], [`ZIndex`] for UI display
-/// - [`CssSource`], [`TagName`] for styling
-/// - [`RenderLayers`] to define which camera layer renders it
-/// - [`HtmlBodyBase`] marker to avoid re-processing
-/// - Observers for pointer click and hover events
 fn internal_node_creation_system(
     mut commands: Commands,
-    query: Query<(Entity, &HtmlBody, Option<&CssSource>), (With<HtmlBody>, Without<HtmlBodyBase>)>,
-    config: Res<ExtendedUiConfiguration>
+    query: Query<(Entity, &Body, Option<&CssSource>), (With<Body>, Without<BodyBase>)>,
+    config: Res<ExtendedUiConfiguration>,
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
+
     for (entity, body, source_opt) in query.iter() {
         let mut css_source = CssSource::default();
         if let Some(source) = source_opt {
             css_source = source.clone();
         }
-        
+
         let mut html_id = String::new();
-        if let Some(id) = body.bind_to_html.clone() {
+        if let Some(id) = body.html_key.clone() {
             html_id = id;
         }
 
-        commands.entity(entity).insert((
-            Name::new(format!("Body-{}-{}", html_id, body.w_count)),
-            Node::default(),
-            WidgetId {
-                id: body.w_count,
-                kind: WidgetKind::HtmlBody
-            },
-            BackgroundColor::default(),
-            ImageNode::default(),
-            ZIndex::default(),
-            Pickable::default(),
-            css_source,
-            TagName("body".to_string()),
-            RenderLayers::layer(*layer),
-            HtmlBodyBase,
-        )).observe(on_internal_click)
+        commands
+            .entity(entity)
+            .insert((
+                Name::new(format!("Body-{}-{}", html_id, body.entry)),
+                Node::default(),
+                WidgetId {
+                    id: body.entry,
+                    kind: WidgetKind::Body,
+                },
+                BackgroundColor::default(),
+                ImageNode::default(),
+                ZIndex::default(),
+                Pickable::default(),
+                css_source,
+                TagName("body".to_string()),
+                RenderLayers::layer(*layer),
+                BodyBase,
+            ))
+            .observe(on_internal_click)
             .observe(on_internal_cursor_entered)
             .observe(on_internal_cursor_leave);
     }
@@ -83,8 +68,8 @@ fn internal_node_creation_system(
 /// - `current_widget_state`: Global resource tracking currently focused widget.
 fn on_internal_click(
     mut trigger: On<Pointer<Click>>,
-    mut query: Query<(&mut UIWidgetState, &UIGenID), With<HtmlBody>>,
-    mut current_widget_state: ResMut<CurrentWidgetState>
+    mut query: Query<(&mut UIWidgetState, &UIGenID), With<Body>>,
+    mut current_widget_state: ResMut<CurrentWidgetState>,
 ) {
     if let Ok((mut state, gen_id)) = query.get_mut(trigger.event_target()) {
         state.focused = true;
@@ -99,7 +84,7 @@ fn on_internal_click(
 /// Sets the `hovered` state to `true`, triggering any hover-related UI feedback.
 fn on_internal_cursor_entered(
     mut trigger: On<Pointer<Over>>,
-    mut query: Query<&mut UIWidgetState, With<HtmlBody>>,
+    mut query: Query<&mut UIWidgetState, With<Body>>,
 ) {
     if let Ok(mut state) = query.get_mut(trigger.event_target()) {
         state.hovered = true;
@@ -113,7 +98,7 @@ fn on_internal_cursor_entered(
 /// Resets the `hovered` state to `false`.
 fn on_internal_cursor_leave(
     mut trigger: On<Pointer<Out>>,
-    mut query: Query<&mut UIWidgetState, With<HtmlBody>>,
+    mut query: Query<&mut UIWidgetState, With<Body>>,
 ) {
     if let Ok(mut state) = query.get_mut(trigger.event_target()) {
         state.hovered = false;

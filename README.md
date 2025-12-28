@@ -8,7 +8,7 @@ ___
 
 Since I've been writing a game in the [_Bevy_](https://bevyengine.org/) engine lately, 
 I created this crate. In my game, 
-I need more complex UI elements that aren't currently supported by Bevy. 
+I need more complex UI elements that Bevy doesn't currently support. 
 These include sliders, choice boxes, check boxes, radio buttons, and so on. 
 So I set about implementing these elements using the standard bevy_ui system. 
 I'd like to make this project available to you so that you can use elements other 
@@ -16,149 +16,94 @@ than just nodes, buttons, or images. If you're missing a widget and know how
 to create it, it would be great if you could add it. 
 Otherwise, feel free to create a ticket.
 
-> *Note:* This project is currently under construction and not suitable for large projects!.
+### Features
+There are many features in this crate. You can see all current supported widgets [here](WIDGETS.md).
+Available features:
+- [x] Full HTML support.
+- [x] CSS support but not all CSS properties.
+- [x] Hot reload support.
+- [x] HTML Bind support for interacting with the code.
+- [x] Font support for family and weight.
+- [ ] Customizable theme.
+- [ ] Animation support.
+- [ ] Validation for widgets like required fields.
+- [ ] Custom Cursor or system cursor support.
 
-## Example
-___
+There are many other things, but currently you can use the core (HTML / CSS) features.
 
-Here I will show you how to use the bevy_extended_ui:
+### How to use?
 
+Add this to your `Cargo.toml`:
+```toml
+[dependencies]
+bevy_extended_ui = "1.1.0"
+bevy_extended_ui_macros = "1.1.0"
+```
 
-First we need to integrate the plugin into your project.
+Then, you add the plugin to your `main.rs` or on any point at a build function:
 ```rust
-fn main() {
-  let _ = App::new()
-          .add_plugins((DefaultPlugins, ExtendedUiPlugin))
-          .run();
+fn build(&mut app: App) {
+    app.add_plugin(ExtendedUiPlugin);
 }
 ```
-
-Next, you can get started right away. Currently, there are widgets (Div, Button, Checkbox, InputField, and Slider). Note that these aren't all the widgets! More are coming soon.
-
-Here's a simple example of a button that we spawn
-```rust
-    commands.spawn((
-        Div::default(),
-        CssSource(String::from("test.css")),
-        CssClass(vec![".div-test".to_string(), ".div-override".to_string()]),
-        children![
-            Button::default(),
-            Button::default()
-        ]
-    ));
-```
-
-Here is an example of some widgets:
-
-<img alt="bHYuo.gif" height="750" src="https://s14.gifyu.com/images/bHYuo.gif" width="600"/>
-
-HTML works now with bevy_extended_ui. You can show the html from your website in bevy!
-But currently these widgets ar supported:
-- Button
-- Div
-- Body
-- H1 - H6
-- Paragraph
-- Slider
-- Select
-- Input type:`number`, `text` and `password`
-- ProgressBar
-```rust
-    commands.spawn(HtmlSource::from_file_path("examples/html/login-ui.html"));
-```
-The html file needed a `head` element which contains a `<meta name="test">` tag, this is used
-for identify the correct ui which you currently need.
-
-### New HTML Controller Support
-You can now use controller for handle functions from html like `onclick` or `onmouseennter` for interact with the html file.
-See a full example at the `examples/` package!
- 
-For implement css styling use `<link href="css/example.css" ref="text/css">`. At the moment only one css
-at the same time is supported!
-Here is an example html:
+Then you create an HTML file:
 ```html
+<html lang="en">
 <head>
-    <meta name="login-example" />
-    <meta controller="controller/login_controller.rs" />
-    <link rel="stylesheet" href="examples/css/login-ui.css" />
-    <title>Page Title</title>
+    <meta name="test">
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <!-- You can link your CSS file here. -->
+    <link rel="stylesheet" href="base.css">
+    <!-- <link rel="stylesheet" href="base2.css"> You can add more CSS files.-->
 </head>
-
 <body>
-<!-- Login Page -->
-<div id="container">
-    <!-- Login headline -->
-    <h2>Login</h2>
 
-    <!-- Input Field with type text and an icon -->
-    <label for="username">Username</label>
-    <input id="username" type="text" icon="icons/user-icon.png" />
+<!-- You can use HTML bindings here. like the onclick attribute. -->
+<button onclick="test_click">Button</button>
 
-    <!-- Input Field with type password and an icon -->
-    <label for="password">Password</label>
-    <input id="password" type="password" icon="icons/pass-icon.png" />
-
-    <!-- Remember me -->
-    <checkbox id="remember-me">Remember me</checkbox>
-
-    <!-- Forgot password -->
-    <p>Forgot password?</p>
-
-    <!-- Login container -->
-    <div class="button-container">
-        <button id="login">
-            Login
-        </button>
-    </div>
-</div>
 </body>
+</html>
 ```
 
-All Widgets support CSS3 and can apply many of the default css rules. Note that the current system working with css but
-not perfect yet! Let me explain it:
-
-```css
-button {
-    background: rgb(255, 255, 255); /* will be white */
-    display: flex; /* set node display flex */
+And finally,
+```rust
+fn build(&mut app: App) {
+    app.add_systems(Startup, |mut reg: ResMut<UiRegistry>, asset_server: Res<AssetServer>| {
+        let handle: Handle<HtmlAsset> = asset_server.load("YOUR_ASSETS_LOCATION/test.html");
+        reg.add_and_use("test".to_string(), HtmlSource::from_handle(handle));
+    });
 }
 
-button:hover {
-    background: rgba(200, 200, 200, 200); /* will work correctly */
-}
-
-.button-text {
-    color: #FFFFFF; /* is white and working */
-}
-
-/* THIS WORK IF THE BUTTON IS HOVERED! */
-.button-text:hover {
-    color: red; /* set red */
-}
-
-/* THIS WILL WORK TOO! */
-button:hover .button-text {
-    color: red; /* set red */
+#[html_fn("test_click")]
+fn test_click(In(event): In<HtmlEvent>) {
+    println!("Button clicked!");
 }
 ```
 
-## Examples
+Note that currently you can use this binding:
+- `onclick`
+- `onchange` Only for `<select>`, `<fieldset>`, `<input>`, `<checkbox>` and `<slider>` elements.
+- `oninit`
+- `onmouseover`
+- `onmouseout`
 
-For more examples, look at the example package. If you need help with CSS rules, look at CSS_SUPPORT.md in the same folder!
-The crate supports many CSS things, the list below shows the future support:
-- CSS variables
-- CSS Animations @keyframes
-- CSS media queries
-- & ~ > Operators
-- SCSS support
+### What comes next?
+
+Next, I'd like to build a website that's structured like React documentation.
+There you'll always be able to see all the patches and how to apply them!
+If anyone has any ideas, I'd be happy to hear them.
+
+### Compatibility
+
+> *Note:* This project is currently under construction and not suitable for large projects!.
 
 | `Bevy` version | `bevy_extended_ui` version |
 |----------------|----------------------------|
-| 0.17.2         | 0.3.0                      |
+| 0.17.3         | 1.1.0                      |
 | 0.16.1         | 0.1.0 - 0.2.2              |
 | 0.16.0         | 0.1.0 - 0.2.2              |
 
 ### Important Links
-[Link to Css rules](CSS_SUPPORT.md)
 
 [Link to Widget attributes](WIDGETS.md)

@@ -1,197 +1,207 @@
-# Widget Documentation
+# Widgets
 
-This document describes all UI widget components used in the extended UI system. Each widget is represented as a Bevy component and is designed to be parsed from HTML and rendered dynamically. All widgets use internal ID pools to ensure unique instance IDs and share common dependencies, such as visibility, transform, and event bindings.
+This document describes all widgets in the project, their corresponding Rust structs, and how they appear in HTML source.
 
 ---
 
-## 🧱 HtmlBody
+## Body (`Body`)
 
-The root container for HTML-rendered UI elements.
+**Struct purpose:** Root container for an HTML structure. Holds an internal `entry` ID and an optional `html_key` (the `<meta name="...">` key of the HTML file).
 
-**Fields:**
-- `w_count`: Unique widget ID.
-- `bind_to_html`: Optional HTML ID to bind this widget to.
-- `source`: Optional `HtmlSource` for origin tracking.
+**HTML tag:**
+```html
+<body>
+  <!-- child widgets -->
+</body>
+```
 
-**Css:**
-- `body`: widget tag for html and css
 ---
 
-## 🧱 Div
+## Div (`Div`)
 
-A generic container element, representing a `<div>` in HTML.
+**Struct purpose:** Generic container for layout and grouping; only stores an internal ID.
 
-**Fields:**
-- `0`: Unique widget ID (newtype).
+**HTML tag:**
+```html
+<div>
+  <!-- child widgets -->
+</div>
+```
 
-**Css:**
-- `div`: widget tag for html and css
 ---
 
-## 📝 Headline
+## Button (`Button`)
 
-Used for rendering headline elements (`<h1>` to `<h6>`).
+**Struct purpose:** Clickable button with text plus an optional icon and its placement.
 
-**Fields:**
-- `w_count`: Unique ID.
-- `text`: Text to display.
-- `h_type`: Headline level (H1–H6).
+**HTML tag:**
+```html
+<button>
+  Text
+  <icon src="path/to/icon.png"></icon>
+</button>
+```
 
-**Enum:** `HeadlineType`
-- Variants: `H1`, `H2`, `H3`, `H4`, `H5`, `H6`
-
-**Css:**
-- `h1 - h6`: widget tag for html and css
 ---
 
-## 📄 Paragraph
+## CheckBox (`CheckBox`)
 
-Represents a simple paragraph of text (`<p>`).
+**Struct purpose:** Checkbox with label, optional icon, and a `checked` state.
 
-**Fields:**
-- `w_count`: Unique ID.
-- `text`: Paragraph content.
+**HTML tag:**
+```html
+<checkbox icon="extended_ui/icons/check-mark.png">Label</checkbox>
+```
 
-**Css:**
-- `p`: widget tag for html and css
 ---
 
-## 🔘 Button
+## ChoiceBox / Select (`ChoiceBox`)
 
-Represents a clickable button element.
+**Struct purpose:** Dropdown selection with a label, current value (`value`), and a list of options.
 
-**Fields:**
-- `w_count`: Unique ID.
-- `text`: Display text.
-- `icon_place`: Icon placement relative to text.
-- `icon_path`: Optional icon asset path.
+**HTML tag:**
+```html
+<select>
+  <option value="a" selected>Option A</option>
+  <option value="b">Option B</option>
+</select>
+```
 
-**Css:**
-- `button`: widget tag for html and css
-- `.button-text`: for the inner text and icon
 ---
 
-## ☑️ CheckBox
+## Divider (`Divider`)
 
-Checkbox input with an optional label and icon.
+**Struct purpose:** Separator line whose alignment can be vertical or horizontal.
 
-**Fields:**
-- `w_count`: Unique ID.
-- `label`: Display label.
-- `icon_path`: Icon path for checked state (default provided).
+**HTML tag:**
+```html
+<divider alignment="horizontal"></divider>
+```
 
-**Css:**
-- `checkbox`: widget tag for html and css
-- `.mark-box`: container for the `mark` icon
-- `.check-text`: the label of checkbox
-- `.mark`: the checked icon
 ---
 
-## 🎚️ Slider
+## FieldSet (`FieldSet`)
 
-Numeric input using a slider UI element.
+**Struct purpose:** Group container for selection widgets (e.g., `<radio>` or `<toggle>`). Controls the selection mode (single/multi) and whether “no selection” is allowed.
 
-**Fields:**
-- `w_count`: Unique ID.
-- `value`: Current value.
-- `step`: Step size.
-- `min`, `max`: Range bounds.
+**HTML tag:**
+```html
+<fieldset mode="single" allow-none="false">
+  <radio value="a" selected>Option A</radio>
+  <radio value="b">Option B</radio>
+</fieldset>
+```
 
-**Css:**
-- `slider`: widget tag for html and css
-- `.track`: the filled slider bar
-- `.thumb`: the slider thumb
 ---
 
-## ✏️ InputField
+## Headline (`Headline`)
 
-Text input widget with extended features.
+**Struct purpose:** Heading with text and type (H1–H6).
 
-**Fields:**
-- `w_count`: Unique ID.
-- `text`: Current input.
-- `label`: Input label.
-- `placeholder`: Placeholder text.
-- `cursor_position`: Position of the text cursor.
-- `clear_after_focus_lost`: Whether to clear on blur.
-- `icon_path`: Optional icon.
-- `input_type`: Type of input (`Text`, `Password`, `Number`).
-- `cap_text_at`: Input cap behavior.
+**HTML tag:**
+```html
+<h1>Headline</h1>
+```
 
-**Enum:** `InputType`
-- Variants: `Text`, `Password`, `Number`
-
-**Enum:** `InputCap`
-- Variants:
-  - `NoCap`: No character limit.
-  - `CapAtNodeSize`: Limit by layout node.
-  - `CapAt(usize)`: Explicit character cap.
-
-**Css:**
-- `input`: widget tag for html and css
-- `.in-icon-container`: the left icon container
-- `.in-icon`: icon from the container itself
-- `.input-label`: input label which move
-- `.in-text-container`: the text holder container
-- `.input-cursor`: the text cursor
-- `.input-text`: input text which displayed
 ---
 
-## 🔽 ChoiceBox
+## Image (`Img`)
 
-Dropdown selection widget.
+**Struct purpose:** Image widget with `src` and `alt` text.
 
-**Fields:**
-- `w_count`: Unique ID.
-- `label`: Display label.
-- `value`: Currently selected option.
-- `options`: List of selectable options.
-- `icon_path`: Optional icon for dropdown.
+**HTML tag:**
+```html
+<img src="path/to/image.png" alt="Description" />
+```
 
-**Struct:** `ChoiceOption`
-- `text`: Display text.
-- `internal_value`: Backend value.
-- `icon_path`: Optional icon.
-
-**Css:**
-- `select`: widget tag for html and css
-- `.select-label`: the outer label
-- `.choice-content-box`: drop down box which the options
-- `.choice-option`: the option card
-- `.option-icon`: manipulated the icon from the option only
-- `.option-text`: manipulated the text and the icon
-- `.option-selected`: the current selected (displayed at top) option card
-- `.option-sel-text`: manipulated the text
-- `.option-drop-box`: icon holder from the dropdown icon
-- `.option-drop-icon`: the dropdown icon itself
 ---
 
-## 🖼️ Img
+## InputField (`InputField`)
 
-Represents an image element (`<img>`).
+**Struct purpose:** Text input with label, placeholder, icon, type (text/email/date/password/number), and length limit.
 
-**Fields:**
-- `w_count`: Unique ID.
-- `src`: Image path.
-- `alt`: Alt text for accessibility.
+**HTML tag:**
+```html
+<label for="name">Name</label>
+<input id="name" type="text" placeholder="Your name" maxlength="32" />
+```
 
-**Css:**
-- `img`: widget tag for html and css
 ---
 
-## 📊 ProgressBar
+## Paragraph (`Paragraph`)
 
-Visualizes progress of a task or value.
+**Struct purpose:** Paragraph with free-form text.
 
-**Fields:**
-- `w_count`: Unique ID.
-- `value`: Current progress value.
-- `max`, `min`: Value bounds.
+**HTML tag:**
+```html
+<p>This is a paragraph.</p>
+```
 
-**Css:**
-- `progressbar`: widget tag for html and css
-- `.progress`: the current show progress
 ---
 
-All widgets implement `Default`, generate a unique internal `w_count`, and are expected to work with Bevy’s ECS-based UI system. Event bindings, visibility, and transforms are handled automatically via required component dependencies.
+## ProgressBar (`ProgressBar`)
 
+**Struct purpose:** Progress indicator with `min`, `max`, and `value`.
+
+**HTML tag:**
+```html
+<progressbar min="0" max="100" value="42"></progressbar>
+```
+
+---
+
+## RadioButton (`RadioButton`)
+
+**Struct purpose:** Single radio button with label, `value`, and `selected` state. Can be used directly or inside a `<fieldset>`.
+
+**HTML tag:**
+```html
+<radio value="choice" selected>Choice</radio>
+```
+
+---
+
+## Scrollbar (`Scrollbar`)
+
+**Struct purpose:** Scrollbar for vertical or horizontal scrolling with min/max/step and current value.
+
+**HTML tag:**
+```html
+<scroll alignment="vertical"></scroll>
+```
+
+---
+
+## Slider (`Slider`)
+
+**Struct purpose:** Slider for numeric input with `min`, `max`, `value`, and `step`.
+
+**HTML tag:**
+```html
+<slider min="0" max="100" value="50" step="5"></slider>
+```
+
+---
+
+## SwitchButton (`SwitchButton`)
+
+**Struct purpose:** Switch widget with a label and optional icon.
+
+**HTML tag:**
+```html
+<switch icon="path/to/icon.png">On/Off</switch>
+```
+
+---
+
+## ToggleButton (`ToggleButton`)
+
+**Struct purpose:** Toggleable button with label, `value`, icon, and `selected` state.
+
+**HTML tag:**
+```html
+<toggle value="flag" selected>
+  Toggle Text
+  <icon src="path/to/icon.png"></icon>
+</toggle>
+```
