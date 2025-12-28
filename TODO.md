@@ -37,11 +37,10 @@ What will come in the next version?
     - [x] Button is not refreshable.
     - [x] :disabled is not every time above :hover styles.
     - [x] :disabled doesn't apply to children by init state.
-    - [ ] Make it easier to use UiStyle.
     - [x] Font support is not working!
 - [x] Ui Default Theme
 - [x] Include disabled ui style.
 - [x] Better examples.
 - [ ] Better documentation.
 - [ ] Test library in an external project.
-- [ ] Create a Patch.md file for current releases.
+- [x] Create a Patch.md file for current releases.
