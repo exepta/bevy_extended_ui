@@ -5,7 +5,7 @@ use bevy::prelude::*;
 use kuchiki::{NodeRef, traits::TendrilSink, Attributes};
 
 use crate::html::{HtmlDirty, HtmlEventBindings, HtmlID, HtmlMeta, HtmlSource, HtmlStates, HtmlStructureMap, HtmlStyle, HtmlSystemSet, HtmlWidgetNode};
-use crate::io::{CssAsset, HtmlAsset};
+use crate::io::{CssAsset, DefaultCssHandle, HtmlAsset};
 use crate::styles::IconPlace;
 use crate::widgets::Button;
 use crate::widgets::*;
@@ -29,6 +29,7 @@ fn update_html_ui(
     asset_server: Res<AssetServer>,
     html_assets: Res<Assets<HtmlAsset>>,
     mut html_asset_events: MessageReader<AssetEvent<HtmlAsset>>,
+    default_css: Res<DefaultCssHandle>,
 
     query_added: Query<(Entity, &HtmlSource), Added<HtmlSource>>,
     query_all: Query<(Entity, &HtmlSource)>,
@@ -116,7 +117,7 @@ fn update_html_ui(
             })
             .collect();
 
-        css_handles = with_default_css_first(&asset_server, css_handles);
+        css_handles = with_default_css_first(&default_css, css_handles);
 
         // Mark this UI as active.
         structure_map.active = Some(meta_key.clone());
@@ -726,16 +727,16 @@ pub fn resolve_relative_asset_path(html_path: &str, href: &str) -> String {
 }
 
 fn with_default_css_first(
-    asset_server: &AssetServer,
+    default_css: &DefaultCssHandle,
     mut css: Vec<Handle<CssAsset>>,
 ) -> Vec<Handle<CssAsset>> {
-    let default = asset_server.load::<CssAsset>(DEFAULT_UI_CSS);
+    let default_handle = default_css.0.clone();
 
     // Remove default if it already exists somewhere
-    css.retain(|h| h.id() != default.id());
+    css.retain(|h| h.id() != default_handle.id());
 
     // Insert default at position 0
-    css.insert(0, default);
+    css.insert(0, default_handle);
 
     css
 }

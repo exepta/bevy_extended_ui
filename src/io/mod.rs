@@ -8,6 +8,11 @@ pub struct CssAsset {
     pub text: String,
 }
 
+pub const DEFAULT_UI_CSS_TEXT: &str = include_str!("../../assets/default/extended_ui.css");
+
+#[derive(Resource, Clone)]
+pub struct DefaultCssHandle(pub Handle<CssAsset>);
+
 #[derive(Asset, TypePath, Debug, Clone)]
 pub struct HtmlAsset {
     pub html: String,
@@ -89,7 +94,16 @@ impl Plugin for ExtendedIoPlugin {
         app.init_asset_loader::<HtmlLoader>();
         app.init_asset::<CssAsset>();
         app.init_asset_loader::<CssLoader>();
+        app.add_systems(Startup, register_default_css_asset);
     }
+}
+
+fn register_default_css_asset(mut commands: Commands, mut css_assets: ResMut<Assets<CssAsset>>) {
+    let handle = css_assets.add(CssAsset {
+        text: DEFAULT_UI_CSS_TEXT.to_string(),
+    });
+
+    commands.insert_resource(DefaultCssHandle(handle));
 }
 
 fn resolve_relative(base_dir: &PathBuf, raw: &str) -> PathBuf {
