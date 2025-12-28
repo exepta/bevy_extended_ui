@@ -19,6 +19,7 @@ members = ["crates/bevy_extended_ui_macros"]
 
 [dependencies.bevy_extended_ui_macros]
 path = "crates/bevy_extended_ui_macros"
+version = "0.1.0"
 
 # Bevy 0.17.0 main library
 [dependencies.bevy]
