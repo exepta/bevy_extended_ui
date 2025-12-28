@@ -1,97 +1,74 @@
-mod converter;
-mod builder;
-mod reload;
+pub mod builder;
+pub mod converter;
+pub mod reload;
+mod bindings;
+
+pub use inventory;
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::mpsc::Receiver;
+use bevy::ecs::system::SystemId;
 use bevy::prelude::*;
-use notify::{ RecommendedWatcher, Event, Error };
+use crate::html::bindings::HtmlEventBindingsPlugin;
 use crate::html::builder::HtmlBuilderSystem;
 use crate::html::converter::HtmlConverterSystem;
-use crate::html::reload::HtmlReloadSystem;
-use crate::observer::time_tick_trigger::TimeTick;
-use crate::observer::widget_init_trigger::WidgetInit;
-use crate::styling::css::apply_property_to_style;
-use crate::styling::Style;
-use crate::widgets::{CheckBox, Div, InputField, Button, HtmlBody, ChoiceBox, Slider, Headline, Paragraph, Img, ProgressBar, Widget};
+use crate::html::reload::HtmlReloadPlugin;
+
+use crate::io::{CssAsset, HtmlAsset};
+use crate::styles::Style;
+use crate::styles::parser::apply_property_to_style;
+use crate::widgets::{Body, Button, CheckBox, ChoiceBox, Div, Divider, FieldSet, Headline, Img, InputField, Paragraph, ProgressBar, RadioButton, Scrollbar, Slider, SwitchButton, ToggleButton, Widget};
 
 pub static HTML_ID_COUNTER: AtomicUsize = AtomicUsize::new(1);
 
-/// Represents a chunk of HTML source code along with its unique identifier.
-///
-/// This component stores the raw HTML source string and an ID string
-/// that uniquely identifies the source within the UI registry.
-///
-/// # Fields
-///
-/// * `source` - The raw HTML source path as a `String`.
-/// * `source_id` - A unique identifier for this HTML source, typically the name under which
-///   it is registered.
-///
-/// # Derives
-///
-/// This struct derives:
-/// - `Component` to be used as a Bevy ECS component.
-/// - `Reflect` to enable reflection, useful for editor integration and serialization.
-/// - `Debug` for formatting and debugging.
-/// - `Clone` for duplicating instances.
-/// - `Default` to provide a default empty instance.
-///
-/// # Example
-///
-/// ```rust
-/// use bevy_extended_ui::html::HtmlSource;
-/// let html = HtmlSource {
-///     source: "path/to/html".to_string(),
-///     source_id: "main_ui".to_string(),
-///     controller: None,
-/// };
-/// ```
-#[derive(Component, Reflect, Debug, Clone, Default)]
+#[derive(SystemSet, Debug, Hash, PartialEq, Eq, Clone)]
+pub enum HtmlSystemSet {
+    Convert,
+    Build,
+    ShowWidgets,
+    Bindings,
+}
+
+#[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
 pub struct HtmlSource {
-    /// The raw HTML source code.
-    pub source: String,
-    /// Unique identifier for the HTML source.
+    pub handle: Handle<HtmlAsset>,
     pub source_id: String,
-    /// Controls the function support location
-    pub controller: Option<String>
+    pub controller: Option<String>,
 }
 
 impl HtmlSource {
-
-    /// Creates a new `HtmlSource` from a file path.
-    ///
-    /// This constructor initializes the `source` field with the given path string
-    /// and uses the default values for all other fields.
-    ///
-    /// # Arguments
-    ///
-    /// * `path` - A string slice representing the file path to the HTML source.
-    ///
-    /// # Returns
-    ///
-    /// A new instance of `HtmlSource` with the specified path.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use bevy_extended_ui::html::HtmlSource;
-    /// let html_source = HtmlSource::from_file_path("assets/ui/main.html");
-    /// ```
-    pub fn from_file_path(path: &str) -> HtmlSource {
-        HtmlSource {
-            source: path.to_string(),
-            ..default()
+    pub fn from_handle(handle: Handle<HtmlAsset>) -> Self {
+        Self {
+            handle,
+            source_id: String::new(),
+            controller: None,
         }
     }
-    
+
+    /// Returns the asset path (relative to assets/) of this HtmlAsset.
+    /// Example: "examples/test.html"
+    pub fn get_source_path(&self) -> String {
+        self.handle
+            .path()
+            .expect("Failed to get source path!")
+            .path()
+            .to_string_lossy()
+            .replace('\\', "/")
+    }
 }
 
 #[derive(Event, Message)]
-pub struct AllWidgetsSpawned;
+pub struct HtmlAllWidgetsSpawned;
+
+#[derive(Event, Message)]
+pub struct HtmlAllWidgetsVisible;
+
+#[derive(Component, Default)]
+pub struct HtmlInitEmitted;
+
+#[derive(Resource, Default)]
+pub struct HtmlInitDelay(pub Option<u8>);
 
 #[derive(Component)]
 pub struct NeedHidden;
@@ -102,30 +79,22 @@ pub struct ShowWidgetsTimer {
     pub active: bool,
 }
 
-#[derive(Resource)]
-pub struct HtmlWatcher {
-    pub watcher: RecommendedWatcher,
-    rx: Arc<Mutex<Receiver<std::result::Result<Event, Error>>>>,
-}
-
 #[derive(Event, Message)]
 pub struct HtmlChangeEvent;
 
-/// A component that stores parsed CSS style data using Bevy's `Style` struct.
+/// A simple explicit "UI needs rebuild" flag.
+/// We use this because mutating the internal HashMap of HtmlStructureMap
+/// does NOT reliably trigger `resource_changed::<HtmlStructureMap>()`.
+#[derive(Resource, Default)]
+pub struct HtmlDirty(pub bool);
+
+/// Component storing parsed inline CSS (`style="..."`) as your custom Style struct.
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
 pub struct HtmlStyle(pub Style);
 
 impl HtmlStyle {
-    /// Parses a raw CSS style string and converts it into an `HtmlStyle`.
-    ///
-    /// The input string should be a semicolon-separated list of CSS properties.
-    ///
-    /// # Example
-    /// ```rust
-    /// use bevy_extended_ui::html::HtmlStyle;
-    /// let style = HtmlStyle::from_str("display: flex; justify-content: center;");
-    /// ```
+    /// Parses inline CSS style declarations ("key: value; ...") into Style.
     pub fn from_str(style_code: &str) -> HtmlStyle {
         let mut style = Style::default();
 
@@ -150,61 +119,180 @@ impl HtmlStyle {
     }
 }
 
-/// Metadata attached to HTML elements, such as class, id, inline styles, or embedded CSS.
 #[derive(Debug, Clone, Default)]
 pub struct HtmlMeta {
-    /// Embedded `<style>` or global CSS rules.
-    pub css: Vec<String>,
-    /// Value of the `id` attribute.
+    /// All referenced CSS assets for this node.
+    pub css: Vec<Handle<CssAsset>>,
     pub id: Option<String>,
-    /// Value(s) of the `class` attribute.
     pub class: Option<Vec<String>>,
-    /// Inline CSS from the `style` attribute.
-    pub style: Option<String>,
+    pub style: Option<HtmlStyle>,
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct HtmlStates {
     pub hidden: bool,
     pub disabled: bool,
-    pub readonly: bool
+    pub readonly: bool,
 }
 
-/// An enum representing a node in the HTML DOM hierarchy,
-/// mapped to Bevy UI components.
+/// Your current DOM model.
 #[derive(Debug, Clone)]
 pub enum HtmlWidgetNode {
+    /// The root `<body>` element of the HTML structure.
+    Body(
+        Body,
+        HtmlMeta,
+        HtmlStates,
+        Vec<HtmlWidgetNode>,
+        HtmlEventBindings,
+        Widget,
+        HtmlID,
+    ),
+    /// A `<div>` container element with nested child nodes.
+    Div(
+        Div,
+        HtmlMeta,
+        HtmlStates,
+        Vec<HtmlWidgetNode>,
+        HtmlEventBindings,
+        Widget,
+        HtmlID,
+    ),
+    /// A `<divider>` element.
+    Divider(
+        Divider,
+        HtmlMeta,
+        HtmlStates,
+        HtmlEventBindings,
+        Widget,
+        HtmlID,
+    ),
     /// A `<button>` element.
-    Button(Button, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
-    /// An `<input type="text">` field.
-    Input(InputField, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
-    /// A checkbox `<input type="checkbox">`.
-    CheckBox(CheckBox, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
+    Button(
+        Button,
+        HtmlMeta,
+        HtmlStates,
+        HtmlEventBindings,
+        Widget,
+        HtmlID,
+    ),
+    /// A checkbox `<checkbox>`.
+    CheckBox(
+        CheckBox,
+        HtmlMeta,
+        HtmlStates,
+        HtmlEventBindings,
+        Widget,
+        HtmlID,
+    ),
     /// A dropdown or select box.
-    ChoiceBox(ChoiceBox, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
+    ChoiceBox(
+        ChoiceBox,
+        HtmlMeta,
+        HtmlStates,
+        HtmlEventBindings,
+        Widget,
+        HtmlID,
+    ),
+    /// A `<fieldset>` container element with nested child nodes from type `<radio> and <toggle>`.
+    FieldSet(
+        FieldSet,
+        HtmlMeta,
+        HtmlStates,
+        Vec<HtmlWidgetNode>,
+        HtmlEventBindings,
+        Widget,
+        HtmlID,
+    ),
+    /// A heading element (`<h1>`-`<h6>`).
+    Headline(
+        Headline,
+        HtmlMeta,
+        HtmlStates,
+        HtmlEventBindings,
+        Widget,
+        HtmlID,
+    ),
     /// A img element (`<img>`).
     Img(Img, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
-    /// A img element (`<img>`).
-    ProgressBar(ProgressBar, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
-    /// A heading element (`<h1>`-`<h6>`).
-    Headline(Headline, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
+    /// An `<input type="text">` field.
+    Input(
+        InputField,
+        HtmlMeta,
+        HtmlStates,
+        HtmlEventBindings,
+        Widget,
+        HtmlID,
+    ),
     /// A paragraph `<p>`.
-    Paragraph(Paragraph, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
-    /// A slider input (range).
-    Slider(Slider, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
-    /// A `<div>` container element with nested child nodes.
-    Div(Div, HtmlMeta, HtmlStates, Vec<HtmlWidgetNode>, HtmlEventBindings, Widget, HtmlID),
-    /// The root `<body>` element of the HTML structure.
-    HtmlBody(HtmlBody, HtmlMeta, HtmlStates, Vec<HtmlWidgetNode>, HtmlEventBindings, Widget, HtmlID),
+    Paragraph(
+        Paragraph,
+        HtmlMeta,
+        HtmlStates,
+        HtmlEventBindings,
+        Widget,
+        HtmlID,
+    ),
+    /// A progressbar `<progressbar>`.
+    ProgressBar(
+        ProgressBar,
+        HtmlMeta,
+        HtmlStates,
+        HtmlEventBindings,
+        Widget,
+        HtmlID,
+    ),
+    /// A radio-button `<radio>`.
+    RadioButton(
+        RadioButton,
+        HtmlMeta,
+        HtmlStates,
+        HtmlEventBindings,
+        Widget,
+        HtmlID,
+    ),
+    /// A slider input `<slider>`).
+    Scrollbar(
+        Scrollbar,
+        HtmlMeta,
+        HtmlStates,
+        HtmlEventBindings,
+        Widget,
+        HtmlID,
+    ),
+    /// A slider input `<slider>`).
+    Slider(
+        Slider,
+        HtmlMeta,
+        HtmlStates,
+        HtmlEventBindings,
+        Widget,
+        HtmlID,
+    ),
+    /// A switch-button `<switch>`).
+    SwitchButton(
+        SwitchButton,
+        HtmlMeta,
+        HtmlStates,
+        HtmlEventBindings,
+        Widget,
+        HtmlID,
+    ),
+    /// A toggle-button `<toggle>`.
+    ToggleButton(
+        ToggleButton,
+        HtmlMeta,
+        HtmlStates,
+        HtmlEventBindings,
+        Widget,
+        HtmlID,
+    ),
 }
 
-/// A resource that holds all parsed HTML structures keyed by identifier.
-/// One entry can be marked as currently active.
+/// Stores all parsed HTML structures keyed by `<meta name="...">`.
 #[derive(Resource)]
 pub struct HtmlStructureMap {
-    /// Map of structure names (e.g., file or document names) to their HTML node trees.
     pub html_map: HashMap<String, Vec<HtmlWidgetNode>>,
-    /// Currently active structure identifier, if any.
     pub active: Option<String>,
 }
 
@@ -226,103 +314,134 @@ impl Default for HtmlID {
     }
 }
 
-/// Function pointer type for click event observers.
-///
-/// These functions are called when a `Trigger` event for a pointer click occurs,
-/// receiving the event trigger and a `Commands` object to issue commands.
-type ClickObserverFn = fn(On<Pointer<Click>>, Commands);
-
-/// Function pointer type for mouse over event observers.
-///
-/// These functions are called when a `Trigger` event for a pointer over occurs,
-/// receiving the event trigger and a `Commands` object.
-type OverObserverFn = fn(On<Pointer<Over>>, Commands);
-
-/// Function pointer type for mouse out event observers.
-///
-/// These functions are called when a `Trigger` event for a pointer out occurs,
-/// receiving the event trigger and a `Commands` object.
-type OutObserverFn = fn(On<Pointer<Out>>, Commands);
-
-/// Function pointer type for update event observers.
-///
-/// These functions are invoked whenever a `TimeTick` event is triggered,
-/// which typically occurs on every system update tick.
-///
-/// They receive the event trigger and a `Commands` object for issuing commands.
-/// Due to the frequency of these events, observers should be designed for efficient execution.
-type UpdateObserverFn = fn(On<TimeTick>, Commands);
-
-/// Type alias for a load observer function used to handle [`WidgetInit`] events.
-///
-/// This function type defines a callback invoked when a widget initialization event is triggered,
-/// allowing custom logic to run during widget setup.
-///
-/// # Parameters
-/// - `Trigger<WidgetInit>`: The trigger object carrying the [`WidgetInit`] event data.
-/// - `Commands`: The [`Commands`] used to issue additional actions or spawn entities.
-///
-/// # See also
-/// [`WidgetInit`], [`Commands`]
-type LoadObserverFn = fn(On<WidgetInit>, Commands);
-
-/// Registry resource that maps event handler names to their observer functions.
-///
-/// Holds hash maps for click, mouse over, mouse out, and update events.
-/// Used to look up the observer system functions by name for attaching to entities.
-#[derive(Default, Resource)]
-pub struct HtmlFunctionRegistry {
-    /// Map of function names to click event observer functions.
-    pub click: HashMap<String, ClickObserverFn>,
-
-    /// Map of function names to mouse over event observer functions.
-    pub over: HashMap<String, OverObserverFn>,
-
-    /// Map of function names to mouse out event observer functions.
-    pub out: HashMap<String, OutObserverFn>,
-
-    /// Map of function names to update event observer functions.
-    pub update: HashMap<String, UpdateObserverFn>,
-
-    pub load: HashMap<String, LoadObserverFn>,
+pub struct HtmlFnRegistration {
+    pub name: &'static str,
+    pub build: fn(&mut World) -> SystemId<In<HtmlEvent>, ()>,
 }
 
-/// Component representing HTML event bindings on an entity.
-///
-/// Each optional field corresponds to the name of a registered observer function
-/// that will be called on the respective event.
-///
-/// Reflect is derived for use with Bevy reflection and editing tools.
+inventory::collect!(HtmlFnRegistration);
+
+#[derive(Clone, Copy)]
+pub struct HtmlEvent {
+    pub entity: Entity,
+    pub object: HtmlEventObject,
+}
+
+impl HtmlEvent {
+    pub fn target(&self) -> Entity { self.entity }
+
+}
+
+#[derive(Clone, Copy)]
+pub enum HtmlEventObject {
+    Click(HtmlClick),
+    Change(HtmlChange),
+    Init(HtmlInit),
+    MouseOut(HtmlMouseOut),
+    MouseOver(HtmlMouseOver),
+}
+
+#[derive(Default, Resource)]
+pub struct HtmlFunctionRegistry {
+    pub click: HashMap<String, SystemId<In<HtmlEvent>>>,
+    pub over: HashMap<String, SystemId<In<HtmlEvent>>>,
+    pub out: HashMap<String, SystemId<In<HtmlEvent>>>,
+    pub change: HashMap<String, SystemId<In<HtmlEvent>>>,
+    pub init: HashMap<String, SystemId<In<HtmlEvent>>>,
+}
+
 #[derive(Component, Reflect, Default, Clone, Debug)]
 #[reflect(Component)]
 pub struct HtmlEventBindings {
-    /// Optional function name to call on a click event.
     pub onclick: Option<String>,
-
-    /// Optional function name to call on mouse enter event.
-    pub onmouseenter: Option<String>,
-
-    /// Optional function name to call on mouse leave event.
-    pub onmouseleave: Option<String>,
-
-    /// Optional function name to call on update event.
-    pub onupdate: Option<String>,
-
-    pub onload: Option<String>,
+    pub onmouseover: Option<String>,
+    pub onmouseout: Option<String>,
+    pub onchange: Option<String>,
+    pub oninit: Option<String>,
 }
 
-/// The main plugin that registers all HTML UI systems and resources.
-pub struct HtmlPlugin;
+#[derive(EntityEvent, Clone, Copy)]
+pub struct HtmlClick {
+    #[event_target]
+    pub entity: Entity,
+}
 
-impl Plugin for HtmlPlugin {
-    /// Configures the app to support HTML parsing and UI construction.
+#[derive(EntityEvent, Clone, Copy)]
+pub struct HtmlMouseOver {
+    #[event_target]
+    pub entity: Entity,
+}
+
+#[derive(EntityEvent, Clone, Copy)]
+pub struct HtmlMouseOut {
+    #[event_target]
+    pub entity: Entity,
+}
+
+#[derive(EntityEvent, Clone, Copy)]
+pub struct HtmlChange {
+    #[event_target]
+    pub entity: Entity,
+}
+
+#[derive(EntityEvent, Clone, Copy)]
+pub struct HtmlInit {
+    #[event_target]
+    pub entity: Entity,
+}
+
+/// Main plugin for HTML UI: converter + builder + reload integration.
+pub struct ExtendedUiHtmlPlugin;
+
+impl Plugin for ExtendedUiHtmlPlugin {
     fn build(&self, app: &mut App) {
         app.add_message::<HtmlChangeEvent>();
+
         app.init_resource::<HtmlStructureMap>();
         app.init_resource::<HtmlFunctionRegistry>();
+        app.init_resource::<HtmlDirty>();
+        app.init_resource::<HtmlInitDelay>();
+
         app.register_type::<HtmlEventBindings>();
         app.register_type::<HtmlSource>();
         app.register_type::<HtmlStyle>();
-        app.add_plugins((HtmlConverterSystem, HtmlBuilderSystem, HtmlReloadSystem));
+
+        app.configure_sets(
+            Update,
+            (
+                HtmlSystemSet::Convert,
+                HtmlSystemSet::Build,
+                HtmlSystemSet::ShowWidgets,
+                HtmlSystemSet::Bindings,
+            )
+                .chain(),
+        );
+        app.add_plugins((
+            HtmlConverterSystem,
+            HtmlBuilderSystem,
+            HtmlReloadPlugin,
+            HtmlEventBindingsPlugin,
+        ));
+
+        app.add_systems(Startup, register_html_fns);
+    }
+}
+
+pub fn register_html_fns(world: &mut World) {
+    let mut to_insert: Vec<(String, SystemId<In<HtmlEvent>>)> = Vec::new();
+
+    for item in inventory::iter::<HtmlFnRegistration> {
+        let id = (item.build)(world);
+        to_insert.push((item.name.to_string(), id));
+    }
+
+    let mut reg = world.resource_mut::<HtmlFunctionRegistry>();
+    for (name, id) in to_insert {
+        reg.change.insert(name.clone(), id);
+        reg.click.insert(name.clone(), id);
+        reg.init.insert(name.clone(), id);
+        reg.out.insert(name.clone(), id);
+        reg.over.insert(name.clone(), id);
+        debug!("Registered html fn '{name}' with id {id:?}");
     }
 }

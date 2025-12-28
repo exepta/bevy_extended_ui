@@ -1,0 +1,27 @@
+use bevy::input::common_conditions::input_toggle_active;
+use bevy::prelude::*;
+use bevy::window::WindowResolution;
+
+use bevy_inspector_egui::bevy_egui::EguiPlugin;
+use bevy_inspector_egui::quick::WorldInspectorPlugin;
+use crate::ExtendedUiPlugin;
+
+pub fn make_app(title: impl Into<String>) -> App {
+    let mut app = App::new();
+
+    app.add_plugins(DefaultPlugins.set(WindowPlugin {
+        primary_window: Some(Window {
+            title: title.into(),
+            resolution: WindowResolution::new(1270, 720),
+            ..default()
+        }),
+        ..default()
+    }))
+        .add_plugins(EguiPlugin::default())
+        .add_plugins(
+            WorldInspectorPlugin::default().run_if(input_toggle_active(false, KeyCode::F1)),
+        )
+        .add_plugins(ExtendedUiPlugin);
+
+    app
+}

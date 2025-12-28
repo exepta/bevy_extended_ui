@@ -1,80 +1,53 @@
-use std::env;
-use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
-use std::sync::mpsc::channel;
+use bevy::asset::AssetEvent;
 use bevy::prelude::*;
-use notify::{recommended_watcher, RecursiveMode, Watcher};
-use crate::html::{HtmlChangeEvent, HtmlWatcher, HTML_ID_COUNTER};
-use crate::html::builder::build_html_source;
-use crate::registry::UiRegistry;
+use std::collections::HashSet;
 
-pub struct HtmlReloadSystem;
+use crate::io::CssAsset;
+use crate::styles::CssSource;
 
-impl Plugin for HtmlReloadSystem {
+#[derive(Component)]
+pub struct CssDirty;
+
+pub struct HtmlReloadPlugin;
+
+impl Plugin for HtmlReloadPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, start_file_watcher.run_if(resource_changed::<UiRegistry>));
-        app.add_systems(Update, (detect_changes, reload_html.after(detect_changes)).run_if(resource_exists::<HtmlWatcher>).before(build_html_source));
+        app.add_systems(Update, mark_css_users_dirty_on_css_change);
     }
 }
 
-fn start_file_watcher(mut commands: Commands, ui_registry: Res<UiRegistry>) {
-    if let Some(active) = ui_registry.current.clone() {
-        if let Some(source) = ui_registry.get(&active) {
-            let mut watch_path = PathBuf::from(&source.source);
-            if watch_path.is_relative() {
-                watch_path = env::current_dir()
-                    .expect("Could not get current dir")
-                    .join(watch_path);
+fn mark_css_users_dirty_on_css_change(
+    mut commands: Commands,
+    mut css_events: MessageReader<AssetEvent<CssAsset>>,
+    query: Query<(Entity, &CssSource)>,
+) {
+    // Collect changed/removed CSS asset ids (fast lookup).
+    let mut changed: HashSet<AssetId<CssAsset>> = HashSet::new();
+    for ev in css_events.read() {
+        match ev {
+            AssetEvent::Modified { id } | AssetEvent::Removed { id } => {
+                changed.insert(*id);
             }
-
-            debug!("============================================");
-            debug!("Watching html file: {}", watch_path.display());
-            debug!("============================================");
-
-            let (tx, rx) = channel();
-
-            let mut watcher = recommended_watcher(tx)
-                .expect("Failed to create watcher");
-            watcher
-                .watch(watch_path.as_path(), RecursiveMode::NonRecursive)
-                .unwrap_or_else(|e| panic!("Failed to watch {}: {}", watch_path.display(), e));
-
-            commands.insert_resource(HtmlWatcher {
-                watcher,
-                rx: Arc::new(Mutex::new(rx)),
-            });
+            _ => {}
         }
     }
-}
 
-fn detect_changes(
-    watcher: Res<HtmlWatcher>,
-    mut reload: MessageWriter<HtmlChangeEvent>
-) {
-    let guard = watcher.rx.lock().unwrap();
-    while let Ok(Ok(event)) = guard.try_recv() {
-        if matches!(event.kind, notify::EventKind::Modify(_)) {
-            debug!("Detected change in html file");
-            reload.write(HtmlChangeEvent);
-        }
-    }
-}
-
-
-fn reload_html(
-    mut ev: MessageReader<HtmlChangeEvent>,
-    mut registry: ResMut<UiRegistry>,
-) {
-    if ev.read().next().is_none() {
+    if changed.is_empty() {
         return;
     }
 
-    if registry.ui_update {
-        return;
+    // Mark all entities that reference any changed CssAsset.
+    for (entity, css_source) in query.iter() {
+        let uses_changed = css_source
+            .0
+            .iter()
+            .any(|h| changed.contains(&h.id()));
+
+        if uses_changed {
+            // IMPORTANT: entity might have been despawned by HTML hot reload
+            if let Ok(mut ec) = commands.get_entity(entity) {
+                ec.insert(CssDirty);
+            }
+        }
     }
-
-    HTML_ID_COUNTER.store(1, std::sync::atomic::Ordering::Relaxed);
-    registry.ui_update = true;
-
-    debug!("Reloaded html file");
 }

@@ -36,7 +36,13 @@ pub fn keycode_to_char(key: KeyCode, shift: bool, alt: bool) -> Option<char> {
         KeyCode::KeyB => Some(if shift { 'B' } else { 'b' }),
         KeyCode::KeyC => Some(if shift { 'C' } else { 'c' }),
         KeyCode::KeyD => Some(if shift { 'D' } else { 'd' }),
-        KeyCode::KeyE => Some(if shift { 'E' } else if alt { 'E' } else { 'e' }),
+        KeyCode::KeyE => Some(if shift {
+            'E'
+        } else if alt {
+            'E'
+        } else {
+            'e'
+        }),
         KeyCode::KeyF => Some(if shift { 'F' } else { 'f' }),
         KeyCode::KeyG => Some(if shift { 'G' } else { 'g' }),
         KeyCode::KeyH => Some(if shift { 'H' } else { 'h' }),
@@ -48,7 +54,13 @@ pub fn keycode_to_char(key: KeyCode, shift: bool, alt: bool) -> Option<char> {
         KeyCode::KeyN => Some(if shift { 'N' } else { 'n' }),
         KeyCode::KeyO => Some(if shift { 'O' } else { 'o' }),
         KeyCode::KeyP => Some(if shift { 'P' } else { 'p' }),
-        KeyCode::KeyQ => Some(if shift { 'Q' } else if alt { '@' } else { 'q' }),
+        KeyCode::KeyQ => Some(if shift {
+            'Q'
+        } else if alt {
+            '@'
+        } else {
+            'q'
+        }),
         KeyCode::KeyR => Some(if shift { 'R' } else { 'r' }),
         KeyCode::KeyS => Some(if shift { 'S' } else { 's' }),
         KeyCode::KeyT => Some(if shift { 'T' } else { 't' }),
@@ -58,16 +70,76 @@ pub fn keycode_to_char(key: KeyCode, shift: bool, alt: bool) -> Option<char> {
         KeyCode::KeyX => Some(if shift { 'X' } else { 'x' }),
         KeyCode::KeyY => Some(if shift { 'Z' } else { 'z' }),
         KeyCode::KeyZ => Some(if shift { 'Y' } else { 'y' }),
-        KeyCode::Digit0 => Some(if shift { '=' } else if alt { '}' } else { '0' }),
-        KeyCode::Digit1 => Some(if shift { '!' } else if alt { '1' } else { '1' }),
-        KeyCode::Digit2 => Some(if shift { '"' } else if alt { '2' } else { '2' }),
-        KeyCode::Digit3 => Some(if shift { '3' } else if alt { '3' } else { '3' }),
-        KeyCode::Digit4 => Some(if shift { '$' } else if alt { '4' } else { '4' }),
-        KeyCode::Digit5 => Some(if shift { '%' } else if alt { '5' } else { '5' }),
-        KeyCode::Digit6 => Some(if shift { '&' } else if alt { '6' } else { '6' }),
-        KeyCode::Digit7 => Some(if shift { '/' } else if alt { '{' } else { '7' }),
-        KeyCode::Digit8 => Some(if shift { '(' } else if alt { '[' } else { '8' }),
-        KeyCode::Digit9 => Some(if shift { ')' } else if alt { ']' } else { '9' }),
+        KeyCode::Digit0 => Some(if shift {
+            '='
+        } else if alt {
+            '}'
+        } else {
+            '0'
+        }),
+        KeyCode::Digit1 => Some(if shift {
+            '!'
+        } else if alt {
+            '1'
+        } else {
+            '1'
+        }),
+        KeyCode::Digit2 => Some(if shift {
+            '"'
+        } else if alt {
+            '2'
+        } else {
+            '2'
+        }),
+        KeyCode::Digit3 => Some(if shift {
+            '3'
+        } else if alt {
+            '3'
+        } else {
+            '3'
+        }),
+        KeyCode::Digit4 => Some(if shift {
+            '$'
+        } else if alt {
+            '4'
+        } else {
+            '4'
+        }),
+        KeyCode::Digit5 => Some(if shift {
+            '%'
+        } else if alt {
+            '5'
+        } else {
+            '5'
+        }),
+        KeyCode::Digit6 => Some(if shift {
+            '&'
+        } else if alt {
+            '6'
+        } else {
+            '6'
+        }),
+        KeyCode::Digit7 => Some(if shift {
+            '/'
+        } else if alt {
+            '{'
+        } else {
+            '7'
+        }),
+        KeyCode::Digit8 => Some(if shift {
+            '('
+        } else if alt {
+            '['
+        } else {
+            '8'
+        }),
+        KeyCode::Digit9 => Some(if shift {
+            ')'
+        } else if alt {
+            ']'
+        } else {
+            '9'
+        }),
         KeyCode::NumpadMultiply => Some('*'),
         KeyCode::NumpadAdd => Some('+'),
         KeyCode::NumpadSubtract => Some('-'),
@@ -83,14 +155,32 @@ pub fn keycode_to_char(key: KeyCode, shift: bool, alt: bool) -> Option<char> {
         KeyCode::Numpad7 => Some('7'),
         KeyCode::Numpad8 => Some('8'),
         KeyCode::Numpad9 => Some('9'),
-        KeyCode::Comma => Some(if shift {';'} else {','}),
-        KeyCode::Period => Some(if shift {':'} else {'.'}),
-        KeyCode::Slash => Some(if shift {'_'} else {'-'}),
-        KeyCode::IntlBackslash => Some(if shift {'>'} else if alt {'|'} else {'<'}),
-        KeyCode::Backquote => Some(if shift {'?'} else {'^'}),
-        KeyCode::Minus => Some(if shift {'?'} else if alt {'\\'} else {'?'}),
-        KeyCode::BracketRight => Some(if shift {'*'} else if alt {'~'} else {'+'}),
-        KeyCode::Backslash => Some(if shift {'\''} else {'#'}),
+        KeyCode::Comma => Some(if shift { ';' } else { ',' }),
+        KeyCode::Period => Some(if shift { ':' } else { '.' }),
+        KeyCode::Slash => Some(if shift { '_' } else { '-' }),
+        KeyCode::IntlBackslash => Some(if shift {
+            '>'
+        } else if alt {
+            '|'
+        } else {
+            '<'
+        }),
+        KeyCode::Backquote => Some(if shift { '?' } else { '^' }),
+        KeyCode::Minus => Some(if shift {
+            '?'
+        } else if alt {
+            '\\'
+        } else {
+            '?'
+        }),
+        KeyCode::BracketRight => Some(if shift {
+            '*'
+        } else if alt {
+            '~'
+        } else {
+            '+'
+        }),
+        KeyCode::Backslash => Some(if shift { '\'' } else { '#' }),
         KeyCode::Space => Some(' '),
         _ => None,
     }

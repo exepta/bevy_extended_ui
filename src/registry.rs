@@ -1,35 +1,28 @@
-use std::collections::{HashMap, VecDeque};
-use std::sync::Mutex;
 use bevy::prelude::*;
 use once_cell::sync::Lazy;
+use std::collections::{HashMap, VecDeque};
+use std::sync::Mutex;
 use crate::html::HtmlSource;
-use crate::UIGenID;
-use crate::widgets::{HtmlBody, WidgetId, WidgetKind};
+use crate::widgets::{Body, UIGenID, WidgetId, WidgetKind};
 
 pub static UI_ID_GENERATE: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
-
-/// A global thread-safe pool of IDs for the "body" widget.
 pub static BODY_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
-/// A global thread-safe pool of IDs for the "div" widget.
 pub static DIV_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
-/// A global thread-safe pool of IDs for the "headline" widget.
-pub static HEADLINE_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
-/// A global thread-safe pool of IDs for the "paragraph" widget.
-pub static PARAGRAPH_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
-/// A global thread-safe pool of IDs for the "button" widget.
 pub static BUTTON_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
-/// A global thread-safe pool of IDs for the "input" widget.
-pub static INPUT_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
-/// A global thread-safe pool of IDs for the "select/choice box" widget.
-pub static SELECT_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
-/// A global thread-safe pool of IDs for the "slider" widget.
-pub static SLIDER_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
-/// A global thread-safe pool of IDs for the "image" widget.
-pub static IMG_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
-/// A global thread-safe pool of IDs for the "progressbar" widget.
-pub static PROGRESS_BAR_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
-/// A global thread-safe pool of IDs for the "check box" widget.
 pub static CHECK_BOX_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
+pub static CHOICE_BOX_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
+pub static DIVIDER_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
+pub static FIELDSET_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
+pub static HEADLINE_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
+pub static IMAGE_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
+pub static INPUT_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
+pub static PARAGRAPH_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
+pub static PROGRESS_BAR_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
+pub static RADIO_BUTTON_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
+pub static SCROLL_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
+pub static SLIDER_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
+pub static SWITCH_BUTTON_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
+pub static TOGGLE_BUTTON_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
 
 /// A pool that manages reusable integer IDs for widgets.
 /// It hands out new IDs or recycles freed IDs.
@@ -74,7 +67,8 @@ impl IdPool {
 /// Resource that registers and manages available UI HTML sources.
 ///
 /// It stores named HTML sources and tracks the currently active UI.
-#[derive(Default, Resource, Debug)]
+#[derive(Default, Resource, Reflect, Debug)]
+#[reflect(Resource)]
 pub struct UiRegistry {
     /// Collection mapping UI names to their HTML source data.
     pub collection: HashMap<String, HtmlSource>,
@@ -97,7 +91,7 @@ impl UiRegistry {
     /// * `name` - The name under which the UI source will be registered.
     /// * `source` - The HTML source data.
     pub fn add(&mut self, name: String, source: HtmlSource) {
-        self.collection.insert(name.clone(), HtmlSource { source: source.source.clone(), source_id: name.clone(), ..default() });
+        self.collection.insert(name.clone(), HtmlSource { source_id: name.clone(), ..source });
     }
 
     /// Adds a UI source and marks it as currently in use.
@@ -107,7 +101,7 @@ impl UiRegistry {
     /// * `name` - The name to register and use.
     /// * `source` - The HTML source data.
     pub fn add_and_use(&mut self, name: String, source: HtmlSource) {
-        self.add(name.clone(), HtmlSource { source: source.source.clone(), source_id: name.clone(), ..default() });
+        self.add(name.clone(), HtmlSource { source_id: name.clone(), ..source});
         self.use_ui(&name);
     }
 
@@ -149,7 +143,7 @@ impl UiRegistry {
         self.collection.clear();
         self.current = None;
     }
-    
+
     /// Retrieves a UI source by name.
     ///
     /// # Arguments
@@ -184,7 +178,7 @@ impl UiRegistry {
     pub fn use_ui(&mut self, name: &str) {
         if self.get(name).is_some() {
             self.current = Some(name.to_string());
-            self.ui_update = false;
+            self.ui_update = true;
         } else {
             warn!("Ui was empty and will removed now!");
             self.current = None;
@@ -207,10 +201,12 @@ pub struct UiInitResource(pub bool);
 struct LastUiUsage(pub Option<String>);
 
 /// Bevy plugin that manages the UI registry lifecycle and cleanup.
-pub struct RegistryPlugin;
+pub struct ExtendedRegistryPlugin;
 
-impl Plugin for RegistryPlugin {
+impl Plugin for ExtendedRegistryPlugin {
     fn build(&self, app: &mut App) {
+        app.init_resource::<UiInitResource>();
+        app.init_resource::<UiRegistry>();
         app.add_systems(
             Update,
             (
@@ -237,7 +233,7 @@ fn update_que(
     mut ui_registry: ResMut<UiRegistry>,
     mut ui_init: ResMut<UiInitResource>,
     query: Query<(Entity, &HtmlSource), With<HtmlSource>>,
-    mut body_query: Query<(Entity, &mut Visibility, &HtmlBody), (Without<HtmlSource>, With<HtmlBody>)>,
+    mut body_query: Query<(Entity, &mut Visibility, &Body), (Without<HtmlSource>, With<Body>)>,
 ) {
     if let Some(name) = ui_registry.current.clone() {
         if query.is_empty() {
@@ -247,7 +243,6 @@ fn update_que(
 
         for (entity, html_source) in query.iter() {
             if html_source.source_id == name && !ui_registry.ui_update{
-                warn!("UI {} is already loaded", name);
                 continue;
             }
 
@@ -256,7 +251,7 @@ fn update_que(
                 if ui_registry.ui_update {
                     commands.entity(body_entity).despawn();
                 } else {
-                    if let Some(bind) = body.bind_to_html.clone() {
+                    if let Some(bind) = body.html_key.clone() {
                         if bind.eq(&html_source.source_id) {
                             *body_vis = Visibility::Hidden;
                         }
@@ -275,7 +270,7 @@ fn update_que(
         for (entity, html_source) in query.iter() {
 
             for (_, mut body_vis, body) in body_query.iter_mut() {
-                if let Some(bind) = body.bind_to_html.clone() {
+                if let Some(bind) = body.html_key.clone() {
                     if bind.eq(&html_source.source_id) {
                         *body_vis = Visibility::Hidden;
                     }
@@ -328,24 +323,24 @@ fn despawn_widget_ids(
     ui_id: Query<&UIGenID>
 ) {
     if let Some(name) = ui_registry.current.clone() {
-            if let Some(last_ui) = last_ui_usage {
-                if let Some(last_ui_name) = last_ui.0.clone() {
-                    if last_ui_name.eq(&name) {
-                        // UI hasn't changed, skip releasing IDs
-                        debug!("UI unchanged: current = {}, last = {}", name, last_ui_name);
-                    }
+        if let Some(last_ui) = last_ui_usage {
+            if let Some(last_ui_name) = last_ui.0.clone() {
+                if last_ui_name.eq(&name) {
+                    // UI hasn't changed, skip releasing IDs
+                    debug!("UI unchanged: current: {}, last: {}", name, last_ui_name);
                 }
             }
+        }
     }
-    
+
     for id in ui_id.iter() {
-        UI_ID_GENERATE.lock().unwrap().release(id.0);
+        UI_ID_GENERATE.lock().unwrap().release(id.get());
     }
 
     for entity in query.iter() {
         if let Ok(widget_id) = widget_ids.get(entity) {
             match widget_id.kind {
-                WidgetKind::HtmlBody => BODY_ID_POOL.lock().unwrap().release(widget_id.id),
+                WidgetKind::Body => BODY_ID_POOL.lock().unwrap().release(widget_id.id),
                 WidgetKind::Div => DIV_ID_POOL.lock().unwrap().release(widget_id.id),
                 WidgetKind::Headline => HEADLINE_ID_POOL.lock().unwrap().release(widget_id.id),
                 WidgetKind::Paragraph => PARAGRAPH_ID_POOL.lock().unwrap().release(widget_id.id),
@@ -353,9 +348,15 @@ fn despawn_widget_ids(
                 WidgetKind::CheckBox => CHECK_BOX_ID_POOL.lock().unwrap().release(widget_id.id),
                 WidgetKind::Slider => SLIDER_ID_POOL.lock().unwrap().release(widget_id.id),
                 WidgetKind::InputField => INPUT_ID_POOL.lock().unwrap().release(widget_id.id),
-                WidgetKind::ChoiceBox => SELECT_ID_POOL.lock().unwrap().release(widget_id.id),
-                WidgetKind::Img => IMG_ID_POOL.lock().unwrap().release(widget_id.id),
+                WidgetKind::ChoiceBox => CHOICE_BOX_ID_POOL.lock().unwrap().release(widget_id.id),
+                WidgetKind::Img => IMAGE_ID_POOL.lock().unwrap().release(widget_id.id),
                 WidgetKind::ProgressBar => PROGRESS_BAR_ID_POOL.lock().unwrap().release(widget_id.id),
+                WidgetKind::RadioButton => RADIO_BUTTON_ID_POOL.lock().unwrap().release(widget_id.id),
+                WidgetKind::SwitchButton => SWITCH_BUTTON_ID_POOL.lock().unwrap().release(widget_id.id),
+                WidgetKind::ToggleButton => TOGGLE_BUTTON_ID_POOL.lock().unwrap().release(widget_id.id),
+                WidgetKind::Scrollbar => SCROLL_ID_POOL.lock().unwrap().release(widget_id.id),
+                WidgetKind::Divider => DIVIDER_ID_POOL.lock().unwrap().release(widget_id.id),
+                WidgetKind::FieldSet => FIELDSET_ID_POOL.lock().unwrap().release(widget_id.id),
             }
         }
     }

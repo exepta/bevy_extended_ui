@@ -14,10 +14,17 @@ categories = ["gui", "rendering"]
 name = "bevy_extended_ui"
 path = "src/lib.rs"
 
+[workspace]
+members = ["crates/bevy_extended_ui_macros"]
+
+[dependencies.bevy_extended_ui_macros]
+path = "crates/bevy_extended_ui_macros"
+
 # Bevy 0.17.0 main library
 [dependencies.bevy]
-version = "0.17.2"
+version = "0.17.3"
 default-features = true
+features = ["file_watcher", "jpeg", "png", "webp"]
 
 # Html Converter
 [dependencies.kuchiki]
@@ -34,7 +41,6 @@ version = "1.21.3"
 version = "1.12.2"
 
 [dependencies.bevy-inspector-egui]
-version = "0.34.0"
-
-[dependencies.notify]
-version = "8.2.0"
+version = "0.35.0"
+[dependencies.inventory]
+version = "0.3.21"
