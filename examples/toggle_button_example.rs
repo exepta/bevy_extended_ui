@@ -44,13 +44,11 @@ fn apply_selected_radio_color_to_text(
 ) {
     let Ok(selections) = set_q.get(set_entity) else { return };
 
-    info!("1 {:?}", selections.0);
     let Some((_text_id, mut text_style)) = text_query
         .iter_mut()
         .find(|(id, _)| id.0 == "my-text")
     else { return };
 
-    info!("2");
     for pair in text_style.styles.values_mut() {
         pair.normal.color = Some(Colored::hex_to_color("#e8e8fd"));
         pair.normal.font_size = Some(FontVal::Px(32.0));
@@ -59,7 +57,6 @@ fn apply_selected_radio_color_to_text(
     for &entity in selections.0.iter() {
         let Ok(toggle) = toggle_q.get(entity) else { continue };
 
-        info!("3 {:?}", toggle.value.as_str());
         match toggle.value.as_str() {
             "text_color" => {
                 if let Some(color) = Colored::named("blue") {

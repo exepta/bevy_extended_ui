@@ -17,6 +17,7 @@ pub struct ToggleButtonWidget;
 impl Plugin for ToggleButtonWidget {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, internal_node_creation_system);
+        app.add_systems(Update, ensure_fieldset_selection_system);
     }
 }
 
@@ -157,6 +158,36 @@ fn internal_node_creation_system(
             .observe(on_internal_click)
             .observe(on_internal_cursor_entered)
             .observe(on_internal_cursor_leave);
+    }
+}
+
+fn ensure_fieldset_selection_system(
+    toggles: Query<(Entity, &InFieldSet, &UIWidgetState), With<ToggleButton>>,
+    mut fieldsets: Query<(
+        &FieldSet,
+        Option<&mut FieldSelectionSingle>,
+        Option<&mut FieldSelectionMulti>,
+    )>,
+) {
+    for (toggle_entity, in_fs, state) in toggles.iter() {
+        if !state.checked {
+            continue;
+        }
+        if let Ok((fieldset, selection_single, selection_multi)) = fieldsets.get_mut(in_fs.0) {
+            if fieldset.field_mode == FieldMode::Single {
+                if let Some(mut selection) = selection_single {
+                    if selection.0.is_none() {
+                        selection.0 = Some(toggle_entity);
+                    }
+                }
+            } else if fieldset.field_mode == FieldMode::Multi {
+                if let Some(mut selection) = selection_multi {
+                    if !selection.0.contains(&toggle_entity) {
+                        selection.0.push(toggle_entity);
+                    }
+                }
+            }
+        }
     }
 }
 
