@@ -112,9 +112,15 @@ jobs:
         if: steps.semantic.outputs.new-release-published == 'true'
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Publish to crates.io
+      - name: Publish macros crate
         if: steps.semantic.outputs.new-release-published == 'true'
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        run: cargo publish --no-verify
+        run: cargo publish -p bevy_extended_ui_macros --no-verify --allow-dirty
+
+      - name: Publish main crate
+        if: steps.semantic.outputs.new-release-published == 'true'
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish -p bevy_extended_ui --no-verify --allow-dirty
 
