@@ -656,6 +656,7 @@ fn parse_html_node(
         }
 
         "toggle" => {
+            let value = attributes.get("value").unwrap_or("").to_string();
             let (icon_path, icon_place) = parse_icon_and_text(node);
             let text = node.text_contents().trim().to_string();
             let selected_attr = attributes.contains("selected");
@@ -663,6 +664,7 @@ fn parse_html_node(
                 ToggleButton {
                     label: text.clone(),
                     icon_path,
+                    value,
                     icon_place,
                     selected: selected_attr,
                     ..default()

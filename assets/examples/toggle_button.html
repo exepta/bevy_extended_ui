@@ -18,10 +18,11 @@
         class="field-center"
         mode="multi"
         onchange="text_format"
+        oninit="text_format"
 >
-    <toggle><icon src="extended_ui/icons/font_size.png"></icon></toggle>
-    <toggle disabled><icon src="extended_ui/icons/icons8-fett-gedruckt-16.png"></icon></toggle>
-    <toggle selected><icon src="extended_ui/icons/icons8-farbmodus-16.png"></icon></toggle>
+    <toggle value="text_size"><icon src="extended_ui/icons/font_size.png"></icon></toggle>
+    <toggle value="test_bold" disabled><icon src="extended_ui/icons/icons8-fett-gedruckt-16.png"></icon></toggle>
+    <toggle value="text_color" selected><icon src="extended_ui/icons/icons8-farbmodus-16.png"></icon></toggle>
 </fieldset>
 
 </body>

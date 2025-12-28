@@ -22,8 +22,14 @@ impl Plugin for ToggleButtonWidget {
 
 fn internal_node_creation_system(
     mut commands: Commands,
-    query: Query<
-        (Entity, &UIGenID, &ToggleButton, Option<&CssSource>),
+    mut query: Query<
+        (
+            Entity,
+            &UIGenID,
+            &mut ToggleButton,
+            Option<&CssSource>,
+            Option<&mut UIWidgetState>,
+        ),
         (With<ToggleButton>, Without<ToggleButtonBase>),
     >,
     parents: Query<&ChildOf>,
@@ -35,21 +41,34 @@ fn internal_node_creation_system(
     mut image_cache: ResMut<ImageCache>,
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
-    for (entity, id, toggle_button, source_opt) in query.iter() {
+    for (entity, id, mut toggle_button, source_opt, ui_state_opt) in query.iter_mut() {
         let mut css_source = CssSource::default();
         if let Some(source) = source_opt {
             css_source = source.clone();
         }
 
-        commands.entity(entity).insert(UIWidgetState {
-            checked: toggle_button.selected,
-            ..default()
-        });
+        let disabled = ui_state_opt
+            .as_ref()
+            .map(|state| state.disabled)
+            .unwrap_or(false);
+        let selected = toggle_button.selected && !disabled;
+        if disabled && toggle_button.selected {
+            toggle_button.selected = false;
+        }
+
+        if let Some(mut state) = ui_state_opt {
+            state.checked = selected;
+        } else {
+            commands.entity(entity).insert(UIWidgetState {
+                checked: selected,
+                ..default()
+            });
+        }
 
         let fs_entity_opt = find_fieldset_ancestor_optional(entity, &parents, &fieldset_q);
         if let Some(fs_ent) = fs_entity_opt {
             commands.entity(entity).insert(InFieldSet(fs_ent));
-            if toggle_button.selected {
+            if selected {
                 if let Ok(Some(mut sel)) = single_sel_q.get_mut(fs_ent) {
                     if sel.0.is_none() {
                         sel.0 = Some(entity);
@@ -187,6 +206,12 @@ fn on_internal_click(
         trigger.propagate(false);
         return;
     };
+
+    if st.disabled {
+        trigger.propagate(false);
+        return;
+    }
+
     current_widget_state.widget_id = gen_id.0;
 
     let mut should_check = false;
