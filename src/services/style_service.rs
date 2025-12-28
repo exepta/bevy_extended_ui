@@ -2,7 +2,7 @@ use crate::ImageCache;
 use crate::html::HtmlStyle;
 use crate::services::image_service::get_or_load_image;
 use crate::services::state_service::update_widget_states;
-use crate::styles::Style;
+use crate::styles::{FontWeight, Style};
 use crate::styles::components::UiStyle;
 use crate::widgets::UIWidgetState;
 use bevy::prelude::*;
@@ -169,6 +169,24 @@ pub fn update_widget_styles_system(
                 if let Some(font_size) = final_style.font_size.clone() {
                     tf.font_size = font_size.get(None);
                 }
+
+                if let Some(font_family) = final_style.font_family.clone() {
+                    let font_path_str = font_family.0.to_string();
+                    if font_path_str.eq_ignore_ascii_case("default") {
+                        tf.font = Default::default();
+                    } else if font_path_str.ends_with(".ttf") {
+                        tf.font = asset_server.load(font_path_str);
+                    } else {
+                        let folder = font_path_str.trim().trim_matches('"').trim_matches('\'');
+
+                        if folder.is_empty() {
+                            tf.font = Default::default();
+                        } else {
+                            let weight_opt = final_style.font_weight.clone(); // Option<FontWeight>
+                            tf.font = load_weighted_font_from_folder(&asset_server, folder, weight_opt);
+                        }
+                    }
+                }
             }
 
             if let Some(mut text_layout) = text_layout {
@@ -319,4 +337,42 @@ fn apply_style_to_node(style: &Style, node: Option<Mut<Node>>) {
         node.grid_auto_columns = style.grid_auto_columns.clone().unwrap_or_default();
         node.grid_auto_rows = style.grid_auto_rows.clone().unwrap_or_default();
     }
+}
+
+fn load_weighted_font_from_folder(
+    asset_server: &AssetServer,
+    folder: &str,
+    weight: Option<FontWeight>,
+) -> Handle<Font> {
+    let folder = folder.trim().trim_matches('"').trim_matches('\'').trim_end_matches('/');
+    if folder.is_empty() {
+        return Default::default();
+    }
+
+    let family = folder_basename(folder);
+
+    let w = weight.unwrap_or(FontWeight::Normal);
+
+    let token = weight_token_exact(w);
+    let path_primary = format!("{folder}/{family}-{token}.ttf");
+
+    asset_server.load::<Font>(path_primary)
+}
+
+fn weight_token_exact(weight: FontWeight) -> &'static str {
+    match weight {
+        FontWeight::Thin       => "Thin",
+        FontWeight::ExtraLight => "ExtraLight",
+        FontWeight::Light      => "Light",
+        FontWeight::Normal     => "Regular",
+        FontWeight::Medium     => "Medium",
+        FontWeight::SemiBold   => "SemiBold",
+        FontWeight::Bold       => "Bold",
+        FontWeight::ExtraBold  => "ExtraBold",
+        FontWeight::Black      => "Black",
+    }
+}
+
+fn folder_basename(folder: &str) -> &str {
+    folder.trim_end_matches('/').rsplit('/').next().unwrap_or(folder)
 }

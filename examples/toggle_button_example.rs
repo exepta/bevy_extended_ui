@@ -59,7 +59,7 @@ fn apply_selected_radio_color_to_text(
 
         match toggle.value.as_str() {
             "text_color" => {
-                if let Some(color) = Colored::named("blue") {
+                if let Some(color) = Colored::named("yellow") {
                     for pair in text_style.styles.values_mut() {
                         pair.normal.color = Some(color);
                     }

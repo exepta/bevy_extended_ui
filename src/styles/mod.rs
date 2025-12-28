@@ -102,19 +102,68 @@ impl Default for Background {
 }
 
 /// Constants for common font weight values.
-#[derive(Reflect, Debug, Clone)]
-pub struct FontWeight;
+#[derive(Reflect, Debug, Clone, PartialEq, Copy)]
+pub enum FontWeight {
+    Thin = 100,
+    ExtraLight = 200,
+    Light = 300,
+    Normal = 400,
+    Medium = 500,
+    SemiBold = 600,
+    Bold = 700,
+    ExtraBold = 800,
+    Black = 900,
+}
 
 impl FontWeight {
-    pub const THIN: u16 = 100;
-    pub const EXTRA_LIGHT: u16 = 200;
-    pub const LIGHT: u16 = 300;
-    pub const NORMAL: u16 = 400;
-    pub const MEDIUM: u16 = 500;
-    pub const SEMI_BOLD: u16 = 600;
-    pub const BOLD: u16 = 700;
-    pub const EXTRA_BOLD: u16 = 800;
-    pub const BLACK: u16 = 900;
+    /// Parses CSS-like font-weight names (case-insensitive)
+    ///
+    /// Examples:
+    /// - "bold" -> Bold
+    /// - "normal" -> Normal
+    /// - "semibold" / "semi-bold" -> SemiBold
+    pub fn from_name(name: &str) -> Option<Self> {
+        let n = name.trim().to_ascii_lowercase();
+
+        match n.as_str() {
+            "thin" => Some(Self::Thin),
+            "extralight" | "extra-light" => Some(Self::ExtraLight),
+            "light" => Some(Self::Light),
+            "normal" | "regular" => Some(Self::Normal),
+            "medium" => Some(Self::Medium),
+            "semibold" | "semi-bold" => Some(Self::SemiBold),
+            "bold" => Some(Self::Bold),
+            "extrabold" | "extra-bold" => Some(Self::ExtraBold),
+            "black" | "heavy" => Some(Self::Black),
+            _ => None,
+        }
+    }
+
+    /// Parses numeric CSS font-weight values
+    ///
+    /// Examples:
+    /// - 700 -> Bold
+    /// - 650 -> SemiBold (nearest lower)
+    /// - 999 -> Black
+    pub fn from_number(value: u16) -> Option<Self> {
+        Some(match value {
+            100 => Self::Thin,
+            200 => Self::ExtraLight,
+            300 => Self::Light,
+            400 => Self::Normal,
+            500 => Self::Medium,
+            600 => Self::SemiBold,
+            700 => Self::Bold,
+            800 => Self::ExtraBold,
+            900 => Self::Black,
+            _ => Self::Normal,
+        })
+    }
+
+    /// Returns the numeric weight (100–900)
+    pub fn as_number(self) -> u16 {
+        self as u16
+    }
 }
 
 /// Placement of an icon relative to text.
@@ -164,6 +213,9 @@ impl FontVal {
     }
 }
 
+#[derive(Reflect, Debug, Clone, PartialEq)]
+pub struct FontFamily(pub String);
+
 #[derive(Reflect, Default, Debug, Clone, PartialEq)]
 pub struct StylePair {
     pub important: Style,
@@ -196,6 +248,8 @@ pub struct Style {
     pub border_width: Option<Val>,
     pub border_radius: Option<Radius>,
     pub font_size: Option<FontVal>,
+    pub font_family: Option<FontFamily>,
+    pub font_weight: Option<FontWeight>,
     pub box_shadow: Option<BoxShadow>,
     pub justify_content: Option<JustifyContent>,
     pub justify_items: Option<JustifyItems>,
@@ -261,6 +315,8 @@ impl Style {
         merge_opt(&mut self.border_radius, &other.border_radius);
 
         merge_opt(&mut self.font_size, &other.font_size);
+        merge_opt(&mut self.font_family, &other.font_family);
+        merge_opt(&mut self.font_weight, &other.font_weight);
         merge_opt(&mut self.box_shadow, &other.box_shadow);
 
         merge_opt(&mut self.justify_content, &other.justify_content);

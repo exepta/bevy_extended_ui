@@ -38,10 +38,10 @@ What will come in the next version?
     - [x] :disabled is not every time above :hover styles.
     - [x] :disabled doesn't apply to children by init state.
     - [ ] Make it easier to use UiStyle.
-    - [ ] Font support is not working!
+    - [x] Font support is not working!
 - [x] Ui Default Theme
-- [ ] Include disabled ui style.
-- [ ] Better examples.
+- [x] Include disabled ui style.
+- [x] Better examples.
 - [ ] Better documentation.
 - [ ] Test library in an external project.
 - [ ] Create a Patch.md file for current releases.

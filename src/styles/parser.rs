@@ -1,5 +1,5 @@
 use crate::styles::paint::Colored;
-use crate::styles::{Background, FontVal, Radius, Style, StylePair};
+use crate::styles::{Background, FontFamily, FontVal, FontWeight, Radius, Style, StylePair};
 use bevy::prelude::*;
 use lightningcss::rules::CssRule;
 use lightningcss::stylesheet::{ParserOptions, PrinterOptions, StyleSheet};
@@ -225,6 +225,17 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
         }
 
         "font-size" => style.font_size = convert_to_font_size(value.to_string()),
+        "font-family" => {
+            style.font_family = Some(FontFamily(
+                value.trim()
+                    .replace(" ", "")
+                    .replace("\"", "")
+                    .replace("'", "")
+                    .to_string()));
+        }
+        "font-weight" => {
+            style.font_weight = convert_to_font_weight(value.to_string());
+        }
 
         "border" => {
             if let Some((rect, color)) = convert_css_border(value.to_string()) {
@@ -282,6 +293,21 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
 
         _ => {}
     }
+}
+
+fn convert_to_font_weight(value: String) -> Option<FontWeight> {
+    let in_value = value.trim();
+    if in_value.is_empty() {
+        return None;
+    }
+
+    // 1) Try numeric first (CSS-style: 1–1000, we clamp logically)
+    if let Ok(num) = in_value.parse::<u16>() {
+        return FontWeight::from_number(num);
+    }
+
+    // 2) Try name-based (case-insensitive)
+    FontWeight::from_name(in_value)
 }
 
 /// Converts a string representation of a CSS value into a Bevy [`Val`].
