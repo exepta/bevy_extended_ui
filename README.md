@@ -36,8 +36,8 @@ There are many other things, but currently you can use the core (HTML / CSS) fea
 Add this to your `Cargo.toml`:
 ```toml
 [dependencies]
-bevy_extended_ui = "1.1.0"
-bevy_extended_ui_macros = "1.1.0"
+bevy_extended_ui = "1.0.0"
+bevy_extended_ui_macros = "1.0.0"
 ```
 
 Then, you add the plugin to your `main.rs` or on any point at a build function:
