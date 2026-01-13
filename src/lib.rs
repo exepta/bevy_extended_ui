@@ -34,7 +34,7 @@ pub struct ImageCache {
 pub struct ExtendedUiConfiguration {
     pub order: isize,
     pub hdr_support: bool,
-    pub enable_default_camera: bool,
+    pub camera: ExtendedCam,
     pub render_layers: Vec<usize>,
     pub assets_path: String,
 }
@@ -49,11 +49,19 @@ impl Default for ExtendedUiConfiguration {
         Self {
             order: 2,
             hdr_support: true,
-            enable_default_camera: true,
+            camera: ExtendedCam::default(),
             render_layers: vec![1, 2],
             assets_path: String::from("assets/extended_ui/"),
         }
     }
+}
+
+#[derive(Debug, Clone, Default)]
+pub enum ExtendedCam {
+    #[default]
+    Default,
+    Simple,
+    None
 }
 
 /// Tracks the currently focused or active widget by its ID.
@@ -103,58 +111,78 @@ impl Plugin for ExtendedUiPlugin {
 
 /// System that manages the lifecycle and configuration of the UI camera.
 ///
-/// This system checks the `ExtendedUiConfiguration` resource to determine whether
-/// a default UI camera should be enabled. If enabled, it either updates an existing
-/// UI camera's settings or spawns a new one with the configured parameters.
-///
-/// If the configuration disables the default UI camera, it despawns any existing UI cameras.
-///
-/// # Parameters
-/// - `commands`: To spawn or despawn entities.
-/// - `configuration`: Resource containing UI camera settings.
-/// - `query`: Query to find existing UI cameras for update or removal.
+/// Uses `ExtendedUiConfiguration.camera` to decide which camera setup is active:
+/// - `ExtendedCam::Default`: managed UI camera with layers/order/HDR
+/// - `ExtendedCam::Simple`: simple Camera2d named "Extended UI Camera"
+/// - `ExtendedCam::None`: despawn all UI cameras
 fn load_ui_camera_system(
     mut commands: Commands,
     configuration: Res<ExtendedUiConfiguration>,
     mut query: Query<(Entity, &mut Camera, &mut RenderLayers), With<UiCamera>>,
 ) {
-    if configuration.enable_default_camera {
-        if let Some((cam_entity, mut camera, mut layers)) = query.iter_mut().next() {
-            /*            camera.hdr = configuration.hdr_support;*/
-            camera.order = configuration.order;
-            *layers = RenderLayers::from_layers(configuration.render_layers.as_slice());
+    match configuration.camera {
+        ExtendedCam::Default => {
+            if let Some((cam_entity, mut camera, mut layers)) = query.iter_mut().next() {
+                camera.order = configuration.order;
+                *layers = RenderLayers::from_layers(configuration.render_layers.as_slice());
 
-            if configuration.hdr_support {
-                commands.entity(cam_entity).insert(Hdr::default());
+                if configuration.hdr_support {
+                    commands.entity(cam_entity).insert(Hdr::default());
+                } else {
+                    commands.entity(cam_entity).remove::<Hdr>();
+                }
+
+                debug!("Ui Camera updated (Default)!");
+            } else {
+                let cam_entity = commands
+                    .spawn((
+                        Name::new("Extended Ui Camera"),
+                        Camera2d,
+                        Camera {
+                            order: configuration.order,
+                            clear_color: ClearColorConfig::None,
+                            ..default()
+                        },
+                        Msaa::Sample4,
+                        RenderLayers::from_layers(configuration.render_layers.as_slice()),
+                        UiCamera,
+                        IsDefaultUiCamera,
+                    ))
+                    .id();
+
+                if configuration.hdr_support {
+                    commands.entity(cam_entity).insert(Hdr::default());
+                }
+
+                debug!("Ui Camera created (Default)!");
             }
-
-            debug!("Ui Camera updated!");
-        } else {
-            let cam_entity = commands
-                .spawn((
-                    Name::new("Extended Ui Camera"),
-                    Camera2d,
-                    Camera {
-                        order: configuration.order,
-                        ..default()
-                    },
-                    Msaa::Sample4,
-                    RenderLayers::from_layers(configuration.render_layers.as_slice()),
-                    Transform::from_translation(Vec3::Z * 1000.0),
-                    UiCamera,
-                    IsDefaultUiCamera,
-                ))
-                .id();
-
-            if configuration.hdr_support {
-                commands.entity(cam_entity).insert(Hdr::default());
-            }
-            debug!("Ui Camera created!");
         }
-    } else {
-        for (entity, _, _) in query.iter() {
-            commands.entity(entity).despawn();
-            debug!("Ui Camera removed!");
+
+        ExtendedCam::Simple => {
+            // remove existing UI cameras first (to avoid duplicate cameras)
+            for (entity, _, _) in query.iter() {
+                commands.entity(entity).despawn();
+            }
+
+            commands.spawn((
+                Name::new("Extended UI Camera"),
+                Camera2d,
+                Camera {
+                    order: configuration.order,
+                    clear_color: ClearColorConfig::None,
+                    ..default()
+                },
+                UiCamera,
+            ));
+
+            debug!("Ui Camera created (Simple)!");
+        }
+
+        ExtendedCam::None => {
+            for (entity, _, _) in query.iter() {
+                commands.entity(entity).despawn();
+                debug!("Ui Camera removed!");
+            }
         }
     }
 }
