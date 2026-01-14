@@ -24,8 +24,19 @@ version = "0.1.0"
 # Bevy 0.17.0 main library
 [dependencies.bevy]
 version = "0.17.3"
-default-features = true
-features = ["file_watcher", "jpeg", "png", "webp"]
+default-features = false
+features = [
+    "bevy_ui",
+    "bevy_camera",
+    "bevy_picking",
+    "bevy_render",
+    "bevy_log",
+    "bevy_core_pipeline",
+
+    "jpeg",
+    "png",
+    "webp"
+]
 
 # Html Converter
 [dependencies.kuchiki]
@@ -41,7 +52,5 @@ version = "1.21.3"
 [dependencies.regex]
 version = "1.12.2"
 
-[dependencies.bevy-inspector-egui]
-version = "0.35.0"
 [dependencies.inventory]
 version = "0.3.21"
