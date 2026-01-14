@@ -14,6 +14,10 @@ categories = ["gui", "rendering"]
 name = "bevy_extended_ui"
 path = "src/lib.rs"
 
+############################################
+#                  Crates                  #
+############################################
+
 [workspace]
 members = ["crates/bevy_extended_ui_macros"]
 
@@ -21,11 +25,37 @@ members = ["crates/bevy_extended_ui_macros"]
 path = "crates/bevy_extended_ui_macros"
 version = "0.1.0"
 
+############################################
+#               Dependencies               #
+############################################
+
 # Bevy 0.17.0 main library
 [dependencies.bevy]
 version = "0.17.3"
-default-features = true
-features = ["file_watcher", "jpeg", "png", "webp"]
+default-features = false
+features = [
+    "bevy_asset",
+    "bevy_color",
+    "bevy_core_pipeline",
+    "bevy_ui_render",
+    "bevy_render",
+    "bevy_text",
+    "bevy_ui",
+    "default_font",
+    "multi_threaded",
+    "png",
+    "jpeg",
+    "gif",
+    "ico",
+    "webp",
+    "bevy_mesh_picking_backend",
+    "bevy_picking",
+    "custom_cursor",
+    "bevy_ui_picking_backend",
+    "bevy_winit",
+    "x11",
+    "bevy_log",
+]
 
 # Html Converter
 [dependencies.kuchiki]
@@ -41,7 +71,5 @@ version = "1.21.3"
 [dependencies.regex]
 version = "1.12.2"
 
-[dependencies.bevy-inspector-egui]
-version = "0.35.0"
 [dependencies.inventory]
 version = "0.3.21"
