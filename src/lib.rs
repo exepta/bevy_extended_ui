@@ -57,12 +57,39 @@ impl Default for ExtendedUiConfiguration {
     }
 }
 
+/// Defines which camera setup should be used by the extended UI / rendering pipeline.
+///
+/// This enum is typically used as a configuration option to select a specific camera mode:
+/// - [`ExtendedCam::Default`] uses the recommended / default camera configuration.
+/// - [`ExtendedCam::Simple`] uses a minimal camera setup (useful for lightweight scenes or testing).
+/// - [`ExtendedCam::None`] disables automatic camera spawning/handling completely.
+///
+/// # Examples
+/// ```rust
+/// # use your_crate::ExtendedCam;
+/// let cam_mode = ExtendedCam::Default;
+///
+/// match cam_mode {
+///     ExtendedCam::Default => {
+///         // spawn default camera setup
+///     }
+///     ExtendedCam::Simple => {
+///         // spawn a simple camera setup
+///     }
+///     ExtendedCam::None => {
+///         // do not spawn/manage any camera
+///     }
+/// }
+/// ```
 #[derive(Debug, Clone, Default)]
 pub enum ExtendedCam {
+    /// Use the recommended default camera setup.
     #[default]
     Default,
+    /// Use a minimal / lightweight camera setup (useful for tests and small demos).
     Simple,
-    None
+    /// Disable camera spawning/handling completely.
+    None,
 }
 
 /// Tracks the currently focused or active widget by its ID.
