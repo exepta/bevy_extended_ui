@@ -14,12 +14,20 @@ categories = ["gui", "rendering"]
 name = "bevy_extended_ui"
 path = "src/lib.rs"
 
+############################################
+#                  Crates                  #
+############################################
+
 [workspace]
 members = ["crates/bevy_extended_ui_macros"]
 
 [dependencies.bevy_extended_ui_macros]
 path = "crates/bevy_extended_ui_macros"
 version = "0.1.0"
+
+############################################
+#               Dependencies               #
+############################################
 
 # Bevy 0.17.0 main library
 [dependencies.bevy]
