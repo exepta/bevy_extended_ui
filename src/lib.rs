@@ -42,13 +42,14 @@ pub struct ExtendedUiConfiguration {
 impl Default for ExtendedUiConfiguration {
     /// Returns a default `ExtendedUiConfiguration` with:
     /// - `order` = 2
-    /// - `hdr_support` enabled
-    /// - `enable_default_camera` enabled
+    /// - `hdr_support` disabled (Currently Buggy!)
+    /// - `camera` default of [`ExtendedCam`]
     /// - `render_layers` set to layers 1 and 2
+    /// - `assets_path`: for preload images. Default `assets/extended_ui/`
     fn default() -> Self {
         Self {
             order: 2,
-            hdr_support: true,
+            hdr_support: false,
             camera: ExtendedCam::default(),
             render_layers: vec![1, 2],
             assets_path: String::from("assets/extended_ui/"),
