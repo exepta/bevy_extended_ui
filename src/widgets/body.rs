@@ -1,9 +1,10 @@
-use crate::styles::{CssSource, TagName};
+use crate::html::HtmlStyle;
+use crate::styles::{CssSource, Style, TagName};
 use crate::widgets::{Body, UIGenID, UIWidgetState, WidgetId, WidgetKind};
+use crate::registry::UiRegistry;
 use crate::{CurrentWidgetState, ExtendedUiConfiguration};
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
-use bevy::ui::FocusPolicy;
 
 #[derive(Component)]
 struct BodyBase;
@@ -18,12 +19,25 @@ impl Plugin for BodyWidget {
 
 fn internal_node_creation_system(
     mut commands: Commands,
-    query: Query<(Entity, &Body, Option<&CssSource>), (With<Body>, Without<BodyBase>)>,
+    mut query: Query<
+        (Entity, &Body, Option<&CssSource>, Option<&mut HtmlStyle>),
+        (With<Body>, Without<BodyBase>),
+    >,
+    existing_bodies: Query<&ZIndex, With<BodyBase>>,
     config: Res<ExtendedUiConfiguration>,
+    ui_registry: Res<UiRegistry>,
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
 
-    for (entity, body, source_opt) in query.iter() {
+    let ui_order = ui_registry.current.as_ref();
+    let max_z_index = existing_bodies
+        .iter()
+        .map(|z_index| z_index.0)
+        .max()
+        .unwrap_or(-1);
+    let mut next_z_index = max_z_index + 1;
+
+    for (entity, body, source_opt, html_style) in query.iter_mut() {
         let mut css_source = CssSource::default();
         if let Some(source) = source_opt {
             css_source = source.clone();
@@ -32,6 +46,27 @@ fn internal_node_creation_system(
         let mut html_id = String::new();
         if let Some(id) = body.html_key.clone() {
             html_id = id;
+        }
+
+        let z_index = if html_id.is_empty() {
+            0
+        } else if ui_order
+            .and_then(|names| names.iter().position(|name| name == &html_id))
+            .is_some()
+        {
+            let assigned = next_z_index;
+            next_z_index += 1;
+            assigned
+        } else {
+            0
+        };
+
+        if let Some(mut inline_style) = html_style {
+            inline_style.0.z_index = Some(z_index);
+        } else {
+            let mut style = Style::default();
+            style.z_index = Some(z_index);
+            commands.entity(entity).insert(HtmlStyle(style));
         }
 
         commands
@@ -45,8 +80,8 @@ fn internal_node_creation_system(
                 },
                 BackgroundColor::default(),
                 ImageNode::default(),
-                ZIndex::default(),
-                FocusPolicy::default(),
+                ZIndex(z_index),
+                Pickable::default(),
                 css_source,
                 TagName("body".to_string()),
                 RenderLayers::layer(*layer),

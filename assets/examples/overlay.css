@@ -4,5 +4,9 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    pointer-events: auto;
+    pointer-events: none;
+}
+
+h1 {
+    pointer-events: none;
 }
