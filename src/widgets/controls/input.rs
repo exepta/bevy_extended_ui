@@ -3,7 +3,6 @@ use std::time::Duration;
 
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
-use bevy::ui::FocusPolicy;
 use crate::styles::components::UiStyle;
 use crate::styles::paint::Colored;
 use crate::styles::{Background, CssClass, CssSource, FontVal, TagName};
@@ -128,7 +127,7 @@ fn internal_node_creation_system(
                     Val::Px(0.),
                 ),
                 ZIndex::default(),
-                FocusPolicy::default(),
+                Pickable::default(),
                 css_source.clone(),
                 TagName(String::from("input")),
                 RenderLayers::layer(layer),
@@ -161,7 +160,7 @@ fn internal_node_creation_system(
                         UIWidgetState::default(),
                         css_source.clone(),
                         CssClass(vec!["in-icon-container".to_string()]),
-                        FocusPolicy::Pass,
+                        Pickable::IGNORE,
                         RenderLayers::layer(layer),
                         InputFieldIcon,
                         BindToID(id.0),
@@ -175,7 +174,7 @@ fn internal_node_creation_system(
                             UIWidgetState::default(),
                             css_source.clone(),
                             CssClass(vec!["in-icon".to_string()]),
-                            FocusPolicy::Pass,
+                            Pickable::IGNORE,
                             RenderLayers::layer(layer),
                             InputFieldIconImage,
                             BindToID(id.0),
@@ -195,7 +194,7 @@ fn internal_node_creation_system(
                     UIWidgetState::default(),
                     css_source.clone(),
                     CssClass(vec!["input-label".to_string()]),
-                    FocusPolicy::Pass,
+                    Pickable::IGNORE,
                     RenderLayers::layer(layer),
                     OverlayLabel,
                     BindToID(id.0),
@@ -213,7 +212,7 @@ fn internal_node_creation_system(
                         UIWidgetState::default(),
                         css_source.clone(),
                         CssClass(vec!["in-text-container".to_string()]),
-                        FocusPolicy::Pass,
+                        Pickable::IGNORE,
                         OriginalWidth(-1.),
                         RenderLayers::layer(layer),
                         InputContainer,
@@ -232,7 +231,7 @@ fn internal_node_creation_system(
                                 css_source.clone(),
                                 CssClass(vec!["input-cursor".to_string()]),
                                 Visibility::Hidden,
-                                FocusPolicy::Pass,
+                                Pickable::IGNORE,
                                 RenderLayers::layer(layer),
                                 InputCursor,
                                 BindToID(id.0),
@@ -249,7 +248,7 @@ fn internal_node_creation_system(
                                 UIWidgetState::default(),
                                 css_source.clone(),
                                 CssClass(vec!["input-text".to_string()]),
-                                FocusPolicy::Pass,
+                                Pickable::IGNORE,
                                 RenderLayers::layer(layer),
                                 InputFieldText,
                                 BindToID(id.0),
@@ -358,7 +357,7 @@ fn sync_input_field_updates(
                         UIWidgetState::default(),
                         css_source.clone(),
                         CssClass(vec!["in-icon-container".to_string()]),
-                        FocusPolicy::Pass,
+                        Pickable::IGNORE,
                         RenderLayers::layer(layer),
                         InputFieldIcon,
                         BindToID(ui_id.0),
@@ -372,7 +371,7 @@ fn sync_input_field_updates(
                             UIWidgetState::default(),
                             css_source.clone(),
                             CssClass(vec!["in-icon".to_string()]),
-                            FocusPolicy::Pass,
+                            Pickable::IGNORE,
                             RenderLayers::layer(layer),
                             InputFieldIconImage,
                             BindToID(ui_id.0),

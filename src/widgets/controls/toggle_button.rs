@@ -1,6 +1,5 @@
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
-use bevy::ui::FocusPolicy;
 use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
 use crate::styles::{CssClass, CssSource, IconPlace, TagName};
 use crate::styles::paint::Colored;
@@ -105,7 +104,7 @@ fn internal_node_creation_system(
                     Val::Px(0.),
                 ),
                 ZIndex::default(),
-                FocusPolicy::default(),
+                Pickable::default(),
                 css_source.clone(),
                 TagName("toggle".to_string()),
                 RenderLayers::layer(*layer),
@@ -136,7 +135,7 @@ fn internal_node_creation_system(
                     UIWidgetState::default(),
                     ZIndex::default(),
                     CssClass(vec!["button-text".to_string()]),
-                    FocusPolicy::Pass,
+                    Pickable::IGNORE,
                     BindToID(id.0),
                     RenderLayers::layer(*layer),
                     ToggleButtonText,

@@ -4,7 +4,6 @@ use crate::styles::{CssSource, TagName};
 use crate::widgets::{ToggleButton, FieldKind, FieldSelectionMulti, FieldSet, FieldSelectionSingle, RadioButton, WidgetId, WidgetKind};
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
-use bevy::ui::FocusPolicy;
 
 #[derive(Component)]
 struct FieldSetBase;
@@ -57,7 +56,7 @@ fn internal_node_creation_system(
                     Val::Px(0.),
                 ),
                 ZIndex::default(),
-                FocusPolicy::default(),
+                Pickable::default(),
                 css_source,
                 TagName("fieldset".to_string()),
                 RenderLayers::layer(*layer),

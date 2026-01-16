@@ -3,7 +3,6 @@ use crate::widgets::{Paragraph, UIGenID, UIWidgetState, WidgetId, WidgetKind};
 use crate::{CurrentWidgetState, ExtendedUiConfiguration};
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
-use bevy::ui::FocusPolicy;
 
 #[derive(Component)]
 struct ParagraphBase;
@@ -54,7 +53,7 @@ fn internal_node_creation_system(
                 TextFont::default(),
                 TextLayout::default(),
                 ZIndex::default(),
-                FocusPolicy::default(),
+                Pickable::default(),
                 css_source,
                 TagName("p".to_string()),
                 RenderLayers::layer(*layer),

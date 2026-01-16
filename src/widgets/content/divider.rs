@@ -3,7 +3,6 @@ use crate::styles::{CssClass, CssSource, TagName};
 use crate::widgets::{Divider, DividerAlignment, WidgetId, WidgetKind};
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
-use bevy::ui::FocusPolicy;
 
 #[derive(Component)]
 struct DividerBase;
@@ -44,7 +43,7 @@ fn internal_node_creation_system(
                 kind: WidgetKind::Divider,
             },
             ZIndex::default(),
-            FocusPolicy::Pass,
+            Pickable::IGNORE,
             BackgroundColor::default(),
             BorderColor::default(),
             BorderRadius::default(),

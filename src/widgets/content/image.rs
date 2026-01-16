@@ -1,7 +1,6 @@
 use bevy::asset::LoadState;
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
-use bevy::ui::FocusPolicy;
 use crate::services::image_service::get_or_load_image;
 use crate::styles::paint::Colored;
 use crate::styles::{CssSource, TagName};
@@ -117,7 +116,7 @@ fn internal_node_creation_system(
                     Val::Px(0.),
                 ),
                 ZIndex::default(),
-                FocusPolicy::default(),
+                Pickable::default(),
                 css_source,
                 TagName("img".to_string()),
                 RenderLayers::layer(*layer),

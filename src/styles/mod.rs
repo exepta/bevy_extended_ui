@@ -7,7 +7,7 @@ use crate::styles::components::UiStyle;
 use bevy::prelude::*;
 use std::cmp::PartialEq;
 use std::collections::HashSet;
-use bevy::ui::FocusPolicy;
+
 // ==================================================
 //                     Css Styling
 // ==================================================
@@ -273,7 +273,7 @@ pub struct Style {
     pub gap: Option<Val>,
     pub text_wrap: Option<LineBreak>,
     pub z_index: Option<i32>,
-    pub pointer_events: Option<FocusPolicy>,
+    pub pointer_events: Option<Pickable>,
     pub scrollbar_width: Option<f32>,
 }
 

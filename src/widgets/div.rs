@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use bevy::camera::visibility::RenderLayers;
 use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
 use bevy::prelude::*;
-use bevy::ui::{FocusPolicy, ScrollPosition};
+use bevy::ui::ScrollPosition;
 use bevy::window::PrimaryWindow;
 use crate::styles::paint::Colored;
 use crate::styles::{CssClass, CssSource, TagName};
@@ -92,7 +92,7 @@ fn internal_node_creation_system(
                     Val::Px(0.),
                 ),
                 ZIndex::default(),
-                FocusPolicy::default(),
+                Pickable::default(),
                 css_source,
                 TagName("div".to_string()),
                 RenderLayers::layer(*layer),
@@ -183,7 +183,7 @@ fn ensure_div_scroll_structure(
                     GlobalTransform::default(),
                     ScrollPosition::default(),
                     UIWidgetState::default(),
-                    FocusPolicy::default(),
+                    Pickable::default(),
                 ))
                 .id();
 
@@ -235,7 +235,7 @@ fn ensure_div_scroll_structure(
                     BackgroundColor::default(),
                     BorderColor::default(),
                     BorderRadius::default(),
-                    FocusPolicy::default(),
+                    Pickable::default(),
                 ))
                 .id();
 
@@ -287,7 +287,7 @@ fn ensure_div_scroll_structure(
                     BackgroundColor::default(),
                     BorderColor::default(),
                     BorderRadius::default(),
-                    FocusPolicy::default(),
+                    Pickable::default(),
                 ))
                 .id();
 

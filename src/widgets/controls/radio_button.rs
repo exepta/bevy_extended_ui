@@ -4,7 +4,6 @@ use crate::widgets::{BindToID, FieldMode, FieldSet, FieldSelectionSingle, InFiel
 use crate::{CurrentWidgetState, ExtendedUiConfiguration};
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
-use bevy::ui::FocusPolicy;
 
 #[derive(Component)]
 struct RadioButtonBase;
@@ -100,7 +99,7 @@ fn internal_node_creation_system(
                     Val::Px(0.),
                 ),
                 ZIndex::default(),
-                FocusPolicy::default(),
+                Pickable::default(),
                 css_source.clone(),
                 TagName(String::from("radio")),
                 RenderLayers::layer(*layer),
@@ -124,7 +123,7 @@ fn internal_node_creation_system(
                         css_source.clone(),
                         UIWidgetState::default(),
                         CssClass(vec!["radio-dot".to_string()]),
-                        FocusPolicy::Pass,
+                        Pickable::IGNORE,
                         BindToID(id.0),
                         RenderLayers::layer(*layer),
                         RadioButtonDot,
@@ -139,7 +138,7 @@ fn internal_node_creation_system(
                         css_source.clone(),
                         UIWidgetState::default(),
                         CssClass(vec!["radio-text".to_string()]),
-                        FocusPolicy::Pass,
+                        Pickable::IGNORE,
                         BindToID(id.0),
                         RenderLayers::layer(*layer),
                         RadioButtonLabel
@@ -364,7 +363,7 @@ fn add_checked_dot_to_radio(
                 BackgroundColor::default(),
                 BorderColor::default(),
                 BorderRadius::default(),
-                FocusPolicy::Pass,
+                Pickable::IGNORE,
                 css_source.clone(),
                 UIWidgetState::default(),
                 CssClass(vec!["checked-dot".to_string()]),

@@ -5,7 +5,6 @@ use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
 use bevy::camera::visibility::RenderLayers;
 use bevy::ecs::relationship::RelatedSpawnerCommands;
 use bevy::prelude::*;
-use bevy::ui::FocusPolicy;
 use crate::widgets::controls::place_icon_if;
 
 #[derive(Component)]
@@ -82,7 +81,7 @@ fn internal_node_creation_system(
                     Val::Px(0.),
                 ),
                 ZIndex::default(),
-                FocusPolicy::default(),
+                Pickable::default(),
                 css_source.clone(),
                 TagName("button".to_string()),
                 RenderLayers::layer(*layer),
@@ -173,7 +172,7 @@ fn spawn_button_children(
         UIWidgetState::default(),
         ZIndex::default(),
         CssClass(vec!["button-text".to_string()]),
-        FocusPolicy::Pass,
+        Pickable::IGNORE,
         BindToID(id.0),
         RenderLayers::layer(layer),
         ButtonText,
