@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use once_cell::sync::Lazy;
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Mutex;
 use crate::html::HtmlSource;
 use crate::widgets::{Body, UIGenID, WidgetId, WidgetKind};
@@ -72,8 +72,8 @@ impl IdPool {
 pub struct UiRegistry {
     /// Collection mapping UI names to their HTML source data.
     pub collection: HashMap<String, HtmlSource>,
-    /// The currently active UI name, if any.
-    pub current: Option<String>,
+    /// The currently active UI names.
+    pub current: Option<Vec<String>>,
 
     pub ui_update: bool,
 }
@@ -105,17 +105,32 @@ impl UiRegistry {
         self.use_ui(&name);
     }
 
+    /// Adds multiple UI sources and marks them as currently in use.
+    ///
+    /// # Arguments
+    ///
+    /// * `entries` - A list of UI names and HTML source data.
+    pub fn add_and_use_multiple(&mut self, entries: Vec<(String, HtmlSource)>) {
+        let mut names = Vec::with_capacity(entries.len());
+        for (name, source) in entries {
+            self.add(name.clone(), HtmlSource { source_id: name.clone(), ..source });
+            names.push(name);
+        }
+        self.use_uis(names);
+    }
+
     /// Removes a UI source from the registry by its name.
     ///
-    /// If the currently active UI (`current`) matches the given name,
-    /// it will also be cleared.
+    /// If the currently active UI list contains the given name,
+    /// it will also be removed.
     ///
     /// # Arguments
     ///
     /// * `name` - The identifier of the UI to remove from the registry.
     pub fn remove(&mut self, name: &str) {
-        if let Some(current) = self.current.clone() {
-            if current.eq(&name.to_string()) {
+        if let Some(current) = &mut self.current {
+            current.retain(|current| current != name);
+            if current.is_empty() {
                 self.current = None;
             }
         }
@@ -136,7 +151,7 @@ impl UiRegistry {
         self.use_ui(to_switch);
     }
 
-    /// Removes all UI sources from the registry and clears the current UI.
+    /// Removes all UI sources from the registry and clears the current UI list.
     ///
     /// This is typically used during global resets or cleanup operations.
     pub fn remove_all(&mut self) {
@@ -165,7 +180,7 @@ impl UiRegistry {
     ///
     /// If the UI with the given name exists in the internal collection, it will be marked
     /// as the currently active UI by setting the `current` field. If it does not exist,
-    /// a warning will be logged and the current UI will be set to `None`.
+    /// a warning will be logged and the current UI list will be cleared.
     ///
     /// # Arguments
     ///
@@ -173,16 +188,39 @@ impl UiRegistry {
     ///
     /// # Behavior
     ///
-    /// - If the named UI exists: `self.current` will be set to `Some(name.to_string())`.
-    /// - If the named UI does not exist: `self.current` will be set to `None`, and a warning is logged.
+    /// - If the named UI exists: `self.current` will be set to `Some(vec![name.to_string()])`.
+    /// - If the named UI does not exist: `self.current` will be cleared, and a warning is logged.
     pub fn use_ui(&mut self, name: &str) {
         if self.get(name).is_some() {
-            self.current = Some(name.to_string());
+            self.current = Some(vec![name.to_string()]);
             self.ui_update = true;
         } else {
             warn!("Ui was empty and will removed now!");
             self.current = None;
         }
+    }
+
+    /// Sets the currently active UIs by name if they exist in the registry.
+    ///
+    /// # Arguments
+    ///
+    /// * `names` - The UI names to activate.
+    pub fn use_uis(&mut self, names: Vec<String>) {
+        let mut valid = Vec::new();
+        for name in names {
+            if self.get(&name).is_some() {
+                valid.push(name);
+            } else {
+                warn!("Ui was empty and will removed now!");
+            }
+        }
+
+        if valid.is_empty() {
+            self.current = None;
+        } else {
+            self.current = Some(valid);
+        }
+        self.ui_update = true;
     }
 }
 
@@ -198,7 +236,7 @@ pub struct UiInitResource(pub bool);
 
 /// Resource tracking the last UI usage name to detect changes.
 #[derive(Resource, Debug)]
-struct LastUiUsage(pub Option<String>);
+struct LastUiUsage(pub Option<Vec<String>>);
 
 /// Bevy plugin that manages the UI registry lifecycle and cleanup.
 pub struct ExtendedRegistryPlugin;
@@ -232,55 +270,76 @@ fn update_que(
     mut commands: Commands,
     mut ui_registry: ResMut<UiRegistry>,
     mut ui_init: ResMut<UiInitResource>,
+    mut structure_map: ResMut<crate::html::HtmlStructureMap>,
     query: Query<(Entity, &HtmlSource), With<HtmlSource>>,
     mut body_query: Query<(Entity, &mut Visibility, &Body), (Without<HtmlSource>, With<Body>)>,
 ) {
-    if let Some(name) = ui_registry.current.clone() {
-        if query.is_empty() {
-            spawn_ui_source(&mut commands, &name, &ui_registry, &mut ui_init);
-            return;
-        }
+    structure_map.active = ui_registry.current.clone();
 
+    let Some(active_names) = ui_registry.current.clone() else {
         for (entity, html_source) in query.iter() {
-            if html_source.source_id == name && !ui_registry.ui_update{
-                continue;
-            }
-
-            // Despawn old body entities before spawning a new UI
-            for (body_entity, mut body_vis, body) in body_query.iter_mut() {
-                if ui_registry.ui_update {
-                    commands.entity(body_entity).despawn();
-                } else {
-                    if let Some(bind) = body.html_key.clone() {
-                        if bind.eq(&html_source.source_id) {
-                            *body_vis = Visibility::Hidden;
-                        }
-                    }
-                }
-            }
-
-            ui_registry.ui_update = false;
-
-            spawn_ui_source(&mut commands, &name, &ui_registry, &mut ui_init);
-
-            // Despawn outdated UI entity
-            commands.entity(entity).despawn();
-        }
-    } else {
-        for (entity, html_source) in query.iter() {
-
             for (_, mut body_vis, body) in body_query.iter_mut() {
-                if let Some(bind) = body.html_key.clone() {
-                    if bind.eq(&html_source.source_id) {
+                if let Some(bind) = body.html_key.as_ref() {
+                    if bind == &html_source.source_id {
                         *body_vis = Visibility::Hidden;
                     }
                 }
             }
 
-            // Despawn outdated UI entity
+            commands.entity(entity).despawn();
+        }
+        ui_registry.ui_update = false;
+        return;
+    };
+    let active_set: HashSet<String> = active_names.iter().cloned().collect();
+
+    if ui_registry.ui_update {
+        for (body_entity, _, body) in body_query.iter_mut() {
+            if let Some(bind) = body.html_key.as_ref() {
+                if active_set.contains(bind) {
+                    commands.entity(body_entity).despawn();
+                }
+            }
+        }
+
+        for (entity, html_source) in query.iter() {
+            if active_set.contains(&html_source.source_id) {
+                commands.entity(entity).despawn();
+            }
+        }
+    }
+
+    let mut existing = HashSet::new();
+    for (_, html_source) in query.iter() {
+        if active_set.contains(&html_source.source_id) {
+            existing.insert(html_source.source_id.clone());
+        }
+    }
+
+    if ui_registry.ui_update {
+        existing.clear();
+    }
+
+    for name in &active_names {
+        if !existing.contains(name) {
+            spawn_ui_source(&mut commands, name, &ui_registry, &mut ui_init);
+        }
+    }
+
+    for (entity, html_source) in query.iter() {
+        if !active_set.contains(&html_source.source_id) {
+            for (_, mut body_vis, body) in body_query.iter_mut() {
+                if let Some(bind) = body.html_key.as_ref() {
+                    if bind == &html_source.source_id {
+                        *body_vis = Visibility::Hidden;
+                    }
+                }
+            }
             commands.entity(entity).despawn();
         }
     }
+
+    ui_registry.ui_update = false;
 }
 
 /// Spawns a UI entity from a registered HTML source by name.
@@ -322,13 +381,10 @@ fn despawn_widget_ids(
     widget_ids: Query<&WidgetId>,
     ui_id: Query<&UIGenID>
 ) {
-    if let Some(name) = ui_registry.current.clone() {
+    if let Some(current) = ui_registry.current.as_ref() {
         if let Some(last_ui) = last_ui_usage {
-            if let Some(last_ui_name) = last_ui.0.clone() {
-                if last_ui_name.eq(&name) {
-                    // UI hasn't changed, skip releasing IDs
-                    debug!("UI unchanged: current: {}, last: {}", name, last_ui_name);
-                }
+            if last_ui.0.as_ref() == Some(current) {
+                debug!("UI unchanged: current: {:?}", current);
             }
         }
     }
