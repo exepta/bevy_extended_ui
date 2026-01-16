@@ -3,6 +3,7 @@ use crate::widgets::{Headline, UIGenID, UIWidgetState, WidgetId, WidgetKind};
 use crate::{CurrentWidgetState, ExtendedUiConfiguration};
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
+use bevy::ui::FocusPolicy;
 
 #[derive(Component)]
 struct HeadlineBase;
@@ -67,7 +68,7 @@ fn internal_node_creation_system(
                 TextFont::default(),
                 TextLayout::default(),
                 ZIndex::default(),
-                Pickable::default(),
+                FocusPolicy::default(),
                 css_source,
                 TagName(format!("{}", headline.h_type.to_string())),
                 RenderLayers::layer(*layer),

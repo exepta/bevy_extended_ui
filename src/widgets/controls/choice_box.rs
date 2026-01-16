@@ -11,6 +11,7 @@ use bevy::camera::visibility::RenderLayers;
 use bevy::ecs::relationship::RelatedSpawnerCommands;
 use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
 use bevy::prelude::*;
+use bevy::ui::FocusPolicy;
 
 #[derive(Component)]
 struct ChoiceBase;
@@ -119,7 +120,7 @@ fn internal_node_creation_system(
                     Val::Px(0.),
                 ),
                 ZIndex::default(),
-                Pickable::default(),
+                FocusPolicy::default(),
                 css_source.clone(),
                 TagName("select".to_string()),
                 RenderLayers::layer(*layer),
@@ -141,7 +142,7 @@ fn internal_node_creation_system(
                     UIWidgetState::default(),
                     css_source.clone(),
                     CssClass(vec!["select-label".to_string()]),
-                    Pickable::IGNORE,
+                    FocusPolicy::Pass,
                     RenderLayers::layer(*layer),
                     OverlayLabel,
                     BindToID(id.0),
@@ -252,7 +253,7 @@ fn internal_node_creation_system(
                                                 String::from("option-icon"),
                                                 String::from("option-text"),
                                             ]),
-                                            Pickable::IGNORE,
+                                            FocusPolicy::Pass,
                                             RenderLayers::layer(*layer),
                                             BindToID(id.0),
                                         ));
@@ -276,7 +277,7 @@ fn internal_node_creation_system(
                                         IgnoreParentState,
                                         css_source.clone(),
                                         CssClass(vec![String::from("option-text")]),
-                                        Pickable::IGNORE,
+                                        FocusPolicy::Pass,
                                         RenderLayers::layer(*layer),
                                         BindToID(id.0),
                                     ));
@@ -691,7 +692,7 @@ fn on_internal_option_cursor_leave(
 ///
 /// These nodes are styled via CSS classes (`"option-selected"`, `"option-sel-text"`, and `"option-drop-box"`)
 /// and tied to the owning widget via [`BindToID`]. They are rendered on the same [`RenderLayers`] level
-/// as the parent `ChoiceBox` and ignore pointer interaction via [`Pickable::IGNORE`].
+/// as the parent `ChoiceBox` and ignore pointer interaction via [`FocusPolicy::Pass`].
 ///
 /// # Parameters
 /// - `builder`: The [`RelatedSpawnerCommands`] to create children in the current entity hierarchy.
@@ -712,7 +713,7 @@ fn on_internal_option_cursor_leave(
 ///
 /// # Components Added:
 /// - [`Name`], [`Node`], [`BackgroundColor`], [`ImageNode`], [`BorderColor`], [`BorderRadius`]
-/// - [`UIWidgetState`], [`CssSource`], [`CssClass`], [`RenderLayers`], [`Pickable`], [`BindToID`]
+/// - [`UIWidgetState`], [`CssSource`], [`CssClass`], [`RenderLayers`], [`FocusPolicy`], [`BindToID`]
 /// - Marker: [`SelectedOptionBase`], [`DropBase`]
 fn generate_child_selected_option(
     builder: &mut RelatedSpawnerCommands<ChildOf>,
@@ -737,7 +738,7 @@ fn generate_child_selected_option(
             css_source.clone(),
             CssClass(vec![String::from("option-selected")]),
             RenderLayers::layer(*layer),
-            Pickable::IGNORE,
+            FocusPolicy::Pass,
             BindToID(*id),
             SelectedOptionBase,
         ))
@@ -754,7 +755,7 @@ fn generate_child_selected_option(
                 IgnoreParentState,
                 css_source.clone(),
                 CssClass(vec![String::from("option-sel-text")]),
-                Pickable::IGNORE,
+                FocusPolicy::Pass,
                 RenderLayers::layer(*layer),
                 BindToID(*id),
             ));
@@ -772,7 +773,7 @@ fn generate_child_selected_option(
             css_source.clone(),
             CssClass(vec![String::from("option-drop-box")]),
             RenderLayers::layer(*layer),
-            Pickable::IGNORE,
+            FocusPolicy::Pass,
             BindToID(*id),
             DropBase,
         ))
@@ -797,7 +798,7 @@ fn generate_child_selected_option(
                 UIWidgetState::default(),
                 css_source.clone(),
                 CssClass(vec![String::from("option-drop-icon")]),
-                Pickable::IGNORE,
+                FocusPolicy::Pass,
                 RenderLayers::layer(*layer),
                 BindToID(*id),
             ));

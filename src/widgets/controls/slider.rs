@@ -1,7 +1,7 @@
 use bevy::camera::visibility::RenderLayers;
 use bevy::ecs::query::QueryFilter;
 use bevy::prelude::*;
-use bevy::ui::RelativeCursorPosition;
+use bevy::ui::{FocusPolicy, RelativeCursorPosition};
 use bevy::window::PrimaryWindow;
 
 use crate::styles::components::UiStyle;
@@ -78,7 +78,7 @@ fn internal_node_creation_system(
                 RenderLayers::layer(layer),
                 SliderNeedInit,
                 SliderBase,
-                Pickable::default(),
+                FocusPolicy::default(),
             ))
             .insert((
                 ImageNode::default(),
@@ -108,7 +108,7 @@ fn internal_node_creation_system(
                         css_source.clone(),
                         CssClass(vec!["slider-track".to_string()]),
                         RenderLayers::layer(layer),
-                        Pickable::default(),
+                        FocusPolicy::default(),
                         SliderTrackContainer,
                         BindToID(id.0),
                     ))
@@ -134,7 +134,7 @@ fn internal_node_creation_system(
                                 css_source.clone(),
                                 CssClass(vec!["track-fill".to_string()]),
                                 RenderLayers::layer(layer),
-                                Pickable::IGNORE,
+                                FocusPolicy::Pass,
                                 SliderTrackFill,
                                 BindToID(id.0),
                             ))
@@ -152,7 +152,7 @@ fn internal_node_creation_system(
                                 css_source.clone(),
                                 CssClass(vec!["thumb".to_string()]),
                                 RenderLayers::layer(layer),
-                                Pickable::default(),
+                                FocusPolicy::default(),
                                 SliderThumb {
                                     current_center_x: 0.0,
                                 },

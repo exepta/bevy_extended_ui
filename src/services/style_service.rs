@@ -6,6 +6,7 @@ use crate::styles::{FontWeight, Style};
 use crate::styles::components::UiStyle;
 use crate::widgets::UIWidgetState;
 use bevy::prelude::*;
+use bevy::ui::FocusPolicy;
 
 pub struct StyleService;
 
@@ -19,6 +20,7 @@ impl Plugin for StyleService {
 }
 
 pub fn update_widget_styles_system(
+    mut commands: Commands,
     mut query: Query<
         (
             Entity,
@@ -39,7 +41,7 @@ pub fn update_widget_styles_system(
         Option<&mut TextLayout>,
         Option<&mut ImageNode>,
         Option<&mut ZIndex>,
-        Option<&mut Pickable>,
+        Option<&mut FocusPolicy>,
     )>,
     asset_server: Res<AssetServer>,
     mut image_cache: ResMut<ImageCache>,
@@ -105,18 +107,18 @@ pub fn update_widget_styles_system(
         }
 
         if let Ok((
-            node,
-            background,
-            border_color,
-            border_radius,
-            box_shadow,
-            text_color,
-            text_font,
-            text_layout,
-            image_node,
-            z_index,
-            pick_able,
-        )) = style_query.get_mut(entity)
+                      node,
+                      background,
+                      border_color,
+                      border_radius,
+                      box_shadow,
+                      text_color,
+                      text_font,
+                      text_layout,
+                      image_node,
+                      z_index,
+                      focus_policy,
+                  )) = style_query.get_mut(entity)
         {
             apply_style_to_node(&final_style, node);
 
@@ -203,12 +205,23 @@ pub fn update_widget_styles_system(
                 index.0 = final_style.z_index.unwrap_or(0);
             }
 
-            if let Some(mut pick) = pick_able {
-                let old_pick = pick.clone();
-                *pick = final_style.pointer_events.unwrap_or(Pickable {
-                    is_hoverable: old_pick.is_hoverable,
-                    should_block_lower: old_pick.should_block_lower,
-                });
+            if let Some(mut fp) = focus_policy {
+                let old = *fp;
+                *fp = match final_style.pointer_events {
+                    Some(pe) if pe == FocusPolicy::Pass => FocusPolicy::Pass, // pointer-events: none
+                    Some(_) => FocusPolicy::Block,                           // pointer-events: auto
+                    None => old,                                             // keep previous
+                };
+            } else {
+                // If an entity doesn't have a FocusPolicy yet, insert one when relevant.
+                if let Some(pe) = &final_style.pointer_events {
+                    let fp = if *pe == FocusPolicy::Pass {
+                        FocusPolicy::Pass
+                    } else {
+                        FocusPolicy::Block
+                    };
+                    commands.entity(entity).insert(fp);
+                }
             }
         }
     }

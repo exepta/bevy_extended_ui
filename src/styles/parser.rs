@@ -6,6 +6,7 @@ use lightningcss::stylesheet::{ParserOptions, PrinterOptions, StyleSheet};
 use lightningcss::traits::ToCss;
 use regex::Regex;
 use std::collections::HashMap;
+use bevy::ui::FocusPolicy;
 
 /// Loads a CSS file and parses it into a [`HashMap`] of selectors to [`Style`] structs.
 ///
@@ -974,11 +975,11 @@ pub fn convert_to_bevy_line_break(value: String) -> Option<LineBreak> {
 /// let pickable = convert_to_bevy_pick_able("none".to_string());
 /// assert_eq!(pickable, Some(Pickable::IGNORE));
 /// ```
-pub fn convert_to_bevy_pick_able(value: String) -> Option<Pickable> {
+pub fn convert_to_bevy_pick_able(value: String) -> Option<FocusPolicy> {
     let trimmed = value.trim();
     match trimmed {
-        "none" => Some(Pickable::IGNORE),
-        _ => Some(Pickable::default()),
+        "none" => Some(FocusPolicy::Pass),
+        _ => Some(FocusPolicy::Block),
     }
 }
 

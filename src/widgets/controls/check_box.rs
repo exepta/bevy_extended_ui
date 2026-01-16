@@ -5,6 +5,7 @@ use crate::widgets::{BindToID, CheckBox, UIGenID, UIWidgetState, WidgetId, Widge
 use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
+use bevy::ui::FocusPolicy;
 
 #[derive(Component)]
 struct CheckBoxBase;
@@ -88,7 +89,7 @@ fn internal_node_creation_system(
                     Val::Px(0.),
                 ),
                 ZIndex::default(),
-                Pickable::default(),
+                FocusPolicy::default(),
                 css_source.clone(),
                 TagName(String::from("checkbox")),
                 RenderLayers::layer(*layer),
@@ -117,7 +118,7 @@ fn internal_node_creation_system(
                         css_source.clone(),
                         widget_state.clone(),
                         CssClass(vec!["mark-box".to_string()]),
-                        Pickable::IGNORE,
+                        FocusPolicy::Pass,
                         BindToID(id.0),
                         RenderLayers::layer(*layer),
                         CheckBoxMark,
@@ -132,7 +133,7 @@ fn internal_node_creation_system(
                         css_source.clone(),
                         widget_state.clone(),
                         CssClass(vec!["check-text".to_string()]),
-                        Pickable::IGNORE,
+                        FocusPolicy::Pass,
                         BindToID(id.0),
                         RenderLayers::layer(*layer),
                         CheckBoxLabel
@@ -204,7 +205,7 @@ fn on_internal_click(
                                 height: Val::Px(height),
                                 ..default()
                             },
-                            Pickable::IGNORE,
+                            FocusPolicy::Pass,
                             css_source.clone(),
                             current_state.clone(),
                             CssClass(vec!["mark".to_string()]),

@@ -1,5 +1,6 @@
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
+use bevy::ui::FocusPolicy;
 use bevy::window::PrimaryWindow;
 use crate::ExtendedUiConfiguration;
 use crate::styles::{CssClass, CssSource, TagName};
@@ -55,7 +56,7 @@ fn internal_node_creation_system(
                 BorderRadius::default(),
                 BoxShadow::new(Colored::TRANSPARENT, Val::Px(0.), Val::Px(0.), Val::Px(0.), Val::Px(0.)),
                 ZIndex::default(),
-                Pickable::IGNORE, // read-only
+                FocusPolicy::Pass,
                 css_source.clone(),
                 TagName(String::from("progressbar")),
                 RenderLayers::layer(layer),
@@ -76,7 +77,7 @@ fn internal_node_creation_system(
                     RenderLayers::layer(layer),
                     css_source.clone(),
                     CssClass(vec!["progress".to_string()]),
-                    Pickable::IGNORE,
+                    FocusPolicy::Pass,
                     ProgressBarTrack,
                     BindToID(id.0),
                 ));

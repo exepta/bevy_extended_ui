@@ -6,6 +6,7 @@ use crate::widgets::{
 use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
+use bevy::ui::FocusPolicy;
 
 #[derive(Component)]
 struct SwitchButtonBase;
@@ -75,7 +76,7 @@ fn internal_node_creation_system(
                     Val::Px(0.),
                 ),
                 ZIndex::default(),
-                Pickable::default(),
+                FocusPolicy::default(),
                 css_source.clone(),
                 TagName(String::from("switch")),
                 RenderLayers::layer(*layer),
@@ -94,7 +95,7 @@ fn internal_node_creation_system(
                         css_source.clone(),
                         UIWidgetState::default(),
                         CssClass(vec!["switch-track".to_string()]),
-                        Pickable::IGNORE,
+                        FocusPolicy::Pass,
                         BindToID(id.0),
                         RenderLayers::layer(*layer),
                         SwitchButtonTrack,
@@ -110,7 +111,7 @@ fn internal_node_creation_system(
                                 css_source.clone(),
                                 UIWidgetState::default(),
                                 CssClass(vec!["switch-dot".to_string()]),
-                                Pickable::IGNORE,
+                                FocusPolicy::Pass,
                                 BindToID(id.0),
                                 RenderLayers::layer(*layer),
                                 SwitchButtonDot,
@@ -127,7 +128,7 @@ fn internal_node_creation_system(
                                         UIWidgetState::default(),
                                         css_source.clone(),
                                         CssClass(vec!["icon-dot".to_string()]),
-                                        Pickable::IGNORE,
+                                        FocusPolicy::Pass,
                                         BindToID(id.0),
                                         RenderLayers::layer(*layer),
                                     ));
@@ -144,7 +145,7 @@ fn internal_node_creation_system(
                     css_source.clone(),
                     UIWidgetState::default(),
                     CssClass(vec!["switch-text".to_string()]),
-                    Pickable::IGNORE,
+                    FocusPolicy::Pass,
                     BindToID(id.0),
                     RenderLayers::layer(*layer),
                     SwitchButtonLabel,

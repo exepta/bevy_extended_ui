@@ -1,7 +1,7 @@
 use bevy::camera::visibility::RenderLayers;
 use bevy::ecs::query::QueryFilter;
 use bevy::prelude::*;
-use bevy::ui::{RelativeCursorPosition, ScrollPosition};
+use bevy::ui::{FocusPolicy, RelativeCursorPosition, ScrollPosition};
 use bevy::window::PrimaryWindow;
 
 use crate::styles::components::UiStyle;
@@ -82,7 +82,7 @@ fn internal_node_creation_system(
                 },
                 TagName(String::from("scroll")),
                 RenderLayers::layer(layer),
-                Pickable::default(),
+                FocusPolicy::default(),
                 UIWidgetState::default(),
             ))
             .insert((
@@ -116,7 +116,7 @@ fn internal_node_creation_system(
                             "scroll-track".to_string(),
                         ]),
                         RenderLayers::layer(layer),
-                        Pickable::default(),
+                        FocusPolicy::default(),
                         ScrollTrack,
                         BindToID(scroll.entry),
                     ))
@@ -142,7 +142,7 @@ fn internal_node_creation_system(
                                     },
                                 ]),
                                 RenderLayers::layer(layer),
-                                Pickable::default(),
+                                FocusPolicy::default(),
                                 ScrollThumb { current_center: 0.0 },
                                 BindToID(scroll.entry),
                             ))

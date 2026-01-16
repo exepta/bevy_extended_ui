@@ -3,6 +3,7 @@ use crate::widgets::{Body, UIGenID, UIWidgetState, WidgetId, WidgetKind};
 use crate::{CurrentWidgetState, ExtendedUiConfiguration};
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
+use bevy::ui::FocusPolicy;
 
 #[derive(Component)]
 struct BodyBase;
@@ -45,7 +46,7 @@ fn internal_node_creation_system(
                 BackgroundColor::default(),
                 ImageNode::default(),
                 ZIndex::default(),
-                Pickable::default(),
+                FocusPolicy::default(),
                 css_source,
                 TagName("body".to_string()),
                 RenderLayers::layer(*layer),
