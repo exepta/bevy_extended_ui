@@ -1,7 +1,6 @@
 use bevy::asset::LoadState;
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
-
 use crate::services::image_service::get_or_load_image;
 use crate::styles::paint::Colored;
 use crate::styles::{CssSource, TagName};

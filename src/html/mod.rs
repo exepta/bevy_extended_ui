@@ -293,7 +293,7 @@ pub enum HtmlWidgetNode {
 #[derive(Resource)]
 pub struct HtmlStructureMap {
     pub html_map: HashMap<String, Vec<HtmlWidgetNode>>,
-    pub active: Option<String>,
+    pub active: Option<Vec<String>>,
 }
 
 impl Default for HtmlStructureMap {

@@ -12,8 +12,10 @@ fn main() {
     let mut app = make_app("Debug Html UI - test");
 
     app.add_systems(Startup, |mut reg: ResMut<UiRegistry>, asset_server: Res<AssetServer>| {
-        let handle: Handle<HtmlAsset> = asset_server.load("examples/switch_button.html");
-        reg.add_and_use("switch_button_test".to_string(), HtmlSource::from_handle(handle));
+        let switch_button_test_handle: Handle<HtmlAsset> = asset_server.load("examples/switch_button.html");
+
+        reg.add("switch_button_test".to_string(), HtmlSource::from_handle(switch_button_test_handle));
+        reg.use_uis(vec!["switch_button_test".to_string()]);
     });
 
     app.run();
