@@ -3,7 +3,6 @@ use std::time::Duration;
 
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
-
 use crate::styles::components::UiStyle;
 use crate::styles::paint::Colored;
 use crate::styles::{Background, CssClass, CssSource, FontVal, TagName};

@@ -2,9 +2,12 @@ use std::collections::HashMap;
 
 use bevy::asset::AssetEvent;
 use bevy::prelude::*;
-use kuchiki::{NodeRef, traits::TendrilSink, Attributes};
+use kuchiki::{traits::TendrilSink, Attributes, NodeRef};
 
-use crate::html::{HtmlDirty, HtmlEventBindings, HtmlID, HtmlMeta, HtmlSource, HtmlStates, HtmlStructureMap, HtmlStyle, HtmlSystemSet, HtmlWidgetNode};
+use crate::html::{
+    HtmlDirty, HtmlEventBindings, HtmlID, HtmlMeta, HtmlSource, HtmlStates, HtmlStructureMap,
+    HtmlStyle, HtmlSystemSet, HtmlWidgetNode,
+};
 use crate::io::{CssAsset, DefaultCssHandle, HtmlAsset};
 use crate::styles::IconPlace;
 use crate::widgets::Button;
@@ -20,9 +23,15 @@ impl Plugin for HtmlConverterSystem {
     }
 }
 
+/// Marker component used for HtmlSource entities whose HtmlAsset wasn't ready yet.
+/// This enables robust re-try parsing on later frames (important for WASM async loading).
+#[derive(Component, Debug, Default)]
+struct PendingHtmlParse;
+
 /// Converts HtmlAsset content into HtmlStructureMap entries.
 /// Also resolves <link rel="stylesheet" href="..."> into Handle<CssAsset>.
 fn update_html_ui(
+    mut commands: Commands,
     mut structure_map: ResMut<HtmlStructureMap>,
     mut html_dirty: ResMut<HtmlDirty>,
 
@@ -32,15 +41,19 @@ fn update_html_ui(
     default_css: Res<DefaultCssHandle>,
 
     query_added: Query<(Entity, &HtmlSource), Added<HtmlSource>>,
+    query_pending: Query<Entity, With<PendingHtmlParse>>,
     query_all: Query<(Entity, &HtmlSource)>,
 ) {
-    // Entities that need reparse (new HtmlSource or modified HtmlAsset).
+    // Entities that need reparse (new HtmlSource, pending retry, or changed HtmlAsset).
     let mut dirty_entities: Vec<Entity> = query_added.iter().map(|(e, _)| e).collect();
+    dirty_entities.extend(query_pending.iter());
 
-    // If an HtmlAsset changed, find all entities referencing it.
+    // If an HtmlAsset changed OR was added later (async), find all entities referencing it.
     for ev in html_asset_events.read() {
         let id = match ev {
-            AssetEvent::Modified { id } | AssetEvent::Removed { id } => *id,
+            AssetEvent::Added { id }
+            | AssetEvent::Modified { id }
+            | AssetEvent::Removed { id } => *id,
             _ => continue,
         };
 
@@ -64,9 +77,13 @@ fn update_html_ui(
         };
 
         let Some(html_asset) = html_assets.get(&html.handle) else {
-            // Asset isn't ready yet.
+            // Asset isn't ready yet (common on WASM). Mark entity for retry.
+            commands.entity(entity).insert(PendingHtmlParse);
             continue;
         };
+
+        // Asset is ready -> ensure we don't keep a retry flag.
+        commands.entity(entity).remove::<PendingHtmlParse>();
 
         let content = html_asset.html.clone();
         let document = kuchiki::parse_html().one(content);
@@ -80,6 +97,19 @@ fn update_html_ui(
             error!("Missing <meta name=...> tag in <head>");
             continue;
         };
+
+        let ui_key = if html.source_id.is_empty() {
+            meta_key.clone()
+        } else {
+            html.source_id.clone()
+        };
+
+        if ui_key != meta_key {
+            debug!(
+                "Using registry key '{}' instead of meta name '{}'",
+                ui_key, meta_key
+            );
+        }
 
         // Optional controller path from <meta controller="...">
         let meta_controller = document
@@ -119,16 +149,13 @@ fn update_html_ui(
 
         css_handles = with_default_css_first(&default_css, css_handles);
 
-        // Mark this UI as active.
-        structure_map.active = Some(meta_key.clone());
-
         // Parse body
         let Ok(body_node) = document.select_first("body") else {
             error!("Missing <body> tag!");
             continue;
         };
 
-        debug!("Create UI for HTML with key [{:?}]", meta_key);
+        debug!("Create UI for HTML with key [{:?}]", ui_key);
         if !meta_controller.is_empty() {
             debug!("UI controller [{:?}]", meta_controller);
         }
@@ -139,10 +166,10 @@ fn update_html_ui(
             body_node.as_node(),
             &css_handles,
             &label_map,
-            &meta_key,
+            &ui_key,
             html,
         ) {
-            structure_map.html_map.insert(meta_key, vec![body_widget]);
+            structure_map.html_map.insert(ui_key, vec![body_widget]);
 
             // IMPORTANT: Explicitly mark UI as dirty so the builder rebuilds.
             html_dirty.0 = true;
@@ -223,10 +250,8 @@ fn parse_html_node(
         }
 
         "checkbox" => {
-            // Checkbox with label and optional icon
             let label = node.text_contents().trim().to_string();
-            let icon_path = attributes
-                .get("icon");
+            let icon_path = attributes.get("icon");
             let icon = icon_path.map(String::from);
             Some(HtmlWidgetNode::CheckBox(
                 CheckBox {
@@ -404,10 +429,7 @@ fn parse_html_node(
             let src_resolved = if src_raw.trim().is_empty() {
                 None
             } else {
-                Some(resolve_relative_asset_path(
-                    &html.get_source_path(),
-                    &src_raw,
-                ))
+                Some(resolve_relative_asset_path(&html.get_source_path(), &src_raw))
             };
 
             Some(HtmlWidgetNode::Img(
@@ -441,6 +463,7 @@ fn parse_html_node(
             } else {
                 None
             };
+
             let cap = match attributes.get("maxlength") {
                 Some(value) if value.trim().eq_ignore_ascii_case("auto") => InputCap::CapAtNodeSize,
                 Some(value) if value.trim().is_empty() => InputCap::NoCap,
@@ -503,7 +526,13 @@ fn parse_html_node(
                     min,
                     max,
                     ..default()
-                }, meta, states, functions, widget.clone(), HtmlID::default()))
+                },
+                meta,
+                states,
+                functions,
+                widget.clone(),
+                HtmlID::default(),
+            ))
         }
 
         "radio" => {
@@ -529,12 +558,11 @@ fn parse_html_node(
         "scroll" => {
             let alignment = attributes.get("alignment").unwrap_or("vertical");
             let mut vertical = true;
-            if alignment.eq_ignore_ascii_case("horizontal") { vertical = false; }
+            if alignment.eq_ignore_ascii_case("horizontal") {
+                vertical = false;
+            }
             Some(HtmlWidgetNode::Scrollbar(
-                Scrollbar {
-                    vertical,
-                    ..default()
-                },
+                Scrollbar { vertical, ..default() },
                 meta,
                 states,
                 functions,
@@ -544,7 +572,6 @@ fn parse_html_node(
         }
 
         "select" => {
-            // Parse dropdown options and selected value
             let mut options = Vec::new();
             let mut selected_value = None;
 
@@ -577,8 +604,7 @@ fn parse_html_node(
                 }
             }
 
-            let value =
-                selected_value.unwrap_or_else(|| options.first().cloned().unwrap_or_default());
+            let value = selected_value.unwrap_or_else(|| options.first().cloned().unwrap_or_default());
 
             Some(HtmlWidgetNode::ChoiceBox(
                 ChoiceBox {
@@ -595,7 +621,6 @@ fn parse_html_node(
         }
 
         "slider" => {
-            // Parse slider attributes: min, max, value, step
             let min = attributes
                 .get("min")
                 .and_then(|v| v.parse::<f32>().ok())
@@ -676,19 +701,19 @@ fn parse_html_node(
                 HtmlID::default(),
             ))
         }
+
         _ => None,
     }
 }
 
 fn bind_html_func(attributes: &Attributes) -> HtmlEventBindings {
-    let functions = HtmlEventBindings {
+    HtmlEventBindings {
         onclick: attributes.get("onclick").map(|s| s.to_string()),
         onmouseover: attributes.get("onmouseenter").map(|s| s.to_string()),
         onmouseout: attributes.get("onmouseleave").map(|s| s.to_string()),
         onchange: attributes.get("onchange").map(|s| s.to_string()),
         oninit: attributes.get("oninit").map(|s| s.to_string()),
-    };
-    functions
+    }
 }
 
 /// Collects mappings from <label for="..."> to its label text.

@@ -50,25 +50,28 @@ pub fn build_html_source(
     }
     html_dirty.0 = false;
 
-    let Some(active) = structure_map.active.clone() else {
+    let Some(active_list) = structure_map.active.as_ref() else {
         return;
     };
 
     // Despawn the old active UI (recursive).
     for (entity, body) in body_query.iter() {
-        if body.html_key.as_deref() == Some(active.as_str()) {
-            commands.entity(entity).despawn();
+        if let Some(key) = body.html_key.as_deref() {
+            if active_list.iter().any(|active| active == key) {
+                commands.entity(entity).despawn();
+            }
         }
     }
 
-    // Spawn the new active UI from the structure map.
-    spawn_structure_for_active(
-        &mut commands,
-        &active,
-        &structure_map,
-        &asset_server,
-        &mut event_writer,
-    );
+    for active in active_list {
+        spawn_structure_for_active(
+            &mut commands,
+            active,
+            &structure_map,
+            &asset_server,
+            &mut event_writer,
+        );
+    }
 }
 
 fn spawn_structure_for_active(
@@ -108,28 +111,37 @@ fn show_all_widgets_finish(
     mut event_writer: MessageWriter<HtmlAllWidgetsVisible>,
 ) {
     if timer.active && timer.timer.tick(time.delta()).is_finished() {
-        if let Some(active) = structure_map.active.clone() {
-            for body in current_body.iter() {
-                if let Some(bind) = body.html_key.clone() {
-                    if bind.eq(&active) {
-                        if let Some(map_nodes) = structure_map.html_map.get(active.as_str()) {
-                            let mut valid_ids = Vec::new();
-                            collect_html_ids(map_nodes, &mut valid_ids);
+        let Some(active_list) = structure_map.active.as_ref() else {
+            return;
+        };
 
-                            for (mut visibility, widget_id) in query.iter_mut() {
-                                if valid_ids.contains(widget_id) {
-                                    *visibility = Visibility::Inherited;
-                                }
-                            }
+        let mut valid_ids = Vec::new();
+        for active in active_list {
+            if let Some(map_nodes) = structure_map.html_map.get(active.as_str()) {
+                collect_html_ids(map_nodes, &mut valid_ids);
+            }
+        }
 
-                            timer.active = false;
-                            event_writer.write(HtmlAllWidgetsVisible);
-                            debug!(
-                                "All widgets for '{}' are now visible after 100ms delay",
-                                active
-                            );
+        if valid_ids.is_empty() {
+            return;
+        }
+
+        for body in current_body.iter() {
+            if let Some(bind) = body.html_key.as_ref() {
+                if active_list.iter().any(|active| active == bind) {
+                    for (mut visibility, widget_id) in query.iter_mut() {
+                        if valid_ids.contains(widget_id) {
+                            *visibility = Visibility::Inherited;
                         }
                     }
+
+                    timer.active = false;
+                    event_writer.write(HtmlAllWidgetsVisible);
+                    debug!(
+                        "All widgets for '{:?}' are now visible after 100ms delay",
+                        active_list
+                    );
+                    break;
                 }
             }
         }

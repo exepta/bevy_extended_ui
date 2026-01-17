@@ -1,4 +1,4 @@
-use bevy_extended_ui::html::{HtmlEvent, HtmlEventObject};
+use bevy_extended_ui::html::HtmlEvent;
 use bevy::prelude::*;
 use bevy_extended_ui::example_utils::make_app;
 use bevy_extended_ui::html::HtmlSource;
