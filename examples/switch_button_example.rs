@@ -13,11 +13,9 @@ fn main() {
 
     app.add_systems(Startup, |mut reg: ResMut<UiRegistry>, asset_server: Res<AssetServer>| {
         let switch_button_test_handle: Handle<HtmlAsset> = asset_server.load("examples/switch_button.html");
-        let overlay_test_handle: Handle<HtmlAsset> = asset_server.load("examples/overlay_ui.html");
 
         reg.add("switch_button_test".to_string(), HtmlSource::from_handle(switch_button_test_handle));
-        reg.add("overlay_ui".to_string(), HtmlSource::from_handle(overlay_test_handle));
-        reg.use_uis(vec!["switch_button_test".to_string(), "overlay_ui".to_string()]);
+        reg.use_uis(vec!["switch_button_test".to_string()]);
     });
 
     app.run();
