@@ -32,7 +32,6 @@ pub fn update_widget_styles_system(
         Option<&mut Node>,
         Option<&mut BackgroundColor>,
         Option<&mut BorderColor>,
-        Option<&mut BorderRadius>,
         Option<&mut BoxShadow>,
         Option<&mut TextColor>,
         Option<&mut TextFont>,
@@ -108,7 +107,6 @@ pub fn update_widget_styles_system(
                       node,
                       background,
                       border_color,
-                      border_radius,
                       box_shadow,
                       text_color,
                       text_font,
@@ -126,20 +124,6 @@ pub fn update_widget_styles_system(
                     .clone()
                     .map(|b| b.color)
                     .unwrap_or(Color::NONE);
-            }
-
-            if let Some(mut br) = border_radius {
-                if let Some(radius) = final_style.border_radius.clone() {
-                    br.top_left = radius.top_left;
-                    br.top_right = radius.top_right;
-                    br.bottom_left = radius.bottom_left;
-                    br.bottom_right = radius.bottom_right;
-                } else {
-                    br.top_left = Val::ZERO;
-                    br.top_right = Val::ZERO;
-                    br.bottom_left = Val::ZERO;
-                    br.bottom_right = Val::ZERO;
-                }
             }
 
             if let Some(mut bc) = border_color {
@@ -307,6 +291,22 @@ fn apply_style_to_node(style: &Style, node: Option<Mut<Node>>) {
         node.padding = style.padding.unwrap_or_default();
         node.margin = style.margin.unwrap_or_default();
         node.border = style.border.unwrap_or_default();
+
+        let mut br = node.border_radius;
+
+        if let Some(radius) = style.border_radius.clone() {
+            br.top_left = radius.top_left;
+            br.top_right = radius.top_right;
+            br.bottom_left = radius.bottom_left;
+            br.bottom_right = radius.bottom_right;
+        } else {
+            br.top_left = Val::ZERO;
+            br.top_right = Val::ZERO;
+            br.bottom_left = Val::ZERO;
+            br.bottom_right = Val::ZERO;
+        }
+        
+        node.border_radius = br;
         node.justify_content = style.justify_content.unwrap_or_default();
         node.align_items = style.align_items.unwrap_or_default();
         node.overflow = style.overflow.unwrap_or_default();

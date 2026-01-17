@@ -83,7 +83,6 @@ fn internal_node_creation_system(
                 ImageNode::default(),
                 BackgroundColor::default(),
                 BorderColor::default(),
-                BorderRadius::default(),
                 BoxShadow::new(
                     Colored::TRANSPARENT,
                     Val::Px(0.),
@@ -234,7 +233,6 @@ fn ensure_div_scroll_structure(
                     ImageNode::default(),
                     BackgroundColor::default(),
                     BorderColor::default(),
-                    BorderRadius::default(),
                     Pickable::default(),
                 ))
                 .id();
@@ -286,7 +284,6 @@ fn ensure_div_scroll_structure(
                     ImageNode::default(),
                     BackgroundColor::default(),
                     BorderColor::default(),
-                    BorderRadius::default(),
                     Pickable::default(),
                 ))
                 .id();

@@ -95,7 +95,6 @@ fn internal_node_creation_system(
                 BackgroundColor::default(),
                 ImageNode::default(),
                 BorderColor::default(),
-                BorderRadius::default(),
                 BoxShadow::new(
                     Colored::TRANSPARENT,
                     Val::Px(0.),

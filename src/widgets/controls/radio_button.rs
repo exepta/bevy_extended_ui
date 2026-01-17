@@ -90,7 +90,6 @@ fn internal_node_creation_system(
                 BackgroundColor::default(),
                 ImageNode::default(),
                 BorderColor::default(),
-                BorderRadius::default(),
                 BoxShadow::new(
                     Colored::TRANSPARENT,
                     Val::Px(0.),
@@ -111,7 +110,6 @@ fn internal_node_creation_system(
                         BackgroundColor::default(),
                         ImageNode::default(),
                         BorderColor::default(),
-                        BorderRadius::default(),
                         BoxShadow::new(
                             Colored::TRANSPARENT,
                             Val::Px(0.),
@@ -362,7 +360,6 @@ fn add_checked_dot_to_radio(
                 },
                 BackgroundColor::default(),
                 BorderColor::default(),
-                BorderRadius::default(),
                 Pickable::IGNORE,
                 css_source.clone(),
                 UIWidgetState::default(),

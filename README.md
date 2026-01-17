@@ -36,8 +36,8 @@ There are many other things, but currently you can use the core (HTML / CSS) fea
 Add this to your `Cargo.toml`:
 ```toml
 [dependencies]
-bevy_extended_ui = "1.1.0"
-bevy_extended_ui_macros = "1.1.0"
+bevy_extended_ui = "1.2.0"
+bevy_extended_ui_macros = "1.2.0"
 ```
 
 Then, you add the plugin to your `main.rs` or on any point at a build function:
@@ -169,10 +169,12 @@ If anyone has any ideas, I'd be happy to hear them.
 
 | `Bevy` version | `bevy_extended_ui` version |
 |----------------|----------------------------|
-| 0.17.3         | 1.0.0 - 1.1.0              |
-| 0.16.1         | 0.1.0 - 0.2.2              |
+| 0.18.0         | 1.2.0                      |
+| 0.17.0         | 1.0.0 - 1.1.0              |
 | 0.16.0         | 0.1.0 - 0.2.2              |
 
 ### Important Links
 
 [Link to Widget attributes](WIDGETS.md)
+<br>
+[Link to Patches](PATCH.md)
