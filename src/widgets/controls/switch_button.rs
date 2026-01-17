@@ -66,7 +66,6 @@ fn internal_node_creation_system(
                 BackgroundColor::default(),
                 ImageNode::default(),
                 BorderColor::default(),
-                BorderRadius::default(),
                 BoxShadow::new(
                     Colored::TRANSPARENT,
                     Val::Px(0.),
@@ -90,7 +89,6 @@ fn internal_node_creation_system(
                         },
                         BackgroundColor::default(),
                         BorderColor::default(),
-                        BorderRadius::default(),
                         css_source.clone(),
                         UIWidgetState::default(),
                         CssClass(vec!["switch-track".to_string()]),
@@ -106,7 +104,6 @@ fn internal_node_creation_system(
                                 Node::default(),
                                 BackgroundColor::default(),
                                 BorderColor::default(),
-                                BorderRadius::default(),
                                 css_source.clone(),
                                 UIWidgetState::default(),
                                 CssClass(vec!["switch-dot".to_string()]),

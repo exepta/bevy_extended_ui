@@ -46,7 +46,6 @@ fn internal_node_creation_system(
             Pickable::IGNORE,
             BackgroundColor::default(),
             BorderColor::default(),
-            BorderRadius::default(),
             css_source,
             TagName("divider".to_string()),
             CssClass(vec![align_class.to_string()]),
