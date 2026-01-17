@@ -98,6 +98,19 @@ fn update_html_ui(
             continue;
         };
 
+        let ui_key = if html.source_id.is_empty() {
+            meta_key.clone()
+        } else {
+            html.source_id.clone()
+        };
+
+        if ui_key != meta_key {
+            debug!(
+                "Using registry key '{}' instead of meta name '{}'",
+                ui_key, meta_key
+            );
+        }
+
         // Optional controller path from <meta controller="...">
         let meta_controller = document
             .select_first("head meta[controller]")
@@ -136,16 +149,13 @@ fn update_html_ui(
 
         css_handles = with_default_css_first(&default_css, css_handles);
 
-        // Mark this UI as active.
-        structure_map.active = Some(meta_key.clone());
-
         // Parse body
         let Ok(body_node) = document.select_first("body") else {
             error!("Missing <body> tag!");
             continue;
         };
 
-        debug!("Create UI for HTML with key [{:?}]", meta_key);
+        debug!("Create UI for HTML with key [{:?}]", ui_key);
         if !meta_controller.is_empty() {
             debug!("UI controller [{:?}]", meta_controller);
         }
@@ -156,10 +166,10 @@ fn update_html_ui(
             body_node.as_node(),
             &css_handles,
             &label_map,
-            &meta_key,
+            &ui_key,
             html,
         ) {
-            structure_map.html_map.insert(meta_key, vec![body_widget]);
+            structure_map.html_map.insert(ui_key, vec![body_widget]);
 
             // IMPORTANT: Explicitly mark UI as dirty so the builder rebuilds.
             html_dirty.0 = true;

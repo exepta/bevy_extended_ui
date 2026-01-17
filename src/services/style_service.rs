@@ -105,18 +105,18 @@ pub fn update_widget_styles_system(
         }
 
         if let Ok((
-            node,
-            background,
-            border_color,
-            border_radius,
-            box_shadow,
-            text_color,
-            text_font,
-            text_layout,
-            image_node,
-            z_index,
-            pick_able,
-        )) = style_query.get_mut(entity)
+                      node,
+                      background,
+                      border_color,
+                      border_radius,
+                      box_shadow,
+                      text_color,
+                      text_font,
+                      text_layout,
+                      image_node,
+                      z_index,
+                      pick_able,
+                  )) = style_query.get_mut(entity)
         {
             apply_style_to_node(&final_style, node);
 
@@ -213,7 +213,6 @@ pub fn update_widget_styles_system(
         }
     }
 }
-
 /// Checks whether a CSS selector matches the widget's current UI state.
 ///
 /// # Parameters
