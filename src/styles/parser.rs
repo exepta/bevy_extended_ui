@@ -1,5 +1,8 @@
 use crate::styles::paint::Colored;
-use crate::styles::{Background, FontFamily, FontVal, FontWeight, Radius, Style, StylePair};
+use crate::styles::{
+    Background, FontFamily, FontVal, FontWeight, Radius, Style, StylePair, TransitionProperty,
+    TransitionSpec, TransitionTiming,
+};
 use bevy::prelude::*;
 use lightningcss::rules::CssRule;
 use lightningcss::stylesheet::{ParserOptions, PrinterOptions, StyleSheet};
@@ -58,7 +61,11 @@ pub fn load_css(css: &str) -> HashMap<String, StylePair> {
             let decls = &style_rule.declarations;
 
             if selector.trim() == ":root" {
-                for property in decls.declarations.iter().chain(decls.important_declarations.iter()) {
+                for property in decls
+                    .declarations
+                    .iter()
+                    .chain(decls.important_declarations.iter())
+                {
                     let property_id = property.property_id();
                     let name = property_id.name();
                     if name.starts_with("--") {
@@ -175,6 +182,7 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
         "box-sizing" => style.box_sizing = convert_to_box_sizing(value.to_string()),
         "scroll-width" => style.scrollbar_width = convert_to_f32(value.to_string()),
         "gap" => style.gap = convert_to_val(value.to_string()),
+        "transition" => style.transition = parse_transition(value),
         "justify-content" => {
             style.justify_content = convert_to_bevy_justify_content(value.to_string())
         }
@@ -227,11 +235,13 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
         "font-size" => style.font_size = convert_to_font_size(value.to_string()),
         "font-family" => {
             style.font_family = Some(FontFamily(
-                value.trim()
+                value
+                    .trim()
                     .replace(" ", "")
                     .replace("\"", "")
                     .replace("'", "")
-                    .to_string()));
+                    .to_string(),
+            ));
         }
         "font-weight" => {
             style.font_weight = convert_to_font_weight(value.to_string());
@@ -292,6 +302,68 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
         "pointer-events" => style.pointer_events = convert_to_bevy_pick_able(value.to_string()),
 
         _ => {}
+    }
+}
+
+fn parse_time_seconds(token: &str) -> Option<f32> {
+    let token = token.trim().to_ascii_lowercase();
+    if let Some(value) = token.strip_suffix("ms") {
+        return value.trim().parse::<f32>().ok().map(|v| v / 1000.0);
+    }
+
+    if let Some(value) = token.strip_suffix('s') {
+        return value.trim().parse::<f32>().ok();
+    }
+
+    None
+}
+
+fn parse_transition(value: &str) -> Option<TransitionSpec> {
+    let mut spec = TransitionSpec::default();
+    let mut has_duration = false;
+    let mut has_delay = false;
+    let mut has_property = false;
+
+    for token in value.split_whitespace() {
+        match token.to_ascii_lowercase().as_str() {
+            "all" => {
+                spec.properties = vec![TransitionProperty::All];
+                has_property = true;
+                continue;
+            }
+            "color" => {
+                spec.properties = vec![TransitionProperty::Color];
+                has_property = true;
+                continue;
+            }
+            "background" | "background-color" => {
+                spec.properties = vec![TransitionProperty::Background];
+                has_property = true;
+                continue;
+            }
+            _ => {}
+        }
+
+        if let Some(time) = parse_time_seconds(token) {
+            if !has_duration {
+                spec.duration = time;
+                has_duration = true;
+            } else if !has_delay {
+                spec.delay = time;
+                has_delay = true;
+            }
+            continue;
+        }
+
+        if let Some(timing) = TransitionTiming::from_name(token) {
+            spec.timing = timing;
+        }
+    }
+
+    if has_duration || has_property {
+        Some(spec)
+    } else {
+        None
     }
 }
 
@@ -594,7 +666,7 @@ pub fn convert_to_box_sizing(value: String) -> Option<BoxSizing> {
 /// Accepts 1–4 values (e.g. `"10px"`, `"10px 20px"`, etc.), similar to CSS shorthand.
 /// Uses the same order as CSS:
 /// - 1 value → all corners
-/// - 2 values → top-left & top-right / bottom-right & bottom-left
+/// - 2 values → top-left and top-right / bottom-right and bottom-left
 /// - 3 values → top-left / top-right / bottom-left (bottom-right = 0)
 /// - 4 values → top-left / top-right / bottom-right / bottom-left
 ///
@@ -654,7 +726,7 @@ pub fn convert_to_radius(value: String) -> Option<Radius> {
 ///
 /// Accepts 1–4 values:
 /// - 1 value → all sides
-/// - 2 values → top & bottom / left & right
+/// - 2 values → top and bottom / left and right
 /// - 3 values → left / right / top (bottom = 0)
 /// - 4 values → left / right / top / bottom
 ///
@@ -1006,10 +1078,10 @@ pub fn convert_to_bevy_grid_flow(value: String) -> Option<GridAutoFlow> {
  *
  * Supports values such as
  * - "span N" (where N is a positive integer),
- * - "start/end" (two positive integers separated by a slash),
- * - or a single positive integer (start).
+ * - "start/end" (two positive integers separated by a slash)
+ * - Or a single positive integer (start).
  *
- * @param value The CSS grid placement string as a string slice.
+ * @param value is The CSS grid placement string as a string slice.
  * @return Some(GridPlacement) if the value is valid and parsed, None otherwise.
  */
 pub fn convert_to_bevy_grid_placement(value: String) -> Option<GridPlacement> {
@@ -1119,9 +1191,9 @@ pub fn convert_to_bevy_grid_template(value: String) -> Option<Vec<RepeatedGridTr
  * - "min-content"
  * - "max-content"
  * - "minmax(min, max)"
- * - fixed sizes with units: "100px", "50%", "1fr"
+ * - fixed sizes with units: "100px", "50%"
  *
- * @param input The CSS grid track string.
+ * @param input is The CSS grid track string.
  * @return Some(GridTrack) if parsing succeeds, None otherwise.
  */
 fn parse_single_grid_track(input: &str) -> Option<GridTrack> {
@@ -1165,7 +1237,7 @@ fn parse_single_grid_track(input: &str) -> Option<GridTrack> {
  * - "max-content"
  * - fixed size in px, e.g. "100px"
  *
- * @param input The CSS min track sizing string.
+ * @param input is The CSS min track sizing string.
  * @return Some(MinTrackSizingFunction) if parsing succeeds, None otherwise.
  */
 fn parse_min_sizing(input: &str) -> Option<MinTrackSizingFunction> {
@@ -1190,9 +1262,9 @@ fn parse_min_sizing(input: &str) -> Option<MinTrackSizingFunction> {
  * - "min-content"
  * - "max-content"
  * - fixed size in px, e.g. "100px"
- * - fractional units, e.g. "1fr"
+ * - fractional units, e.g. "1 fr"
  *
- * @param input The CSS max track sizing string.
+ *  @param input is The CSS max track sizing string.
  * @return Some(MaxTrackSizingFunction) if parsing succeeds, None otherwise.
  */
 fn parse_max_sizing(input: &str) -> Option<MaxTrackSizingFunction> {
@@ -1228,9 +1300,9 @@ fn parse_max_sizing(input: &str) -> Option<MaxTrackSizingFunction> {
  * - "x" applies only to the horizontal axis.
  * - "y" applies only to the vertical axis.
  *
- * @param value The CSS overflow value string.
+ * @param value is The CSS overflow value string.
  * @param which The axis specifier ("x", "y", "all", etc.).
- * @return Some(Overflow) if valid input, None otherwise.
+ * @return Some (Overflow) if valid input, None otherwise.
  */
 pub fn convert_overflow(value: String, which: &str) -> Option<Overflow> {
     let trimmed = value.trim();
@@ -1268,9 +1340,9 @@ pub fn convert_overflow(value: String, which: &str) -> Option<Overflow> {
  * Supported units:
  * - px (pixels), e.g. "10px"
  * - percent (%), e.g. "50%"
- * - zero ("0") without unit
+ * - zero ("0") without a unit
  *
- * @param value The CSS radius string.
+ * @param value is The CSS radius string.
  * @return Some(Vec<Val>) if parsing succeeds, None otherwise.
  */
 fn parse_radius_values(value: &str) -> Option<Vec<Val>> {

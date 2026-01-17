@@ -217,6 +217,82 @@ impl FontVal {
 #[derive(Reflect, Debug, Clone, PartialEq)]
 pub struct FontFamily(pub String);
 
+#[derive(Reflect, Debug, Clone, PartialEq, Eq, Copy)]
+pub enum TransitionTiming {
+    Linear,
+    Ease,
+    EaseIn,
+    EaseOut,
+    EaseInOut,
+}
+
+impl TransitionTiming {
+    pub fn apply(self, t: f32) -> f32 {
+        match self {
+            TransitionTiming::Linear => t,
+            TransitionTiming::Ease => t * t * (3.0 - 2.0 * t),
+            TransitionTiming::EaseIn => t * t,
+            TransitionTiming::EaseOut => 1.0 - (1.0 - t).powi(2),
+            TransitionTiming::EaseInOut => {
+                if t < 0.5 {
+                    2.0 * t * t
+                } else {
+                    1.0 - (-2.0 * t + 2.0).powi(2) / 2.0
+                }
+            }
+        }
+    }
+
+    pub fn from_name(value: &str) -> Option<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "linear" => Some(Self::Linear),
+            "ease" => Some(Self::Ease),
+            "ease-in" => Some(Self::EaseIn),
+            "ease-out" => Some(Self::EaseOut),
+            "ease-in-out" => Some(Self::EaseInOut),
+            _ => None,
+        }
+    }
+}
+
+impl Default for TransitionTiming {
+    fn default() -> Self {
+        TransitionTiming::EaseInOut
+    }
+}
+
+#[derive(Reflect, Debug, Clone, PartialEq, Eq, Copy)]
+pub enum TransitionProperty {
+    All,
+    Color,
+    Background,
+}
+
+impl Default for TransitionProperty {
+    fn default() -> Self {
+        TransitionProperty::All
+    }
+}
+
+#[derive(Reflect, Debug, Clone, PartialEq)]
+pub struct TransitionSpec {
+    pub properties: Vec<TransitionProperty>,
+    pub duration: f32,
+    pub delay: f32,
+    pub timing: TransitionTiming,
+}
+
+impl Default for TransitionSpec {
+    fn default() -> Self {
+        Self {
+            properties: vec![TransitionProperty::All],
+            duration: 0.3,
+            delay: 0.0,
+            timing: TransitionTiming::EaseInOut,
+        }
+    }
+}
+
 #[derive(Reflect, Default, Debug, Clone, PartialEq)]
 pub struct StylePair {
     pub important: Style,
@@ -275,6 +351,7 @@ pub struct Style {
     pub z_index: Option<i32>,
     pub pointer_events: Option<Pickable>,
     pub scrollbar_width: Option<f32>,
+    pub transition: Option<TransitionSpec>,
 }
 
 impl Style {
@@ -339,7 +416,10 @@ impl Style {
         merge_opt(&mut self.grid_auto_flow, &other.grid_auto_flow);
 
         merge_opt(&mut self.grid_template_rows, &other.grid_template_rows);
-        merge_opt(&mut self.grid_template_columns, &other.grid_template_columns);
+        merge_opt(
+            &mut self.grid_template_columns,
+            &other.grid_template_columns,
+        );
         merge_opt(&mut self.grid_auto_rows, &other.grid_auto_rows);
         merge_opt(&mut self.grid_auto_columns, &other.grid_auto_columns);
 
@@ -351,6 +431,7 @@ impl Style {
         merge_opt(&mut self.pointer_events, &other.pointer_events);
 
         merge_opt(&mut self.scrollbar_width, &other.scrollbar_width);
+        merge_opt(&mut self.transition, &other.transition);
     }
 }
 
