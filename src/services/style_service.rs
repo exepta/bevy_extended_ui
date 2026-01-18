@@ -85,10 +85,7 @@ pub fn update_widget_styles_system(
     >,
     mut transition_query: Query<Option<&mut StyleTransition>>,
     mut animation_query: Query<Option<&mut StyleAnimation>>,
-    mut qs: ParamSet<(
-        Query<UiStyleComponents>,
-        Query<(&UiTransform, Option<&LastUiTransform>)>,
-    )>,
+    mut qs: ParamSet<(Query<UiStyleComponents>,)>,
     time: Res<Time>,
     asset_server: Res<AssetServer>,
     mut image_cache: ResMut<ImageCache>,
@@ -175,7 +172,7 @@ pub fn update_widget_styles_system(
             let copy_spec = spec.clone();
 
             let (from_transform, to_transform) =
-                resolve_transform_transition(&spec, qs.p1().get(entity).ok());
+                resolve_transform_transition(&spec, &from, &to);
 
             let transition_state = StyleTransition {
                 from,
@@ -213,7 +210,7 @@ pub fn update_widget_styles_system(
             transition.spec = final_style.transition.clone().unwrap_or_default();
 
             let (from_transform, to_transform) =
-                resolve_transform_transition(&transition.spec, qs.p1().get(entity).ok());
+                resolve_transform_transition(&transition.spec, &transition.from, &transition.to);
             transition.from_transform = from_transform;
             transition.to_transform = to_transform;
 
@@ -515,7 +512,7 @@ fn apply_transform_style(style: &Style, transform: &mut UiTransform) {
         return;
     }
 
-    let mut next = *transform;
+    let mut next = UiTransform::default();
 
     if let Some(translation) = style.transform.translation {
         next.translation = translation;
@@ -548,6 +545,12 @@ fn apply_transform_style(style: &Style, transform: &mut UiTransform) {
     *transform = next;
 }
 
+fn ui_transform_from_style(style: &Style) -> UiTransform {
+    let mut transform = UiTransform::default();
+    apply_transform_style(style, &mut transform);
+    transform
+}
+
 fn blend_style(from: &Style, to: &Style, t: f32, spec: &TransitionSpec) -> Style {
     let mut blended = to.clone();
 
@@ -574,19 +577,16 @@ fn blend_animation_style(from: &Style, to: &Style, t: f32) -> Style {
 
 fn resolve_transform_transition(
     spec: &TransitionSpec,
-    transform: Option<(&UiTransform, Option<&LastUiTransform>)>,
+    from: &Style,
+    to: &Style,
 ) -> (Option<UiTransform>, Option<UiTransform>) {
     if !transition_allows_transform(spec) {
         return (None, None);
     }
 
-    let Some((current, last)) = transform else {
-        return (None, None);
-    };
-
-    let from = last.map(|last| last.0).unwrap_or(*current);
-    let to = *current;
-    (Some(from), Some(to))
+    let from_transform = ui_transform_from_style(from);
+    let to_transform = ui_transform_from_style(to);
+    (Some(from_transform), Some(to_transform))
 }
 
 fn transition_allows_color(spec: &TransitionSpec) -> bool {
