@@ -25,7 +25,8 @@ Available features:
 - [x] HTML Bind support for interacting with the code.
 - [x] Font support for family and weight.
 - [x] Animation support (`@keyframes`).
-- [ ] Validation for widgets like required fields.
+- [x] Validation for widgets like required fields.
+- [ ] Form Widget for validation and submission.
 - [ ] Custom Cursor or system cursor support.
 - [ ] CSS `*` support.
 - [ ] Customizable theme.
