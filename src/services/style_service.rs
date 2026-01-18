@@ -842,6 +842,7 @@ fn selector_matches_state(selector: &str, state: &UIWidgetState) -> bool {
                 "checked" if state.disabled || !state.checked => return false,
                 "focus" if state.disabled || !state.focused => return false,
                 "hover" if state.disabled || !state.hovered => return false,
+                "invalid" if !state.invalid => return false,
                 _ => {}
             }
         }

@@ -726,3 +726,54 @@ toggle .button-text {
 toggle:disabled .button-text {
     color: var(--disabled-text);
 }
+
+/**********************************
+             Animations
+ ***********************************/
+
+@keyframes default-pulse {
+    0% {
+        transform: scale(1);
+        background-color: #4c8bf5;
+    }
+    100% {
+        transform: scale(1.05);
+        background-color: #72a1ff;
+    }
+}
+
+@keyframes default-shake {
+    0% {
+        transform: translateX(0);
+    }
+    10% {
+        transform: translateX(3px);
+    }
+    20% {
+        transform: translateX(0);
+    }
+    30% {
+        transform: translateX(-3px);
+    }
+    40% {
+        transform: translateX(0);
+    }
+    50% {
+        transform: translateX(3px);
+    }
+    60% {
+        transform: translateX(0);
+    }
+    70% {
+        transform: translateX(-3px);
+    }
+    80% {
+        transform: translateX(0);
+    }
+    90% {
+        transform: translateX(3px);
+    }
+    100% {
+        transform: translateX(0);
+    }
+}

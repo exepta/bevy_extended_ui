@@ -2,6 +2,7 @@ mod body;
 mod content;
 mod controls;
 mod div;
+mod validation;
 
 use crate::registry::*;
 use crate::styles::IconPlace;
@@ -63,10 +64,101 @@ pub struct UIWidgetState {
     pub readonly: bool,
     pub checked: bool,
     pub open: bool,
+    pub invalid: bool,
 }
 
 #[derive(Component, Default, Clone, Debug)]
 pub struct Widget(pub Option<String>);
+
+#[derive(Component, Reflect, Debug, Clone, Default)]
+#[reflect(Component)]
+pub struct ValidationRules {
+    pub required: bool,
+    pub min_length: Option<usize>,
+    pub max_length: Option<usize>,
+    pub pattern: Option<String>,
+}
+
+impl ValidationRules {
+    pub fn from_attribute(value: &str) -> Option<Self> {
+        let mut rules = ValidationRules::default();
+
+        for part in value.split('&') {
+            let trimmed = part.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+
+            let lower = trimmed.to_ascii_lowercase();
+            if lower == "required" {
+                rules.required = true;
+                continue;
+            }
+
+            if let Some((name, args)) = trimmed.split_once('(') {
+                let name = name.trim().to_ascii_lowercase();
+                let args = args.trim_end_matches(')').trim();
+                match name.as_str() {
+                    "length" => apply_length_rules(args, &mut rules),
+                    "pattern" => apply_pattern_rule(args, &mut rules),
+                    _ => {}
+                }
+            }
+        }
+
+        if rules.is_empty() {
+            None
+        } else {
+            Some(rules)
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        !self.required && self.min_length.is_none() && self.max_length.is_none() && self.pattern.is_none()
+    }
+}
+
+fn apply_length_rules(args: &str, rules: &mut ValidationRules) {
+    let parts: Vec<&str> = args.split(',').map(|part| part.trim()).collect();
+    if parts.is_empty() {
+        return;
+    }
+
+    let parse_part = |part: &str| part.parse::<usize>().ok();
+
+    match parts.as_slice() {
+        [single] => {
+            if let Some(value) = parse_part(single) {
+                rules.min_length = Some(value);
+                rules.max_length = Some(value);
+            }
+        }
+        [min, max, ..] => {
+            if let Some(value) = parse_part(min) {
+                rules.min_length = Some(value);
+            }
+            if let Some(value) = parse_part(max) {
+                rules.max_length = Some(value);
+            }
+        },
+        &[] => todo!()
+    }
+}
+
+fn apply_pattern_rule(args: &str, rules: &mut ValidationRules) {
+    let trimmed = args.trim();
+    let stripped = trimmed
+        .strip_prefix('"')
+        .and_then(|rest| rest.strip_suffix('"'))
+        .or_else(|| trimmed.strip_prefix('\'').and_then(|rest| rest.strip_suffix('\'')))
+        .unwrap_or(trimmed);
+
+    if stripped.is_empty() {
+        return;
+    }
+
+    rules.pattern = Some(stripped.to_string());
+}
 
 #[derive(Component, Clone, Copy, Debug)]
 pub struct WidgetId {
@@ -102,6 +194,7 @@ impl Plugin for ExtendedWidgetPlugin {
         app.register_type::<UIGenID>();
         app.register_type::<BindToID>();
         app.register_type::<UIWidgetState>();
+        app.register_type::<ValidationRules>();
         app.register_type::<Body>();
         app.add_plugins((
             ExtendedControlWidgets,
@@ -109,6 +202,7 @@ impl Plugin for ExtendedWidgetPlugin {
             BodyWidget,
             DivWidget,
         ));
+        app.add_systems(Update, validation::update_validation_states);
     }
 }
 

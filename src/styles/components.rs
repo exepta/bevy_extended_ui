@@ -77,7 +77,7 @@ impl UiStyle {
         let mut filtered = HashMap::new();
         let mut priority_map = HashMap::<String, u8>::new();
 
-        let pseudo_classes = ["hover", "focus", "read-only", "disabled"];
+        let pseudo_classes = ["hover", "focus", "read-only", "disabled", "invalid"];
 
         let mut insert_with_pseudo = |base: &str, prio: u8| {
             for (selector, style) in self.styles.iter() {
