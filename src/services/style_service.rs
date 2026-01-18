@@ -1,10 +1,13 @@
+use crate::ImageCache;
 use crate::html::HtmlStyle;
 use crate::services::image_service::get_or_load_image;
 use crate::services::state_service::update_widget_states;
 use crate::styles::components::UiStyle;
-use crate::styles::{FontWeight, Style, TransitionProperty, TransitionSpec};
+use crate::styles::{
+    AnimationDirection, AnimationKeyframe, AnimationSpec, FontWeight, Style, TransformStyle,
+    TransitionProperty, TransitionSpec,
+};
 use crate::widgets::UIWidgetState;
-use crate::ImageCache;
 
 use bevy::color::Srgba;
 use bevy::math::Rot2;
@@ -25,7 +28,11 @@ impl Plugin for StyleService {
         );
         app.add_systems(
             PostUpdate,
-            sync_last_ui_transform.after(update_style_transitions),
+            update_style_animations.after(update_style_transitions),
+        );
+        app.add_systems(
+            PostUpdate,
+            sync_last_ui_transform.after(update_style_animations),
         );
     }
 }
@@ -42,6 +49,14 @@ pub struct StyleTransition {
 
 #[derive(Component, Debug, Clone, Copy)]
 pub struct LastUiTransform(pub UiTransform);
+
+#[derive(Component, Debug, Clone)]
+pub struct StyleAnimation {
+    base: Style,
+    keyframes: Vec<AnimationKeyframe>,
+    spec: AnimationSpec,
+    start_time: f32,
+}
 
 type UiStyleComponents<'w, 's> = (
     Option<Mut<'w, Node>>,
@@ -69,6 +84,7 @@ pub fn update_widget_styles_system(
         Or<(Changed<UiStyle>, Changed<HtmlStyle>, Changed<UIWidgetState>)>,
     >,
     mut transition_query: Query<Option<&mut StyleTransition>>,
+    mut animation_query: Query<Option<&mut StyleAnimation>>,
 
     mut qs: ParamSet<(
         Query<UiStyleComponents>,
@@ -140,6 +156,15 @@ pub fn update_widget_styles_system(
         if has_changed {
             ui_style.active_style = Some(final_style.clone());
         }
+
+        update_style_animation_state(
+            &mut commands,
+            entity,
+            &final_style,
+            &ui_style.keyframes,
+            time.elapsed_secs(),
+            &mut animation_query,
+        );
 
         let mut transition = transition_query.get_mut(entity).ok().flatten();
         let should_transition =
@@ -260,6 +285,67 @@ pub fn update_style_transitions(
     }
 }
 
+pub fn update_style_animations(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut animations: Query<(Entity, &mut StyleAnimation)>,
+    mut style_query: Query<UiStyleComponents>,
+    asset_server: Res<AssetServer>,
+    mut image_cache: ResMut<ImageCache>,
+    mut images: ResMut<Assets<Image>>,
+) {
+    let now = time.elapsed_secs();
+
+    for (entity, animation) in animations.iter_mut() {
+        let duration = animation.spec.duration.max(0.001);
+        let elapsed = now - animation.start_time - animation.spec.delay;
+
+        if elapsed < 0.0 {
+            continue;
+        }
+
+        if let Some(iterations) = animation.spec.iterations {
+            if iterations <= 0.0 {
+                commands.entity(entity).remove::<StyleAnimation>();
+                continue;
+            }
+
+            let total = duration * iterations;
+            if elapsed >= total {
+                let final_cycle = (iterations - 1.0).max(0.0).floor() as u32;
+                let progress = animation_progress(&animation.spec, final_cycle, 1.0);
+                if let Ok(mut components) = style_query.get_mut(entity) {
+                    let blended = sample_animation_style(&animation.keyframes, progress);
+                    apply_style_components(
+                        &blended,
+                        &mut components,
+                        &asset_server,
+                        &mut image_cache,
+                        &mut images,
+                    );
+                }
+                commands.entity(entity).remove::<StyleAnimation>();
+                continue;
+            }
+        }
+
+        let cycles = (elapsed / duration).floor().max(0.0) as u32;
+        let cycle_progress = (elapsed / duration).fract();
+        let progress = animation_progress(&animation.spec, cycles, cycle_progress);
+
+        if let Ok(mut components) = style_query.get_mut(entity) {
+            let blended = sample_animation_style(&animation.keyframes, progress);
+            apply_style_components(
+                &blended,
+                &mut components,
+                &asset_server,
+                &mut image_cache,
+                &mut images,
+            );
+        }
+    }
+}
+
 pub fn sync_last_ui_transform(
     mut commands: Commands,
     mut query: Query<(Entity, &UiTransform, Option<&mut LastUiTransform>)>,
@@ -303,12 +389,7 @@ fn apply_style_components(
 
     // BoxShadow
     if let Some(bs) = components.3.as_mut() {
-        bs.0 = style
-            .box_shadow
-            .as_ref()
-            .cloned()
-            .unwrap_or_default()
-            .0;
+        bs.0 = style.box_shadow.as_ref().cloned().unwrap_or_default().0;
     }
 
     // TextColor
@@ -369,14 +450,10 @@ fn apply_style_components(
     // Pickable
     if let Some(pick) = components.9.as_mut() {
         let old_pick = pick.clone();
-        let new_pick = style
-            .pointer_events
-            .as_ref()
-            .cloned()
-            .unwrap_or(Pickable {
-                is_hoverable: old_pick.is_hoverable,
-                should_block_lower: old_pick.should_block_lower,
-            });
+        let new_pick = style.pointer_events.as_ref().cloned().unwrap_or(Pickable {
+            is_hoverable: old_pick.is_hoverable,
+            should_block_lower: old_pick.should_block_lower,
+        });
 
         **pick = new_pick;
     }
@@ -433,6 +510,15 @@ fn blend_style(from: &Style, to: &Style, t: f32, spec: &TransitionSpec) -> Style
     blended
 }
 
+fn blend_animation_style(from: &Style, to: &Style, t: f32) -> Style {
+    let mut blended = to.clone();
+    blended.color = blend_color(from.color, to.color, t);
+    blended.border_color = blend_color(from.border_color, to.border_color, t);
+    blended.background = blend_background(from.background.clone(), to.background.clone(), t);
+    blended.transform = blend_transform_style(&from.transform, &to.transform, t);
+    blended
+}
+
 fn resolve_transform_transition(
     spec: &TransitionSpec,
     transform: Option<(&UiTransform, Option<&LastUiTransform>)>,
@@ -463,9 +549,12 @@ fn transition_allows_background(spec: &TransitionSpec) -> bool {
 }
 
 fn transition_allows_transform(spec: &TransitionSpec) -> bool {
-    spec.properties
-        .iter()
-        .any(|prop| matches!(prop, TransitionProperty::All | TransitionProperty::Transform))
+    spec.properties.iter().any(|prop| {
+        matches!(
+            prop,
+            TransitionProperty::All | TransitionProperty::Transform
+        )
+    })
 }
 
 fn blend_ui_transform(from: UiTransform, to: UiTransform, t: f32) -> UiTransform {
@@ -476,8 +565,29 @@ fn blend_ui_transform(from: UiTransform, to: UiTransform, t: f32) -> UiTransform
     }
 }
 
+fn blend_transform_style(from: &TransformStyle, to: &TransformStyle, t: f32) -> TransformStyle {
+    TransformStyle {
+        translation: blend_val2_opt(from.translation, to.translation, t),
+        translation_x: blend_val_opt(from.translation_x, to.translation_x, t),
+        translation_y: blend_val_opt(from.translation_y, to.translation_y, t),
+        scale: blend_vec2_opt(from.scale, to.scale, t),
+        scale_x: blend_f32_opt(from.scale_x, to.scale_x, t),
+        scale_y: blend_f32_opt(from.scale_y, to.scale_y, t),
+        rotation: blend_f32_opt(from.rotation, to.rotation, t),
+    }
+}
+
 fn blend_val2(from: Val2, to: Val2, t: f32) -> Val2 {
     Val2::new(blend_val(from.x, to.x, t), blend_val(from.y, to.y, t))
+}
+
+fn blend_val2_opt(from: Option<Val2>, to: Option<Val2>, t: f32) -> Option<Val2> {
+    match (from, to) {
+        (Some(a), Some(b)) => Some(blend_val2(a, b, t)),
+        (None, Some(b)) => Some(b),
+        (Some(a), None) => Some(a),
+        _ => None,
+    }
 }
 
 fn blend_val(from: Val, to: Val, t: f32) -> Val {
@@ -488,10 +598,37 @@ fn blend_val(from: Val, to: Val, t: f32) -> Val {
     }
 }
 
+fn blend_val_opt(from: Option<Val>, to: Option<Val>, t: f32) -> Option<Val> {
+    match (from, to) {
+        (Some(a), Some(b)) => Some(blend_val(a, b, t)),
+        (None, Some(b)) => Some(b),
+        (Some(a), None) => Some(a),
+        _ => None,
+    }
+}
+
 fn blend_rot2(from: Rot2, to: Rot2, t: f32) -> Rot2 {
     let from_angle = from.as_radians();
     let to_angle = to.as_radians();
     Rot2::radians(lerp(from_angle, to_angle, t))
+}
+
+fn blend_vec2_opt(from: Option<Vec2>, to: Option<Vec2>, t: f32) -> Option<Vec2> {
+    match (from, to) {
+        (Some(a), Some(b)) => Some(a.lerp(b, t)),
+        (None, Some(b)) => Some(b),
+        (Some(a), None) => Some(a),
+        _ => None,
+    }
+}
+
+fn blend_f32_opt(from: Option<f32>, to: Option<f32>, t: f32) -> Option<f32> {
+    match (from, to) {
+        (Some(a), Some(b)) => Some(lerp(a, b, t)),
+        (None, Some(b)) => Some(b),
+        (Some(a), None) => Some(a),
+        _ => None,
+    }
 }
 
 fn blend_color(from: Option<Color>, to: Option<Color>, t: f32) -> Option<Color> {
@@ -526,6 +663,116 @@ fn blend_background(
         (None, Some(value)) => Some(value),
         _ => None,
     }
+}
+
+fn update_style_animation_state(
+    commands: &mut Commands,
+    entity: Entity,
+    final_style: &Style,
+    keyframes: &std::collections::HashMap<String, Vec<AnimationKeyframe>>,
+    now: f32,
+    animation_query: &mut Query<Option<&mut StyleAnimation>>,
+) {
+    let mut animation = animation_query.get_mut(entity).ok().flatten();
+    let Some(spec) = final_style.animation.clone() else {
+        if animation.is_some() {
+            commands.entity(entity).remove::<StyleAnimation>();
+        }
+        return;
+    };
+
+    if spec.name.is_empty() {
+        if animation.is_some() {
+            commands.entity(entity).remove::<StyleAnimation>();
+        }
+        return;
+    }
+
+    let Some(frames) = keyframes.get(&spec.name) else {
+        if animation.is_some() {
+            commands.entity(entity).remove::<StyleAnimation>();
+        }
+        return;
+    };
+
+    if frames.is_empty() {
+        if animation.is_some() {
+            commands.entity(entity).remove::<StyleAnimation>();
+        }
+        return;
+    }
+
+    let mut computed = Vec::with_capacity(frames.len());
+    for frame in frames {
+        let mut style = final_style.clone();
+        style.merge(&frame.style);
+        computed.push(AnimationKeyframe {
+            progress: frame.progress,
+            style,
+        });
+    }
+
+    let new_animation = StyleAnimation {
+        base: final_style.clone(),
+        keyframes: computed,
+        spec,
+        start_time: now,
+    };
+
+    if let Some(existing) = animation.as_mut() {
+        if existing.spec != new_animation.spec
+            || existing.base != new_animation.base
+            || existing.keyframes != new_animation.keyframes
+        {
+            **existing = new_animation;
+        }
+    } else {
+        commands.entity(entity).insert(new_animation);
+    }
+}
+
+fn animation_progress(spec: &AnimationSpec, cycle_index: u32, cycle_progress: f32) -> f32 {
+    let mut progress = cycle_progress.clamp(0.0, 1.0);
+    let is_odd = cycle_index % 2 == 1;
+    match spec.direction {
+        AnimationDirection::Normal => {}
+        AnimationDirection::Reverse => progress = 1.0 - progress,
+        AnimationDirection::Alternate => {
+            if is_odd {
+                progress = 1.0 - progress;
+            }
+        }
+        AnimationDirection::AlternateReverse => {
+            if !is_odd {
+                progress = 1.0 - progress;
+            }
+        }
+    }
+    spec.timing.apply(progress)
+}
+
+fn sample_animation_style(keyframes: &[AnimationKeyframe], progress: f32) -> Style {
+    if keyframes.is_empty() {
+        return Style::default();
+    }
+
+    let mut prev = &keyframes[0];
+    if progress <= prev.progress {
+        return prev.style.clone();
+    }
+
+    for next in keyframes.iter().skip(1) {
+        if progress <= next.progress {
+            if (next.progress - prev.progress).abs() < f32::EPSILON {
+                return next.style.clone();
+            }
+            let local_t = (progress - prev.progress) / (next.progress - prev.progress);
+            return blend_animation_style(&prev.style, &next.style, local_t);
+        }
+        prev = next;
+    }
+
+    prev.style.clone()
 }
 
 fn lerp(from: f32, to: f32, t: f32) -> f32 {
