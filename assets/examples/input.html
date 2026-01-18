@@ -13,7 +13,9 @@
 </div>
 
 <label for="text">Text</label>
-<input onchange="on_text_change" id="text" type="text" placeholder="Enter text">
+<input onchange="on_text_change" id="text" type="text" placeholder="Enter text"
+       validation="required & length(1, 100) & pattern(^[A-Za-z0-9 ]+$)"
+>
 
 <label for="text-icon">Text</label>
 <input id="text-icon" type="text" placeholder="Enter with icon" icon="extended_ui/icons/check-mark.png">

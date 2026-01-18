@@ -17,7 +17,7 @@ use crate::html::reload::HtmlReloadPlugin;
 use crate::io::{CssAsset, HtmlAsset};
 use crate::styles::Style;
 use crate::styles::parser::apply_property_to_style;
-use crate::widgets::{Body, Button, CheckBox, ChoiceBox, Div, Divider, FieldSet, Headline, Img, InputField, Paragraph, ProgressBar, RadioButton, Scrollbar, Slider, SwitchButton, ToggleButton, Widget};
+use crate::widgets::{Body, Button, CheckBox, ChoiceBox, Div, Divider, FieldSet, Headline, Img, InputField, Paragraph, ProgressBar, RadioButton, Scrollbar, Slider, SwitchButton, ToggleButton, ValidationRules, Widget};
 
 pub static HTML_ID_COUNTER: AtomicUsize = AtomicUsize::new(1);
 
@@ -126,6 +126,7 @@ pub struct HtmlMeta {
     pub id: Option<String>,
     pub class: Option<Vec<String>>,
     pub style: Option<HtmlStyle>,
+    pub validation: Option<ValidationRules>,
 }
 
 #[derive(Debug, Clone, Default)]

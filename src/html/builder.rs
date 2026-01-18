@@ -392,6 +392,10 @@ fn spawn_with_meta<T: Component>(
     if let Some(inline_style) = &meta.style {
         commands.entity(entity).insert(inline_style.clone());
     }
+
+    if let Some(validation) = &meta.validation {
+        commands.entity(entity).insert(validation.clone());
+    }
     
     if states.hidden {
         commands.entity(entity).insert(NeedHidden);

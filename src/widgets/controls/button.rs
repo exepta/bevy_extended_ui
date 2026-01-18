@@ -211,7 +211,12 @@ fn on_internal_click(
     mut current_widget_state: ResMut<CurrentWidgetState>,
 ) {
     if let Ok((mut state, gen_id)) = query.get_mut(trigger.entity) {
+        if state.disabled {
+            trigger.propagate(false);
+            return;
+        }
         state.focused = true;
+        state.checked = true;
         current_widget_state.widget_id = gen_id.0;
     }
 

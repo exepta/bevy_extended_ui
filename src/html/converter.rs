@@ -198,6 +198,7 @@ fn parse_html_node(
             .get("class")
             .map(|s| s.split_whitespace().map(str::to_string).collect()),
         style: attributes.get("style").map(HtmlStyle::from_str),
+        validation: parse_validation_attributes(&attributes),
     };
 
     let states = HtmlStates {
@@ -355,6 +356,7 @@ fn parse_html_node(
                         .get("class")
                         .map(|s| s.split_whitespace().map(str::to_string).collect()),
                     style: attrs.get("style").map(HtmlStyle::from_str),
+                    validation: parse_validation_attributes(&attrs),
                 };
 
                 let child_states = HtmlStates {
@@ -714,6 +716,20 @@ fn bind_html_func(attributes: &Attributes) -> HtmlEventBindings {
         onchange: attributes.get("onchange").map(|s| s.to_string()),
         oninit: attributes.get("oninit").map(|s| s.to_string()),
     }
+}
+
+fn parse_validation_attributes(attributes: &Attributes) -> Option<ValidationRules> {
+    let mut rules = attributes
+        .get("validation")
+        .and_then(ValidationRules::from_attribute);
+
+    if attributes.contains("required") {
+        let mut merged = rules.unwrap_or_default();
+        merged.required = true;
+        rules = Some(merged);
+    }
+
+    rules
 }
 
 /// Collects mappings from <label for="..."> to its label text.
