@@ -63,7 +63,12 @@ body {
 
 #fn_q_key {
     z-index: 2;
-    animation: button-pulse 1.4s ease-in-out infinite alternate;
+    animation: button-pulse 5.0s ease-in-out infinite alternate;
+}
+
+#fn_q_key:hover {
+    z-index: 2;
+    animation: btn-h 1.4s ease-in-out infinite alternate;
 }
 
 @keyframes button-pulse {
@@ -86,5 +91,16 @@ body {
     100% {
         transform: scale(1) rotate(360deg);
         background-color: #4c8bf5;
+    }
+}
+
+@keyframes btn-h {
+    0% {
+        transform: scale(1);
+        background-color: #4c8bf5;
+    }
+    100% {
+        transform: scale(1.05);
+        background-color: #72a1ff;
     }
 }

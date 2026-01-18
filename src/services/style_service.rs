@@ -771,11 +771,13 @@ fn update_style_animation_state(
     };
 
     if let Some(existing) = animation.as_mut() {
-        if existing.spec != new_animation.spec
-            || existing.base != new_animation.base
+        if existing.spec != new_animation.spec {
+            **existing = new_animation;
+        } else if existing.base != new_animation.base
             || existing.keyframes != new_animation.keyframes
         {
-            **existing = new_animation;
+            existing.base = new_animation.base;
+            existing.keyframes = new_animation.keyframes;
         }
     } else {
         commands.entity(entity).insert(new_animation);
