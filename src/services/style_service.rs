@@ -7,12 +7,12 @@ use crate::styles::{
     TransitionProperty, TransitionSpec,
 };
 use crate::widgets::UIWidgetState;
+use crate::ImageCache;
 
 use bevy::color::Srgba;
 use bevy::math::Rot2;
 use bevy::prelude::*;
 use bevy::ui::{UiTransform, Val2};
-use crate::ImageCache;
 
 pub struct StyleService;
 
@@ -85,12 +85,10 @@ pub fn update_widget_styles_system(
     >,
     mut transition_query: Query<Option<&mut StyleTransition>>,
     mut animation_query: Query<Option<&mut StyleAnimation>>,
-
     mut qs: ParamSet<(
         Query<UiStyleComponents>,
         Query<(&UiTransform, Option<&LastUiTransform>)>,
     )>,
-
     time: Res<Time>,
     asset_server: Res<AssetServer>,
     mut image_cache: ResMut<ImageCache>,
@@ -174,6 +172,7 @@ pub fn update_widget_styles_system(
             let spec = final_style.transition.clone().unwrap_or_default();
             let from = previous_style.unwrap_or_default();
             let to = final_style.clone();
+            let copy_spec = spec.clone();
 
             let (from_transform, to_transform) =
                 resolve_transform_transition(&spec, qs.p1().get(entity).ok());
@@ -192,6 +191,14 @@ pub fn update_widget_styles_system(
             } else {
                 commands.entity(entity).insert(transition_state);
             }
+
+            if !transition_allows_transform(&copy_spec) {
+                if let Ok(mut components) = qs.p0().get_mut(entity) {
+                    if let Some(transform) = components.10.as_mut() {
+                        apply_transform_style(&final_style, transform);
+                    }
+                }
+            }
             continue;
         }
 
@@ -199,6 +206,7 @@ pub fn update_widget_styles_system(
             if !has_changed {
                 continue;
             }
+
             transition.from = previous_style.unwrap_or_default();
             transition.to = final_style.clone();
             transition.start_time = time.elapsed_secs();
@@ -209,6 +217,13 @@ pub fn update_widget_styles_system(
             transition.from_transform = from_transform;
             transition.to_transform = to_transform;
 
+            if !transition_allows_transform(&transition.spec) {
+                if let Ok(mut components) = qs.p0().get_mut(entity) {
+                    if let Some(transform) = components.10.as_mut() {
+                        apply_transform_style(&final_style, transform);
+                    }
+                }
+            }
             continue;
         }
 
@@ -228,9 +243,7 @@ pub fn update_style_transitions(
     mut commands: Commands,
     time: Res<Time>,
     mut transitions: Query<(Entity, &mut StyleTransition)>,
-
     mut style_query: Query<UiStyleComponents>,
-
     asset_server: Res<AssetServer>,
     mut image_cache: ResMut<ImageCache>,
     mut images: ResMut<Assets<Image>>,
@@ -290,6 +303,7 @@ pub fn update_style_animations(
     time: Res<Time>,
     mut animations: Query<(Entity, &mut StyleAnimation)>,
     mut style_query: Query<UiStyleComponents>,
+    ui_style_query: Query<&UiStyle>,
     asset_server: Res<AssetServer>,
     mut image_cache: ResMut<ImageCache>,
     mut images: ResMut<Assets<Image>>,
@@ -297,6 +311,29 @@ pub fn update_style_animations(
     let now = time.elapsed_secs();
 
     for (entity, animation) in animations.iter_mut() {
+        let desired_style = ui_style_query
+            .get(entity)
+            .ok()
+            .and_then(|ui| ui.active_style.as_ref());
+
+        let desired_animation_name = desired_style
+            .and_then(|s| s.animation.as_ref())
+            .map(|a| a.name.as_str());
+
+        if desired_animation_name != Some(animation.spec.name.as_str()) {
+            if let (Some(style), Ok(mut components)) = (desired_style, style_query.get_mut(entity)) {
+                apply_style_components(
+                    style,
+                    &mut components,
+                    &asset_server,
+                    &mut image_cache,
+                    &mut images,
+                );
+            }
+            commands.entity(entity).remove::<StyleAnimation>();
+            continue;
+        }
+
         let duration = animation.spec.duration.max(0.001);
         let elapsed = now - animation.start_time - animation.spec.delay;
 
@@ -306,6 +343,15 @@ pub fn update_style_animations(
 
         if let Some(iterations) = animation.spec.iterations {
             if iterations <= 0.0 {
+                if let Ok(mut components) = style_query.get_mut(entity) {
+                    apply_style_components(
+                        &animation.base,
+                        &mut components,
+                        &asset_server,
+                        &mut image_cache,
+                        &mut images,
+                    );
+                }
                 commands.entity(entity).remove::<StyleAnimation>();
                 continue;
             }
@@ -459,43 +505,47 @@ fn apply_style_components(
     }
 
     if let Some(transform) = components.10.as_mut() {
-        if style.transform.is_empty() {
-            **transform = UiTransform::default();
-            return;
-        }
-
-        let mut next = **transform;
-
-        if let Some(translation) = style.transform.translation {
-            next.translation = translation;
-        }
-
-        if let Some(x) = style.transform.translation_x {
-            next.translation.x = x;
-        }
-
-        if let Some(y) = style.transform.translation_y {
-            next.translation.y = y;
-        }
-
-        if let Some(scale) = style.transform.scale {
-            next.scale = scale;
-        }
-
-        if let Some(scale_x) = style.transform.scale_x {
-            next.scale.x = scale_x;
-        }
-
-        if let Some(scale_y) = style.transform.scale_y {
-            next.scale.y = scale_y;
-        }
-
-        if let Some(rotation) = style.transform.rotation {
-            next.rotation = Rot2::radians(rotation);
-        }
-
-        **transform = next;
+        apply_transform_style(style, transform);
     }
+}
+
+fn apply_transform_style(style: &Style, transform: &mut UiTransform) {
+    if style.transform.is_empty() {
+        *transform = UiTransform::default();
+        return;
+    }
+
+    let mut next = *transform;
+
+    if let Some(translation) = style.transform.translation {
+        next.translation = translation;
+    }
+
+    if let Some(x) = style.transform.translation_x {
+        next.translation.x = x;
+    }
+
+    if let Some(y) = style.transform.translation_y {
+        next.translation.y = y;
+    }
+
+    if let Some(scale) = style.transform.scale {
+        next.scale = scale;
+    }
+
+    if let Some(scale_x) = style.transform.scale_x {
+        next.scale.x = scale_x;
+    }
+
+    if let Some(scale_y) = style.transform.scale_y {
+        next.scale.y = scale_y;
+    }
+
+    if let Some(rotation) = style.transform.rotation {
+        next.rotation = Rot2::radians(rotation);
+    }
+
+    *transform = next;
 }
 
 fn blend_style(from: &Style, to: &Style, t: f32, spec: &TransitionSpec) -> Style {
@@ -553,10 +603,7 @@ fn transition_allows_background(spec: &TransitionSpec) -> bool {
 
 fn transition_allows_transform(spec: &TransitionSpec) -> bool {
     spec.properties.iter().any(|prop| {
-        matches!(
-            prop,
-            TransitionProperty::All | TransitionProperty::Transform
-        )
+        matches!(prop, TransitionProperty::All | TransitionProperty::Transform)
     })
 }
 
@@ -677,6 +724,7 @@ fn update_style_animation_state(
     animation_query: &mut Query<Option<&mut StyleAnimation>>,
 ) {
     let mut animation = animation_query.get_mut(entity).ok().flatten();
+
     let Some(spec) = final_style.animation.clone() else {
         if animation.is_some() {
             commands.entity(entity).remove::<StyleAnimation>();

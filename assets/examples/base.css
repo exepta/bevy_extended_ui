@@ -62,11 +62,11 @@ body {
 }
 
 #fn_q_key {
+    z-index: 2;
     transform: rotate(0deg);
 }
 
 #fn_q_key:hover {
-    z-index: 2;
     animation: button-pulse 1.4s ease-in-out infinite alternate;
 }
 
