@@ -19,10 +19,10 @@ pub struct HtmlAsset {
     pub stylesheets: Vec<Handle<CssAsset>>,
 }
 
-#[derive(Default)]
+#[derive(Default, TypePath)]
 pub struct CssLoader;
 
-#[derive(Default)]
+#[derive(Default, TypePath)]
 pub struct HtmlLoader;
 
 impl AssetLoader for CssLoader {
@@ -63,7 +63,8 @@ impl AssetLoader for HtmlLoader {
         reader.read_to_end(&mut bytes).await?;
         let html = String::from_utf8_lossy(&bytes).to_string();
 
-        let base_dir = load_context
+        let base_dir: PathBuf = load_context
+            .path()
             .path()
             .parent()
             .unwrap_or(Path::new(""))

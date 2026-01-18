@@ -24,10 +24,12 @@ Available features:
 - [x] Hot reload support.
 - [x] HTML Bind support for interacting with the code.
 - [x] Font support for family and weight.
-- [ ] Customizable theme.
-- [ ] Animation support.
-- [ ] Validation for widgets like required fields.
+- [x] Animation support (`@keyframes`).
+- [x] Validation for widgets like required fields.
+- [ ] Form Widget for validation and submission.
 - [ ] Custom Cursor or system cursor support.
+- [ ] CSS `*` support.
+- [ ] Customizable theme.
 
 There are many other things, but currently you can use the core (HTML / CSS) features.
 
@@ -36,8 +38,8 @@ There are many other things, but currently you can use the core (HTML / CSS) fea
 Add this to your `Cargo.toml`:
 ```toml
 [dependencies]
-bevy_extended_ui = "1.0.0"
-bevy_extended_ui_macros = "1.0.0"
+bevy_extended_ui = "1.2.0"
+bevy_extended_ui_macros = "1.2.0"
 ```
 
 Then, you add the plugin to your `main.rs` or on any point at a build function:
@@ -88,6 +90,100 @@ Note that currently you can use this binding:
 - `onmouseover`
 - `onmouseout`
 
+### WASM support
+Now we have wasm support but still not fully tested! Here is an example to show you
+how to use it:
+```rust
+fn main() {
+    #[cfg(target_arch = "wasm32")]
+    console_error_panic_hook::set_once();
+
+    App::new()
+        .add_plugins(DefaultPlugins.set(WindowPlugin {
+            primary_window: Some(Window {
+                title: "Bevy WASM".into(),
+                canvas: Some("#bevy".into()),
+                fit_canvas_to_parent: true,
+                prevent_default_event_handling: true,
+                ..default()
+            }),
+            ..default()
+        }).set(AssetPlugin {
+            meta_check: AssetMetaCheck::Never,
+            ..default()
+        }))
+        .add_plugins(ExtendedUiPlugin)
+        .add_systems(Startup, load_ui)
+        .run();
+}
+
+fn load_ui(mut reg: ResMut<UiRegistry>, asset_server: Res<AssetServer>) {
+    let handle: Handle<HtmlAsset> = asset_server.load("test.html");
+    reg.add_and_use("test-ui".to_string(), HtmlSource::from_handle(handle));
+}
+
+```
+
+and the index HTML:
+```html
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Bevy Web</title>
+    <style>
+        html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #333; }
+        #container { width: 100%; height: 100%; }
+        canvas { width: 100%; height: 100%; display: block; }
+    </style>
+    <link data-trunk rel="copy-dir" href="assets" />
+</head>
+<body>
+<div id="container">
+    <canvas id="bevy"></canvas>
+</div>
+</body>
+</html>
+```
+
+It was tested with the crate trunk, which worked well. This trunk.toml file was used:
+```toml
+[build]
+dist = "dist"
+
+[[copy]]
+source = "assets"
+dest = "assets"
+
+[serve]
+no_spa = true
+```
+
+### Animation support
+Basic `@keyframes` usage example:
+```css
+@keyframes button-pulse {
+    0% {
+        transform: scale(1);
+        background-color: #4c8bf5;
+    }
+    50% {
+        transform: scale(1.05);
+        background-color: #72a1ff;
+    }
+    100% {
+        transform: scale(1);
+        background-color: #4c8bf5;
+    }
+}
+
+.cta-button {
+    animation: button-pulse 1.4s ease-in-out infinite alternate;
+}
+```
+
+You can now use `@keyframes` in your CSS. There is now a limit tested; this means that you can use any CSS property.
+
 ### What comes next?
 
 Next, I'd like to build a website that's structured like React documentation.
@@ -100,10 +196,12 @@ If anyone has any ideas, I'd be happy to hear them.
 
 | `Bevy` version | `bevy_extended_ui` version |
 |----------------|----------------------------|
-| 0.17.3         | 1.0.0                      |
-| 0.16.1         | 0.1.0 - 0.2.2              |
+| 0.18.0         | 1.2.0                      |
+| 0.17.0         | 1.0.0 - 1.1.0              |
 | 0.16.0         | 0.1.0 - 0.2.2              |
 
 ### Important Links
 
 [Link to Widget attributes](WIDGETS.md)
+<br>
+[Link to Patches](PATCH.md)

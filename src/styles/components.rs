@@ -1,12 +1,12 @@
 use crate::io::CssAsset;
 use crate::styles::parser::load_css;
-use crate::styles::{CssClass, CssID, Style, StylePair, TagName};
+use crate::styles::{AnimationKeyframe, CssClass, CssID, ParsedCss, Style, StylePair, TagName};
 use bevy::prelude::*;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::sync::RwLock;
 
-static CSS_CACHE: Lazy<RwLock<HashMap<AssetId<CssAsset>, HashMap<String, StylePair>>>> =
+static CSS_CACHE: Lazy<RwLock<HashMap<AssetId<CssAsset>, ParsedCss>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
 
 #[derive(Component, Reflect, Debug, Clone)]
@@ -14,6 +14,7 @@ static CSS_CACHE: Lazy<RwLock<HashMap<AssetId<CssAsset>, HashMap<String, StylePa
 pub struct UiStyle {
     pub css: Handle<CssAsset>,
     pub styles: HashMap<String, StylePair>,
+    pub keyframes: HashMap<String, Vec<AnimationKeyframe>>,
     pub active_style: Option<Style>,
 }
 
@@ -28,7 +29,8 @@ impl UiStyle {
         {
             return Self {
                 css,
-                styles: cached,
+                styles: cached.styles,
+                keyframes: cached.keyframes,
                 active_style: None,
             };
         }
@@ -37,6 +39,7 @@ impl UiStyle {
             return Self {
                 css,
                 styles: HashMap::new(),
+                keyframes: HashMap::new(),
                 active_style: None,
             };
         };
@@ -49,7 +52,8 @@ impl UiStyle {
 
         Self {
             css,
-            styles: parsed,
+            styles: parsed.styles,
+            keyframes: parsed.keyframes,
             active_style: None,
         }
     }
@@ -73,7 +77,7 @@ impl UiStyle {
         let mut filtered = HashMap::new();
         let mut priority_map = HashMap::<String, u8>::new();
 
-        let pseudo_classes = ["hover", "focus", "read-only", "disabled"];
+        let pseudo_classes = ["hover", "focus", "read-only", "disabled", "invalid"];
 
         let mut insert_with_pseudo = |base: &str, prio: u8| {
             for (selector, style) in self.styles.iter() {
@@ -129,6 +133,7 @@ impl UiStyle {
         Self {
             css: self.css.clone(),
             styles: filtered,
+            keyframes: self.keyframes.clone(),
             active_style: None,
         }
     }

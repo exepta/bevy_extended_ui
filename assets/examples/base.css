@@ -61,3 +61,20 @@ body {
     width: 250px;
 }
 
+#fn_q_key:hover {
+    z-index: 2;
+    animation: default-pulse 1.4s ease-in-out infinite alternate;
+}
+
+input:invalid {
+    border-color: #ff4d4d;
+    animation: default-shake 0.5s ease-in-out;
+}
+
+.form-field:invalid {
+    box-shadow: 0 0 0 2px rgba(255, 77, 77, 0.4);
+}
+
+#text:invalid {
+    background: rgba(255, 77, 77, 0.1);
+}

@@ -31,7 +31,7 @@ version = "0.1.0"
 
 # Bevy 0.17.0 main library
 [dependencies.bevy]
-version = "0.17.3"
+version = "0.18.0"
 default-features = false
 features = [
     "bevy_asset",
@@ -43,15 +43,15 @@ features = [
     "bevy_ui",
     "default_font",
     "multi_threaded",
+    "picking",
+    "ui_picking",
     "png",
     "jpeg",
     "gif",
     "ico",
     "webp",
-    "bevy_mesh_picking_backend",
     "bevy_picking",
     "custom_cursor",
-    "bevy_ui_picking_backend",
     "bevy_winit",
     "x11",
     "bevy_log",

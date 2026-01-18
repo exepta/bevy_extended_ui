@@ -1,17 +1,19 @@
-use std::collections::{HashMap, HashSet};
-use std::sync::RwLock;
 use bevy::prelude::*;
 use once_cell::sync::Lazy;
+use std::collections::{HashMap, HashSet};
+use std::sync::RwLock;
 
 use crate::io::CssAsset;
 use crate::styles::components::UiStyle;
 use crate::styles::parser::load_css;
-use crate::styles::{CssClass, CssID, CssSource, ExistingCssIDs, StylePair, TagName};
+use crate::styles::{
+    AnimationKeyframe, CssClass, CssID, CssSource, ExistingCssIDs, ParsedCss, StylePair, TagName,
+};
 
 // Marks entities as needing CSS re-apply on hot reload
 use crate::html::reload::CssDirty;
 
-static PARSED_CSS_CACHE: Lazy<RwLock<HashMap<AssetId<CssAsset>, HashMap<String, StylePair>>>> =
+static PARSED_CSS_CACHE: Lazy<RwLock<HashMap<AssetId<CssAsset>, ParsedCss>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
 
 #[derive(Resource, Default)]
@@ -135,7 +137,7 @@ fn apply_css_to_entities(
             continue;
         };
 
-        let merged_styles = load_and_merge_styles_from_assets(
+        let merged_css = load_and_merge_styles_from_assets(
             &css_source.0,
             &css_assets,
             id,
@@ -149,22 +151,27 @@ fn apply_css_to_entities(
 
         let final_style = UiStyle {
             css: primary_css,
-            styles: merged_styles,
+            styles: merged_css.styles,
+            keyframes: merged_css.keyframes,
             active_style: None,
         };
 
         match style_query.get(entity) {
             Ok(Some(existing)) if existing.styles != final_style.styles => {
-                commands.entity(entity).queue_silenced(move |mut ew: EntityWorldMut| {
-                    ew.insert(final_style);
-                    ew.remove::<CssDirty>();
-                });
+                commands
+                    .entity(entity)
+                    .queue_silenced(move |mut ew: EntityWorldMut| {
+                        ew.insert(final_style);
+                        ew.remove::<CssDirty>();
+                    });
             }
             Ok(None) => {
-                commands.entity(entity).queue_silenced(move |mut ew: EntityWorldMut| {
-                    ew.insert(final_style);
-                    ew.remove::<CssDirty>();
-                });
+                commands
+                    .entity(entity)
+                    .queue_silenced(move |mut ew: EntityWorldMut| {
+                        ew.insert(final_style);
+                        ew.remove::<CssDirty>();
+                    });
             }
             _ => {}
         }
@@ -184,8 +191,9 @@ fn load_and_merge_styles_from_assets(
         Option<&TagName>,
         Option<&ChildOf>,
     )>,
-) -> HashMap<String, StylePair> {
-    let mut merged: HashMap<String, StylePair> = HashMap::new();
+) -> ParsedCss {
+    let mut merged_styles: HashMap<String, StylePair> = HashMap::new();
+    let mut merged_keyframes: HashMap<String, Vec<AnimationKeyframe>> = HashMap::new();
 
     for handle in sources {
         let asset_id = handle.id();
@@ -207,11 +215,11 @@ fn load_and_merge_styles_from_assets(
             parsed
         };
 
-        for (selector, new_style) in parsed_map.iter() {
+        for (selector, new_style) in parsed_map.styles.iter() {
             let selector_parts: Vec<&str> = selector.split_whitespace().collect();
 
             if matches_selector_chain(&selector_parts, id, class, tag, parent, parent_query) {
-                merged
+                merged_styles
                     .entry(selector.clone())
                     .and_modify(|existing| {
                         existing.normal.merge(&new_style.normal);
@@ -220,9 +228,16 @@ fn load_and_merge_styles_from_assets(
                     .or_insert_with(|| new_style.clone());
             }
         }
+
+        for (name, keyframes) in parsed_map.keyframes.iter() {
+            merged_keyframes.insert(name.clone(), keyframes.clone());
+        }
     }
 
-    merged
+    ParsedCss {
+        styles: merged_styles,
+        keyframes: merged_keyframes,
+    }
 }
 
 fn matches_selector_chain(
