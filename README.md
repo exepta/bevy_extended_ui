@@ -24,8 +24,8 @@ Available features:
 - [x] Hot reload support.
 - [x] HTML Bind support for interacting with the code.
 - [x] Font support for family and weight.
+- [x] Animation support (`@keyframes`).
 - [ ] Customizable theme.
-- [ ] Animation support.
 - [ ] Validation for widgets like required fields.
 - [ ] Custom Cursor or system cursor support.
 
@@ -64,6 +64,28 @@ Then you create an HTML file:
 
 </body>
 </html>
+```
+
+Basic `@keyframes` usage example:
+```css
+@keyframes button-pulse {
+    0% {
+        transform: scale(1);
+        background-color: #4c8bf5;
+    }
+    50% {
+        transform: scale(1.05);
+        background-color: #72a1ff;
+    }
+    100% {
+        transform: scale(1);
+        background-color: #4c8bf5;
+    }
+}
+
+.cta-button {
+    animation: button-pulse 1.4s ease-in-out infinite alternate;
+}
 ```
 
 And finally,

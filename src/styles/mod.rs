@@ -6,7 +6,7 @@ use crate::io::CssAsset;
 use crate::styles::components::UiStyle;
 use bevy::prelude::*;
 use std::cmp::PartialEq;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 // ==================================================
 //                     Css Styling
@@ -217,10 +217,171 @@ impl FontVal {
 #[derive(Reflect, Debug, Clone, PartialEq)]
 pub struct FontFamily(pub String);
 
+#[derive(Reflect, Debug, Clone, PartialEq, Eq, Copy)]
+pub enum TransitionTiming {
+    Linear,
+    Ease,
+    EaseIn,
+    EaseOut,
+    EaseInOut,
+}
+
+impl TransitionTiming {
+    pub fn apply(self, t: f32) -> f32 {
+        match self {
+            TransitionTiming::Linear => t,
+            TransitionTiming::Ease => t * t * (3.0 - 2.0 * t),
+            TransitionTiming::EaseIn => t * t,
+            TransitionTiming::EaseOut => 1.0 - (1.0 - t).powi(2),
+            TransitionTiming::EaseInOut => {
+                if t < 0.5 {
+                    2.0 * t * t
+                } else {
+                    1.0 - (-2.0 * t + 2.0).powi(2) / 2.0
+                }
+            }
+        }
+    }
+
+    pub fn from_name(value: &str) -> Option<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "linear" => Some(Self::Linear),
+            "ease" => Some(Self::Ease),
+            "ease-in" => Some(Self::EaseIn),
+            "ease-out" => Some(Self::EaseOut),
+            "ease-in-out" => Some(Self::EaseInOut),
+            _ => None,
+        }
+    }
+}
+
+impl Default for TransitionTiming {
+    fn default() -> Self {
+        TransitionTiming::EaseInOut
+    }
+}
+
+#[derive(Reflect, Debug, Clone, PartialEq, Eq, Copy)]
+pub enum AnimationDirection {
+    Normal,
+    Reverse,
+    Alternate,
+    AlternateReverse,
+}
+
+impl AnimationDirection {
+    pub fn from_name(value: &str) -> Option<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "normal" => Some(Self::Normal),
+            "reverse" => Some(Self::Reverse),
+            "alternate" => Some(Self::Alternate),
+            "alternate-reverse" => Some(Self::AlternateReverse),
+            _ => None,
+        }
+    }
+}
+
+impl Default for AnimationDirection {
+    fn default() -> Self {
+        AnimationDirection::Normal
+    }
+}
+
+#[derive(Reflect, Debug, Clone, PartialEq, Eq, Copy)]
+pub enum TransitionProperty {
+    All,
+    Color,
+    Background,
+    Transform,
+}
+
+impl Default for TransitionProperty {
+    fn default() -> Self {
+        TransitionProperty::All
+    }
+}
+
+#[derive(Reflect, Debug, Clone, PartialEq)]
+pub struct AnimationSpec {
+    pub name: String,
+    pub duration: f32,
+    pub delay: f32,
+    pub timing: TransitionTiming,
+    pub iterations: Option<f32>,
+    pub direction: AnimationDirection,
+}
+
+impl Default for AnimationSpec {
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            duration: 0.0,
+            delay: 0.0,
+            timing: TransitionTiming::Ease,
+            iterations: Some(1.0),
+            direction: AnimationDirection::Normal,
+        }
+    }
+}
+
+#[derive(Reflect, Debug, Clone, PartialEq)]
+pub struct TransitionSpec {
+    pub properties: Vec<TransitionProperty>,
+    pub duration: f32,
+    pub delay: f32,
+    pub timing: TransitionTiming,
+}
+
+impl Default for TransitionSpec {
+    fn default() -> Self {
+        Self {
+            properties: vec![TransitionProperty::All],
+            duration: 0.3,
+            delay: 0.0,
+            timing: TransitionTiming::EaseInOut,
+        }
+    }
+}
+
+#[derive(Reflect, Default, Debug, Clone, PartialEq)]
+pub struct AnimationKeyframe {
+    pub progress: f32,
+    pub style: Style,
+}
+
+#[derive(Reflect, Default, Debug, Clone, PartialEq)]
+pub struct ParsedCss {
+    pub styles: HashMap<String, StylePair>,
+    pub keyframes: HashMap<String, Vec<AnimationKeyframe>>,
+}
+
 #[derive(Reflect, Default, Debug, Clone, PartialEq)]
 pub struct StylePair {
     pub important: Style,
     pub normal: Style,
+}
+
+#[derive(Reflect, Default, Debug, Clone, PartialEq)]
+pub struct TransformStyle {
+    pub translation: Option<Val2>,
+    pub translation_x: Option<Val>,
+    pub translation_y: Option<Val>,
+    pub scale: Option<Vec2>,
+    pub scale_x: Option<f32>,
+    pub scale_y: Option<f32>,
+    pub rotation: Option<f32>,
+}
+
+impl TransformStyle {
+    pub fn is_empty(&self) -> bool {
+        self.translation.is_none()
+            && self.translation_x.is_none()
+            && self.translation_y.is_none()
+            && self.scale.is_none()
+            && self.scale_x.is_none()
+            && self.scale_y.is_none()
+            && self.rotation.is_none()
+    }
 }
 
 /// Comprehensive style properties for UI elements.
@@ -275,6 +436,9 @@ pub struct Style {
     pub z_index: Option<i32>,
     pub pointer_events: Option<Pickable>,
     pub scrollbar_width: Option<f32>,
+    pub transition: Option<TransitionSpec>,
+    pub transform: TransformStyle,
+    pub animation: Option<AnimationSpec>,
 }
 
 impl Style {
@@ -339,7 +503,10 @@ impl Style {
         merge_opt(&mut self.grid_auto_flow, &other.grid_auto_flow);
 
         merge_opt(&mut self.grid_template_rows, &other.grid_template_rows);
-        merge_opt(&mut self.grid_template_columns, &other.grid_template_columns);
+        merge_opt(
+            &mut self.grid_template_columns,
+            &other.grid_template_columns,
+        );
         merge_opt(&mut self.grid_auto_rows, &other.grid_auto_rows);
         merge_opt(&mut self.grid_auto_columns, &other.grid_auto_columns);
 
@@ -351,6 +518,26 @@ impl Style {
         merge_opt(&mut self.pointer_events, &other.pointer_events);
 
         merge_opt(&mut self.scrollbar_width, &other.scrollbar_width);
+        merge_opt(&mut self.transition, &other.transition);
+
+        merge_opt(
+            &mut self.transform.translation,
+            &other.transform.translation,
+        );
+        merge_opt(
+            &mut self.transform.translation_x,
+            &other.transform.translation_x,
+        );
+        merge_opt(
+            &mut self.transform.translation_y,
+            &other.transform.translation_y,
+        );
+        merge_opt(&mut self.transform.scale, &other.transform.scale);
+        merge_opt(&mut self.transform.scale_x, &other.transform.scale_x);
+        merge_opt(&mut self.transform.scale_y, &other.transform.scale_y);
+        merge_opt(&mut self.transform.rotation, &other.transform.rotation);
+
+        merge_opt(&mut self.animation, &other.animation);
     }
 }
 

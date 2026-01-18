@@ -61,3 +61,46 @@ body {
     width: 250px;
 }
 
+#fn_q_key {
+    z-index: 2;
+    animation: button-pulse 5.0s ease-in-out infinite alternate;
+}
+
+#fn_q_key:hover {
+    z-index: 2;
+    animation: btn-h 1.4s ease-in-out infinite alternate;
+}
+
+@keyframes button-pulse {
+    0% {
+        transform: scale(1) rotate(0deg);
+        background-color: #4c8bf5;
+    }
+    25% {
+        transform: scale(1.05) rotate(90deg);
+        background-color: #72a1ff;
+    }
+    50% {
+        transform: scale(1) rotate(180deg);
+        background-color: #4c8bf5;
+    }
+    75% {
+        transform: scale(1.05) rotate(270deg);
+        background-color: #72a1ff;
+    }
+    100% {
+        transform: scale(1) rotate(360deg);
+        background-color: #4c8bf5;
+    }
+}
+
+@keyframes btn-h {
+    0% {
+        transform: scale(1);
+        background-color: #4c8bf5;
+    }
+    100% {
+        transform: scale(1.05);
+        background-color: #72a1ff;
+    }
+}
