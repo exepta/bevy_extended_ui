@@ -266,6 +266,7 @@ pub enum TransitionProperty {
     All,
     Color,
     Background,
+    Transform,
 }
 
 impl Default for TransitionProperty {
@@ -297,6 +298,29 @@ impl Default for TransitionSpec {
 pub struct StylePair {
     pub important: Style,
     pub normal: Style,
+}
+
+#[derive(Reflect, Default, Debug, Clone, PartialEq)]
+pub struct TransformStyle {
+    pub translation: Option<Val2>,
+    pub translation_x: Option<Val>,
+    pub translation_y: Option<Val>,
+    pub scale: Option<Vec2>,
+    pub scale_x: Option<f32>,
+    pub scale_y: Option<f32>,
+    pub rotation: Option<f32>,
+}
+
+impl TransformStyle {
+    pub fn is_empty(&self) -> bool {
+        self.translation.is_none()
+            && self.translation_x.is_none()
+            && self.translation_y.is_none()
+            && self.scale.is_none()
+            && self.scale_x.is_none()
+            && self.scale_y.is_none()
+            && self.rotation.is_none()
+    }
 }
 
 /// Comprehensive style properties for UI elements.
@@ -352,6 +376,7 @@ pub struct Style {
     pub pointer_events: Option<Pickable>,
     pub scrollbar_width: Option<f32>,
     pub transition: Option<TransitionSpec>,
+    pub transform: TransformStyle,
 }
 
 impl Style {
@@ -432,6 +457,14 @@ impl Style {
 
         merge_opt(&mut self.scrollbar_width, &other.scrollbar_width);
         merge_opt(&mut self.transition, &other.transition);
+
+        merge_opt(&mut self.transform.translation, &other.transform.translation);
+        merge_opt(&mut self.transform.translation_x, &other.transform.translation_x);
+        merge_opt(&mut self.transform.translation_y, &other.transform.translation_y);
+        merge_opt(&mut self.transform.scale, &other.transform.scale);
+        merge_opt(&mut self.transform.scale_x, &other.transform.scale_x);
+        merge_opt(&mut self.transform.scale_y, &other.transform.scale_y);
+        merge_opt(&mut self.transform.rotation, &other.transform.rotation);
     }
 }
 

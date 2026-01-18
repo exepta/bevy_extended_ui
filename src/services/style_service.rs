@@ -381,7 +381,41 @@ fn apply_style_components(
         **pick = new_pick;
     }
 
-    let _ = components.10.as_mut();
+    if let Some(transform) = components.10.as_mut() {
+        if !style.transform.is_empty() {
+            let mut next = **transform;
+
+            if let Some(translation) = style.transform.translation {
+                next.translation = translation;
+            }
+
+            if let Some(x) = style.transform.translation_x {
+                next.translation.x = x;
+            }
+
+            if let Some(y) = style.transform.translation_y {
+                next.translation.y = y;
+            }
+
+            if let Some(scale) = style.transform.scale {
+                next.scale = scale;
+            }
+
+            if let Some(scale_x) = style.transform.scale_x {
+                next.scale.x = scale_x;
+            }
+
+            if let Some(scale_y) = style.transform.scale_y {
+                next.scale.y = scale_y;
+            }
+
+            if let Some(rotation) = style.transform.rotation {
+                next.rotation = Rot2::radians(rotation);
+            }
+
+            **transform = next;
+        }
+    }
 }
 
 fn blend_style(from: &Style, to: &Style, t: f32, spec: &TransitionSpec) -> Style {
@@ -431,7 +465,7 @@ fn transition_allows_background(spec: &TransitionSpec) -> bool {
 fn transition_allows_transform(spec: &TransitionSpec) -> bool {
     spec.properties
         .iter()
-        .any(|prop| matches!(prop, TransitionProperty::All))
+        .any(|prop| matches!(prop, TransitionProperty::All | TransitionProperty::Transform))
 }
 
 fn blend_ui_transform(from: UiTransform, to: UiTransform, t: f32) -> UiTransform {

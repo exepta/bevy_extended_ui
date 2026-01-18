@@ -1,9 +1,10 @@
 use crate::styles::paint::Colored;
 use crate::styles::{
-    Background, FontFamily, FontVal, FontWeight, Radius, Style, StylePair, TransitionProperty,
-    TransitionSpec, TransitionTiming,
+    Background, FontFamily, FontVal, FontWeight, Radius, Style, StylePair, TransformStyle,
+    TransitionProperty, TransitionSpec, TransitionTiming,
 };
 use bevy::prelude::*;
+use bevy::ui::Val2;
 use lightningcss::rules::CssRule;
 use lightningcss::stylesheet::{ParserOptions, PrinterOptions, StyleSheet};
 use lightningcss::traits::ToCss;
@@ -183,6 +184,7 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
         "scroll-width" => style.scrollbar_width = convert_to_f32(value.to_string()),
         "gap" => style.gap = convert_to_val(value.to_string()),
         "transition" => style.transition = parse_transition(value),
+        "transform" => apply_transform_functions(value, &mut style.transform),
         "justify-content" => {
             style.justify_content = convert_to_bevy_justify_content(value.to_string())
         }
@@ -341,6 +343,11 @@ fn parse_transition(value: &str) -> Option<TransitionSpec> {
                 has_property = true;
                 continue;
             }
+            "transform" | "scale" | "translate" | "translation" | "rotate" | "rotation" => {
+                spec.properties = vec![TransitionProperty::Transform];
+                has_property = true;
+                continue;
+            }
             _ => {}
         }
 
@@ -415,6 +422,130 @@ pub fn convert_to_val(value: String) -> Option<Val> {
         val = Some(Val::Px(0.0));
     }
     val
+}
+
+fn parse_val2(value: &str) -> Option<Val2> {
+    let parts: Vec<&str> = value.split_whitespace().collect();
+    match parts.as_slice() {
+        [x] => convert_to_val(x.to_string()).map(|x_val| Val2::new(x_val, Val::Px(0.0))),
+        [x, y, ..] => {
+            let x_val = convert_to_val((*x).to_string())?;
+            let y_val = convert_to_val((*y).to_string())?;
+            Some(Val2::new(x_val, y_val))
+        }
+        _ => None,
+    }
+}
+
+fn apply_transform_functions(value: &str, transform: &mut TransformStyle) {
+    let mut remainder = value.trim();
+    while let Some(open_idx) = remainder.find('(') {
+        let name = remainder[..open_idx].trim().to_ascii_lowercase();
+        let after_open = &remainder[open_idx + 1..];
+        let Some(close_idx) = after_open.find(')') else {
+            break;
+        };
+        let args = after_open[..close_idx].trim();
+        let normalized = args.replace(',', " ");
+
+        match name.as_str() {
+            "translate" | "translation" => {
+                if let Some(val) = parse_val2(normalized.as_str()) {
+                    transform.translation = Some(val);
+                }
+            }
+            "translatex" => {
+                if let Some(val) = convert_to_val(normalized.clone()) {
+                    transform.translation_x = Some(val);
+                }
+            }
+            "translatey" => {
+                if let Some(val) = convert_to_val(normalized.clone()) {
+                    transform.translation_y = Some(val);
+                }
+            }
+            "scale" => {
+                if let Some(val) = parse_scale_vec2(normalized.as_str()) {
+                    transform.scale = Some(val);
+                }
+            }
+            "scalex" => {
+                if let Some(val) = parse_scale_value(normalized.as_str()) {
+                    transform.scale_x = Some(val);
+                }
+            }
+            "scaley" => {
+                if let Some(val) = parse_scale_value(normalized.as_str()) {
+                    transform.scale_y = Some(val);
+                }
+            }
+            "rotate" | "rotation" => {
+                if let Some(val) = parse_rotation(normalized.as_str()) {
+                    transform.rotation = Some(val);
+                }
+            }
+            _ => {}
+        }
+
+        remainder = after_open[close_idx + 1..].trim_start();
+    }
+}
+
+fn parse_scale_value(value: &str) -> Option<f32> {
+    value.trim().parse::<f32>().ok()
+}
+
+fn parse_scale_vec2(value: &str) -> Option<Vec2> {
+    let parts: Vec<&str> = value.split_whitespace().collect();
+    match parts.as_slice() {
+        [x] => parse_scale_value(x).map(|v| Vec2::splat(v)),
+        [x, y, ..] => {
+            let x_val = parse_scale_value(x)?;
+            let y_val = parse_scale_value(y)?;
+            Some(Vec2::new(x_val, y_val))
+        }
+        _ => None,
+    }
+}
+
+fn parse_rotation(value: &str) -> Option<f32> {
+    let token = value.trim().to_ascii_lowercase();
+    if let Some(deg) = token.strip_suffix("deg") {
+        return deg
+            .trim()
+            .parse::<f32>()
+            .ok()
+            .map(|v| nudge_problematic_rotation(v.to_radians()));
+    }
+
+    if let Some(rad) = token.strip_suffix("rad") {
+        return rad.trim().parse::<f32>().ok().map(nudge_problematic_rotation);
+    }
+
+    token
+        .parse::<f32>()
+        .ok()
+        .map(|v| nudge_problematic_rotation(v.to_radians()))
+}
+
+fn nudge_problematic_rotation(rad: f32) -> f32 {
+    let tau = std::f32::consts::TAU;
+    let half_pi = std::f32::consts::FRAC_PI_2;
+    let quarter_pi = std::f32::consts::FRAC_PI_4;
+
+    // Normalize to [0, TAU)
+    let a = rad.rem_euclid(tau);
+
+    // Distance to nearest (45° + k*90°)
+    let m = (a - quarter_pi).rem_euclid(half_pi);
+    let dist = m.min(half_pi - m);
+
+    let eps = 1e-6;
+    if dist <= eps {
+        a + 1e-6
+    } else {
+        rad
+    }
 }
 
 /// Converts a numeric string into an [`i32`] if the format is valid.
