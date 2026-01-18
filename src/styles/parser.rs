@@ -1,4 +1,3 @@
-use std::cmp::Ordering;
 use crate::styles::paint::Colored;
 use crate::styles::{
     AnimationDirection, AnimationKeyframe, AnimationSpec, Background, FontFamily, FontVal,
@@ -12,6 +11,7 @@ use lightningcss::rules::keyframes::KeyframeSelector;
 use lightningcss::stylesheet::{ParserOptions, PrinterOptions, StyleSheet};
 use lightningcss::traits::ToCss;
 use regex::Regex;
+use std::cmp::Ordering;
 use std::collections::HashMap;
 
 /// Loads a CSS file and parses it into a [`ParsedCss`] with selectors and keyframes.
@@ -158,7 +158,11 @@ pub fn load_css(css: &str) -> ParsedCss {
     }
 
     for keyframes in keyframes_map.values_mut() {
-        keyframes.sort_by(|a, b| a.progress.partial_cmp(&b.progress).unwrap_or(Ordering::Equal));
+        keyframes.sort_by(|a, b| {
+            a.progress
+                .partial_cmp(&b.progress)
+                .unwrap_or(Ordering::Equal)
+        });
     }
 
     ParsedCss {
@@ -371,7 +375,7 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
 
 fn keyframe_selector_progress(selector: &KeyframeSelector) -> Option<f32> {
     match selector {
-        KeyframeSelector::Percentage(p) => Some(p.0.clamp(0.0, 1.0) as f32),
+        KeyframeSelector::Percentage(p) => Some(p.0.clamp(0.0, 1.0)),
         KeyframeSelector::From => Some(0.0),
         KeyframeSelector::To => Some(1.0),
         KeyframeSelector::TimelineRangePercentage(_) => None,

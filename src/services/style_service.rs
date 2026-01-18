@@ -1,4 +1,3 @@
-use crate::ImageCache;
 use crate::html::HtmlStyle;
 use crate::services::image_service::get_or_load_image;
 use crate::services::state_service::update_widget_states;
@@ -13,6 +12,7 @@ use bevy::color::Srgba;
 use bevy::math::Rot2;
 use bevy::prelude::*;
 use bevy::ui::{UiTransform, Val2};
+use crate::ImageCache;
 
 pub struct StyleService;
 
@@ -459,39 +459,42 @@ fn apply_style_components(
     }
 
     if let Some(transform) = components.10.as_mut() {
-        if !style.transform.is_empty() {
-            let mut next = **transform;
-
-            if let Some(translation) = style.transform.translation {
-                next.translation = translation;
-            }
-
-            if let Some(x) = style.transform.translation_x {
-                next.translation.x = x;
-            }
-
-            if let Some(y) = style.transform.translation_y {
-                next.translation.y = y;
-            }
-
-            if let Some(scale) = style.transform.scale {
-                next.scale = scale;
-            }
-
-            if let Some(scale_x) = style.transform.scale_x {
-                next.scale.x = scale_x;
-            }
-
-            if let Some(scale_y) = style.transform.scale_y {
-                next.scale.y = scale_y;
-            }
-
-            if let Some(rotation) = style.transform.rotation {
-                next.rotation = Rot2::radians(rotation);
-            }
-
-            **transform = next;
+        if style.transform.is_empty() {
+            **transform = UiTransform::default();
+            return;
         }
+
+        let mut next = **transform;
+
+        if let Some(translation) = style.transform.translation {
+            next.translation = translation;
+        }
+
+        if let Some(x) = style.transform.translation_x {
+            next.translation.x = x;
+        }
+
+        if let Some(y) = style.transform.translation_y {
+            next.translation.y = y;
+        }
+
+        if let Some(scale) = style.transform.scale {
+            next.scale = scale;
+        }
+
+        if let Some(scale_x) = style.transform.scale_x {
+            next.scale.x = scale_x;
+        }
+
+        if let Some(scale_y) = style.transform.scale_y {
+            next.scale.y = scale_y;
+        }
+
+        if let Some(rotation) = style.transform.rotation {
+            next.rotation = Rot2::radians(rotation);
+        }
+
+        **transform = next;
     }
 }
 
