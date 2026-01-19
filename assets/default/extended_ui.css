@@ -734,13 +734,12 @@ toggle:disabled .button-text {
 @keyframes default-pulse {
     0% {
         transform: scale(1);
-        background-color: #4c8bf5;
     }
     100% {
         transform: scale(1.05);
-        background-color: #72a1ff;
     }
 }
+
 
 @keyframes default-shake {
     0% {
