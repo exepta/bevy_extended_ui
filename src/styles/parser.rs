@@ -1,13 +1,20 @@
 use crate::styles::paint::Colored;
-use crate::styles::{Background, FontFamily, FontVal, FontWeight, Radius, Style, StylePair};
+use crate::styles::{
+    AnimationDirection, AnimationKeyframe, AnimationSpec, Background, FontFamily, FontVal,
+    FontWeight, ParsedCss, Radius, Style, StylePair, TransformStyle, TransitionProperty,
+    TransitionSpec, TransitionTiming,
+};
 use bevy::prelude::*;
+use bevy::ui::Val2;
 use lightningcss::rules::CssRule;
+use lightningcss::rules::keyframes::KeyframeSelector;
 use lightningcss::stylesheet::{ParserOptions, PrinterOptions, StyleSheet};
 use lightningcss::traits::ToCss;
 use regex::Regex;
+use std::cmp::Ordering;
 use std::collections::HashMap;
 
-/// Loads a CSS file and parses it into a [`HashMap`] of selectors to [`Style`] structs.
+/// Loads a CSS file and parses it into a [`ParsedCss`] with selectors and keyframes.
 ///
 /// This function reads a `.css` file from the disk, parses its rules, and converts each supported
 /// CSS property into a Bevy-compatible [`Style`] representation. These styles can later be applied
@@ -17,32 +24,32 @@ use std::collections::HashMap;
 /// - `path`: A path to the CSS file. If empty, it falls back to the default path `"assets/internal.css"`.
 ///
 /// # Returns
-/// - `Ok(HashMap<selector, Style>)` on success, where each key is a full CSS selector (e.g. `#login:hover`)
-/// - `Ok(empty map)` if the file cannot be read or parsed, but no panic occurs
-/// - `Err(...)` is reserved for future use (currently always returns `Ok(...)`)
+/// - `ParsedCss` on success, containing styles and keyframes.
+/// - Empty maps if the file cannot be parsed, but no panic occurs.
 ///
 /// # Example
 /// ```rust
 /// use bevy_extended_ui::styling::css::load_css;
-/// let styles = load_css("assets/theme.css").unwrap();
-/// let button_style = styles.get(".button:hover");
+/// let styles = load_css("assets/theme.css");
+/// let button_style = styles.styles.get(".button:hover");
 /// ```
 ///
 /// # Notes
 /// - This uses [`grass_compiler::StyleSheet`] to parse the file.
 /// - Supports standard properties like `width`, `height`, `padding`, `color`, `background`, `font-size`, `z-index`, etc.
 /// - Ignores unsupported or malformed declarations silently.
-pub fn load_css(css: &str) -> HashMap<String, StylePair> {
+pub fn load_css(css: &str) -> ParsedCss {
     let stylesheet = match StyleSheet::parse(css, ParserOptions::default()) {
         Ok(stylesheet) => stylesheet,
         Err(err) => {
             error!("Css Parsing failed: {:?}", err);
-            return HashMap::new();
+            return ParsedCss::default();
         }
     };
 
     let mut css_vars = HashMap::new();
     let mut style_map = HashMap::new();
+    let mut keyframes_map: HashMap<String, Vec<AnimationKeyframe>> = HashMap::new();
 
     for rule in &stylesheet.rules.0 {
         if let CssRule::Style(style_rule) = rule {
@@ -58,7 +65,11 @@ pub fn load_css(css: &str) -> HashMap<String, StylePair> {
             let decls = &style_rule.declarations;
 
             if selector.trim() == ":root" {
-                for property in decls.declarations.iter().chain(decls.important_declarations.iter()) {
+                for property in decls
+                    .declarations
+                    .iter()
+                    .chain(decls.important_declarations.iter())
+                {
                     let property_id = property.property_id();
                     let name = property_id.name();
                     if name.starts_with("--") {
@@ -99,9 +110,65 @@ pub fn load_css(css: &str) -> HashMap<String, StylePair> {
 
             style_map.insert(selector, style);
         }
+
+        if let CssRule::Keyframes(keyframes_rule) = rule {
+            let name = match keyframes_rule.name.to_css_string(PrinterOptions::default()) {
+                Ok(name) => name,
+                Err(_) => continue,
+            };
+
+            let entry = keyframes_map.entry(name).or_default();
+
+            for keyframe in &keyframes_rule.keyframes {
+                let mut style = Style::default();
+                let decls = &keyframe.declarations;
+
+                for property in &decls.declarations {
+                    let property_id = property.property_id();
+                    let name = property_id.name();
+                    let value = match property.value_to_css_string(PrinterOptions::default()) {
+                        Ok(v) => v,
+                        Err(_) => continue,
+                    };
+                    let resolved = resolve_var(&value, &css_vars);
+                    apply_property_to_style(&mut style, name, &resolved);
+                }
+
+                for property in &decls.important_declarations {
+                    let property_id = property.property_id();
+                    let name = property_id.name();
+                    let value = match property.value_to_css_string(PrinterOptions::default()) {
+                        Ok(v) => v,
+                        Err(_) => continue,
+                    };
+                    let resolved = resolve_var(&value, &css_vars);
+                    apply_property_to_style(&mut style, name, &resolved);
+                }
+
+                for selector in &keyframe.selectors {
+                    if let Some(progress) = keyframe_selector_progress(selector) {
+                        entry.push(AnimationKeyframe {
+                            progress,
+                            style: style.clone(),
+                        });
+                    }
+                }
+            }
+        }
     }
 
-    style_map
+    for keyframes in keyframes_map.values_mut() {
+        keyframes.sort_by(|a, b| {
+            a.progress
+                .partial_cmp(&b.progress)
+                .unwrap_or(Ordering::Equal)
+        });
+    }
+
+    ParsedCss {
+        styles: style_map,
+        keyframes: keyframes_map,
+    }
 }
 
 fn resolve_var(value: &str, css_vars: &HashMap<String, String>) -> String {
@@ -175,6 +242,15 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
         "box-sizing" => style.box_sizing = convert_to_box_sizing(value.to_string()),
         "scroll-width" => style.scrollbar_width = convert_to_f32(value.to_string()),
         "gap" => style.gap = convert_to_val(value.to_string()),
+        "transition" => style.transition = parse_transition(value),
+        "transform" => apply_transform_functions(value, &mut style.transform),
+        "animation" => style.animation = parse_animation(value),
+        "animation-name" => apply_animation_name(style, value),
+        "animation-duration" => apply_animation_duration(style, value),
+        "animation-delay" => apply_animation_delay(style, value),
+        "animation-timing-function" => apply_animation_timing(style, value),
+        "animation-iteration-count" => apply_animation_iterations(style, value),
+        "animation-direction" => apply_animation_direction(style, value),
         "justify-content" => {
             style.justify_content = convert_to_bevy_justify_content(value.to_string())
         }
@@ -227,11 +303,13 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
         "font-size" => style.font_size = convert_to_font_size(value.to_string()),
         "font-family" => {
             style.font_family = Some(FontFamily(
-                value.trim()
+                value
+                    .trim()
                     .replace(" ", "")
                     .replace("\"", "")
                     .replace("'", "")
-                    .to_string()));
+                    .to_string(),
+            ));
         }
         "font-weight" => {
             style.font_weight = convert_to_font_weight(value.to_string());
@@ -295,6 +373,193 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
     }
 }
 
+fn keyframe_selector_progress(selector: &KeyframeSelector) -> Option<f32> {
+    match selector {
+        KeyframeSelector::Percentage(p) => Some(p.0.clamp(0.0, 1.0)),
+        KeyframeSelector::From => Some(0.0),
+        KeyframeSelector::To => Some(1.0),
+        KeyframeSelector::TimelineRangePercentage(_) => None,
+    }
+}
+
+fn parse_time_seconds(token: &str) -> Option<f32> {
+    let token = token.trim().to_ascii_lowercase();
+    if let Some(value) = token.strip_suffix("ms") {
+        return value.trim().parse::<f32>().ok().map(|v| v / 1000.0);
+    }
+
+    if let Some(value) = token.strip_suffix('s') {
+        return value.trim().parse::<f32>().ok();
+    }
+
+    None
+}
+
+fn parse_transition(value: &str) -> Option<TransitionSpec> {
+    let mut spec = TransitionSpec::default();
+    let mut has_duration = false;
+    let mut has_delay = false;
+    let mut has_property = false;
+
+    for token in value.split_whitespace() {
+        match token.to_ascii_lowercase().as_str() {
+            "all" => {
+                spec.properties = vec![TransitionProperty::All];
+                has_property = true;
+                continue;
+            }
+            "color" => {
+                spec.properties = vec![TransitionProperty::Color];
+                has_property = true;
+                continue;
+            }
+            "background" | "background-color" => {
+                spec.properties = vec![TransitionProperty::Background];
+                has_property = true;
+                continue;
+            }
+            "transform" | "scale" | "translate" | "translation" | "rotate" | "rotation" => {
+                spec.properties = vec![TransitionProperty::Transform];
+                has_property = true;
+                continue;
+            }
+            _ => {}
+        }
+
+        if let Some(time) = parse_time_seconds(token) {
+            if !has_duration {
+                spec.duration = time;
+                has_duration = true;
+            } else if !has_delay {
+                spec.delay = time;
+                has_delay = true;
+            }
+            continue;
+        }
+
+        if let Some(timing) = TransitionTiming::from_name(token) {
+            spec.timing = timing;
+        }
+    }
+
+    if has_duration || has_property {
+        Some(spec)
+    } else {
+        None
+    }
+}
+
+fn parse_animation(value: &str) -> Option<AnimationSpec> {
+    let mut spec = AnimationSpec::default();
+    let mut has_duration = false;
+    let mut has_delay = false;
+    let mut has_name = false;
+
+    let segment = value.split(',').next().unwrap_or(value);
+    for token in segment.split_whitespace() {
+        let lower = token.to_ascii_lowercase();
+
+        if let Some(time) = parse_time_seconds(token) {
+            if !has_duration {
+                spec.duration = time;
+                has_duration = true;
+            } else if !has_delay {
+                spec.delay = time;
+                has_delay = true;
+            }
+            continue;
+        }
+
+        if let Some(timing) = TransitionTiming::from_name(token) {
+            spec.timing = timing;
+            continue;
+        }
+
+        if let Some(direction) = AnimationDirection::from_name(token) {
+            spec.direction = direction;
+            continue;
+        }
+
+        if lower == "infinite" {
+            spec.iterations = None;
+            continue;
+        }
+
+        if let Ok(count) = token.parse::<f32>() {
+            spec.iterations = Some(count.max(0.0));
+            continue;
+        }
+
+        if !has_name && lower != "none" {
+            spec.name = token.to_string();
+            has_name = true;
+        }
+    }
+
+    if spec.name.is_empty() {
+        None
+    } else {
+        Some(spec)
+    }
+}
+
+fn ensure_animation_spec(style: &mut Style) -> &mut AnimationSpec {
+    style.animation.get_or_insert_with(AnimationSpec::default)
+}
+
+fn apply_animation_name(style: &mut Style, value: &str) {
+    let name = value.trim();
+    if name.eq_ignore_ascii_case("none") || name.is_empty() {
+        style.animation = None;
+        return;
+    }
+
+    let spec = ensure_animation_spec(style);
+    spec.name = name.to_string();
+}
+
+fn apply_animation_duration(style: &mut Style, value: &str) {
+    if let Some(duration) = parse_time_seconds(value) {
+        let spec = ensure_animation_spec(style);
+        spec.duration = duration;
+    }
+}
+
+fn apply_animation_delay(style: &mut Style, value: &str) {
+    if let Some(delay) = parse_time_seconds(value) {
+        let spec = ensure_animation_spec(style);
+        spec.delay = delay;
+    }
+}
+
+fn apply_animation_timing(style: &mut Style, value: &str) {
+    if let Some(timing) = TransitionTiming::from_name(value) {
+        let spec = ensure_animation_spec(style);
+        spec.timing = timing;
+    }
+}
+
+fn apply_animation_iterations(style: &mut Style, value: &str) {
+    let trimmed = value.trim();
+    let spec = ensure_animation_spec(style);
+
+    if trimmed.eq_ignore_ascii_case("infinite") {
+        spec.iterations = None;
+        return;
+    }
+
+    if let Ok(count) = trimmed.parse::<f32>() {
+        spec.iterations = Some(count.max(0.0));
+    }
+}
+
+fn apply_animation_direction(style: &mut Style, value: &str) {
+    if let Some(direction) = AnimationDirection::from_name(value) {
+        let spec = ensure_animation_spec(style);
+        spec.direction = direction;
+    }
+}
+
 fn convert_to_font_weight(value: String) -> Option<FontWeight> {
     let in_value = value.trim();
     if in_value.is_empty() {
@@ -343,6 +608,130 @@ pub fn convert_to_val(value: String) -> Option<Val> {
         val = Some(Val::Px(0.0));
     }
     val
+}
+
+fn parse_val2(value: &str) -> Option<Val2> {
+    let parts: Vec<&str> = value.split_whitespace().collect();
+    match parts.as_slice() {
+        [x] => convert_to_val(x.to_string()).map(|x_val| Val2::new(x_val, Val::Px(0.0))),
+        [x, y, ..] => {
+            let x_val = convert_to_val((*x).to_string())?;
+            let y_val = convert_to_val((*y).to_string())?;
+            Some(Val2::new(x_val, y_val))
+        }
+        _ => None,
+    }
+}
+
+fn apply_transform_functions(value: &str, transform: &mut TransformStyle) {
+    let mut remainder = value.trim();
+    while let Some(open_idx) = remainder.find('(') {
+        let name = remainder[..open_idx].trim().to_ascii_lowercase();
+        let after_open = &remainder[open_idx + 1..];
+        let Some(close_idx) = after_open.find(')') else {
+            break;
+        };
+        let args = after_open[..close_idx].trim();
+        let normalized = args.replace(',', " ");
+
+        match name.as_str() {
+            "translate" | "translation" => {
+                if let Some(val) = parse_val2(normalized.as_str()) {
+                    transform.translation = Some(val);
+                }
+            }
+            "translatex" => {
+                if let Some(val) = convert_to_val(normalized.clone()) {
+                    transform.translation_x = Some(val);
+                }
+            }
+            "translatey" => {
+                if let Some(val) = convert_to_val(normalized.clone()) {
+                    transform.translation_y = Some(val);
+                }
+            }
+            "scale" => {
+                if let Some(val) = parse_scale_vec2(normalized.as_str()) {
+                    transform.scale = Some(val);
+                }
+            }
+            "scalex" => {
+                if let Some(val) = parse_scale_value(normalized.as_str()) {
+                    transform.scale_x = Some(val);
+                }
+            }
+            "scaley" => {
+                if let Some(val) = parse_scale_value(normalized.as_str()) {
+                    transform.scale_y = Some(val);
+                }
+            }
+            "rotate" | "rotation" => {
+                if let Some(val) = parse_rotation(normalized.as_str()) {
+                    transform.rotation = Some(val);
+                }
+            }
+            _ => {}
+        }
+
+        remainder = after_open[close_idx + 1..].trim_start();
+    }
+}
+
+fn parse_scale_value(value: &str) -> Option<f32> {
+    value.trim().parse::<f32>().ok()
+}
+
+fn parse_scale_vec2(value: &str) -> Option<Vec2> {
+    let parts: Vec<&str> = value.split_whitespace().collect();
+    match parts.as_slice() {
+        [x] => parse_scale_value(x).map(|v| Vec2::splat(v)),
+        [x, y, ..] => {
+            let x_val = parse_scale_value(x)?;
+            let y_val = parse_scale_value(y)?;
+            Some(Vec2::new(x_val, y_val))
+        }
+        _ => None,
+    }
+}
+
+fn parse_rotation(value: &str) -> Option<f32> {
+    let token = value.trim().to_ascii_lowercase();
+    if let Some(deg) = token.strip_suffix("deg") {
+        return deg
+            .trim()
+            .parse::<f32>()
+            .ok()
+            .map(|v| nudge_problematic_rotation(v.to_radians()));
+    }
+
+    if let Some(rad) = token.strip_suffix("rad") {
+        return rad
+            .trim()
+            .parse::<f32>()
+            .ok()
+            .map(nudge_problematic_rotation);
+    }
+
+    token
+        .parse::<f32>()
+        .ok()
+        .map(|v| nudge_problematic_rotation(v.to_radians()))
+}
+
+fn nudge_problematic_rotation(rad: f32) -> f32 {
+    let tau = std::f32::consts::TAU;
+    let half_pi = std::f32::consts::FRAC_PI_2;
+    let quarter_pi = std::f32::consts::FRAC_PI_4;
+
+    // Normalize to [0, TAU)
+    let a = rad.rem_euclid(tau);
+
+    // Distance to nearest (45° + k*90°)
+    let m = (a - quarter_pi).rem_euclid(half_pi);
+    let dist = m.min(half_pi - m);
+
+    let eps = 1e-6;
+    if dist <= eps { a + 1e-6 } else { rad }
 }
 
 /// Converts a numeric string into an [`i32`] if the format is valid.
@@ -594,7 +983,7 @@ pub fn convert_to_box_sizing(value: String) -> Option<BoxSizing> {
 /// Accepts 1–4 values (e.g. `"10px"`, `"10px 20px"`, etc.), similar to CSS shorthand.
 /// Uses the same order as CSS:
 /// - 1 value → all corners
-/// - 2 values → top-left & top-right / bottom-right & bottom-left
+/// - 2 values → top-left and top-right / bottom-right and bottom-left
 /// - 3 values → top-left / top-right / bottom-left (bottom-right = 0)
 /// - 4 values → top-left / top-right / bottom-right / bottom-left
 ///
@@ -654,7 +1043,7 @@ pub fn convert_to_radius(value: String) -> Option<Radius> {
 ///
 /// Accepts 1–4 values:
 /// - 1 value → all sides
-/// - 2 values → top & bottom / left & right
+/// - 2 values → top and bottom / left and right
 /// - 3 values → left / right / top (bottom = 0)
 /// - 4 values → left / right / top / bottom
 ///
@@ -1006,10 +1395,10 @@ pub fn convert_to_bevy_grid_flow(value: String) -> Option<GridAutoFlow> {
  *
  * Supports values such as
  * - "span N" (where N is a positive integer),
- * - "start/end" (two positive integers separated by a slash),
- * - or a single positive integer (start).
+ * - "start/end" (two positive integers separated by a slash)
+ * - Or a single positive integer (start).
  *
- * @param value The CSS grid placement string as a string slice.
+ * @param value is The CSS grid placement string as a string slice.
  * @return Some(GridPlacement) if the value is valid and parsed, None otherwise.
  */
 pub fn convert_to_bevy_grid_placement(value: String) -> Option<GridPlacement> {
@@ -1119,9 +1508,9 @@ pub fn convert_to_bevy_grid_template(value: String) -> Option<Vec<RepeatedGridTr
  * - "min-content"
  * - "max-content"
  * - "minmax(min, max)"
- * - fixed sizes with units: "100px", "50%", "1fr"
+ * - fixed sizes with units: "100px", "50%"
  *
- * @param input The CSS grid track string.
+ * @param input is The CSS grid track string.
  * @return Some(GridTrack) if parsing succeeds, None otherwise.
  */
 fn parse_single_grid_track(input: &str) -> Option<GridTrack> {
@@ -1165,7 +1554,7 @@ fn parse_single_grid_track(input: &str) -> Option<GridTrack> {
  * - "max-content"
  * - fixed size in px, e.g. "100px"
  *
- * @param input The CSS min track sizing string.
+ * @param input is The CSS min track sizing string.
  * @return Some(MinTrackSizingFunction) if parsing succeeds, None otherwise.
  */
 fn parse_min_sizing(input: &str) -> Option<MinTrackSizingFunction> {
@@ -1190,9 +1579,9 @@ fn parse_min_sizing(input: &str) -> Option<MinTrackSizingFunction> {
  * - "min-content"
  * - "max-content"
  * - fixed size in px, e.g. "100px"
- * - fractional units, e.g. "1fr"
+ * - fractional units, e.g. "1 fr"
  *
- * @param input The CSS max track sizing string.
+ *  @param input is The CSS max track sizing string.
  * @return Some(MaxTrackSizingFunction) if parsing succeeds, None otherwise.
  */
 fn parse_max_sizing(input: &str) -> Option<MaxTrackSizingFunction> {
@@ -1228,9 +1617,9 @@ fn parse_max_sizing(input: &str) -> Option<MaxTrackSizingFunction> {
  * - "x" applies only to the horizontal axis.
  * - "y" applies only to the vertical axis.
  *
- * @param value The CSS overflow value string.
+ * @param value is The CSS overflow value string.
  * @param which The axis specifier ("x", "y", "all", etc.).
- * @return Some(Overflow) if valid input, None otherwise.
+ * @return Some (Overflow) if valid input, None otherwise.
  */
 pub fn convert_overflow(value: String, which: &str) -> Option<Overflow> {
     let trimmed = value.trim();
@@ -1268,9 +1657,9 @@ pub fn convert_overflow(value: String, which: &str) -> Option<Overflow> {
  * Supported units:
  * - px (pixels), e.g. "10px"
  * - percent (%), e.g. "50%"
- * - zero ("0") without unit
+ * - zero ("0") without a unit
  *
- * @param value The CSS radius string.
+ * @param value is The CSS radius string.
  * @return Some(Vec<Val>) if parsing succeeds, None otherwise.
  */
 fn parse_radius_values(value: &str) -> Option<Vec<Val>> {

@@ -1,6 +1,6 @@
 :root {
-    --primary: #ef7545;
-    --primary-hover: #fa8354;
+    --primary: #ff7037;
+    --primary-hover: #ef7545;
     --primary-disabled: #754e44;
     --primary-transparent-layer: rgba(239, 117, 69, 0.35);
     --headline: #b9b9c6;
@@ -25,6 +25,7 @@ button {
     justify-content: center;
     align-items: center;
     gap: 10px;
+    transition: all 0.3s;
     padding: 0 15px;
 }
 
@@ -38,6 +39,7 @@ button:hover {
 
 button .button-text {
     color: var(--text-color);
+    transition: all 0.3s;
 }
 
 button:disabled .button-text {
@@ -54,6 +56,7 @@ checkbox {
     align-items: center;
     flex-direction: row;
     gap: 10px;
+    transition: all 0.3s;
 }
 
 checkbox .mark-box {
@@ -65,6 +68,7 @@ checkbox .mark-box {
     border-radius: 4px;
     border: 2px;
     border-color: var(--text-color);
+    transition: all 0.3s;
 }
 
 checkbox:disabled .mark-box {
@@ -76,6 +80,7 @@ checkbox .mark-box .mark {
     color: var(--text-color);
     width: 16px;
     height: 16px;
+    transition: all 0.3s;
 }
 
 checkbox:disabled .mark-box .mark {
@@ -94,6 +99,7 @@ checkbox:disabled .mark-box {
 
 checkbox .check-text {
     font-size: 13px;
+    transition: all 0.3s;
 }
 
 checkbox:disabled .check-text {
@@ -206,6 +212,7 @@ input {
     border-radius: 5px;
     border: 2px;
     border-color: var(--text-color-dark);
+    transition: all 0.3s;
 }
 
 input:disabled {
@@ -226,6 +233,7 @@ input .input-label {
     top: 19px;
     font-size: 14px;
     color: var(--text-color);
+    transition: all 0.3s;
 }
 
 input .in-icon-container {
@@ -234,11 +242,13 @@ input .in-icon-container {
     display: flex;
     justify-content: center;
     align-items: center;
+    transition: all 0.3s;
 }
 
 .in-icon-container .in-icon {
     font-size: 16px;
     color: var(--text-color);
+    transition: all 0.3s;
 }
 
 input .in-text-container {
@@ -250,6 +260,7 @@ input .in-text-container {
     overflow-y: hidden;
     overflow-x: scroll;
     padding-left: 10px;
+    transition: all 0.3s;
 }
 
 input:disabled .input-label {
@@ -269,6 +280,7 @@ input .in-text-container .input-text {
     width: 100%;
     text-wrap: nowrap;
     color: var(--text-color);
+    transition: all 0.3s;
 }
 
 input:disabled .in-text-container .input-text {
@@ -279,6 +291,7 @@ input .in-text-container .input-cursor {
     width: 2px;
     height: 20px;
     background: var(--text-color);
+    transition: all 0.3s;
 }
 
 input:disabled .in-text-container .input-cursor {
@@ -298,6 +311,7 @@ progressbar {
     min-height: 10px;
     border-radius: 5px;
     background: var(--primary-transparent-layer);
+    transition: all 0.3s;
 }
 
 progressbar .progress {
@@ -305,6 +319,7 @@ progressbar .progress {
     height: 100%;
     background: var(--primary-hover);
     border-radius: 5px;
+    transition: all 0.3s;
 }
 
 /* Radio Button */
@@ -318,6 +333,7 @@ radio {
     gap: 10px;
     min-width: 100px;
     min-height: 50px;
+    transition: all 0.3s;
 }
 
 radio .radio-dot {
@@ -330,6 +346,7 @@ radio .radio-dot {
     justify-content: center;
     align-items: center;
     background: transparent;
+    transition: all 0.3s;
 }
 
 radio:hover .radio-dot {
@@ -349,6 +366,7 @@ radio .radio-dot .checked-dot {
     height: 17px;
     background: var(--primary);
     border-radius: 50%;
+    transition: all 0.3s;
 }
 
 radio:disabled .radio-dot .checked-dot {
@@ -358,6 +376,7 @@ radio:disabled .radio-dot .checked-dot {
 radio .radio-text {
     font-size: 13px;
     color: var(--text-color);
+    transition: all 0.3s;
 }
 
 radio:disabled .radio-text {
@@ -371,6 +390,7 @@ scroll {
     background: var(--primary-transparent-layer);
     border-radius: 5px;
     position: relative;
+    transition: all 0.3s;
 }
 
 .scroll-horizontal {
@@ -381,6 +401,7 @@ scroll {
 scroll .scroll-track {
     width: 100%;
     height: 100%;
+    transition: all 0.3s;
 }
 
 scroll .scroll-track .scroll-thumb {
@@ -388,6 +409,7 @@ scroll .scroll-track .scroll-thumb {
     width: 100%;
     background: var(--primary);
     border-radius: 5px;
+    transition: all 0.3s;
 }
 
 .scroll-horizontal .scroll-track .scroll-thumb {
@@ -404,6 +426,7 @@ select {
     border-color: var(--text-color);
     color: var(--text-color);
     z-index: 1;
+    transition: all 0.3s;
 }
 
 select:disabled {
@@ -425,6 +448,7 @@ select .select-label {
     top: 19px;
     color: var(--text-color);
     font-size: 14px;
+    transition: all 0.3s;
 }
 
 select:disabled .select-label {
@@ -447,11 +471,13 @@ select .option-drop-box {
     display: flex;
     justify-content: center;
     align-items: center;
+    transition: all 0.3s;
 }
 
 select .option-drop-box .option-drop-icon {
     color: var(--text-color);
     font-size: 14px;
+    transition: all 0.3s;
 }
 
 .option-drop-box .option-drop-icon:hover {
@@ -472,11 +498,13 @@ select .option-selected {
     padding-left: 15px;
     flex-grow: 1;
     border-radius: 5px 0;
+    transition: all 0.3s;
 }
 
 select .option-selected .option-sel-text {
     color: var(--text-color);
     font-size: 14px;
+    transition: all 0.3s;
 }
 
 .option-selected:disabled .option-sel-text {
@@ -498,6 +526,7 @@ select .choice-content-box {
     background: var(--gray-background);
     overflow-x: hidden;
     overflow-y: scroll;
+    transition: all 0.3s;
 }
 
 select .choice-content-box .choice-option {
@@ -513,11 +542,13 @@ select .choice-content-box .choice-option {
     gap: 10px;
     flex-grow: 1;
     background: var(--gray-background);
+    transition: all 0.3s;
 }
 
 select .choice-content-box .choice-option .option-text {
     color: var(--text-color);
     font-size: 14px;
+    transition: all 0.3s;
 }
 
 
@@ -545,6 +576,7 @@ slider {
     display: flex;
     justify-content: center;
     align-items: center;
+    transition: all 0.3s;
 }
 
 slider .slider-track {
@@ -557,6 +589,7 @@ slider .slider-track {
     display: flex;
     justify-content: start;
     align-items: center;
+    transition: all 0.3s;
 }
 
 slider:disabled .slider-track {
@@ -571,6 +604,7 @@ slider .slider-track .track-fill {
     width: 0;
     background: var(--primary);
     border-radius: 5px;
+    transition: all 0.3s;
 }
 
 slider:disabled .slider-track .track-fill {
@@ -584,6 +618,7 @@ slider .slider-track .thumb {
     border-radius: 50%;
     position: absolute;
     box-shadow: 0 0 1px 1px #303033;
+    transition: all 0.3s;
 }
 
 slider:disabled .slider-track .thumb {
@@ -600,16 +635,19 @@ switch {
     align-items: center;
     position: relative;
     gap: 10px;
+    transition: all 0.3s;
 }
 
 switch .switch-text {
     font-size: 11px;
     font-weight: 200;
     color: var(--text-color);
+    transition: all 0.3s;
 }
 
 switch:disabled .switch-text {
     color: var(--disabled-text);
+    transition: all 0.3s;
 }
 
 switch .switch-track {
@@ -621,6 +659,7 @@ switch .switch-track {
     display: flex;
     justify-content: start;
     align-items: center;
+    transition: all 0.3s;
 }
 
 switch:checked .switch-track {
@@ -642,11 +681,13 @@ switch .switch-track .switch-dot {
     align-items: center;
     padding: 5px;
     background: var(--primary);
+    transition: all 0.3s;
 }
 
 switch .switch-track .switch-dot .icon-dot {
     width: 80%;
     height: 80%;
+    transition: all 0.3s;
 }
 
 switch:disabled .switch-track .switch-dot {
@@ -663,6 +704,7 @@ toggle {
     display: flex;
     justify-content: center;
     align-items: center;
+    transition: all 0.3s;
 }
 
 toggle:disabled {
@@ -683,4 +725,54 @@ toggle .button-text {
 
 toggle:disabled .button-text {
     color: var(--disabled-text);
+}
+
+/**********************************
+             Animations
+ ***********************************/
+
+@keyframes default-pulse {
+    0% {
+        transform: scale(1);
+    }
+    100% {
+        transform: scale(1.05);
+    }
+}
+
+
+@keyframes default-shake {
+    0% {
+        transform: translateX(0);
+    }
+    10% {
+        transform: translateX(3px);
+    }
+    20% {
+        transform: translateX(0);
+    }
+    30% {
+        transform: translateX(-3px);
+    }
+    40% {
+        transform: translateX(0);
+    }
+    50% {
+        transform: translateX(3px);
+    }
+    60% {
+        transform: translateX(0);
+    }
+    70% {
+        transform: translateX(-3px);
+    }
+    80% {
+        transform: translateX(0);
+    }
+    90% {
+        transform: translateX(3px);
+    }
+    100% {
+        transform: translateX(0);
+    }
 }

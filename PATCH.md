@@ -1,10 +1,7 @@
 ## Patch Notes
 
-### Version 1.1.0
-- New Multi UI system added
-- WASM support added thanks to @h-banii
-- Body widget updated
-
-#### Bug fixes
-- Fixed a bug where the camera would not render correctly
-- Fixed styles for all widgets because of a bug in the CSS parser
+### Version 1.2.0
+- Update to Bevy 0.18.0
+- CSS `@keyframes` support
+- CSS `animation`, `transition` and `transform` support
+- Widget Validation support and `:invalid` pseudo-class

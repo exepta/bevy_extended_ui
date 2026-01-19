@@ -59,8 +59,8 @@ fn cleanup_unused_images_full(
 pub fn get_or_load_image(
     path: &str,
     image_cache: &mut ImageCache,
-    images: &mut ResMut<Assets<Image>>,
-    asset_server: &Res<AssetServer>,
+    images: &mut Assets<Image>,
+    asset_server: &AssetServer,
 ) -> Handle<Image> {
     if let Some(handle) = image_cache.map.get(path) {
         return handle.clone();
