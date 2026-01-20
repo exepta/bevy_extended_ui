@@ -78,3 +78,55 @@ input:invalid {
 #text:invalid {
     background: rgba(255, 77, 77, 0.1);
 }
+
+.pulse-example {
+    animation: default-pulse 0.8s ease-in-out infinite alternate;
+    background: cornflowerblue;
+}
+
+.color-example {
+    animation: color-swap 4.0s ease-in-out infinite;
+}
+
+.shake-example {
+    animation: default-shake 0.8s ease-in-out infinite;
+    background: seagreen;
+}
+
+.rotate-example {
+    animation: propeller-rotate 3.0s linear infinite;
+    background: #ff006a;
+    margin-top: 100px;
+}
+
+@keyframes color-swap {
+    0% {
+        background: cornflowerblue;
+    }
+    25% {
+        background: #6a00ff;
+    }
+    50% {
+        background: #ff006a;
+    }
+    75% {
+        background: #ff6336;
+    }
+    100% {
+        background: cornflowerblue;
+    }
+}
+
+@keyframes size-swap {
+    0% {
+        width: 40px;
+    }
+    100% {
+        width: 200px;
+    }
+}
+
+@keyframes propeller-rotate {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
