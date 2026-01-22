@@ -27,22 +27,15 @@ button {
     gap: 10px;
     transition: all 0.3s;
     padding: 0 15px;
-}
-
-button:disabled {
-    background: var(--primary-disabled);
+    color: var(--text-color);
 }
 
 button:hover {
     background: var(--primary-hover);
 }
 
-button .button-text {
-    color: var(--text-color);
-    transition: all 0.3s;
-}
-
-button:disabled .button-text {
+button:disabled {
+    background: var(--primary-disabled);
     color: var(--text-color-dark);
 }
 
@@ -57,6 +50,7 @@ checkbox {
     flex-direction: row;
     gap: 10px;
     transition: all 0.3s;
+    color: red;
 }
 
 checkbox .mark-box {
@@ -77,14 +71,9 @@ checkbox:disabled .mark-box {
 }
 
 checkbox .mark-box .mark {
-    color: var(--text-color);
     width: 16px;
     height: 16px;
     transition: all 0.3s;
-}
-
-checkbox:disabled .mark-box .mark {
-    color: var(--disabled-text);
 }
 
 checkbox:checked .mark-box {
@@ -93,6 +82,7 @@ checkbox:checked .mark-box {
 }
 
 checkbox:disabled .mark-box {
+    color: var(--disabled-text);
     border-color: var(--primary-disabled);
     background: var(--primary-disabled);
 }
@@ -102,7 +92,7 @@ checkbox .check-text {
     transition: all 0.3s;
 }
 
-checkbox:disabled .check-text {
+checkbox:disabled {
     color: var(--disabled-text);
 }
 
@@ -435,11 +425,11 @@ select:disabled {
 }
 
 select:hover {
-    border-color: var( --primary-hover);
+    border-color: var(--primary-hover);
 }
 
 select:focus {
-    border-color: var( --primary);
+    border-color: var(--primary);
 }
 
 select .select-label {
@@ -735,6 +725,7 @@ toggle:disabled .button-text {
     0% {
         transform: scale(1);
     }
+
     100% {
         transform: scale(1.05);
     }
@@ -745,33 +736,43 @@ toggle:disabled .button-text {
     0% {
         transform: translateX(0);
     }
+
     10% {
         transform: translateX(3px);
     }
+
     20% {
         transform: translateX(0);
     }
+
     30% {
         transform: translateX(-3px);
     }
+
     40% {
         transform: translateX(0);
     }
+
     50% {
         transform: translateX(3px);
     }
+
     60% {
         transform: translateX(0);
     }
+
     70% {
         transform: translateX(-3px);
     }
+
     80% {
         transform: translateX(0);
     }
+
     90% {
         transform: translateX(3px);
     }
+
     100% {
         transform: translateX(0);
     }

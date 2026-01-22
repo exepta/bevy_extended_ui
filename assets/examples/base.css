@@ -103,15 +103,19 @@ input:invalid {
     0% {
         background: cornflowerblue;
     }
+
     25% {
         background: #6a00ff;
     }
+
     50% {
         background: #ff006a;
     }
+
     75% {
         background: #ff6336;
     }
+
     100% {
         background: cornflowerblue;
     }
@@ -121,12 +125,18 @@ input:invalid {
     0% {
         width: 40px;
     }
+
     100% {
         width: 200px;
     }
 }
 
 @keyframes propeller-rotate {
-    from { transform: rotate(0deg); }
-    to   { transform: rotate(360deg); }
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
 }

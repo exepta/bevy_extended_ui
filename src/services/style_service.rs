@@ -1,3 +1,4 @@
+use crate::ImageCache;
 use crate::html::HtmlStyle;
 use crate::services::image_service::get_or_load_image;
 use crate::services::state_service::update_widget_states;
@@ -7,7 +8,6 @@ use crate::styles::{
     TransitionProperty, TransitionSpec,
 };
 use crate::widgets::UIWidgetState;
-use crate::ImageCache;
 
 use bevy::color::Srgba;
 use bevy::math::Rot2;
@@ -33,6 +33,10 @@ impl Plugin for StyleService {
         app.add_systems(
             PostUpdate,
             sync_last_ui_transform.after(update_style_animations),
+        );
+        app.add_systems(
+            PostUpdate,
+            propagate_style_inheritance.after(update_widget_styles_system),
         );
     }
 }
@@ -171,8 +175,7 @@ pub fn update_widget_styles_system(
             let to = final_style.clone();
             let copy_spec = spec.clone();
 
-            let (from_transform, to_transform) =
-                resolve_transform_transition(&spec, &from, &to);
+            let (from_transform, to_transform) = resolve_transform_transition(&spec, &from, &to);
 
             let transition_state = StyleTransition {
                 from,
@@ -318,7 +321,8 @@ pub fn update_style_animations(
             .map(|a| a.name.as_str());
 
         if desired_animation_name != Some(animation.spec.name.as_str()) {
-            if let (Some(style), Ok(mut components)) = (desired_style, style_query.get_mut(entity)) {
+            if let (Some(style), Ok(mut components)) = (desired_style, style_query.get_mut(entity))
+            {
                 apply_style_components(
                     style,
                     &mut components,
@@ -603,7 +607,10 @@ fn transition_allows_background(spec: &TransitionSpec) -> bool {
 
 fn transition_allows_transform(spec: &TransitionSpec) -> bool {
     spec.properties.iter().any(|prop| {
-        matches!(prop, TransitionProperty::All | TransitionProperty::Transform)
+        matches!(
+            prop,
+            TransitionProperty::All | TransitionProperty::Transform
+        )
     })
 }
 
@@ -977,4 +984,44 @@ fn folder_basename(folder: &str) -> &str {
         .rsplit('/')
         .next()
         .unwrap_or(folder)
+}
+
+pub fn propagate_style_inheritance(
+    parent_query: Query<(&UiStyle, &Children)>,
+    mut child_query: Query<(
+        Option<&UiStyle>,
+        Option<&mut TextColor>,
+        Option<&mut ImageNode>,
+    )>,
+) {
+    for (parent_style, children) in parent_query.iter() {
+        if let Some(parent_final_style) = &parent_style.active_style {
+            if let Some(parent_color) = parent_final_style.color {
+                for child_entity in children.iter() {
+                    if let Ok((child_ui_style_opt, mut text_color_opt, mut image_node_opt)) =
+                        child_query.get_mut(child_entity)
+                    {
+                        let has_override = child_ui_style_opt.map_or(false, |s| {
+                            s.active_style
+                                .as_ref()
+                                .map_or(false, |as_ref| as_ref.color.is_some())
+                        });
+
+                        if !has_override {
+                            if let Some(text_color) = text_color_opt.as_mut() {
+                                if text_color.0 != parent_color {
+                                    text_color.0 = parent_color;
+                                }
+                            }
+                            if let Some(image_node) = image_node_opt.as_mut() {
+                                if image_node.color != parent_color {
+                                    image_node.color = parent_color;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
