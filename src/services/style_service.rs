@@ -28,7 +28,7 @@ impl Plugin for StyleService {
         );
         app.add_systems(
             PostUpdate,
-            update_style_transitions.after(propagate_style_inheritance),
+            update_style_transitions.after(update_widget_styles_system),
         );
         app.add_systems(
             PostUpdate,
@@ -37,6 +37,10 @@ impl Plugin for StyleService {
         app.add_systems(
             PostUpdate,
             sync_last_ui_transform.after(update_style_animations),
+        );
+        app.add_systems(
+            PostUpdate,
+            propagate_style_inheritance.after(update_widget_styles_system),
         );
     }
 }
@@ -989,7 +993,7 @@ fn folder_basename(folder: &str) -> &str {
 pub fn propagate_style_inheritance(
     root_query: Query<Entity, (With<UiStyle>, Without<ChildOf>)>,
     children_query: Query<&Children>,
-    mut style_query: Query<&mut UiStyle>,
+    style_query: Query<&UiStyle>,
     mut target_query: Query<(
         Option<&mut TextColor>,
         Option<&mut TextFont>,
@@ -1002,7 +1006,7 @@ pub fn propagate_style_inheritance(
             root_entity,
             None,
             &children_query,
-            &mut style_query,
+            &style_query,
             &mut target_query,
             &asset_server,
         );
@@ -1013,7 +1017,7 @@ fn propagate_recursive(
     entity: Entity,
     inherited_style: Option<&crate::styles::Style>,
     children_query: &Query<&Children>,
-    style_query: &mut Query<&mut UiStyle>,
+    style_query: &Query<&UiStyle>,
     target_query: &mut Query<(
         Option<&mut TextColor>,
         Option<&mut TextFont>,
@@ -1021,99 +1025,95 @@ fn propagate_recursive(
     )>,
     asset_server: &Res<AssetServer>,
 ) {
-    // 1. Determine what we should propagate to children.
-    //    We merge (inherited_style + my_local_active_style).
+    // 1. Determine the effective style for THIS entity
+    //    If this entity has its own active_style, we use it.
+    //    Otherwise, we might use inherited values.
+    //    BUT: The original requirement is about parents passing styles to children.
+    //    So we look at what we should pass down vs what we should apply here.
 
-    let (_my_active_style, style_to_propagate) =
-        if let Ok(mut ui_style) = style_query.get_mut(entity) {
-            let local_active = ui_style.active_style.clone();
+    let my_style_comp = style_query.get(entity).ok();
+    let my_active_style = my_style_comp.and_then(|s| s.active_style.as_ref());
 
-            let mut to_propagate = if let Some(inherited) = inherited_style {
-                inherited.clone()
-            } else {
-                crate::styles::Style::default()
-            };
+    // 2. Prepare the style to pass down to children.
+    //    This is effectively: inherited_style merged with my_active_style
+    //    (where my_active_style takes precedence).
+    let mut style_to_propagate = if let Some(inherited) = inherited_style {
+        inherited.clone()
+    } else {
+        crate::styles::Style::default()
+    };
 
-            if let Some(mine) = local_active.as_ref() {
-                to_propagate.merge(mine);
-            }
+    if let Some(mine) = my_active_style {
+        style_to_propagate.merge(mine);
+    }
 
-            // 2. Apply inherited properties to THIS entity's UiStyle if missing locally.
-            // Mutating active_style here allows update_style_transitions (running next) to detect change!
-            if let Some(final_style) = ui_style.active_style.as_mut() {
-                if let Some(inherited) = inherited_style {
-                    // COLOR
-                    if final_style.color.is_none() {
-                        final_style.color = inherited.color;
+    // 3. Apply styles to THIS entity's components if strictly inherited (no local override)
+    if let Ok((mut text_color_opt, mut text_font_opt, mut image_node_opt)) =
+        target_query.get_mut(entity)
+    {
+        // --- COLOR ---
+        // Apply inherited color if I don't have my own color
+        let has_local_color = my_active_style.map_or(false, |s| s.color.is_some());
+        if !has_local_color {
+            if let Some(parent_color) = inherited_style.and_then(|s| s.color) {
+                if let Some(text_color) = text_color_opt.as_mut() {
+                    if text_color.0 != parent_color {
+                        text_color.0 = parent_color;
                     }
-                    // FONT-SIZE
-                    if final_style.font_size.is_none() {
-                        final_style.font_size = inherited.font_size.clone();
-                    }
-                    // FONT-FAMILY
-                    if final_style.font_family.is_none() {
-                        final_style.font_family = inherited.font_family.clone();
-                    }
-                    // FONT-WEIGHT
-                    if final_style.font_weight.is_none() {
-                        final_style.font_weight = inherited.font_weight;
-                    }
-                    // TRANSITION
-                    if final_style.transition.is_none() {
-                        final_style.transition = inherited.transition.clone();
+                }
+                if let Some(image_node) = image_node_opt.as_mut() {
+                    if image_node.color != parent_color {
+                        image_node.color = parent_color;
                     }
                 }
             }
+        }
 
-            (local_active, to_propagate)
-        } else {
-            let to_propagate = if let Some(inherited) = inherited_style {
-                inherited.clone()
-            } else {
-                crate::styles::Style::default()
-            };
-            (None, to_propagate)
-        };
+        // --- FONT SIZE ---
+        let has_local_size = my_active_style.map_or(false, |s| s.font_size.is_some());
+        if !has_local_size {
+            if let Some(parent_size_val) = inherited_style.and_then(|s| s.font_size.as_ref()) {
+                if let Some(text_font) = text_font_opt.as_mut() {
+                    // 12.0 is default base, could be configurable
+                    let size_px = parent_size_val.get(Some(12.0));
+                    if text_font.font_size != size_px {
+                        text_font.font_size = size_px;
+                    }
+                }
+            }
+        }
 
-    // 3. Apply styles to raw components (entities without UiStyle)
-    if !style_query.contains(entity) {
-        if let Ok((mut text_color_opt, mut text_font_opt, mut image_node_opt)) =
-            target_query.get_mut(entity)
-        {
-            // Apply hard values as these don't support transitions without UiStyle
+        // --- FONT FAMILY & WEIGHT ---
+        // Note: Logic similar to apply_text_style needed here to resolve handle.
+        // If we strictly inherit family/weight, we need to load the font.
+        // This is complex because we need the folder structure logic from apply_text_style.
+        // For now, simpler approach: if we have a resolved font handle from parent logic?
+        // Actually, style_service re-resolves fonts every time active_style changes.
+        // Providing the full path logic again here might be duplicative.
+        // A better approach: The `inherited_style` now contains the family/weight.
+        // We can re-use the standard `apply_text_style` logic if we synthesize a style?
+        // OR: Just implement the specific property application here.
+
+        let has_local_family = my_active_style.map_or(false, |s| s.font_family.is_some());
+        let has_local_weight = my_active_style.map_or(false, |s| s.font_weight.is_some());
+
+        if !has_local_family && !has_local_weight {
+            // We need to form the font path from inherited values
             if let Some(inherited) = inherited_style {
-                if let Some(color) = inherited.color {
-                    if let Some(tc) = text_color_opt.as_mut() {
-                        if tc.0 != color {
-                            tc.0 = color;
-                        }
-                    }
-                    if let Some(img) = image_node_opt.as_mut() {
-                        if img.color != color {
-                            img.color = color;
-                        }
-                    }
-                }
-                if let Some(font_size) = &inherited.font_size {
-                    if let Some(tf) = text_font_opt.as_mut() {
-                        let px = font_size.get(None);
-                        if tf.font_size != px {
-                            tf.font_size = px;
-                        }
-                    }
-                }
                 if let Some(family) = &inherited.font_family {
                     let weight = inherited
                         .font_weight
                         .unwrap_or(crate::styles::FontWeight::Normal);
-                    let folder = &family.0;
+                    let folder = &family.0; // Assuming FontFamily is struct(String)
                     let weight_str = weight_token_exact(weight);
-                    let full_path =
-                        format!("{}/{}-{}.ttf", folder, folder_basename(folder), weight_str);
+                    // This assumes a standard naming convention "Family-Weight.ttf"
+                    let filename = format!("{}-{}.ttf", folder_basename(folder), weight_str);
+                    let full_path = format!("{}/{}", folder, filename);
+
                     let handle = asset_server.load(full_path);
-                    if let Some(tf) = text_font_opt.as_mut() {
-                        if tf.font != handle {
-                            tf.font = handle;
+                    if let Some(text_font) = text_font_opt.as_mut() {
+                        if text_font.font != handle {
+                            text_font.font = handle;
                         }
                     }
                 }
@@ -1126,7 +1126,7 @@ fn propagate_recursive(
         for child_entity in children {
             propagate_recursive(
                 *child_entity,
-                Some(&style_to_propagate),
+                Some(&style_to_propagate), // Pass down the merged style
                 children_query,
                 style_query,
                 target_query,
