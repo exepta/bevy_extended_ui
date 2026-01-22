@@ -94,10 +94,6 @@ checkbox:disabled .mark-box {
 
 /* Div */
 
-div {
-    scroll-width: 10;
-}
-
 div scroll {
     position: absolute;
     right: 0;
