@@ -102,18 +102,27 @@ input:invalid {
 @keyframes color-swap {
     0% {
         background: cornflowerblue;
+        color: #fff;
     }
+
     25% {
         background: #6a00ff;
+        color: #000;
     }
+
     50% {
         background: #ff006a;
+        color: #fff;
     }
+
     75% {
         background: #ff6336;
+        color: #000;
     }
+
     100% {
         background: cornflowerblue;
+        color: #fff;
     }
 }
 
@@ -121,12 +130,18 @@ input:invalid {
     0% {
         width: 40px;
     }
+
     100% {
         width: 200px;
     }
 }
 
 @keyframes propeller-rotate {
-    from { transform: rotate(0deg); }
-    to   { transform: rotate(360deg); }
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
 }
