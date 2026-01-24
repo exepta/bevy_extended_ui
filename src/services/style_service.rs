@@ -20,39 +20,26 @@ impl Plugin for StyleService {
     fn build(&self, app: &mut App) {
         app.add_systems(
             PostUpdate,
-            update_widget_styles_system.after(update_widget_states),
-        );
-        app.add_systems(
-            PostUpdate,
-            propagate_style_inheritance.after(update_widget_styles_system),
-        );
-        app.add_systems(
-            PostUpdate,
-            update_style_transitions.after(update_widget_styles_system),
-        );
-        app.add_systems(
-            PostUpdate,
-            update_style_animations.after(update_style_transitions),
-        );
-        app.add_systems(
-            PostUpdate,
-            sync_last_ui_transform.after(update_style_animations),
-        );
-        app.add_systems(
-            PostUpdate,
-            propagate_style_inheritance.after(update_widget_styles_system),
+            (
+                update_widget_styles_system.after(update_widget_states),
+                update_style_transitions.after(update_widget_styles_system),
+                update_style_animations.after(update_style_transitions),
+                propagate_style_inheritance.after(update_style_animations),
+                sync_last_ui_transform.after(propagate_style_inheritance),
+            ),
         );
     }
 }
 
 #[derive(Component, Debug, Clone)]
 pub struct StyleTransition {
-    from: Style,
-    to: Style,
-    start_time: f32,
-    spec: TransitionSpec,
-    from_transform: Option<UiTransform>,
-    to_transform: Option<UiTransform>,
+    pub from: Style,
+    pub to: Style,
+    pub start_time: f32,
+    pub spec: TransitionSpec,
+    pub from_transform: Option<UiTransform>,
+    pub to_transform: Option<UiTransform>,
+    pub current_style: Option<Style>,
 }
 
 #[derive(Component, Debug, Clone, Copy)]
@@ -60,10 +47,11 @@ pub struct LastUiTransform(pub UiTransform);
 
 #[derive(Component, Debug, Clone)]
 pub struct StyleAnimation {
-    base: Style,
-    keyframes: Vec<AnimationKeyframe>,
-    spec: AnimationSpec,
-    start_time: f32,
+    pub base: Style,
+    pub keyframes: Vec<AnimationKeyframe>,
+    pub spec: AnimationSpec,
+    pub start_time: f32,
+    pub current_style: Option<Style>,
 }
 
 type UiStyleComponents<'w, 's> = (
@@ -188,6 +176,7 @@ pub fn update_widget_styles_system(
                 spec,
                 from_transform,
                 to_transform,
+                current_style: None,
             };
 
             if let Some(existing) = transition.as_mut() {
@@ -254,12 +243,13 @@ pub fn update_style_transitions(
 ) {
     let now = time.elapsed_secs();
 
-    for (entity, transition) in transitions.iter_mut() {
+    for (entity, mut transition) in transitions.iter_mut() {
         let elapsed = now - transition.start_time - transition.spec.delay;
         let duration = transition.spec.duration.max(0.001);
         let t = (elapsed / duration).clamp(0.0, 1.0);
         let eased = transition.spec.timing.apply(t);
         let blended = blend_style(&transition.from, &transition.to, eased, &transition.spec);
+        transition.current_style = Some(blended.clone());
 
         if let Ok(mut components) = style_query.get_mut(entity) {
             apply_style_components(
@@ -314,7 +304,7 @@ pub fn update_style_animations(
 ) {
     let now = time.elapsed_secs();
 
-    for (entity, animation) in animations.iter_mut() {
+    for (entity, mut animation) in animations.iter_mut() {
         let desired_style = ui_style_query
             .get(entity)
             .ok()
@@ -386,6 +376,7 @@ pub fn update_style_animations(
 
         if let Ok(mut components) = style_query.get_mut(entity) {
             let blended = sample_animation_style(&animation.keyframes, progress);
+            animation.current_style = Some(blended.clone());
             apply_style_components(
                 &blended,
                 &mut components,
@@ -779,6 +770,7 @@ fn update_style_animation_state(
         keyframes: computed,
         spec,
         start_time: now,
+        current_style: None,
     };
 
     if let Some(existing) = animation.as_mut() {
@@ -998,6 +990,8 @@ pub fn propagate_style_inheritance(
         Option<&mut TextColor>,
         Option<&mut TextFont>,
         Option<&mut ImageNode>,
+        Option<&StyleTransition>,
+        Option<&StyleAnimation>,
     )>,
     asset_server: Res<AssetServer>,
 ) {
@@ -1022,6 +1016,8 @@ fn propagate_recursive(
         Option<&mut TextColor>,
         Option<&mut TextFont>,
         Option<&mut ImageNode>,
+        Option<&StyleTransition>,
+        Option<&StyleAnimation>,
     )>,
     asset_server: &Res<AssetServer>,
 ) {
@@ -1047,10 +1043,24 @@ fn propagate_recursive(
         style_to_propagate.merge(mine);
     }
 
+    // 2.1 Check for active animations or transitions on this entity
+    // and use their current style if available.
+    if let Ok(components) = target_query.get(entity) {
+        if let Some(transition) = components.3 {
+            if let Some(current) = &transition.current_style {
+                style_to_propagate.merge(current);
+            }
+        }
+        if let Some(animation) = components.4 {
+            if let Some(current) = &animation.current_style {
+                style_to_propagate.merge(current);
+            }
+        }
+    }
+
     // 3. Apply styles to THIS entity's components if strictly inherited (no local override)
-    if let Ok((mut text_color_opt, mut text_font_opt, mut image_node_opt)) =
-        target_query.get_mut(entity)
-    {
+    if let Ok(components) = target_query.get_mut(entity) {
+        let (mut text_color_opt, mut text_font_opt, mut image_node_opt, _, _) = components;
         // --- COLOR ---
         // Apply inherited color if I don't have my own color
         let has_local_color = my_active_style.map_or(false, |s| s.color.is_some());
