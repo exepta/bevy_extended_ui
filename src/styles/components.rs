@@ -115,6 +115,8 @@ impl UiStyle {
             insert_with_pseudo(&tag.0, 3);
         }
 
+        insert_with_pseudo("*", 0);
+
         if let Some(classes) = classes {
             for class in &classes.0 {
                 let normalized = if class.starts_with('.') {

@@ -1,3 +1,4 @@
+use crate::ImageCache;
 use crate::html::HtmlStyle;
 use crate::services::image_service::get_or_load_image;
 use crate::services::state_service::update_widget_states;
@@ -7,7 +8,6 @@ use crate::styles::{
     TransitionProperty, TransitionSpec,
 };
 use crate::widgets::UIWidgetState;
-use crate::ImageCache;
 
 use bevy::color::Srgba;
 use bevy::math::Rot2;
@@ -20,31 +20,26 @@ impl Plugin for StyleService {
     fn build(&self, app: &mut App) {
         app.add_systems(
             PostUpdate,
-            update_widget_styles_system.after(update_widget_states),
-        );
-        app.add_systems(
-            PostUpdate,
-            update_style_transitions.after(update_widget_styles_system),
-        );
-        app.add_systems(
-            PostUpdate,
-            update_style_animations.after(update_style_transitions),
-        );
-        app.add_systems(
-            PostUpdate,
-            sync_last_ui_transform.after(update_style_animations),
+            (
+                update_widget_styles_system.after(update_widget_states),
+                update_style_transitions.after(update_widget_styles_system),
+                update_style_animations.after(update_style_transitions),
+                propagate_style_inheritance.after(update_style_animations),
+                sync_last_ui_transform.after(propagate_style_inheritance),
+            ),
         );
     }
 }
 
 #[derive(Component, Debug, Clone)]
 pub struct StyleTransition {
-    from: Style,
-    to: Style,
-    start_time: f32,
-    spec: TransitionSpec,
-    from_transform: Option<UiTransform>,
-    to_transform: Option<UiTransform>,
+    pub from: Style,
+    pub to: Style,
+    pub start_time: f32,
+    pub spec: TransitionSpec,
+    pub from_transform: Option<UiTransform>,
+    pub to_transform: Option<UiTransform>,
+    pub current_style: Option<Style>,
 }
 
 #[derive(Component, Debug, Clone, Copy)]
@@ -52,10 +47,11 @@ pub struct LastUiTransform(pub UiTransform);
 
 #[derive(Component, Debug, Clone)]
 pub struct StyleAnimation {
-    base: Style,
-    keyframes: Vec<AnimationKeyframe>,
-    spec: AnimationSpec,
-    start_time: f32,
+    pub base: Style,
+    pub keyframes: Vec<AnimationKeyframe>,
+    pub spec: AnimationSpec,
+    pub start_time: f32,
+    pub current_style: Option<Style>,
 }
 
 type UiStyleComponents<'w, 's> = (
@@ -94,34 +90,42 @@ pub fn update_widget_styles_system(
     for (entity, state_opt, html_style_opt, mut ui_style) in query.iter_mut() {
         let state = state_opt.cloned().unwrap_or_default();
 
-        let mut base_styles: Vec<(&String, u32)> = vec![];
-        let mut pseudo_styles: Vec<(&String, u32)> = vec![];
+        let mut base_styles: Vec<(&String, u32, usize)> = vec![];
+        let mut pseudo_styles: Vec<(&String, u32, usize)> = vec![];
 
-        for sel in ui_style.styles.keys() {
+        for (sel, style_pair) in &ui_style.styles {
             if selector_matches_state(sel, &state) {
                 let specificity = selector_specificity(sel);
                 if sel.contains(':') {
-                    pseudo_styles.push((sel, specificity));
+                    pseudo_styles.push((sel, specificity, style_pair.origin));
                 } else {
-                    base_styles.push((sel, specificity));
+                    base_styles.push((sel, specificity, style_pair.origin));
                 }
             }
         }
 
-        base_styles.sort_by_key(|&(_, spec)| spec);
-        pseudo_styles.sort_by_key(|&(_, spec)| spec);
+        // Sort by origin (ascending) then specificity (ascending)
+        // Later origin overrides earlier. Higher specificity overrides lower.
+        base_styles.sort_by(|a, b| match a.2.cmp(&b.2) {
+            std::cmp::Ordering::Equal => a.1.cmp(&b.1),
+            other => other,
+        });
+        pseudo_styles.sort_by(|a, b| match a.2.cmp(&b.2) {
+            std::cmp::Ordering::Equal => a.1.cmp(&b.1),
+            other => other,
+        });
 
         let mut final_style = Style::default();
 
         // 1) base normal
-        for (sel, _) in &base_styles {
+        for (sel, _, _) in &base_styles {
             if let Some(pair) = ui_style.styles.get(*sel) {
                 final_style.merge(&pair.normal);
             }
         }
 
         // 2) base important
-        for (sel, _) in &base_styles {
+        for (sel, _, _) in &base_styles {
             if let Some(pair) = ui_style.styles.get(*sel) {
                 final_style.merge(&pair.important);
             }
@@ -133,14 +137,14 @@ pub fn update_widget_styles_system(
         }
 
         // 4) pseudo normal
-        for (sel, _) in &pseudo_styles {
+        for (sel, _, _) in &pseudo_styles {
             if let Some(pair) = ui_style.styles.get(*sel) {
                 final_style.merge(&pair.normal);
             }
         }
 
         // 5) pseudo important
-        for (sel, _) in &pseudo_styles {
+        for (sel, _, _) in &pseudo_styles {
             if let Some(pair) = ui_style.styles.get(*sel) {
                 final_style.merge(&pair.important);
             }
@@ -171,8 +175,7 @@ pub fn update_widget_styles_system(
             let to = final_style.clone();
             let copy_spec = spec.clone();
 
-            let (from_transform, to_transform) =
-                resolve_transform_transition(&spec, &from, &to);
+            let (from_transform, to_transform) = resolve_transform_transition(&spec, &from, &to);
 
             let transition_state = StyleTransition {
                 from,
@@ -181,6 +184,7 @@ pub fn update_widget_styles_system(
                 spec,
                 from_transform,
                 to_transform,
+                current_style: None,
             };
 
             if let Some(existing) = transition.as_mut() {
@@ -247,12 +251,13 @@ pub fn update_style_transitions(
 ) {
     let now = time.elapsed_secs();
 
-    for (entity, transition) in transitions.iter_mut() {
+    for (entity, mut transition) in transitions.iter_mut() {
         let elapsed = now - transition.start_time - transition.spec.delay;
         let duration = transition.spec.duration.max(0.001);
         let t = (elapsed / duration).clamp(0.0, 1.0);
         let eased = transition.spec.timing.apply(t);
         let blended = blend_style(&transition.from, &transition.to, eased, &transition.spec);
+        transition.current_style = Some(blended.clone());
 
         if let Ok(mut components) = style_query.get_mut(entity) {
             apply_style_components(
@@ -307,7 +312,7 @@ pub fn update_style_animations(
 ) {
     let now = time.elapsed_secs();
 
-    for (entity, animation) in animations.iter_mut() {
+    for (entity, mut animation) in animations.iter_mut() {
         let desired_style = ui_style_query
             .get(entity)
             .ok()
@@ -318,7 +323,8 @@ pub fn update_style_animations(
             .map(|a| a.name.as_str());
 
         if desired_animation_name != Some(animation.spec.name.as_str()) {
-            if let (Some(style), Ok(mut components)) = (desired_style, style_query.get_mut(entity)) {
+            if let (Some(style), Ok(mut components)) = (desired_style, style_query.get_mut(entity))
+            {
                 apply_style_components(
                     style,
                     &mut components,
@@ -378,6 +384,7 @@ pub fn update_style_animations(
 
         if let Ok(mut components) = style_query.get_mut(entity) {
             let blended = sample_animation_style(&animation.keyframes, progress);
+            animation.current_style = Some(blended.clone());
             apply_style_components(
                 &blended,
                 &mut components,
@@ -603,7 +610,10 @@ fn transition_allows_background(spec: &TransitionSpec) -> bool {
 
 fn transition_allows_transform(spec: &TransitionSpec) -> bool {
     spec.properties.iter().any(|prop| {
-        matches!(prop, TransitionProperty::All | TransitionProperty::Transform)
+        matches!(
+            prop,
+            TransitionProperty::All | TransitionProperty::Transform
+        )
     })
 }
 
@@ -768,6 +778,7 @@ fn update_style_animation_state(
         keyframes: computed,
         spec,
         start_time: now,
+        current_style: None,
     };
 
     if let Some(existing) = animation.as_mut() {
@@ -860,6 +871,8 @@ fn selector_specificity(selector: &str) -> u32 {
             100
         } else if base.starts_with('.') {
             10
+        } else if base == "*" {
+            0
         } else {
             1
         };
@@ -977,4 +990,168 @@ fn folder_basename(folder: &str) -> &str {
         .rsplit('/')
         .next()
         .unwrap_or(folder)
+}
+
+pub fn propagate_style_inheritance(
+    root_query: Query<Entity, (With<UiStyle>, Without<ChildOf>)>,
+    children_query: Query<&Children>,
+    style_query: Query<&UiStyle>,
+    mut target_query: Query<(
+        Option<&mut TextColor>,
+        Option<&mut TextFont>,
+        Option<&mut ImageNode>,
+        Option<&StyleTransition>,
+        Option<&StyleAnimation>,
+    )>,
+    asset_server: Res<AssetServer>,
+) {
+    for root_entity in root_query.iter() {
+        propagate_recursive(
+            root_entity,
+            None,
+            &children_query,
+            &style_query,
+            &mut target_query,
+            &asset_server,
+        );
+    }
+}
+
+fn propagate_recursive(
+    entity: Entity,
+    inherited_style: Option<&crate::styles::Style>,
+    children_query: &Query<&Children>,
+    style_query: &Query<&UiStyle>,
+    target_query: &mut Query<(
+        Option<&mut TextColor>,
+        Option<&mut TextFont>,
+        Option<&mut ImageNode>,
+        Option<&StyleTransition>,
+        Option<&StyleAnimation>,
+    )>,
+    asset_server: &Res<AssetServer>,
+) {
+    // 1. Determine the effective style for THIS entity
+    //    If this entity has its own active_style, we use it.
+    //    Otherwise, we might use inherited values.
+    //    BUT: The original requirement is about parents passing styles to children.
+    //    So we look at what we should pass down vs what we should apply here.
+
+    let my_style_comp = style_query.get(entity).ok();
+    let my_active_style = my_style_comp.and_then(|s| s.active_style.as_ref());
+
+    // 2. Prepare the style to pass down to children.
+    //    This is effectively: inherited_style merged with my_active_style
+    //    (where my_active_style takes precedence).
+    let mut style_to_propagate = if let Some(inherited) = inherited_style {
+        inherited.clone()
+    } else {
+        crate::styles::Style::default()
+    };
+
+    if let Some(mine) = my_active_style {
+        style_to_propagate.merge(mine);
+    }
+
+    // 2.1 Check for active animations or transitions on this entity
+    // and use their current style if available.
+    if let Ok(components) = target_query.get(entity) {
+        if let Some(transition) = components.3 {
+            if let Some(current) = &transition.current_style {
+                style_to_propagate.merge(current);
+            }
+        }
+        if let Some(animation) = components.4 {
+            if let Some(current) = &animation.current_style {
+                style_to_propagate.merge(current);
+            }
+        }
+    }
+
+    // 3. Apply styles to THIS entity's components if strictly inherited (no local override)
+    if let Ok(components) = target_query.get_mut(entity) {
+        let (mut text_color_opt, mut text_font_opt, mut image_node_opt, _, _) = components;
+        // --- COLOR ---
+        // Apply inherited color if I don't have my own color
+        let has_local_color = my_active_style.map_or(false, |s| s.color.is_some());
+        if !has_local_color {
+            if let Some(parent_color) = inherited_style.and_then(|s| s.color) {
+                if let Some(text_color) = text_color_opt.as_mut() {
+                    if text_color.0 != parent_color {
+                        text_color.0 = parent_color;
+                    }
+                }
+                if let Some(image_node) = image_node_opt.as_mut() {
+                    if image_node.color != parent_color {
+                        image_node.color = parent_color;
+                    }
+                }
+            }
+        }
+
+        // --- FONT SIZE ---
+        let has_local_size = my_active_style.map_or(false, |s| s.font_size.is_some());
+        if !has_local_size {
+            if let Some(parent_size_val) = inherited_style.and_then(|s| s.font_size.as_ref()) {
+                if let Some(text_font) = text_font_opt.as_mut() {
+                    // 12.0 is default base, could be configurable
+                    let size_px = parent_size_val.get(Some(12.0));
+                    if text_font.font_size != size_px {
+                        text_font.font_size = size_px;
+                    }
+                }
+            }
+        }
+
+        // --- FONT FAMILY & WEIGHT ---
+        // Note: Logic similar to apply_text_style needed here to resolve handle.
+        // If we strictly inherit family/weight, we need to load the font.
+        // This is complex because we need the folder structure logic from apply_text_style.
+        // For now, simpler approach: if we have a resolved font handle from parent logic?
+        // Actually, style_service re-resolves fonts every time active_style changes.
+        // Providing the full path logic again here might be duplicative.
+        // A better approach: The `inherited_style` now contains the family/weight.
+        // We can re-use the standard `apply_text_style` logic if we synthesize a style?
+        // OR: Just implement the specific property application here.
+
+        let has_local_family = my_active_style.map_or(false, |s| s.font_family.is_some());
+        let has_local_weight = my_active_style.map_or(false, |s| s.font_weight.is_some());
+
+        if !has_local_family && !has_local_weight {
+            // We need to form the font path from inherited values
+            if let Some(inherited) = inherited_style {
+                if let Some(family) = &inherited.font_family {
+                    let weight = inherited
+                        .font_weight
+                        .unwrap_or(crate::styles::FontWeight::Normal);
+                    let folder = &family.0; // Assuming FontFamily is struct(String)
+                    let weight_str = weight_token_exact(weight);
+                    // This assumes a standard naming convention "Family-Weight.ttf"
+                    let filename = format!("{}-{}.ttf", folder_basename(folder), weight_str);
+                    let full_path = format!("{}/{}", folder, filename);
+
+                    let handle = asset_server.load(full_path);
+                    if let Some(text_font) = text_font_opt.as_mut() {
+                        if text_font.font != handle {
+                            text_font.font = handle;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 4. Recurse to children
+    if let Ok(children) = children_query.get(entity) {
+        for child_entity in children {
+            propagate_recursive(
+                *child_entity,
+                Some(&style_to_propagate), // Pass down the merged style
+                children_query,
+                style_query,
+                target_query,
+                asset_server,
+            );
+        }
+    }
 }

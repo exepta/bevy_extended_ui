@@ -195,7 +195,7 @@ fn load_and_merge_styles_from_assets(
     let mut merged_styles: HashMap<String, StylePair> = HashMap::new();
     let mut merged_keyframes: HashMap<String, Vec<AnimationKeyframe>> = HashMap::new();
 
-    for handle in sources {
+    for (index, handle) in sources.iter().enumerate() {
         let asset_id = handle.id();
 
         let parsed_map = if let Some(cached) = PARSED_CSS_CACHE
@@ -224,8 +224,13 @@ fn load_and_merge_styles_from_assets(
                     .and_modify(|existing| {
                         existing.normal.merge(&new_style.normal);
                         existing.important.merge(&new_style.important);
+                        existing.origin = index; // Update origin to latest source
                     })
-                    .or_insert_with(|| new_style.clone());
+                    .or_insert_with(|| {
+                        let mut s = new_style.clone();
+                        s.origin = index;
+                        s
+                    });
             }
         }
 
@@ -293,6 +298,10 @@ fn matches_selector(
     tag_opt: Option<&TagName>,
 ) -> bool {
     let base = selector.split(':').next().unwrap_or(selector);
+
+    if base == "*" {
+        return true;
+    }
 
     if let (Some(id), Some(rest)) = (id_opt, base.strip_prefix('#')) {
         if rest == id.0 {

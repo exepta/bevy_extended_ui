@@ -61,7 +61,10 @@ pub fn load_css(css: &str) -> ParsedCss {
                 Err(_) => continue,
             };
 
-            let mut style = StylePair::default();
+            let mut style = StylePair {
+                origin: 0,
+                ..Default::default()
+            };
             let decls = &style_rule.declarations;
 
             if selector.trim() == ":root" {
