@@ -1,24 +1,27 @@
 # bevy_extended_ui
-___
+
+---
+
 [![Crates.io](https://img.shields.io/crates/v/bevy_extended_ui.svg)](https://crates.io/crates/bevy_extended_ui)
 [![Downloads](https://img.shields.io/crates/d/bevy_extended_ui.svg)](https://crates.io/crates/bevy_extended_ui)
 [![license](https://img.shields.io/badge/license-Apache-blue.svg)](./LICENSE)
 [![Build](https://github.com/exepta/bevy_extended_ui/actions/workflows/build.yml/badge.svg)](https://github.com/exepta/bevy_extended_ui/actions/workflows/build.yml)
 
-
-Since I've been writing a game in the [_Bevy_](https://bevyengine.org/) engine lately, 
-I created this crate. In my game, 
-I need more complex UI elements that Bevy doesn't currently support. 
-These include sliders, choice boxes, check boxes, radio buttons, and so on. 
-So I set about implementing these elements using the standard bevy_ui system. 
-I'd like to make this project available to you so that you can use elements other 
-than just nodes, buttons, or images. If you're missing a widget and know how 
-to create it, it would be great if you could add it. 
+Since I've been writing a game in the [_Bevy_](https://bevyengine.org/) engine lately,
+I created this crate. In my game,
+I need more complex UI elements that Bevy doesn't currently support.
+These include sliders, choice boxes, check boxes, radio buttons, and so on.
+So I set about implementing these elements using the standard bevy_ui system.
+I'd like to make this project available to you so that you can use elements other
+than just nodes, buttons, or images. If you're missing a widget and know how
+to create it, it would be great if you could add it.
 Otherwise, feel free to create a ticket.
 
 ### Features
+
 There are many features in this crate. You can see all current supported widgets [here](WIDGETS.md).
 Available features:
+
 - [x] Full HTML support.
 - [x] CSS support but not all CSS properties.
 - [x] Hot reload support.
@@ -26,9 +29,9 @@ Available features:
 - [x] Font support for family and weight.
 - [x] Animation support (`@keyframes`).
 - [x] Validation for widgets like required fields.
+- [x] CSS `*` support.
 - [ ] Form Widget for validation and submission.
 - [ ] Custom Cursor or system cursor support.
-- [ ] CSS `*` support.
 - [ ] Customizable theme.
 
 There are many other things, but currently you can use the core (HTML / CSS) features.
@@ -36,6 +39,7 @@ There are many other things, but currently you can use the core (HTML / CSS) fea
 ### How to use?
 
 Add this to your `Cargo.toml`:
+
 ```toml
 [dependencies]
 bevy_extended_ui = "1.2.0"
@@ -43,32 +47,34 @@ bevy_extended_ui_macros = "1.2.0"
 ```
 
 Then, you add the plugin to your `main.rs` or on any point at a build function:
+
 ```rust
 fn build(&mut app: App) {
     app.add_plugin(ExtendedUiPlugin);
 }
 ```
+
 Then you create an HTML file:
+
 ```html
 <html lang="en">
-<head>
-    <meta name="test">
-    <meta charset="UTF-8">
+  <head>
+    <meta name="test" />
+    <meta charset="UTF-8" />
     <title>Title</title>
     <!-- You can link your CSS file here. -->
-    <link rel="stylesheet" href="base.css">
+    <link rel="stylesheet" href="base.css" />
     <!-- <link rel="stylesheet" href="base2.css"> You can add more CSS files.-->
-</head>
-<body>
-
-<!-- You can use HTML bindings here. like the onclick attribute. -->
-<button onclick="test_click">Button</button>
-
-</body>
+  </head>
+  <body>
+    <!-- You can use HTML bindings here. like the onclick attribute. -->
+    <button onclick="test_click">Button</button>
+  </body>
 </html>
 ```
 
 And finally,
+
 ```rust
 fn build(&mut app: App) {
     app.add_systems(Startup, |mut reg: ResMut<UiRegistry>, asset_server: Res<AssetServer>| {
@@ -84,6 +90,7 @@ fn test_click(In(event): In<HtmlEvent>) {
 ```
 
 Note that currently you can use this binding:
+
 - `onclick`
 - `onchange` Only for `<select>`, `<fieldset>`, `<input>`, `<checkbox>` and `<slider>` elements.
 - `oninit`
@@ -91,8 +98,10 @@ Note that currently you can use this binding:
 - `onmouseout`
 
 ### WASM support
+
 Now we have wasm support but still not fully tested! Here is an example to show you
 how to use it:
+
 ```rust
 fn main() {
     #[cfg(target_arch = "wasm32")]
@@ -125,28 +134,45 @@ fn load_ui(mut reg: ResMut<UiRegistry>, asset_server: Res<AssetServer>) {
 ```
 
 and the index HTML:
+
 ```html
 <!doctype html>
 <html lang="en">
-<head>
+  <head>
     <meta charset="utf-8" />
     <title>Bevy Web</title>
     <style>
-        html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #333; }
-        #container { width: 100%; height: 100%; }
-        canvas { width: 100%; height: 100%; display: block; }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #333;
+      }
+      #container {
+        width: 100%;
+        height: 100%;
+      }
+      canvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
     </style>
     <link data-trunk rel="copy-dir" href="assets" />
-</head>
-<body>
-<div id="container">
-    <canvas id="bevy"></canvas>
-</div>
-</body>
+  </head>
+  <body>
+    <div id="container">
+      <canvas id="bevy"></canvas>
+    </div>
+  </body>
 </html>
 ```
 
 It was tested with the crate trunk, which worked well. This trunk.toml file was used:
+
 ```toml
 [build]
 dist = "dist"
@@ -160,25 +186,27 @@ no_spa = true
 ```
 
 ### Animation support
+
 Basic `@keyframes` usage example:
+
 ```css
 @keyframes button-pulse {
-    0% {
-        transform: scale(1);
-        background-color: #4c8bf5;
-    }
-    50% {
-        transform: scale(1.05);
-        background-color: #72a1ff;
-    }
-    100% {
-        transform: scale(1);
-        background-color: #4c8bf5;
-    }
+  0% {
+    transform: scale(1);
+    background-color: #4c8bf5;
+  }
+  50% {
+    transform: scale(1.05);
+    background-color: #72a1ff;
+  }
+  100% {
+    transform: scale(1);
+    background-color: #4c8bf5;
+  }
 }
 
 .cta-button {
-    animation: button-pulse 1.4s ease-in-out infinite alternate;
+  animation: button-pulse 1.4s ease-in-out infinite alternate;
 }
 ```
 
@@ -192,11 +220,11 @@ If anyone has any ideas, I'd be happy to hear them.
 
 ### Compatibility
 
-> *Note:* This project is currently under construction and not suitable for large projects!.
+> _Note:_ This project is currently under construction and not suitable for large projects!.
 
 | `Bevy` version | `bevy_extended_ui` version |
-|----------------|----------------------------|
-| 0.18.0         | 1.2.0                      |
+| -------------- | -------------------------- |
+| 0.18.0         | 1.2.0 - 1.3.0              |
 | 0.17.0         | 1.0.0 - 1.1.0              |
 | 0.16.0         | 0.1.0 - 0.2.2              |
 

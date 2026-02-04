@@ -90,34 +90,42 @@ pub fn update_widget_styles_system(
     for (entity, state_opt, html_style_opt, mut ui_style) in query.iter_mut() {
         let state = state_opt.cloned().unwrap_or_default();
 
-        let mut base_styles: Vec<(&String, u32)> = vec![];
-        let mut pseudo_styles: Vec<(&String, u32)> = vec![];
+        let mut base_styles: Vec<(&String, u32, usize)> = vec![];
+        let mut pseudo_styles: Vec<(&String, u32, usize)> = vec![];
 
-        for sel in ui_style.styles.keys() {
+        for (sel, style_pair) in &ui_style.styles {
             if selector_matches_state(sel, &state) {
                 let specificity = selector_specificity(sel);
                 if sel.contains(':') {
-                    pseudo_styles.push((sel, specificity));
+                    pseudo_styles.push((sel, specificity, style_pair.origin));
                 } else {
-                    base_styles.push((sel, specificity));
+                    base_styles.push((sel, specificity, style_pair.origin));
                 }
             }
         }
 
-        base_styles.sort_by_key(|&(_, spec)| spec);
-        pseudo_styles.sort_by_key(|&(_, spec)| spec);
+        // Sort by origin (ascending) then specificity (ascending)
+        // Later origin overrides earlier. Higher specificity overrides lower.
+        base_styles.sort_by(|a, b| match a.2.cmp(&b.2) {
+            std::cmp::Ordering::Equal => a.1.cmp(&b.1),
+            other => other,
+        });
+        pseudo_styles.sort_by(|a, b| match a.2.cmp(&b.2) {
+            std::cmp::Ordering::Equal => a.1.cmp(&b.1),
+            other => other,
+        });
 
         let mut final_style = Style::default();
 
         // 1) base normal
-        for (sel, _) in &base_styles {
+        for (sel, _, _) in &base_styles {
             if let Some(pair) = ui_style.styles.get(*sel) {
                 final_style.merge(&pair.normal);
             }
         }
 
         // 2) base important
-        for (sel, _) in &base_styles {
+        for (sel, _, _) in &base_styles {
             if let Some(pair) = ui_style.styles.get(*sel) {
                 final_style.merge(&pair.important);
             }
@@ -129,14 +137,14 @@ pub fn update_widget_styles_system(
         }
 
         // 4) pseudo normal
-        for (sel, _) in &pseudo_styles {
+        for (sel, _, _) in &pseudo_styles {
             if let Some(pair) = ui_style.styles.get(*sel) {
                 final_style.merge(&pair.normal);
             }
         }
 
         // 5) pseudo important
-        for (sel, _) in &pseudo_styles {
+        for (sel, _, _) in &pseudo_styles {
             if let Some(pair) = ui_style.styles.get(*sel) {
                 final_style.merge(&pair.important);
             }
@@ -863,6 +871,8 @@ fn selector_specificity(selector: &str) -> u32 {
             100
         } else if base.starts_with('.') {
             10
+        } else if base == "*" {
+            0
         } else {
             1
         };

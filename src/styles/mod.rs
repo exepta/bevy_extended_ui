@@ -359,6 +359,7 @@ pub struct ParsedCss {
 pub struct StylePair {
     pub important: Style,
     pub normal: Style,
+    pub origin: usize,
 }
 
 #[derive(Reflect, Default, Debug, Clone, PartialEq)]
