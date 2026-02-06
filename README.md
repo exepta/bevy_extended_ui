@@ -96,6 +96,7 @@ Note that currently you can use this binding:
 - `oninit`
 - `onmouseover`
 - `onmouseout`
+- `onfoucs`
 
 ### WASM support
 

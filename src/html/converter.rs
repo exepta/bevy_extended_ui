@@ -715,6 +715,10 @@ fn bind_html_func(attributes: &Attributes) -> HtmlEventBindings {
         onmouseout: attributes.get("onmouseleave").map(|s| s.to_string()),
         onchange: attributes.get("onchange").map(|s| s.to_string()),
         oninit: attributes.get("oninit").map(|s| s.to_string()),
+        onfoucs: attributes
+            .get("onfoucs")
+            .or_else(|| attributes.get("onfocus"))
+            .map(|s| s.to_string()),
     }
 }
 

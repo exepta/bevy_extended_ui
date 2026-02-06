@@ -38,6 +38,10 @@ impl Plugin for HtmlEventBindingsPlugin {
         app.add_systems(Update, emit_input_change.in_set(HtmlSystemSet::Bindings));
         app.add_systems(Update, emit_slider_change.in_set(HtmlSystemSet::Bindings));
         app.add_observer(on_html_change);
+
+        // observer (focus)
+        app.add_systems(Update, emit_html_focus_events.in_set(HtmlSystemSet::Bindings));
+        app.add_observer(on_html_focus);
     }
 }
 
@@ -293,5 +297,54 @@ pub(crate) fn on_html_change(
         commands.run_system_with(sys_id, HtmlEvent { entity, object: HtmlEventObject::Change(HtmlChange { entity: entity.clone()}) });
     } else {
         warn!("onchange binding '{name}' not registered via #[html_fn(...)]");
+    }
+}
+
+// =================================================
+//                        Focus
+// =================================================
+
+pub(crate) fn emit_html_focus_events(
+    mut commands: Commands,
+    mut query: Query<
+        (Entity, &HtmlEventBindings, &UIWidgetState, Option<&mut HtmlFocusState>),
+        Changed<UIWidgetState>,
+    >,
+) {
+    for (entity, bindings, state, focus_state) in &mut query {
+        let should_track = bindings.onfoucs.is_some();
+        let was_focused = focus_state.as_ref().map(|s| s.focused).unwrap_or(false);
+
+        if let Some(mut focus_state) = focus_state {
+            focus_state.focused = state.focused;
+        } else if should_track {
+            commands.entity(entity).insert(HtmlFocusState { focused: state.focused });
+        }
+
+        if !should_track || state.disabled {
+            continue;
+        }
+
+        if state.focused && !was_focused {
+            commands.trigger(HtmlFocus { entity });
+        }
+    }
+}
+
+pub(crate) fn on_html_focus(
+    focus: On<HtmlFocus>,
+    mut commands: Commands,
+    reg: Res<HtmlFunctionRegistry>,
+    q_bindings: Query<&HtmlEventBindings>,
+) {
+    let entity = focus.entity;
+
+    let Ok(bindings) = q_bindings.get(entity) else { return };
+    let Some(name) = bindings.onfoucs.as_deref() else { return };
+
+    if let Some(&sys_id) = reg.focus.get(name) {
+        commands.run_system_with(sys_id, HtmlEvent { entity, object: HtmlEventObject::Focus(HtmlFocus { entity: entity.clone()}) });
+    } else {
+        warn!("onfoucs binding '{name}' not registered via #[html_fn(...)]");
     }
 }

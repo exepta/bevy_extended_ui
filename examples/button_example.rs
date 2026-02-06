@@ -26,6 +26,11 @@ fn init_me_btn(In(target): In<HtmlEvent>) {
     info!("init_me_btn called for entity {:?}", target.entity);
 }
 
+#[html_fn("focus_me")]
+fn focus_me(In(target): In<HtmlEvent>) {
+    info!("focus_me called for entity {:?}", target.entity);
+}
+
 #[html_fn("click_me_btn")]
 fn click_me_btn(
     In(_target): In<HtmlEvent>,

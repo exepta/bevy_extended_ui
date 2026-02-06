@@ -340,6 +340,7 @@ pub enum HtmlEventObject {
     Init(HtmlInit),
     MouseOut(HtmlMouseOut),
     MouseOver(HtmlMouseOver),
+    Focus(HtmlFocus),
 }
 
 #[derive(Default, Resource)]
@@ -349,6 +350,7 @@ pub struct HtmlFunctionRegistry {
     pub out: HashMap<String, SystemId<In<HtmlEvent>>>,
     pub change: HashMap<String, SystemId<In<HtmlEvent>>>,
     pub init: HashMap<String, SystemId<In<HtmlEvent>>>,
+    pub focus: HashMap<String, SystemId<In<HtmlEvent>>>,
 }
 
 #[derive(Component, Reflect, Default, Clone, Debug)]
@@ -359,12 +361,18 @@ pub struct HtmlEventBindings {
     pub onmouseout: Option<String>,
     pub onchange: Option<String>,
     pub oninit: Option<String>,
+    pub onfoucs: Option<String>,
 }
 
 #[derive(EntityEvent, Clone, Copy)]
 pub struct HtmlClick {
     #[event_target]
     pub entity: Entity,
+}
+
+#[derive(Component, Default, Clone, Copy)]
+struct HtmlFocusState {
+    focused: bool,
 }
 
 #[derive(EntityEvent, Clone, Copy)]
@@ -387,6 +395,12 @@ pub struct HtmlChange {
 
 #[derive(EntityEvent, Clone, Copy)]
 pub struct HtmlInit {
+    #[event_target]
+    pub entity: Entity,
+}
+
+#[derive(EntityEvent, Clone, Copy)]
+pub struct HtmlFocus {
     #[event_target]
     pub entity: Entity,
 }
@@ -440,6 +454,7 @@ pub fn register_html_fns(world: &mut World) {
     for (name, id) in to_insert {
         reg.change.insert(name.clone(), id);
         reg.click.insert(name.clone(), id);
+        reg.focus.insert(name.clone(), id);
         reg.init.insert(name.clone(), id);
         reg.out.insert(name.clone(), id);
         reg.over.insert(name.clone(), id);
