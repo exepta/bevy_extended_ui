@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use bevy_extended_ui::example_utils::make_app;
-use bevy_extended_ui::html::{HtmlEvent, HtmlEventObject, HtmlSource};
+use bevy_extended_ui::html::{HtmlChange, HtmlSource};
 use bevy_extended_ui::io::HtmlAsset;
 use bevy_extended_ui::registry::UiRegistry;
 use bevy_extended_ui::styles::components::UiStyle;
@@ -22,17 +22,12 @@ fn main() {
 
 #[html_fn("text_color")]
 fn text_color_from_set(
-    In(event): In<HtmlEvent>,
+    In(event): In<HtmlChange>,
     text_query: Query<(&CssID, &mut UiStyle), With<Headline>>,
     set_q: Query<(&CssID, &FieldSelectionSingle)>,
     radio_q: Query<&RadioButton>,
 ) {
-    match event.object {
-        HtmlEventObject::Change(_) => {
-            apply_selected_radio_color_to_text(text_query, set_q, radio_q, event.entity);
-        }
-        _ => {}
-    }
+    apply_selected_radio_color_to_text(text_query, set_q, radio_q, event.entity);
 }
 
 fn apply_selected_radio_color_to_text(

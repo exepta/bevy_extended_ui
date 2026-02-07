@@ -1,6 +1,6 @@
 use bevy::log::warn;
 use bevy::prelude::*;
-use bevy::ui::ScrollPosition;
+use bevy::ui::{ComputedNode, RelativeCursorPosition, ScrollPosition};
 use std::collections::{HashMap, HashSet};
 use crate::CurrentWidgetState;
 use crate::html::*;
@@ -9,10 +9,23 @@ use crate::widgets::{
     UIGenID, UIWidgetState,
 };
 
+#[derive(Component, Default, Clone, Copy)]
+pub(crate) struct HtmlFocusTracker {
+    focused: bool,
+}
+
+#[derive(Resource, Default)]
+pub(crate) struct HtmlScrollTracker {
+    positions: HashMap<usize, Vec2>,
+    scrollbar_values: HashMap<Entity, f32>,
+}
+
 pub struct HtmlEventBindingsPlugin;
 
 impl Plugin for HtmlEventBindingsPlugin {
     fn build(&self, app: &mut App) {
+        app.init_resource::<HtmlScrollTracker>();
+
         // observer (click)
         app.add_observer(emit_html_click_events);
         app.add_observer(on_html_click);
@@ -77,16 +90,32 @@ impl Plugin for HtmlEventBindingsPlugin {
 pub(crate) fn emit_html_click_events(
     ev: On<Pointer<Click>>,
     mut commands: Commands,
-    q_bindings: Query<(&HtmlEventBindings, Option<&UIWidgetState>)>,
+    q_bindings: Query<(
+        &HtmlEventBindings,
+        Option<&UIWidgetState>,
+        Option<&RelativeCursorPosition>,
+        Option<&ComputedNode>,
+    )>,
 ) {
     let entity = ev.event().entity;
 
-    let Ok((bindings, state_opt)) = q_bindings.get(entity) else { return };
+    let Ok((bindings, state_opt, rel_pos, node)) = q_bindings.get(entity) else { return };
     if let Some(state) = state_opt {
         if state.disabled { return; }
     }
     if bindings.onclick.is_some() {
-        commands.trigger(HtmlClick { entity });
+        let position = ev.pointer_location.position;
+        let inner_position = rel_pos
+            .and_then(|rel| rel.normalized)
+            .map(|norm| {
+                if let Some(node) = node {
+                    Vec2::new(norm.x * node.size.x, norm.y * node.size.y)
+                } else {
+                    norm
+                }
+            })
+            .unwrap_or(position);
+        commands.trigger(HtmlClick { entity, position, inner_position });
     }
 }
 
@@ -101,8 +130,10 @@ pub(crate) fn on_html_click(
     let Ok(bindings) = q_bindings.get(entity) else { return };
     let Some(name) = bindings.onclick.as_deref() else { return };
 
-    if let Some(&sys_id) = reg.click.get(name) {
-        commands.run_system_with(sys_id, HtmlEvent { entity, object: HtmlEventObject::Click(HtmlClick { entity: entity.clone()}) });
+    if let Some(&sys_id) = reg.click_typed.get(name) {
+        commands.run_system_with(sys_id, *click);
+    } else if let Some(&sys_id) = reg.click.get(name) {
+        commands.run_system_with(sys_id, HtmlEvent { entity });
     } else {
         warn!("onclick binding '{name}' not registered via #[html_fn(...)]");
     }
@@ -136,8 +167,10 @@ pub(crate) fn on_html_mouse_over(
     let Ok(bindings) = q_bindings.get(entity) else { return };
     let Some(name) = bindings.onmouseover.as_deref() else { return };
 
-    if let Some(&sys_id) = reg.over.get(name) {
-        commands.run_system_with(sys_id, HtmlEvent { entity, object: HtmlEventObject::MouseOver(HtmlMouseOver { entity: entity.clone()}) });
+    if let Some(&sys_id) = reg.over_typed.get(name) {
+        commands.run_system_with(sys_id, *over);
+    } else if let Some(&sys_id) = reg.over.get(name) {
+        commands.run_system_with(sys_id, HtmlEvent { entity });
     } else {
         warn!("onmouseover binding '{name}' not registered via #[html_fn(...)]");
     }
@@ -171,8 +204,10 @@ pub(crate) fn on_html_mouse_out(
     let Ok(bindings) = q_bindings.get(entity) else { return };
     let Some(name) = bindings.onmouseout.as_deref() else { return };
 
-    if let Some(&sys_id) = reg.out.get(name) {
-        commands.run_system_with(sys_id, HtmlEvent { entity, object: HtmlEventObject::MouseOut(HtmlMouseOut { entity: entity.clone()}) });
+    if let Some(&sys_id) = reg.out_typed.get(name) {
+        commands.run_system_with(sys_id, *out);
+    } else if let Some(&sys_id) = reg.out.get(name) {
+        commands.run_system_with(sys_id, HtmlEvent { entity });
     } else {
         warn!("onmouseout binding '{name}' not registered via #[html_fn(...)]");
     }
@@ -227,9 +262,10 @@ pub(crate) fn on_html_init(
 
     let Some(name) = bindings.oninit.as_deref() else { return };
 
-    if let Some(&sys_id) = reg.init.get(name) {
-
-        commands.run_system_with(sys_id, HtmlEvent { entity, object: HtmlEventObject::Init(HtmlInit { entity: entity.clone()}) });
+    if let Some(&sys_id) = reg.init_typed.get(name) {
+        commands.run_system_with(sys_id, *init);
+    } else if let Some(&sys_id) = reg.init.get(name) {
+        commands.run_system_with(sys_id, HtmlEvent { entity });
     } else {
         warn!("oninit binding '{name}' not registered via #[html_fn(...)]");
     }
@@ -245,7 +281,7 @@ pub(crate) fn emit_checkbox_change(
     query: Query<(Entity, &HtmlEventBindings), Changed<CheckBox>>,
 ) {
     for (entity, binding) in &query {
-        emit_change_if_bound(&mut commands, binding, entity);
+        emit_change_if_bound(&mut commands, binding, entity, HtmlChangeAction::State);
     }
 }
 
@@ -255,7 +291,7 @@ pub(crate) fn emit_choice_box_change(
     query: Query<(Entity, &HtmlEventBindings), Changed<ChoiceBox>>,
 ) {
     for (entity, binding) in &query {
-        emit_change_if_bound(&mut commands, binding, entity);
+        emit_change_if_bound(&mut commands, binding, entity, HtmlChangeAction::State);
     }
 }
 
@@ -272,7 +308,7 @@ pub(crate) fn emit_field_set_change(
     >,
 ) {
     for (entity, binding) in &query {
-        emit_change_if_bound(&mut commands, binding, entity);
+        emit_change_if_bound(&mut commands, binding, entity, HtmlChangeAction::State);
     }
 }
 
@@ -282,7 +318,7 @@ pub(crate) fn emit_slider_change(
     query: Query<(Entity, &HtmlEventBindings), Changed<Slider>>,
 ) {
     for (entity, binding) in &query {
-        emit_change_if_bound(&mut commands, binding, entity);
+        emit_change_if_bound(&mut commands, binding, entity, HtmlChangeAction::State);
     }
 }
 
@@ -291,7 +327,7 @@ pub(crate) fn emit_input_change(
     query: Query<(Entity, &HtmlEventBindings), Changed<InputValue>>,
 ) {
     for (entity, binding) in &query {
-        emit_change_if_bound(&mut commands, binding, entity);
+        emit_change_if_bound(&mut commands, binding, entity, HtmlChangeAction::State);
     }
 }
 
@@ -299,9 +335,10 @@ fn emit_change_if_bound(
     commands: &mut Commands,
     bindings: &HtmlEventBindings,
     entity: Entity,
+    action: HtmlChangeAction,
 ) {
     if bindings.onchange.is_some() {
-        commands.trigger(HtmlChange { entity });
+        commands.trigger(HtmlChange { entity, action });
     }
 }
 
@@ -317,9 +354,10 @@ pub(crate) fn on_html_change(
 
     let Some(name) = bindings.onchange.as_deref() else { return };
 
-    if let Some(&sys_id) = reg.change.get(name) {
-
-        commands.run_system_with(sys_id, HtmlEvent { entity, object: HtmlEventObject::Change(HtmlChange { entity: entity.clone()}) });
+    if let Some(&sys_id) = reg.change_typed.get(name) {
+        commands.run_system_with(sys_id, *init);
+    } else if let Some(&sys_id) = reg.change.get(name) {
+        commands.run_system_with(sys_id, HtmlEvent { entity });
     } else {
         warn!("onchange binding '{name}' not registered via #[html_fn(...)]");
     }
@@ -332,7 +370,7 @@ pub(crate) fn on_html_change(
 pub(crate) fn emit_html_focus_events(
     mut commands: Commands,
     mut query: Query<
-        (Entity, &HtmlEventBindings, &UIWidgetState, Option<&mut HtmlFocusState>),
+        (Entity, &HtmlEventBindings, &UIWidgetState, Option<&mut HtmlFocusTracker>),
         Changed<UIWidgetState>,
     >,
 ) {
@@ -343,15 +381,23 @@ pub(crate) fn emit_html_focus_events(
         if let Some(mut focus_state) = focus_state {
             focus_state.focused = state.focused;
         } else if should_track {
-            commands.entity(entity).insert(HtmlFocusState { focused: state.focused });
+            commands.entity(entity).insert(HtmlFocusTracker { focused: state.focused });
         }
 
-        if !should_track || state.disabled {
+        if !should_track {
             continue;
         }
 
-        if state.focused && !was_focused {
-            commands.trigger(HtmlFocus { entity });
+        if state.focused != was_focused {
+            if state.focused && state.disabled {
+                continue;
+            }
+            let focus_state = if state.focused {
+                HtmlFocusState::Gained
+            } else {
+                HtmlFocusState::Lost
+            };
+            commands.trigger(HtmlFocus { entity, state: focus_state });
         }
     }
 }
@@ -367,8 +413,10 @@ pub(crate) fn on_html_focus(
     let Ok(bindings) = q_bindings.get(entity) else { return };
     let Some(name) = bindings.onfoucs.as_deref() else { return };
 
-    if let Some(&sys_id) = reg.focus.get(name) {
-        commands.run_system_with(sys_id, HtmlEvent { entity, object: HtmlEventObject::Focus(HtmlFocus { entity: entity.clone()}) });
+    if let Some(&sys_id) = reg.focus_typed.get(name) {
+        commands.run_system_with(sys_id, *focus);
+    } else if let Some(&sys_id) = reg.focus.get(name) {
+        commands.run_system_with(sys_id, HtmlEvent { entity });
     } else {
         warn!("onfoucs binding '{name}' not registered via #[html_fn(...)]");
     }
@@ -382,6 +430,7 @@ pub(crate) fn emit_html_scroll_events(
     mut commands: Commands,
     scroll_q: Query<(&ScrollPosition, &BindToID), Changed<ScrollPosition>>,
     widget_q: Query<(Entity, &UIGenID, &HtmlEventBindings, Option<&UIWidgetState>)>,
+    mut tracker: ResMut<HtmlScrollTracker>,
 ) {
     let mut bindings_by_id: HashMap<usize, (Entity, bool)> = HashMap::new();
     for (entity, id, bindings, state_opt) in &widget_q {
@@ -396,29 +445,47 @@ pub(crate) fn emit_html_scroll_events(
     }
 
     let mut fired: HashSet<Entity> = HashSet::new();
-    for (_, bind) in &scroll_q {
+    for (scroll_pos, bind) in &scroll_q {
         let Some((entity, disabled)) = bindings_by_id.get(&bind.0) else { continue };
+        let current = Vec2::new(scroll_pos.x, scroll_pos.y);
+        let last = tracker.positions.get(&bind.0).copied().unwrap_or(current);
+        tracker.positions.insert(bind.0, current);
         if *disabled {
             continue;
         }
         if fired.insert(*entity) {
-            commands.trigger(HtmlScroll { entity: *entity });
+            commands.trigger(HtmlScroll {
+                entity: *entity,
+                delta: current - last,
+                x: current.x,
+                y: current.y,
+            });
         }
     }
 }
 
 pub(crate) fn emit_html_scrollbar_events(
     mut commands: Commands,
-    query: Query<(Entity, &HtmlEventBindings, Option<&UIWidgetState>), Changed<Scrollbar>>,
+    query: Query<(Entity, &Scrollbar, &HtmlEventBindings, Option<&UIWidgetState>), Changed<Scrollbar>>,
+    mut tracker: ResMut<HtmlScrollTracker>,
 ) {
-    for (entity, bindings, state_opt) in &query {
+    for (entity, scroll, bindings, state_opt) in &query {
         if bindings.onscroll.is_none() {
             continue;
         }
+        let last_value = tracker.scrollbar_values.get(&entity).copied().unwrap_or(scroll.value);
+        tracker.scrollbar_values.insert(entity, scroll.value);
+
         if state_opt.map(|s| s.disabled).unwrap_or(false) {
             continue;
         }
-        commands.trigger(HtmlScroll { entity });
+        let (x, y, delta) = if scroll.vertical {
+            (0.0, scroll.value, Vec2::new(0.0, scroll.value - last_value))
+        } else {
+            (scroll.value, 0.0, Vec2::new(scroll.value - last_value, 0.0))
+        };
+
+        commands.trigger(HtmlScroll { entity, delta, x, y });
     }
 }
 
@@ -433,8 +500,10 @@ pub(crate) fn on_html_scroll(
     let Ok(bindings) = q_bindings.get(entity) else { return };
     let Some(name) = bindings.onscroll.as_deref() else { return };
 
-    if let Some(&sys_id) = reg.scroll.get(name) {
-        commands.run_system_with(sys_id, HtmlEvent { entity, object: HtmlEventObject::Scroll(HtmlScroll { entity: entity.clone()}) });
+    if let Some(&sys_id) = reg.scroll_typed.get(name) {
+        commands.run_system_with(sys_id, *scroll);
+    } else if let Some(&sys_id) = reg.scroll.get(name) {
+        commands.run_system_with(sys_id, HtmlEvent { entity });
     } else {
         warn!("onscroll binding '{name}' not registered via #[html_fn(...)]");
     }
@@ -535,8 +604,10 @@ pub(crate) fn on_html_key_down(
     let Ok(bindings) = q_bindings.get(entity) else { return };
     let Some(name) = bindings.onkeydown.as_deref() else { return };
 
-    if let Some(&sys_id) = reg.keydown.get(name) {
-        commands.run_system_with(sys_id, HtmlEvent { entity, object: HtmlEventObject::KeyDown(HtmlKeyDown { entity: entity.clone(), key: keydown.key }) });
+    if let Some(&sys_id) = reg.keydown_typed.get(name) {
+        commands.run_system_with(sys_id, *keydown);
+    } else if let Some(&sys_id) = reg.keydown.get(name) {
+        commands.run_system_with(sys_id, HtmlEvent { entity });
     } else {
         warn!("onkeydown binding '{name}' not registered via #[html_fn(...)]");
     }
@@ -553,8 +624,10 @@ pub(crate) fn on_html_key_up(
     let Ok(bindings) = q_bindings.get(entity) else { return };
     let Some(name) = bindings.onkeyup.as_deref() else { return };
 
-    if let Some(&sys_id) = reg.keyup.get(name) {
-        commands.run_system_with(sys_id, HtmlEvent { entity, object: HtmlEventObject::KeyUp(HtmlKeyUp { entity: entity.clone(), key: keyup.key }) });
+    if let Some(&sys_id) = reg.keyup_typed.get(name) {
+        commands.run_system_with(sys_id, *keyup);
+    } else if let Some(&sys_id) = reg.keyup.get(name) {
+        commands.run_system_with(sys_id, HtmlEvent { entity });
     } else {
         warn!("onkeyup binding '{name}' not registered via #[html_fn(...)]");
     }
@@ -576,7 +649,10 @@ pub(crate) fn emit_html_drag_start_events(
         if state.disabled { return; }
     }
     if bindings.ondragstart.is_some() {
-        commands.trigger(HtmlDragStart { entity });
+        commands.trigger(HtmlDragStart {
+            entity,
+            position: ev.pointer_location.position,
+        });
     }
 }
 
@@ -591,8 +667,10 @@ pub(crate) fn on_html_drag_start(
     let Ok(bindings) = q_bindings.get(entity) else { return };
     let Some(name) = bindings.ondragstart.as_deref() else { return };
 
-    if let Some(&sys_id) = reg.dragstart.get(name) {
-        commands.run_system_with(sys_id, HtmlEvent { entity, object: HtmlEventObject::DragStart(HtmlDragStart { entity: entity.clone()}) });
+    if let Some(&sys_id) = reg.dragstart_typed.get(name) {
+        commands.run_system_with(sys_id, *drag);
+    } else if let Some(&sys_id) = reg.dragstart.get(name) {
+        commands.run_system_with(sys_id, HtmlEvent { entity });
     } else {
         warn!("ondragstart binding '{name}' not registered via #[html_fn(...)]");
     }
@@ -610,7 +688,10 @@ pub(crate) fn emit_html_drag_events(
         if state.disabled { return; }
     }
     if bindings.ondrag.is_some() {
-        commands.trigger(HtmlDrag { entity });
+        commands.trigger(HtmlDrag {
+            entity,
+            position: ev.pointer_location.position,
+        });
     }
 }
 
@@ -625,8 +706,10 @@ pub(crate) fn on_html_drag(
     let Ok(bindings) = q_bindings.get(entity) else { return };
     let Some(name) = bindings.ondrag.as_deref() else { return };
 
-    if let Some(&sys_id) = reg.drag.get(name) {
-        commands.run_system_with(sys_id, HtmlEvent { entity, object: HtmlEventObject::Drag(HtmlDrag { entity: entity.clone()}) });
+    if let Some(&sys_id) = reg.drag_typed.get(name) {
+        commands.run_system_with(sys_id, *drag);
+    } else if let Some(&sys_id) = reg.drag.get(name) {
+        commands.run_system_with(sys_id, HtmlEvent { entity });
     } else {
         warn!("ondrag binding '{name}' not registered via #[html_fn(...)]");
     }
@@ -644,7 +727,10 @@ pub(crate) fn emit_html_drag_stop_events(
         if state.disabled { return; }
     }
     if bindings.ondragstop.is_some() {
-        commands.trigger(HtmlDragStop { entity });
+        commands.trigger(HtmlDragStop {
+            entity,
+            position: ev.pointer_location.position,
+        });
     }
 }
 
@@ -659,8 +745,10 @@ pub(crate) fn on_html_drag_stop(
     let Ok(bindings) = q_bindings.get(entity) else { return };
     let Some(name) = bindings.ondragstop.as_deref() else { return };
 
-    if let Some(&sys_id) = reg.dragstop.get(name) {
-        commands.run_system_with(sys_id, HtmlEvent { entity, object: HtmlEventObject::DragStop(HtmlDragStop { entity: entity.clone()}) });
+    if let Some(&sys_id) = reg.dragstop_typed.get(name) {
+        commands.run_system_with(sys_id, *drag);
+    } else if let Some(&sys_id) = reg.dragstop.get(name) {
+        commands.run_system_with(sys_id, HtmlEvent { entity });
     } else {
         warn!("ondragstop binding '{name}' not registered via #[html_fn(...)]");
     }

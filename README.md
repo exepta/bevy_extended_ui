@@ -239,4 +239,6 @@ If anyone has any ideas, I'd be happy to hear them.
 
 [Link to Widget attributes](WIDGETS.md)
 <br>
+[Link to Event Rules](EVENT.md)
+<br>
 [Link to Patches](PATCH.md)
