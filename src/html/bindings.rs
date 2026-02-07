@@ -1,7 +1,13 @@
 use bevy::log::warn;
 use bevy::prelude::*;
+use bevy::ui::ScrollPosition;
+use std::collections::{HashMap, HashSet};
+use crate::CurrentWidgetState;
 use crate::html::*;
-use crate::widgets::{CheckBox, FieldSelectionMulti, FieldSelectionSingle, InputValue, UIWidgetState};
+use crate::widgets::{
+    BindToID, CheckBox, FieldSelectionMulti, FieldSelectionSingle, InputValue, Scrollbar,
+    UIGenID, UIWidgetState,
+};
 
 pub struct HtmlEventBindingsPlugin;
 
@@ -42,6 +48,25 @@ impl Plugin for HtmlEventBindingsPlugin {
         // observer (focus)
         app.add_systems(Update, emit_html_focus_events.in_set(HtmlSystemSet::Bindings));
         app.add_observer(on_html_focus);
+
+        // observer (scroll)
+        app.add_systems(Update, emit_html_scroll_events.in_set(HtmlSystemSet::Bindings));
+        app.add_systems(Update, emit_html_scrollbar_events.in_set(HtmlSystemSet::Bindings));
+        app.add_observer(on_html_scroll);
+
+        // observer (keyboard)
+        app.add_systems(Update, emit_html_key_down_events.in_set(HtmlSystemSet::Bindings));
+        app.add_systems(Update, emit_html_key_up_events.in_set(HtmlSystemSet::Bindings));
+        app.add_observer(on_html_key_down);
+        app.add_observer(on_html_key_up);
+
+        // observer (drag)
+        app.add_observer(emit_html_drag_start_events);
+        app.add_observer(on_html_drag_start);
+        app.add_observer(emit_html_drag_events);
+        app.add_observer(on_html_drag);
+        app.add_observer(emit_html_drag_stop_events);
+        app.add_observer(on_html_drag_stop);
     }
 }
 
@@ -346,5 +371,297 @@ pub(crate) fn on_html_focus(
         commands.run_system_with(sys_id, HtmlEvent { entity, object: HtmlEventObject::Focus(HtmlFocus { entity: entity.clone()}) });
     } else {
         warn!("onfoucs binding '{name}' not registered via #[html_fn(...)]");
+    }
+}
+
+// =================================================
+//                        Scroll
+// =================================================
+
+pub(crate) fn emit_html_scroll_events(
+    mut commands: Commands,
+    scroll_q: Query<(&ScrollPosition, &BindToID), Changed<ScrollPosition>>,
+    widget_q: Query<(Entity, &UIGenID, &HtmlEventBindings, Option<&UIWidgetState>)>,
+) {
+    let mut bindings_by_id: HashMap<usize, (Entity, bool)> = HashMap::new();
+    for (entity, id, bindings, state_opt) in &widget_q {
+        if bindings.onscroll.is_some() {
+            let disabled = state_opt.map(|s| s.disabled).unwrap_or(false);
+            bindings_by_id.insert(id.get(), (entity, disabled));
+        }
+    }
+
+    if bindings_by_id.is_empty() {
+        return;
+    }
+
+    let mut fired: HashSet<Entity> = HashSet::new();
+    for (_, bind) in &scroll_q {
+        let Some((entity, disabled)) = bindings_by_id.get(&bind.0) else { continue };
+        if *disabled {
+            continue;
+        }
+        if fired.insert(*entity) {
+            commands.trigger(HtmlScroll { entity: *entity });
+        }
+    }
+}
+
+pub(crate) fn emit_html_scrollbar_events(
+    mut commands: Commands,
+    query: Query<(Entity, &HtmlEventBindings, Option<&UIWidgetState>), Changed<Scrollbar>>,
+) {
+    for (entity, bindings, state_opt) in &query {
+        if bindings.onscroll.is_none() {
+            continue;
+        }
+        if state_opt.map(|s| s.disabled).unwrap_or(false) {
+            continue;
+        }
+        commands.trigger(HtmlScroll { entity });
+    }
+}
+
+pub(crate) fn on_html_scroll(
+    scroll: On<HtmlScroll>,
+    mut commands: Commands,
+    reg: Res<HtmlFunctionRegistry>,
+    q_bindings: Query<&HtmlEventBindings>,
+) {
+    let entity = scroll.entity;
+
+    let Ok(bindings) = q_bindings.get(entity) else { return };
+    let Some(name) = bindings.onscroll.as_deref() else { return };
+
+    if let Some(&sys_id) = reg.scroll.get(name) {
+        commands.run_system_with(sys_id, HtmlEvent { entity, object: HtmlEventObject::Scroll(HtmlScroll { entity: entity.clone()}) });
+    } else {
+        warn!("onscroll binding '{name}' not registered via #[html_fn(...)]");
+    }
+}
+
+// =================================================
+//                       Keyboard
+// =================================================
+
+pub(crate) fn emit_html_key_down_events(
+    mut commands: Commands,
+    keyboard: Res<ButtonInput<KeyCode>>,
+    current_widget_state: Res<CurrentWidgetState>,
+    q_bindings: Query<(Entity, &UIGenID, &HtmlEventBindings, &UIWidgetState)>,
+) {
+    let keys: Vec<KeyCode> = keyboard.get_just_pressed().copied().collect();
+    if keys.is_empty() {
+        return;
+    }
+
+    let mut target = None;
+    if current_widget_state.widget_id != 0 {
+        for (entity, id, bindings, state) in &q_bindings {
+            if id.get() == current_widget_state.widget_id {
+                target = Some((entity, bindings, state.disabled));
+                break;
+            }
+        }
+    }
+
+    if target.is_none() {
+        for (entity, _, bindings, state) in &q_bindings {
+            if state.focused {
+                target = Some((entity, bindings, state.disabled));
+                break;
+            }
+        }
+    }
+
+    let Some((entity, bindings, disabled)) = target else { return };
+    if disabled || bindings.onkeydown.is_none() {
+        return;
+    }
+
+    for key in keys {
+        commands.trigger(HtmlKeyDown { entity, key });
+    }
+}
+
+pub(crate) fn emit_html_key_up_events(
+    mut commands: Commands,
+    keyboard: Res<ButtonInput<KeyCode>>,
+    current_widget_state: Res<CurrentWidgetState>,
+    q_bindings: Query<(Entity, &UIGenID, &HtmlEventBindings, &UIWidgetState)>,
+) {
+    let keys: Vec<KeyCode> = keyboard.get_just_released().copied().collect();
+    if keys.is_empty() {
+        return;
+    }
+
+    let mut target = None;
+    if current_widget_state.widget_id != 0 {
+        for (entity, id, bindings, state) in &q_bindings {
+            if id.get() == current_widget_state.widget_id {
+                target = Some((entity, bindings, state.disabled));
+                break;
+            }
+        }
+    }
+
+    if target.is_none() {
+        for (entity, _, bindings, state) in &q_bindings {
+            if state.focused {
+                target = Some((entity, bindings, state.disabled));
+                break;
+            }
+        }
+    }
+
+    let Some((entity, bindings, disabled)) = target else { return };
+    if disabled || bindings.onkeyup.is_none() {
+        return;
+    }
+
+    for key in keys {
+        commands.trigger(HtmlKeyUp { entity, key });
+    }
+}
+
+pub(crate) fn on_html_key_down(
+    keydown: On<HtmlKeyDown>,
+    mut commands: Commands,
+    reg: Res<HtmlFunctionRegistry>,
+    q_bindings: Query<&HtmlEventBindings>,
+) {
+    let entity = keydown.entity;
+
+    let Ok(bindings) = q_bindings.get(entity) else { return };
+    let Some(name) = bindings.onkeydown.as_deref() else { return };
+
+    if let Some(&sys_id) = reg.keydown.get(name) {
+        commands.run_system_with(sys_id, HtmlEvent { entity, object: HtmlEventObject::KeyDown(HtmlKeyDown { entity: entity.clone(), key: keydown.key }) });
+    } else {
+        warn!("onkeydown binding '{name}' not registered via #[html_fn(...)]");
+    }
+}
+
+pub(crate) fn on_html_key_up(
+    keyup: On<HtmlKeyUp>,
+    mut commands: Commands,
+    reg: Res<HtmlFunctionRegistry>,
+    q_bindings: Query<&HtmlEventBindings>,
+) {
+    let entity = keyup.entity;
+
+    let Ok(bindings) = q_bindings.get(entity) else { return };
+    let Some(name) = bindings.onkeyup.as_deref() else { return };
+
+    if let Some(&sys_id) = reg.keyup.get(name) {
+        commands.run_system_with(sys_id, HtmlEvent { entity, object: HtmlEventObject::KeyUp(HtmlKeyUp { entity: entity.clone(), key: keyup.key }) });
+    } else {
+        warn!("onkeyup binding '{name}' not registered via #[html_fn(...)]");
+    }
+}
+
+// =================================================
+//                         Drag
+// =================================================
+
+pub(crate) fn emit_html_drag_start_events(
+    ev: On<Pointer<DragStart>>,
+    mut commands: Commands,
+    q_bindings: Query<(&HtmlEventBindings, Option<&UIWidgetState>)>,
+) {
+    let entity = ev.event().entity;
+
+    let Ok((bindings, state_opt)) = q_bindings.get(entity) else { return };
+    if let Some(state) = state_opt {
+        if state.disabled { return; }
+    }
+    if bindings.ondragstart.is_some() {
+        commands.trigger(HtmlDragStart { entity });
+    }
+}
+
+pub(crate) fn on_html_drag_start(
+    drag: On<HtmlDragStart>,
+    mut commands: Commands,
+    reg: Res<HtmlFunctionRegistry>,
+    q_bindings: Query<&HtmlEventBindings>,
+) {
+    let entity = drag.entity;
+
+    let Ok(bindings) = q_bindings.get(entity) else { return };
+    let Some(name) = bindings.ondragstart.as_deref() else { return };
+
+    if let Some(&sys_id) = reg.dragstart.get(name) {
+        commands.run_system_with(sys_id, HtmlEvent { entity, object: HtmlEventObject::DragStart(HtmlDragStart { entity: entity.clone()}) });
+    } else {
+        warn!("ondragstart binding '{name}' not registered via #[html_fn(...)]");
+    }
+}
+
+pub(crate) fn emit_html_drag_events(
+    ev: On<Pointer<Drag>>,
+    mut commands: Commands,
+    q_bindings: Query<(&HtmlEventBindings, Option<&UIWidgetState>)>,
+) {
+    let entity = ev.event().entity;
+
+    let Ok((bindings, state_opt)) = q_bindings.get(entity) else { return };
+    if let Some(state) = state_opt {
+        if state.disabled { return; }
+    }
+    if bindings.ondrag.is_some() {
+        commands.trigger(HtmlDrag { entity });
+    }
+}
+
+pub(crate) fn on_html_drag(
+    drag: On<HtmlDrag>,
+    mut commands: Commands,
+    reg: Res<HtmlFunctionRegistry>,
+    q_bindings: Query<&HtmlEventBindings>,
+) {
+    let entity = drag.entity;
+
+    let Ok(bindings) = q_bindings.get(entity) else { return };
+    let Some(name) = bindings.ondrag.as_deref() else { return };
+
+    if let Some(&sys_id) = reg.drag.get(name) {
+        commands.run_system_with(sys_id, HtmlEvent { entity, object: HtmlEventObject::Drag(HtmlDrag { entity: entity.clone()}) });
+    } else {
+        warn!("ondrag binding '{name}' not registered via #[html_fn(...)]");
+    }
+}
+
+pub(crate) fn emit_html_drag_stop_events(
+    ev: On<Pointer<DragEnd>>,
+    mut commands: Commands,
+    q_bindings: Query<(&HtmlEventBindings, Option<&UIWidgetState>)>,
+) {
+    let entity = ev.event().entity;
+
+    let Ok((bindings, state_opt)) = q_bindings.get(entity) else { return };
+    if let Some(state) = state_opt {
+        if state.disabled { return; }
+    }
+    if bindings.ondragstop.is_some() {
+        commands.trigger(HtmlDragStop { entity });
+    }
+}
+
+pub(crate) fn on_html_drag_stop(
+    drag: On<HtmlDragStop>,
+    mut commands: Commands,
+    reg: Res<HtmlFunctionRegistry>,
+    q_bindings: Query<&HtmlEventBindings>,
+) {
+    let entity = drag.entity;
+
+    let Ok(bindings) = q_bindings.get(entity) else { return };
+    let Some(name) = bindings.ondragstop.as_deref() else { return };
+
+    if let Some(&sys_id) = reg.dragstop.get(name) {
+        commands.run_system_with(sys_id, HtmlEvent { entity, object: HtmlEventObject::DragStop(HtmlDragStop { entity: entity.clone()}) });
+    } else {
+        warn!("ondragstop binding '{name}' not registered via #[html_fn(...)]");
     }
 }

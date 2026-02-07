@@ -341,6 +341,12 @@ pub enum HtmlEventObject {
     MouseOut(HtmlMouseOut),
     MouseOver(HtmlMouseOver),
     Focus(HtmlFocus),
+    Scroll(HtmlScroll),
+    KeyDown(HtmlKeyDown),
+    KeyUp(HtmlKeyUp),
+    DragStart(HtmlDragStart),
+    Drag(HtmlDrag),
+    DragStop(HtmlDragStop),
 }
 
 #[derive(Default, Resource)]
@@ -351,6 +357,12 @@ pub struct HtmlFunctionRegistry {
     pub change: HashMap<String, SystemId<In<HtmlEvent>>>,
     pub init: HashMap<String, SystemId<In<HtmlEvent>>>,
     pub focus: HashMap<String, SystemId<In<HtmlEvent>>>,
+    pub scroll: HashMap<String, SystemId<In<HtmlEvent>>>,
+    pub keydown: HashMap<String, SystemId<In<HtmlEvent>>>,
+    pub keyup: HashMap<String, SystemId<In<HtmlEvent>>>,
+    pub dragstart: HashMap<String, SystemId<In<HtmlEvent>>>,
+    pub drag: HashMap<String, SystemId<In<HtmlEvent>>>,
+    pub dragstop: HashMap<String, SystemId<In<HtmlEvent>>>,
 }
 
 #[derive(Component, Reflect, Default, Clone, Debug)]
@@ -362,6 +374,12 @@ pub struct HtmlEventBindings {
     pub onchange: Option<String>,
     pub oninit: Option<String>,
     pub onfoucs: Option<String>,
+    pub onscroll: Option<String>,
+    pub onkeydown: Option<String>,
+    pub onkeyup: Option<String>,
+    pub ondragstart: Option<String>,
+    pub ondrag: Option<String>,
+    pub ondragstop: Option<String>,
 }
 
 #[derive(EntityEvent, Clone, Copy)]
@@ -401,6 +419,44 @@ pub struct HtmlInit {
 
 #[derive(EntityEvent, Clone, Copy)]
 pub struct HtmlFocus {
+    #[event_target]
+    pub entity: Entity,
+}
+
+#[derive(EntityEvent, Clone, Copy)]
+pub struct HtmlScroll {
+    #[event_target]
+    pub entity: Entity,
+}
+
+#[derive(EntityEvent, Clone, Copy)]
+pub struct HtmlKeyDown {
+    #[event_target]
+    pub entity: Entity,
+    pub key: KeyCode,
+}
+
+#[derive(EntityEvent, Clone, Copy)]
+pub struct HtmlKeyUp {
+    #[event_target]
+    pub entity: Entity,
+    pub key: KeyCode,
+}
+
+#[derive(EntityEvent, Clone, Copy)]
+pub struct HtmlDragStart {
+    #[event_target]
+    pub entity: Entity,
+}
+
+#[derive(EntityEvent, Clone, Copy)]
+pub struct HtmlDrag {
+    #[event_target]
+    pub entity: Entity,
+}
+
+#[derive(EntityEvent, Clone, Copy)]
+pub struct HtmlDragStop {
     #[event_target]
     pub entity: Entity,
 }
@@ -456,6 +512,12 @@ pub fn register_html_fns(world: &mut World) {
         reg.click.insert(name.clone(), id);
         reg.focus.insert(name.clone(), id);
         reg.init.insert(name.clone(), id);
+        reg.scroll.insert(name.clone(), id);
+        reg.keydown.insert(name.clone(), id);
+        reg.keyup.insert(name.clone(), id);
+        reg.dragstart.insert(name.clone(), id);
+        reg.drag.insert(name.clone(), id);
+        reg.dragstop.insert(name.clone(), id);
         reg.out.insert(name.clone(), id);
         reg.over.insert(name.clone(), id);
         debug!("Registered html fn '{name}' with id {id:?}");

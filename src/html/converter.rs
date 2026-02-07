@@ -719,6 +719,15 @@ fn bind_html_func(attributes: &Attributes) -> HtmlEventBindings {
             .get("onfoucs")
             .or_else(|| attributes.get("onfocus"))
             .map(|s| s.to_string()),
+        onscroll: attributes.get("onscroll").map(|s| s.to_string()),
+        onkeydown: attributes.get("onkeydown").map(|s| s.to_string()),
+        onkeyup: attributes.get("onkeyup").map(|s| s.to_string()),
+        ondragstart: attributes.get("ondragstart").map(|s| s.to_string()),
+        ondrag: attributes.get("ondrag").map(|s| s.to_string()),
+        ondragstop: attributes
+            .get("ondragstop")
+            .or_else(|| attributes.get("ondragend"))
+            .map(|s| s.to_string()),
     }
 }
 

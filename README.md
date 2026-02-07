@@ -97,6 +97,12 @@ Note that currently you can use this binding:
 - `onmouseover`
 - `onmouseout`
 - `onfoucs`
+- `onscroll`
+- `onkeydown`
+- `onkeyup`
+- `ondragstart`
+- `ondrag`
+- `ondragstop`
 
 ### WASM support
 
@@ -224,7 +230,7 @@ If anyone has any ideas, I'd be happy to hear them.
 > _Note:_ This project is currently under construction and not suitable for large projects!.
 
 | `Bevy` version | `bevy_extended_ui` version |
-| -------------- | -------------------------- |
+|----------------|----------------------------|
 | 0.18.0         | 1.2.0 - 1.3.0              |
 | 0.17.0         | 1.0.0 - 1.1.0              |
 | 0.16.0         | 0.1.0 - 0.2.2              |
