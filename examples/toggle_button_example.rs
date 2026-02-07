@@ -1,4 +1,4 @@
-use bevy_extended_ui::html::{HtmlEvent, HtmlEventObject};
+use bevy_extended_ui::html::HtmlChange;
 use bevy::prelude::*;
 use bevy_extended_ui::example_utils::make_app;
 use bevy_extended_ui::html::HtmlSource;
@@ -23,17 +23,12 @@ fn main() {
 
 #[html_fn("text_format")]
 fn text_color_from_set(
-    In(event): In<HtmlEvent>,
+    In(event): In<HtmlChange>,
     text_query: Query<(&CssID, &mut UiStyle), With<Headline>>,
     set_q: Query<&FieldSelectionMulti>,
     toggle_q: Query<&ToggleButton>,
 ) {
-    match event.object {
-        HtmlEventObject::Change(_) | HtmlEventObject::Init(_) => {
-            apply_selected_radio_color_to_text(text_query, set_q, toggle_q, event.entity);
-        }
-        _ => {}
-    }
+    apply_selected_radio_color_to_text(text_query, set_q, toggle_q, event.entity);
 }
 
 fn apply_selected_radio_color_to_text(

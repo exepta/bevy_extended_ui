@@ -7,7 +7,7 @@ use bevy::ui::ScrollPosition;
 use bevy::window::PrimaryWindow;
 use crate::styles::paint::Colored;
 use crate::styles::{CssClass, CssSource, TagName};
-use crate::widgets::{Div, Scrollbar, UIGenID, UIWidgetState, WidgetId, WidgetKind};
+use crate::widgets::{BindToID, Div, Scrollbar, UIGenID, UIWidgetState, WidgetId, WidgetKind};
 use crate::{CurrentWidgetState, ExtendedUiConfiguration};
 
 #[derive(Component)]
@@ -108,6 +108,7 @@ fn ensure_div_scroll_structure(
         (
             Entity,
             &Div,
+            &UIGenID,
             &mut Node,
             Option<&Children>,
             Option<&CssSource>,
@@ -126,6 +127,7 @@ fn ensure_div_scroll_structure(
     for (
         div_entity,
         div,
+        ui_id,
         mut div_node,
         children_opt,
         source_opt,
@@ -176,6 +178,7 @@ fn ensure_div_scroll_structure(
                     TagName("div".to_string()),
                     DivScrollContent,
                     DivContentOwner(div_entity),
+                    BindToID(ui_id.get()),
                     Visibility::Inherited,
                     InheritedVisibility::default(),
                     Transform::default(),
@@ -195,6 +198,7 @@ fn ensure_div_scroll_structure(
 
             content_entity
         };
+        commands.entity(content_entity).insert(BindToID(ui_id.get()));
 
         let mut sb_y_entity = sb_y_opt.map(|s| **s);
         let mut sb_x_entity = sb_x_opt.map(|s| **s);

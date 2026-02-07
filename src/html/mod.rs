@@ -315,9 +315,59 @@ impl Default for HtmlID {
     }
 }
 
-pub struct HtmlFnRegistration {
-    pub name: &'static str,
-    pub build: fn(&mut World) -> SystemId<In<HtmlEvent>, ()>,
+pub enum HtmlFnRegistration {
+    HtmlEvent {
+        name: &'static str,
+        build: fn(&mut World) -> SystemId<In<HtmlEvent>, ()>,
+    },
+    HtmlClick {
+        name: &'static str,
+        build: fn(&mut World) -> SystemId<In<HtmlClick>, ()>,
+    },
+    HtmlChange {
+        name: &'static str,
+        build: fn(&mut World) -> SystemId<In<HtmlChange>, ()>,
+    },
+    HtmlInit {
+        name: &'static str,
+        build: fn(&mut World) -> SystemId<In<HtmlInit>, ()>,
+    },
+    HtmlMouseOut {
+        name: &'static str,
+        build: fn(&mut World) -> SystemId<In<HtmlMouseOut>, ()>,
+    },
+    HtmlMouseOver {
+        name: &'static str,
+        build: fn(&mut World) -> SystemId<In<HtmlMouseOver>, ()>,
+    },
+    HtmlFocus {
+        name: &'static str,
+        build: fn(&mut World) -> SystemId<In<HtmlFocus>, ()>,
+    },
+    HtmlScroll {
+        name: &'static str,
+        build: fn(&mut World) -> SystemId<In<HtmlScroll>, ()>,
+    },
+    HtmlKeyDown {
+        name: &'static str,
+        build: fn(&mut World) -> SystemId<In<HtmlKeyDown>, ()>,
+    },
+    HtmlKeyUp {
+        name: &'static str,
+        build: fn(&mut World) -> SystemId<In<HtmlKeyUp>, ()>,
+    },
+    HtmlDragStart {
+        name: &'static str,
+        build: fn(&mut World) -> SystemId<In<HtmlDragStart>, ()>,
+    },
+    HtmlDrag {
+        name: &'static str,
+        build: fn(&mut World) -> SystemId<In<HtmlDrag>, ()>,
+    },
+    HtmlDragStop {
+        name: &'static str,
+        build: fn(&mut World) -> SystemId<In<HtmlDragStop>, ()>,
+    },
 }
 
 inventory::collect!(HtmlFnRegistration);
@@ -325,21 +375,11 @@ inventory::collect!(HtmlFnRegistration);
 #[derive(Clone, Copy)]
 pub struct HtmlEvent {
     pub entity: Entity,
-    pub object: HtmlEventObject,
 }
 
 impl HtmlEvent {
     pub fn target(&self) -> Entity { self.entity }
 
-}
-
-#[derive(Clone, Copy)]
-pub enum HtmlEventObject {
-    Click(HtmlClick),
-    Change(HtmlChange),
-    Init(HtmlInit),
-    MouseOut(HtmlMouseOut),
-    MouseOver(HtmlMouseOver),
 }
 
 #[derive(Default, Resource)]
@@ -349,6 +389,25 @@ pub struct HtmlFunctionRegistry {
     pub out: HashMap<String, SystemId<In<HtmlEvent>>>,
     pub change: HashMap<String, SystemId<In<HtmlEvent>>>,
     pub init: HashMap<String, SystemId<In<HtmlEvent>>>,
+    pub focus: HashMap<String, SystemId<In<HtmlEvent>>>,
+    pub scroll: HashMap<String, SystemId<In<HtmlEvent>>>,
+    pub keydown: HashMap<String, SystemId<In<HtmlEvent>>>,
+    pub keyup: HashMap<String, SystemId<In<HtmlEvent>>>,
+    pub dragstart: HashMap<String, SystemId<In<HtmlEvent>>>,
+    pub drag: HashMap<String, SystemId<In<HtmlEvent>>>,
+    pub dragstop: HashMap<String, SystemId<In<HtmlEvent>>>,
+    pub click_typed: HashMap<String, SystemId<In<HtmlClick>>>,
+    pub over_typed: HashMap<String, SystemId<In<HtmlMouseOver>>>,
+    pub out_typed: HashMap<String, SystemId<In<HtmlMouseOut>>>,
+    pub change_typed: HashMap<String, SystemId<In<HtmlChange>>>,
+    pub init_typed: HashMap<String, SystemId<In<HtmlInit>>>,
+    pub focus_typed: HashMap<String, SystemId<In<HtmlFocus>>>,
+    pub scroll_typed: HashMap<String, SystemId<In<HtmlScroll>>>,
+    pub keydown_typed: HashMap<String, SystemId<In<HtmlKeyDown>>>,
+    pub keyup_typed: HashMap<String, SystemId<In<HtmlKeyUp>>>,
+    pub dragstart_typed: HashMap<String, SystemId<In<HtmlDragStart>>>,
+    pub drag_typed: HashMap<String, SystemId<In<HtmlDrag>>>,
+    pub dragstop_typed: HashMap<String, SystemId<In<HtmlDragStop>>>,
 }
 
 #[derive(Component, Reflect, Default, Clone, Debug)]
@@ -359,12 +418,21 @@ pub struct HtmlEventBindings {
     pub onmouseout: Option<String>,
     pub onchange: Option<String>,
     pub oninit: Option<String>,
+    pub onfoucs: Option<String>,
+    pub onscroll: Option<String>,
+    pub onkeydown: Option<String>,
+    pub onkeyup: Option<String>,
+    pub ondragstart: Option<String>,
+    pub ondrag: Option<String>,
+    pub ondragstop: Option<String>,
 }
 
 #[derive(EntityEvent, Clone, Copy)]
 pub struct HtmlClick {
     #[event_target]
     pub entity: Entity,
+    pub position: Vec2,
+    pub inner_position: Vec2,
 }
 
 #[derive(EntityEvent, Clone, Copy)]
@@ -379,16 +447,81 @@ pub struct HtmlMouseOut {
     pub entity: Entity,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HtmlChangeAction {
+    State,
+    Style,
+    Unknown,
+}
+
 #[derive(EntityEvent, Clone, Copy)]
 pub struct HtmlChange {
     #[event_target]
     pub entity: Entity,
+    pub action: HtmlChangeAction,
 }
 
 #[derive(EntityEvent, Clone, Copy)]
 pub struct HtmlInit {
     #[event_target]
     pub entity: Entity,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HtmlFocusState {
+    Gained,
+    Lost,
+}
+
+#[derive(EntityEvent, Clone, Copy)]
+pub struct HtmlFocus {
+    #[event_target]
+    pub entity: Entity,
+    pub state: HtmlFocusState,
+}
+
+#[derive(EntityEvent, Clone, Copy)]
+pub struct HtmlScroll {
+    #[event_target]
+    pub entity: Entity,
+    pub delta: Vec2,
+    pub x: f32,
+    pub y: f32,
+}
+
+#[derive(EntityEvent, Clone, Copy)]
+pub struct HtmlKeyDown {
+    #[event_target]
+    pub entity: Entity,
+    pub key: KeyCode,
+}
+
+#[derive(EntityEvent, Clone, Copy)]
+pub struct HtmlKeyUp {
+    #[event_target]
+    pub entity: Entity,
+    pub key: KeyCode,
+}
+
+#[derive(EntityEvent, Clone, Copy)]
+pub struct HtmlDragStart {
+    #[event_target]
+    pub entity: Entity,
+    pub position: Vec2,
+}
+
+#[derive(EntityEvent, Clone, Copy)]
+pub struct HtmlDrag {
+    #[event_target]
+    pub entity: Entity,
+    pub position: Vec2,
+}
+
+#[derive(EntityEvent, Clone, Copy)]
+pub struct HtmlDragStop {
+    #[event_target]
+    pub entity: Entity,
+    pub position: Vec2,
 }
 
 /// Main plugin for HTML UI: converter + builder + reload integration.
@@ -432,15 +565,98 @@ pub fn register_html_fns(world: &mut World) {
     let mut to_insert: Vec<(String, SystemId<In<HtmlEvent>>)> = Vec::new();
 
     for item in inventory::iter::<HtmlFnRegistration> {
-        let id = (item.build)(world);
-        to_insert.push((item.name.to_string(), id));
+        match item {
+            HtmlFnRegistration::HtmlEvent { name, build } => {
+                let id = (*build)(world);
+                to_insert.push(((*name).to_string(), id));
+            }
+            HtmlFnRegistration::HtmlClick { name, build } => {
+                let id = (*build)(world);
+                world.resource_mut::<HtmlFunctionRegistry>()
+                    .click_typed
+                    .insert((*name).to_string(), id);
+            }
+            HtmlFnRegistration::HtmlChange { name, build } => {
+                let id = (*build)(world);
+                world.resource_mut::<HtmlFunctionRegistry>()
+                    .change_typed
+                    .insert((*name).to_string(), id);
+            }
+            HtmlFnRegistration::HtmlInit { name, build } => {
+                let id = (*build)(world);
+                world.resource_mut::<HtmlFunctionRegistry>()
+                    .init_typed
+                    .insert((*name).to_string(), id);
+            }
+            HtmlFnRegistration::HtmlMouseOut { name, build } => {
+                let id = (*build)(world);
+                world.resource_mut::<HtmlFunctionRegistry>()
+                    .out_typed
+                    .insert((*name).to_string(), id);
+            }
+            HtmlFnRegistration::HtmlMouseOver { name, build } => {
+                let id = (*build)(world);
+                world.resource_mut::<HtmlFunctionRegistry>()
+                    .over_typed
+                    .insert((*name).to_string(), id);
+            }
+            HtmlFnRegistration::HtmlFocus { name, build } => {
+                let id = (*build)(world);
+                world.resource_mut::<HtmlFunctionRegistry>()
+                    .focus_typed
+                    .insert((*name).to_string(), id);
+            }
+            HtmlFnRegistration::HtmlScroll { name, build } => {
+                let id = (*build)(world);
+                world.resource_mut::<HtmlFunctionRegistry>()
+                    .scroll_typed
+                    .insert((*name).to_string(), id);
+            }
+            HtmlFnRegistration::HtmlKeyDown { name, build } => {
+                let id = (*build)(world);
+                world.resource_mut::<HtmlFunctionRegistry>()
+                    .keydown_typed
+                    .insert((*name).to_string(), id);
+            }
+            HtmlFnRegistration::HtmlKeyUp { name, build } => {
+                let id = (*build)(world);
+                world.resource_mut::<HtmlFunctionRegistry>()
+                    .keyup_typed
+                    .insert((*name).to_string(), id);
+            }
+            HtmlFnRegistration::HtmlDragStart { name, build } => {
+                let id = (*build)(world);
+                world.resource_mut::<HtmlFunctionRegistry>()
+                    .dragstart_typed
+                    .insert((*name).to_string(), id);
+            }
+            HtmlFnRegistration::HtmlDrag { name, build } => {
+                let id = (*build)(world);
+                world.resource_mut::<HtmlFunctionRegistry>()
+                    .drag_typed
+                    .insert((*name).to_string(), id);
+            }
+            HtmlFnRegistration::HtmlDragStop { name, build } => {
+                let id = (*build)(world);
+                world.resource_mut::<HtmlFunctionRegistry>()
+                    .dragstop_typed
+                    .insert((*name).to_string(), id);
+            }
+        }
     }
 
     let mut reg = world.resource_mut::<HtmlFunctionRegistry>();
     for (name, id) in to_insert {
         reg.change.insert(name.clone(), id);
         reg.click.insert(name.clone(), id);
+        reg.focus.insert(name.clone(), id);
         reg.init.insert(name.clone(), id);
+        reg.scroll.insert(name.clone(), id);
+        reg.keydown.insert(name.clone(), id);
+        reg.keyup.insert(name.clone(), id);
+        reg.dragstart.insert(name.clone(), id);
+        reg.drag.insert(name.clone(), id);
+        reg.dragstop.insert(name.clone(), id);
         reg.out.insert(name.clone(), id);
         reg.over.insert(name.clone(), id);
         debug!("Registered html fn '{name}' with id {id:?}");

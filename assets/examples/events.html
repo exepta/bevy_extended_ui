@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta name="events_test">
+  <meta charset="UTF-8">
+  <title>Events</title>
+  <link rel="stylesheet" href="base.css">
+</head>
+
+<body>
+
+  <button oninit="ev_init">Init</button>
+  <button onclick="ev_click">Click</button>
+  <button onmouseenter="ev_over" onmouseleave="ev_out">Hover</button>
+
+  <input id="event-input" type="text" placeholder="Type here"
+         onfoucs="ev_focus"
+         onkeydown="ev_key_down"
+         onkeyup="ev_key_up"
+         onchange="ev_change" />
+
+  <div class="display-scroll" onscroll="ev_scroll" style="width: 250px; height: 120px;">
+    <div style="height: 320px; width: 100%; display: flex; flex-direction: column; gap: 6px;">
+      <p>Scroll content line 1</p>
+      <p>Scroll content line 2</p>
+      <p>Scroll content line 3</p>
+      <p>Scroll content line 4</p>
+      <p>Scroll content line 5</p>
+      <p>Scroll content line 6</p>
+      <p>Scroll content line 7</p>
+      <p>Scroll content line 8</p>
+    </div>
+  </div>
+
+  <div ondragstart="ev_drag_start" ondrag="ev_drag" ondragstop="ev_drag_stop"
+       style="width: 180px; height: 60px; background: #ff006a; display: flex; justify-content: center; align-items: center;">
+    Drag me
+  </div>
+
+</body>
+
+</html>
