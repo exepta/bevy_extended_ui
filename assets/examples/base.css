@@ -79,6 +79,15 @@ input:invalid {
     background: rgba(255, 77, 77, 0.1);
 }
 
+#fn_q_key {
+    transition: all 0.3s;
+    transform: scale(1);
+}
+
+#fn_q_key:hover {
+    transform: scale(1.2);
+}
+
 .pulse-example {
     animation: default-pulse 0.8s ease-in-out infinite alternate;
     background: cornflowerblue;
@@ -96,7 +105,58 @@ input:invalid {
 .rotate-example {
     animation: propeller-rotate 3.0s linear infinite;
     background: #ff006a;
-    margin-top: 100px;
+    margin-top: 80px;
+    margin-bottom: 80px;
+}
+
+.layout-example {
+    animation: layout-swell 1.6s ease-in-out infinite alternate;
+    background: #1f2630;
+    color: #fff;
+    box-sizing: border-box;
+    border: 2px solid #66c2a5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+@keyframes layout-swell {
+    0% {
+        width: 150px;
+        height: 40px;
+        min-width: 150px;
+        max-width: 150px;
+        min-height: 40px;
+        max-height: 40px;
+        font-size: 12px;
+        border-radius: 6px;
+        border-color: #66c2a5;
+    }
+
+    50% {
+        width: 175px;
+        height: 52px;
+        min-width: 175px;
+        max-width: 210px;
+        min-height: 52px;
+        max-height: 52px;
+        font-size: 16px;
+        border-radius: 14px;
+        border-color: #fc8d62;
+    }
+
+    100% {
+        width: 200px;
+        height: 58px;
+        min-width: 200px;
+        max-width: 260px;
+        min-height: 58px;
+        max-height: 64px;
+        font-size: 18px;
+        border-radius: 22px;
+        border-color: #8da0cb;
+    }
 }
 
 @keyframes color-swap {

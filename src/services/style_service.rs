@@ -4,8 +4,8 @@ use crate::services::image_service::get_or_load_image;
 use crate::services::state_service::update_widget_states;
 use crate::styles::components::UiStyle;
 use crate::styles::{
-    AnimationDirection, AnimationKeyframe, AnimationSpec, FontWeight, Style, TransformStyle,
-    TransitionProperty, TransitionSpec,
+    AnimationDirection, AnimationKeyframe, AnimationSpec, FontVal, FontWeight, Radius, Style,
+    TransformStyle, TransitionProperty, TransitionSpec,
 };
 use crate::widgets::UIWidgetState;
 
@@ -579,6 +579,16 @@ fn blend_animation_style(from: &Style, to: &Style, t: f32) -> Style {
     blended.border_color = blend_color(from.border_color, to.border_color, t);
     blended.background = blend_background(from.background.clone(), to.background.clone(), t);
     blended.transform = blend_transform_style(&from.transform, &to.transform, t);
+    blended.width = blend_val_opt(from.width.clone(), to.width.clone(), t);
+    blended.height = blend_val_opt(from.height.clone(), to.height.clone(), t);
+    blended.min_width = blend_val_opt(from.min_width.clone(), to.min_width.clone(), t);
+    blended.max_width = blend_val_opt(from.max_width.clone(), to.max_width.clone(), t);
+    blended.min_height = blend_val_opt(from.min_height.clone(), to.min_height.clone(), t);
+    blended.max_height = blend_val_opt(from.max_height.clone(), to.max_height.clone(), t);
+    blended.padding = blend_ui_rect_opt(&from.padding, &to.padding, t);
+    blended.margin = blend_ui_rect_opt(&from.margin, &to.margin, t);
+    blended.font_size = blend_font_val_opt(&from.font_size, &to.font_size, t);
+    blended.border_radius = blend_radius_opt(&from.border_radius, &to.border_radius, t);
     blended
 }
 
@@ -663,6 +673,59 @@ fn blend_val_opt(from: Option<Val>, to: Option<Val>, t: f32) -> Option<Val> {
         (Some(a), Some(b)) => Some(blend_val(a, b, t)),
         (None, Some(b)) => Some(b),
         (Some(a), None) => Some(a),
+        _ => None,
+    }
+}
+
+fn blend_ui_rect(from: &UiRect, to: &UiRect, t: f32) -> UiRect {
+    UiRect {
+        left: blend_val(from.left.clone(), to.left.clone(), t),
+        right: blend_val(from.right.clone(), to.right.clone(), t),
+        top: blend_val(from.top.clone(), to.top.clone(), t),
+        bottom: blend_val(from.bottom.clone(), to.bottom.clone(), t),
+    }
+}
+
+fn blend_ui_rect_opt(from: &Option<UiRect>, to: &Option<UiRect>, t: f32) -> Option<UiRect> {
+    match (from, to) {
+        (Some(a), Some(b)) => Some(blend_ui_rect(a, b, t)),
+        (None, Some(b)) => Some(b.clone()),
+        (Some(a), None) => Some(a.clone()),
+        _ => None,
+    }
+}
+
+fn blend_radius(from: &Radius, to: &Radius, t: f32) -> Radius {
+    Radius {
+        top_left: blend_val(from.top_left.clone(), to.top_left.clone(), t),
+        top_right: blend_val(from.top_right.clone(), to.top_right.clone(), t),
+        bottom_left: blend_val(from.bottom_left.clone(), to.bottom_left.clone(), t),
+        bottom_right: blend_val(from.bottom_right.clone(), to.bottom_right.clone(), t),
+    }
+}
+
+fn blend_radius_opt(from: &Option<Radius>, to: &Option<Radius>, t: f32) -> Option<Radius> {
+    match (from, to) {
+        (Some(a), Some(b)) => Some(blend_radius(a, b, t)),
+        (None, Some(b)) => Some(b.clone()),
+        (Some(a), None) => Some(a.clone()),
+        _ => None,
+    }
+}
+
+fn blend_font_val(from: &FontVal, to: &FontVal, t: f32) -> FontVal {
+    match (from, to) {
+        (FontVal::Px(a), FontVal::Px(b)) => FontVal::Px(lerp(*a, *b, t)),
+        (FontVal::Rem(a), FontVal::Rem(b)) => FontVal::Rem(lerp(*a, *b, t)),
+        _ => to.clone(),
+    }
+}
+
+fn blend_font_val_opt(from: &Option<FontVal>, to: &Option<FontVal>, t: f32) -> Option<FontVal> {
+    match (from, to) {
+        (Some(a), Some(b)) => Some(blend_font_val(a, b, t)),
+        (None, Some(b)) => Some(b.clone()),
+        (Some(a), None) => Some(a.clone()),
         _ => None,
     }
 }
