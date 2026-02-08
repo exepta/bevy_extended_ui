@@ -36,6 +36,14 @@ Available features:
 
 There are many other things, but currently you can use the core (HTML / CSS) features.
 
+### Toolchains
+
+This project supports both stable and nightly Rust.
+
+- Default: `stable` via `rust-toolchain.toml`
+- Nightly: `cargo +nightly-2025-08-07 ...` or `rustup override set nightly-2025-08-07`
+- Optional: use `rust-toolchain-nightly.toml` as a drop-in replacement if you want nightly by default
+
 ### How to use?
 
 Add this to your `Cargo.toml`:

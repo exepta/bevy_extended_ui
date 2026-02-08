@@ -184,7 +184,7 @@ fn update_src(
     mut image_cache: ResMut<ImageCache>,
     mut images: ResMut<Assets<Image>>,
 ) {
-    for (entity, mut image_node, mut state, img, alt_child, mut fb_state, mut cached) in
+    for (entity, mut image_node, _state, img, alt_child, mut fb_state, mut cached) in
         query.iter_mut()
     {
         let existing_child = alt_child.map(|c| c.0);
@@ -213,8 +213,6 @@ fn update_src(
             // But we should reset the fallback state so we can log on the next real transition.
             *fb_state = ImgFallbackState::None;
         }
-
-        state.checked = state.checked;
     }
 }
 

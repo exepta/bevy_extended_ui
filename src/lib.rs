@@ -1,4 +1,3 @@
-#![feature(trivial_bounds)]
 use crate::html::ExtendedUiHtmlPlugin;
 use crate::io::ExtendedIoPlugin;
 use crate::services::ExtendedServicePlugin;
