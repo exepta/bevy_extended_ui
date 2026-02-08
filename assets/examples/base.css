@@ -79,6 +79,15 @@ input:invalid {
     background: rgba(255, 77, 77, 0.1);
 }
 
+#fn_q_key {
+    transition: all 0.3s;
+    transform: scale(1);
+}
+
+#fn_q_key:hover {
+    transform: scale(1.2);
+}
+
 .pulse-example {
     animation: default-pulse 0.8s ease-in-out infinite alternate;
     background: cornflowerblue;
@@ -96,7 +105,49 @@ input:invalid {
 .rotate-example {
     animation: propeller-rotate 3.0s linear infinite;
     background: #ff006a;
-    margin-top: 100px;
+}
+
+.layout-container {
+    width: 200px;
+    height: 200px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.layout-example {
+    animation: layout-swell 1.6s ease-in-out infinite alternate;
+    background: #1f2630;
+    color: #fff;
+    box-sizing: border-box;
+    border: 2px #66c2a5;
+    transition: all 0.3s;
+}
+
+@keyframes layout-swell {
+    0% {
+        width: 150px;
+        height: 40px;
+        font-size: 12px;
+        border-radius: 6px;
+        border-color: #66c2a5;
+    }
+
+    50% {
+        width: 175px;
+        height: 52px;
+        font-size: 16px;
+        border-radius: 14px;
+        border-color: #fc8d62;
+    }
+
+    100% {
+        width: 200px;
+        height: 58px;
+        font-size: 18px;
+        border-radius: 22px;
+        border-color: #8da0cb;
+    }
 }
 
 @keyframes color-swap {
