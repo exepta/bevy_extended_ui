@@ -197,6 +197,7 @@ input {
     transition: all 0.3s;
     color: var(--text-color);
     font-size: 15px;
+    cursor: text;
 }
 
 input:disabled {

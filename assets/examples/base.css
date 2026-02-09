@@ -122,7 +122,7 @@ input:invalid {
     color: #fff;
     box-sizing: border-box;
     border: 2px #66c2a5;
-    transition: all 0.3s;
+    transition: all 1.6s;
 }
 
 @keyframes layout-swell {
