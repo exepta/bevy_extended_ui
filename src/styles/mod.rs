@@ -5,6 +5,7 @@ pub mod parser;
 use crate::io::CssAsset;
 use crate::styles::components::UiStyle;
 use bevy::prelude::*;
+use bevy::window::SystemCursorIcon;
 use std::cmp::PartialEq;
 use std::collections::{HashMap, HashSet};
 
@@ -385,6 +386,12 @@ impl TransformStyle {
     }
 }
 
+#[derive(Reflect, Debug, Clone, PartialEq)]
+pub enum CursorStyle {
+    System(SystemCursorIcon),
+    Custom(String),
+}
+
 /// Comprehensive style properties for UI elements.
 #[derive(Reflect, Default, Debug, Clone, PartialEq)]
 pub struct Style {
@@ -435,6 +442,7 @@ pub struct Style {
     pub gap: Option<Val>,
     pub text_wrap: Option<LineBreak>,
     pub z_index: Option<i32>,
+    pub cursor: Option<CursorStyle>,
     pub pointer_events: Option<Pickable>,
     pub scrollbar_width: Option<f32>,
     pub transition: Option<TransitionSpec>,
@@ -516,6 +524,7 @@ impl Style {
         merge_opt(&mut self.text_wrap, &other.text_wrap);
 
         merge_opt(&mut self.z_index, &other.z_index);
+        merge_opt(&mut self.cursor, &other.cursor);
         merge_opt(&mut self.pointer_events, &other.pointer_events);
 
         merge_opt(&mut self.scrollbar_width, &other.scrollbar_width);

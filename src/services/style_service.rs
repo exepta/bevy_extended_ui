@@ -4,8 +4,8 @@ use crate::services::image_service::get_or_load_image;
 use crate::services::state_service::update_widget_states;
 use crate::styles::components::UiStyle;
 use crate::styles::{
-    AnimationDirection, AnimationKeyframe, AnimationSpec, FontVal, FontWeight, Radius, Style,
-    TransformStyle, TransitionProperty, TransitionSpec,
+    AnimationDirection, AnimationKeyframe, AnimationSpec, CursorStyle, FontVal, FontWeight, Radius,
+    Style, TransformStyle, TransitionProperty, TransitionSpec,
 };
 use crate::widgets::UIWidgetState;
 
@@ -13,11 +13,15 @@ use bevy::color::Srgba;
 use bevy::math::Rot2;
 use bevy::prelude::*;
 use bevy::ui::{UiTransform, Val2};
+use bevy::window::{
+    CursorIcon, CustomCursor, CustomCursorImage, PrimaryWindow, SystemCursorIcon,
+};
 
 pub struct StyleService;
 
 impl Plugin for StyleService {
     fn build(&self, app: &mut App) {
+        app.init_resource::<CssCursorState>();
         app.add_systems(
             PostUpdate,
             (
@@ -26,6 +30,7 @@ impl Plugin for StyleService {
                 update_style_animations.after(update_style_transitions),
                 propagate_style_inheritance.after(update_style_animations),
                 sync_last_ui_transform.after(propagate_style_inheritance),
+                update_css_cursor_icons.after(update_widget_styles_system),
             ),
         );
     }
@@ -54,6 +59,12 @@ pub struct StyleAnimation {
     pub current_style: Option<Style>,
 }
 
+#[derive(Resource, Default)]
+struct CssCursorState {
+    active: bool,
+    previous: Option<CursorIcon>,
+}
+
 type UiStyleComponents<'w, 's> = (
     Option<Mut<'w, Node>>,
     Option<Mut<'w, BackgroundColor>>,
@@ -67,6 +78,87 @@ type UiStyleComponents<'w, 's> = (
     Option<Mut<'w, Pickable>>,
     Option<Mut<'w, UiTransform>>,
 );
+
+fn update_css_cursor_icons(
+    mut commands: Commands,
+    mut cursor_state: ResMut<CssCursorState>,
+    mut window_q: Query<(Entity, Option<&mut CursorIcon>), With<PrimaryWindow>>,
+    hovered_q: Query<(&UiStyle, &UIWidgetState)>,
+    asset_server: Res<AssetServer>,
+    mut image_cache: ResMut<ImageCache>,
+    mut images: ResMut<Assets<Image>>,
+) {
+    let Ok((window_entity, mut cursor_opt)) = window_q.single_mut() else {
+        return;
+    };
+
+    let mut desired_cursor: Option<(CursorStyle, i32)> = None;
+    let mut best_z = i32::MIN;
+
+    for (ui_style, state) in hovered_q.iter() {
+        if !state.hovered {
+            continue;
+        }
+
+        let Some(active) = ui_style.active_style.as_ref() else {
+            continue;
+        };
+
+        let Some(cursor) = active.cursor.clone() else {
+            continue;
+        };
+
+        let z = active.z_index.unwrap_or(0);
+        if desired_cursor.is_none() || z > best_z {
+            desired_cursor = Some((cursor, z));
+            best_z = z;
+        }
+    }
+
+    if let Some((cursor_style, _)) = desired_cursor {
+        let new_icon = match cursor_style {
+            CursorStyle::System(system_icon) => CursorIcon::from(system_icon),
+            CursorStyle::Custom(path) => {
+                let handle =
+                    get_or_load_image(path.as_str(), &mut image_cache, &mut images, &asset_server);
+                if images.get(handle.id()).is_none() {
+                    return;
+                }
+                CursorIcon::Custom(CustomCursor::Image(CustomCursorImage {
+                    handle,
+                    hotspot: (0, 0),
+                    ..default()
+                }))
+            }
+        };
+        if !cursor_state.active {
+            cursor_state.previous = cursor_opt.as_deref().cloned();
+            cursor_state.active = true;
+        }
+
+        if let Some(cursor) = cursor_opt.as_deref_mut() {
+            if *cursor != new_icon {
+                *cursor = new_icon;
+            }
+        } else {
+            commands.entity(window_entity).insert(new_icon);
+        }
+    } else if cursor_state.active {
+        cursor_state.active = false;
+        let restore_icon = cursor_state
+            .previous
+            .take()
+            .unwrap_or_else(|| CursorIcon::from(SystemCursorIcon::Default));
+
+        if let Some(cursor) = cursor_opt.as_deref_mut() {
+            if *cursor != restore_icon {
+                *cursor = restore_icon;
+            }
+        } else {
+            commands.entity(window_entity).insert(restore_icon);
+        }
+    }
+}
 
 pub fn update_widget_styles_system(
     mut commands: Commands,
@@ -1082,7 +1174,7 @@ pub fn propagate_style_inheritance(
 
 fn propagate_recursive(
     entity: Entity,
-    inherited_style: Option<&crate::styles::Style>,
+    inherited_style: Option<&Style>,
     children_query: &Query<&Children>,
     style_query: &Query<&UiStyle>,
     target_query: &mut Query<(
@@ -1104,12 +1196,12 @@ fn propagate_recursive(
     let my_active_style = my_style_comp.and_then(|s| s.active_style.as_ref());
 
     // 2. Prepare the style to pass down to children.
-    //    This is effectively: inherited_style merged with my_active_style
+    //    This is effective: inherited_style merged with my_active_style
     //    (where my_active_style takes precedence).
     let mut style_to_propagate = if let Some(inherited) = inherited_style {
         inherited.clone()
     } else {
-        crate::styles::Style::default()
+        Style::default()
     };
 
     if let Some(mine) = my_active_style {
@@ -1170,8 +1262,8 @@ fn propagate_recursive(
         // Note: Logic similar to apply_text_style needed here to resolve handle.
         // If we strictly inherit family/weight, we need to load the font.
         // This is complex because we need the folder structure logic from apply_text_style.
-        // For now, simpler approach: if we have a resolved font handle from parent logic?
-        // Actually, style_service re-resolves fonts every time active_style changes.
+        // For now, a simpler approach: if we have a resolved font handle from parent logic?
+        // Actually, style_service resolves fonts every time active_style changes.
         // Providing the full path logic again here might be duplicative.
         // A better approach: The `inherited_style` now contains the family/weight.
         // We can re-use the standard `apply_text_style` logic if we synthesize a style?
@@ -1186,7 +1278,7 @@ fn propagate_recursive(
                 if let Some(family) = &inherited.font_family {
                     let weight = inherited
                         .font_weight
-                        .unwrap_or(crate::styles::FontWeight::Normal);
+                        .unwrap_or(FontWeight::Normal);
                     let folder = &family.0; // Assuming FontFamily is struct(String)
                     let weight_str = weight_token_exact(weight);
                     // This assumes a standard naming convention "Family-Weight.ttf"

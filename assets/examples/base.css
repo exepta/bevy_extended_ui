@@ -91,6 +91,7 @@ input:invalid {
 .pulse-example {
     animation: default-pulse 0.8s ease-in-out infinite alternate;
     background: cornflowerblue;
+    cursor: url("images/test.png");
 }
 
 .color-example {

@@ -1,11 +1,12 @@
 use crate::styles::paint::Colored;
 use crate::styles::{
-    AnimationDirection, AnimationKeyframe, AnimationSpec, Background, FontFamily, FontVal,
-    FontWeight, ParsedCss, Radius, Style, StylePair, TransformStyle, TransitionProperty,
+    AnimationDirection, AnimationKeyframe, AnimationSpec, Background, CursorStyle, FontFamily,
+    FontVal, FontWeight, ParsedCss, Radius, Style, StylePair, TransformStyle, TransitionProperty,
     TransitionSpec, TransitionTiming,
 };
-use bevy::prelude::*;
 use bevy::ui::Val2;
+use bevy::prelude::*;
+use bevy::window::SystemCursorIcon;
 use lightningcss::rules::CssRule;
 use lightningcss::rules::keyframes::KeyframeSelector;
 use lightningcss::stylesheet::{ParserOptions, PrinterOptions, StyleSheet};
@@ -371,6 +372,7 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
         "text-wrap" => style.text_wrap = convert_to_bevy_line_break(value.to_string()),
         "z-index" => style.z_index = convert_to_i32(value.to_string()),
         "pointer-events" => style.pointer_events = convert_to_bevy_pick_able(value.to_string()),
+        "cursor" => style.cursor = convert_to_cursor_style(value.to_string()),
 
         _ => {}
     }
@@ -1372,6 +1374,103 @@ pub fn convert_to_bevy_pick_able(value: String) -> Option<Pickable> {
         "none" => Some(Pickable::IGNORE),
         _ => Some(Pickable::default()),
     }
+}
+
+/// Converts a CSS cursor value into a Bevy [`CursorStyle`].
+///
+/// Supports `custom("...")` and `url("...")` as custom cursors, plus standard CSS keywords
+/// like `default`, `pointer`, `text`, `move`, and resize cursors. If multiple cursors are
+/// provided (e.g. `custom(...), pointer`), the first supported entry wins.
+pub fn convert_to_cursor_style(value: String) -> Option<CursorStyle> {
+    for raw in value.split(',') {
+        if let Some(path) = parse_cursor_path(raw) {
+            return Some(CursorStyle::Custom(path));
+        }
+
+        if let Some(icon) = parse_cursor_keyword(raw) {
+            return Some(CursorStyle::System(icon));
+        }
+    }
+
+    None
+}
+
+fn parse_cursor_keyword(token: &str) -> Option<SystemCursorIcon> {
+    let token = token
+        .trim()
+        .trim_matches('"')
+        .trim_matches('\'')
+        .trim();
+
+    if token.is_empty() {
+        return None;
+    }
+
+    match token.to_ascii_lowercase().as_str() {
+        "auto" | "default" | "none" => Some(SystemCursorIcon::Default),
+        "context-menu" => Some(SystemCursorIcon::ContextMenu),
+        "help" => Some(SystemCursorIcon::Help),
+        "pointer" => Some(SystemCursorIcon::Pointer),
+        "progress" => Some(SystemCursorIcon::Progress),
+        "wait" => Some(SystemCursorIcon::Wait),
+        "cell" => Some(SystemCursorIcon::Cell),
+        "crosshair" => Some(SystemCursorIcon::Crosshair),
+        "text" => Some(SystemCursorIcon::Text),
+        "vertical-text" => Some(SystemCursorIcon::VerticalText),
+        "alias" => Some(SystemCursorIcon::Alias),
+        "copy" => Some(SystemCursorIcon::Copy),
+        "move" => Some(SystemCursorIcon::Move),
+        "no-drop" => Some(SystemCursorIcon::NoDrop),
+        "not-allowed" => Some(SystemCursorIcon::NotAllowed),
+        "grab" => Some(SystemCursorIcon::Grab),
+        "grabbing" => Some(SystemCursorIcon::Grabbing),
+        "e-resize" => Some(SystemCursorIcon::EResize),
+        "n-resize" => Some(SystemCursorIcon::NResize),
+        "ne-resize" => Some(SystemCursorIcon::NeResize),
+        "nw-resize" => Some(SystemCursorIcon::NwResize),
+        "s-resize" => Some(SystemCursorIcon::SResize),
+        "se-resize" => Some(SystemCursorIcon::SeResize),
+        "sw-resize" => Some(SystemCursorIcon::SwResize),
+        "w-resize" => Some(SystemCursorIcon::WResize),
+        "ew-resize" => Some(SystemCursorIcon::EwResize),
+        "ns-resize" => Some(SystemCursorIcon::NsResize),
+        "nesw-resize" => Some(SystemCursorIcon::NeswResize),
+        "nwse-resize" => Some(SystemCursorIcon::NwseResize),
+        "col-resize" => Some(SystemCursorIcon::ColResize),
+        "row-resize" => Some(SystemCursorIcon::RowResize),
+        "all-scroll" => Some(SystemCursorIcon::AllScroll),
+        "zoom-in" => Some(SystemCursorIcon::ZoomIn),
+        "zoom-out" => Some(SystemCursorIcon::ZoomOut),
+        _ => None,
+    }
+}
+
+fn parse_cursor_path(token: &str) -> Option<String> {
+    let trimmed = token.trim();
+    let lower = trimmed.to_ascii_lowercase();
+
+    let mut inner = if lower.starts_with("custom(") {
+        &trimmed["custom(".len()..]
+    } else if lower.starts_with("url(") {
+        &trimmed["url(".len()..]
+    } else {
+        return None;
+    };
+
+    if let Some(end) = inner.rfind(')') {
+        inner = &inner[..end];
+    }
+
+    let mut path = inner.trim().trim_matches('"').trim_matches('\'').trim().to_string();
+    if path.is_empty() {
+        return None;
+    }
+
+    if path.starts_with('/') {
+        path.remove(0);
+    }
+
+    Some(path)
 }
 
 /**
