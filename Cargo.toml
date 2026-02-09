@@ -69,7 +69,7 @@ version = "1.0.0-alpha.68"
 version = "1.21.3"
 
 [dependencies.regex]
-version = "1.12.2"
+version = "1.12.3"
 
 [dependencies.inventory]
 version = "0.3.21"
