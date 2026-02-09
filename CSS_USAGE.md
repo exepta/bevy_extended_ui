@@ -65,6 +65,7 @@ properties or values are ignored silently.
 
 ### Interaction / Misc
 
+- `cursor`
 - `pointer-events`
 - `z-index`
 - `scroll-width`
@@ -178,7 +179,25 @@ Translations use `px`, `%`, or `0`. Scale is unitless `f32`.
 ### Pointer Events
 
 - `pointer-events: none` disables picking
-- any other value uses default pick behavior
+- any other value uses the default pick behavior
+
+### Cursor
+
+`cursor` supports system icons and custom images.
+
+Custom image forms:
+
+- `custom("images/test.png")`
+- `url("images/test.png")`
+- Leading `/` is allowed (e.g. `/images/test.png`) and will be trimmed.
+
+System cursor keywords:
+
+- `default`, `auto`, `pointer`, `text`, `move`, `wait`, `progress`, `help`, `crosshair`
+- `not-allowed`, `no-drop`, `grab`, `grabbing`, `alias`, `copy`
+- `e-resize`, `n-resize`, `ne-resize`, `nw-resize`, `s-resize`, `se-resize`, `sw-resize`, `w-resize`
+- `ew-resize`, `ns-resize`, `nesw-resize`, `nwse-resize`
+- `col-resize`, `row-resize`, `all-scroll`, `zoom-in`, `zoom-out`
 
 ### Text Wrap
 

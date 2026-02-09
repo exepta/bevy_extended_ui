@@ -1,0 +1,101 @@
+:root {
+  --bg: #f1f5f9;
+  --card: #ffffff;
+  --border: #d1d5db;
+  --text: #0f172a;
+  --muted: #64748b;
+  --accent: #2563eb;
+  --accent-dark: #1d4ed8;
+}
+
+body {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+}
+
+.contact-card {
+  width: 420px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--card);
+  border-radius: 12px;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.15);
+}
+
+.contact-input {
+  width: 100%;
+  height: 44px;
+  padding: 10px 12px;
+  border: 1px var(--border);
+  border-radius: 8px;
+  background-color: #ffffff;
+  color: var(--text);
+}
+
+.contact-input:focus {
+  border-color: var(--accent);
+}
+
+.contact-input:hover {
+  border-color: var(--accent);
+}
+
+.input-label {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.input-label:focus {
+  color: var(--accent);
+}
+
+.input-text {
+  color: var(--text);
+}
+
+.contact-input .in-text-container .input-cursor {
+  background: var(--accent);
+}
+
+.primary-button {
+  width: 100%;
+  height: 44px;
+  background: var(--accent);
+  color: #ffffff;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.primary-button:hover {
+  background: var(--accent-dark);
+}
+
+.contact-check {
+  width: 100%;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.mark-box {
+  border: 1px var(--border);
+  background: #ffffff;
+}
+
+.mark-box:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.check-text {
+  color: var(--text);
+  font-size: 13px;
+}
