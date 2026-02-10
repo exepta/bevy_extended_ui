@@ -1,5 +1,6 @@
 use crate::html::ExtendedUiHtmlPlugin;
 use crate::io::ExtendedIoPlugin;
+use crate::lang::UILang;
 use crate::services::ExtendedServicePlugin;
 use crate::styles::ExtendedStylingPlugin;
 use crate::widgets::ExtendedWidgetPlugin;
@@ -11,6 +12,7 @@ use crate::registry::ExtendedRegistryPlugin;
 
 pub mod html;
 pub mod io;
+pub mod lang;
 pub mod registry;
 pub mod services;
 pub mod styles;
@@ -36,6 +38,7 @@ pub struct ExtendedUiConfiguration {
     pub camera: ExtendedCam,
     pub render_layers: Vec<usize>,
     pub assets_path: String,
+    pub language_path: String,
 }
 
 impl Default for ExtendedUiConfiguration {
@@ -45,6 +48,7 @@ impl Default for ExtendedUiConfiguration {
     /// - `camera` default of [`ExtendedCam`]
     /// - `render_layers` set to layers 1 and 2
     /// - `assets_path`: for preload images. Default `assets/extended_ui/`
+    /// - `language_path`: for translations. Default `assets/lang`
     fn default() -> Self {
         Self {
             order: 2,
@@ -52,6 +56,7 @@ impl Default for ExtendedUiConfiguration {
             camera: ExtendedCam::default(),
             render_layers: vec![1, 2],
             assets_path: String::from("assets/extended_ui/"),
+            language_path: String::from("assets/lang"),
         }
     }
 }
@@ -120,6 +125,7 @@ impl Plugin for ExtendedUiPlugin {
         app.init_resource::<ExtendedUiConfiguration>();
         app.init_resource::<ImageCache>();
         app.init_resource::<CurrentWidgetState>();
+        app.init_resource::<UILang>();
         app.register_type::<Camera>();
         app.add_plugins((
             ExtendedRegistryPlugin,

@@ -9,9 +9,11 @@ use crate::html::{
     HtmlStyle, HtmlSystemSet, HtmlWidgetNode,
 };
 use crate::io::{CssAsset, DefaultCssHandle, HtmlAsset};
+use crate::lang::{localize_html, UiLangState, UILang};
 use crate::styles::IconPlace;
 use crate::widgets::Button;
 use crate::widgets::*;
+use crate::ExtendedUiConfiguration;
 
 pub const DEFAULT_UI_CSS: &str = "default/extended_ui.css";
 
@@ -34,7 +36,10 @@ fn update_html_ui(
     mut commands: Commands,
     mut structure_map: ResMut<HtmlStructureMap>,
     mut html_dirty: ResMut<HtmlDirty>,
+    mut ui_lang: ResMut<UILang>,
+    mut lang_state: ResMut<UiLangState>,
 
+    config: Res<ExtendedUiConfiguration>,
     asset_server: Res<AssetServer>,
     html_assets: Res<Assets<HtmlAsset>>,
     mut html_asset_events: MessageReader<AssetEvent<HtmlAsset>>,
@@ -44,6 +49,21 @@ fn update_html_ui(
     query_pending: Query<Entity, With<PendingHtmlParse>>,
     query_all: Query<(Entity, &HtmlSource)>,
 ) {
+    let resolved = ui_lang.resolved().map(|lang| lang.to_string());
+    let mut lang_dirty = false;
+
+    if lang_state.last_resolved != resolved {
+        lang_state.last_resolved = resolved;
+        lang_dirty = true;
+    }
+
+    if lang_state.last_language_path.as_deref() != Some(config.language_path.as_str()) {
+        lang_state
+            .last_language_path
+            .replace(config.language_path.clone());
+        lang_dirty = true;
+    }
+
     // Entities that need reparse (new HtmlSource, pending retry, or changed HtmlAsset).
     let mut dirty_entities: Vec<Entity> = query_added.iter().map(|(e, _)| e).collect();
     dirty_entities.extend(query_pending.iter());
@@ -67,6 +87,12 @@ fn update_html_ui(
     dirty_entities.sort();
     dirty_entities.dedup();
 
+    if lang_dirty {
+        dirty_entities.extend(query_all.iter().map(|(e, _)| e));
+        dirty_entities.sort();
+        dirty_entities.dedup();
+    }
+
     if dirty_entities.is_empty() {
         return;
     }
@@ -86,7 +112,21 @@ fn update_html_ui(
         commands.entity(entity).remove::<PendingHtmlParse>();
 
         let content = html_asset.html.clone();
-        let document = kuchiki::parse_html().one(content);
+        let raw_document = kuchiki::parse_html().one(content.clone());
+        let html_lang = raw_document
+            .select_first("html")
+            .ok()
+            .and_then(|node| node.attributes.borrow().get("lang").map(|s| s.to_string()));
+
+        ui_lang.apply_html_lang(html_lang.as_deref());
+        lang_state.last_resolved = ui_lang.resolved().map(|lang| lang.to_string());
+
+        let localized = localize_html(&content, ui_lang.resolved(), &config.language_path);
+        let document = if localized == content {
+            raw_document
+        } else {
+            kuchiki::parse_html().one(localized)
+        };
 
         // Extract unique UI key from <meta name="...">
         let Some(meta_key) = document
