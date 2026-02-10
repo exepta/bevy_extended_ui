@@ -17,9 +17,11 @@ use bevy::window::{
     CursorIcon, CustomCursor, CustomCursorImage, PrimaryWindow, SystemCursorIcon,
 };
 
+/// Plugin that applies CSS styles, transitions, and animations to UI nodes.
 pub struct StyleService;
 
 impl Plugin for StyleService {
+    /// Registers style update systems and resources.
     fn build(&self, app: &mut App) {
         app.init_resource::<CssCursorState>();
         app.add_systems(
@@ -36,6 +38,7 @@ impl Plugin for StyleService {
     }
 }
 
+/// Component storing an active style transition.
 #[derive(Component, Debug, Clone)]
 pub struct StyleTransition {
     pub from: Style,
@@ -47,9 +50,11 @@ pub struct StyleTransition {
     pub current_style: Option<Style>,
 }
 
+/// Component caching the last computed UI transform.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct LastUiTransform(pub UiTransform);
 
+/// Component storing an active style animation.
 #[derive(Component, Debug, Clone)]
 pub struct StyleAnimation {
     pub base: Style,
@@ -59,12 +64,14 @@ pub struct StyleAnimation {
     pub current_style: Option<Style>,
 }
 
+/// Resource tracking the currently applied CSS cursor state.
 #[derive(Resource, Default)]
 struct CssCursorState {
     active: bool,
     previous: Option<CursorIcon>,
 }
 
+/// Convenience alias for mutable style-related UI component access.
 type UiStyleComponents<'w, 's> = (
     Option<Mut<'w, Node>>,
     Option<Mut<'w, BackgroundColor>>,
@@ -79,6 +86,7 @@ type UiStyleComponents<'w, 's> = (
     Option<Mut<'w, UiTransform>>,
 );
 
+/// Updates the OS cursor icon based on hovered widget styles.
 fn update_css_cursor_icons(
     mut commands: Commands,
     mut cursor_state: ResMut<CssCursorState>,
@@ -160,6 +168,7 @@ fn update_css_cursor_icons(
     }
 }
 
+/// Computes active styles for widgets and applies them to UI components.
 pub fn update_widget_styles_system(
     mut commands: Commands,
     mut query: Query<
@@ -332,6 +341,7 @@ pub fn update_widget_styles_system(
     }
 }
 
+/// Advances and applies style transitions based on time.
 pub fn update_style_transitions(
     mut commands: Commands,
     time: Res<Time>,
@@ -392,6 +402,7 @@ pub fn update_style_transitions(
     }
 }
 
+/// Advances and applies style animations based on time.
 pub fn update_style_animations(
     mut commands: Commands,
     time: Res<Time>,
@@ -488,6 +499,7 @@ pub fn update_style_animations(
     }
 }
 
+/// Updates the cached UI transform after styles are applied.
 pub fn sync_last_ui_transform(
     mut commands: Commands,
     mut query: Query<(Entity, &UiTransform, Option<&mut LastUiTransform>)>,
@@ -501,6 +513,7 @@ pub fn sync_last_ui_transform(
     }
 }
 
+/// Applies a `Style` to Bevy UI components.
 fn apply_style_components(
     style: &Style,
     components: &mut UiStyleComponents,
@@ -605,6 +618,7 @@ fn apply_style_components(
     }
 }
 
+/// Applies transform-related style fields to a `UiTransform`.
 fn apply_transform_style(style: &Style, transform: &mut UiTransform) {
     if style.transform.is_empty() {
         *transform = UiTransform::default();
@@ -644,12 +658,14 @@ fn apply_transform_style(style: &Style, transform: &mut UiTransform) {
     *transform = next;
 }
 
+/// Builds a `UiTransform` from the style's transform fields.
 fn ui_transform_from_style(style: &Style) -> UiTransform {
     let mut transform = UiTransform::default();
     apply_transform_style(style, &mut transform);
     transform
 }
 
+/// Blends two styles based on a transition specification.
 fn blend_style(from: &Style, to: &Style, t: f32, spec: &TransitionSpec) -> Style {
     let mut blended = to.clone();
 
@@ -665,6 +681,7 @@ fn blend_style(from: &Style, to: &Style, t: f32, spec: &TransitionSpec) -> Style
     blended
 }
 
+/// Blends two styles for animation interpolation.
 fn blend_animation_style(from: &Style, to: &Style, t: f32) -> Style {
     let mut blended = to.clone();
     blended.color = blend_color(from.color, to.color, t);
@@ -684,6 +701,7 @@ fn blend_animation_style(from: &Style, to: &Style, t: f32) -> Style {
     blended
 }
 
+/// Resolves transform blending with optional cached transforms.
 fn resolve_transform_transition(
     spec: &TransitionSpec,
     from: &Style,
@@ -698,18 +716,21 @@ fn resolve_transform_transition(
     (Some(from_transform), Some(to_transform))
 }
 
+/// Returns true if the transition includes color changes.
 fn transition_allows_color(spec: &TransitionSpec) -> bool {
     spec.properties.iter().any(|prop| {
         matches!(prop, TransitionProperty::All) || matches!(prop, TransitionProperty::Color)
     })
 }
 
+/// Returns true if the transition includes background changes.
 fn transition_allows_background(spec: &TransitionSpec) -> bool {
     spec.properties.iter().any(|prop| {
         matches!(prop, TransitionProperty::All) || matches!(prop, TransitionProperty::Background)
     })
 }
 
+/// Returns true if the transition includes transform changes.
 fn transition_allows_transform(spec: &TransitionSpec) -> bool {
     spec.properties.iter().any(|prop| {
         matches!(
@@ -719,6 +740,7 @@ fn transition_allows_transform(spec: &TransitionSpec) -> bool {
     })
 }
 
+/// Linearly interpolates between two UI transforms.
 fn blend_ui_transform(from: UiTransform, to: UiTransform, t: f32) -> UiTransform {
     UiTransform {
         translation: blend_val2(from.translation, to.translation, t),
@@ -727,6 +749,7 @@ fn blend_ui_transform(from: UiTransform, to: UiTransform, t: f32) -> UiTransform
     }
 }
 
+/// Blends transform style fields based on a factor.
 fn blend_transform_style(from: &TransformStyle, to: &TransformStyle, t: f32) -> TransformStyle {
     TransformStyle {
         translation: blend_val2_opt(from.translation, to.translation, t),
@@ -739,10 +762,12 @@ fn blend_transform_style(from: &TransformStyle, to: &TransformStyle, t: f32) -> 
     }
 }
 
+/// Blends two `Val2` values.
 fn blend_val2(from: Val2, to: Val2, t: f32) -> Val2 {
     Val2::new(blend_val(from.x, to.x, t), blend_val(from.y, to.y, t))
 }
 
+/// Blends optional `Val2` values when both are set.
 fn blend_val2_opt(from: Option<Val2>, to: Option<Val2>, t: f32) -> Option<Val2> {
     match (from, to) {
         (Some(a), Some(b)) => Some(blend_val2(a, b, t)),
@@ -752,6 +777,7 @@ fn blend_val2_opt(from: Option<Val2>, to: Option<Val2>, t: f32) -> Option<Val2> 
     }
 }
 
+/// Blends two `Val` values.
 fn blend_val(from: Val, to: Val, t: f32) -> Val {
     match (from, to) {
         (Val::Px(a), Val::Px(b)) => Val::Px(lerp(a, b, t)),
@@ -760,6 +786,7 @@ fn blend_val(from: Val, to: Val, t: f32) -> Val {
     }
 }
 
+/// Blends optional `Val` values when both are set.
 fn blend_val_opt(from: Option<Val>, to: Option<Val>, t: f32) -> Option<Val> {
     match (from, to) {
         (Some(a), Some(b)) => Some(blend_val(a, b, t)),
@@ -769,6 +796,7 @@ fn blend_val_opt(from: Option<Val>, to: Option<Val>, t: f32) -> Option<Val> {
     }
 }
 
+/// Blends two `UiRect` values.
 fn blend_ui_rect(from: &UiRect, to: &UiRect, t: f32) -> UiRect {
     UiRect {
         left: blend_val(from.left.clone(), to.left.clone(), t),
@@ -778,6 +806,7 @@ fn blend_ui_rect(from: &UiRect, to: &UiRect, t: f32) -> UiRect {
     }
 }
 
+/// Blends optional `UiRect` values when both are set.
 fn blend_ui_rect_opt(from: &Option<UiRect>, to: &Option<UiRect>, t: f32) -> Option<UiRect> {
     match (from, to) {
         (Some(a), Some(b)) => Some(blend_ui_rect(a, b, t)),
@@ -787,6 +816,7 @@ fn blend_ui_rect_opt(from: &Option<UiRect>, to: &Option<UiRect>, t: f32) -> Opti
     }
 }
 
+/// Blends two border radius values.
 fn blend_radius(from: &Radius, to: &Radius, t: f32) -> Radius {
     Radius {
         top_left: blend_val(from.top_left.clone(), to.top_left.clone(), t),
@@ -796,6 +826,7 @@ fn blend_radius(from: &Radius, to: &Radius, t: f32) -> Radius {
     }
 }
 
+/// Blends optional radius values when both are set.
 fn blend_radius_opt(from: &Option<Radius>, to: &Option<Radius>, t: f32) -> Option<Radius> {
     match (from, to) {
         (Some(a), Some(b)) => Some(blend_radius(a, b, t)),
@@ -805,6 +836,7 @@ fn blend_radius_opt(from: &Option<Radius>, to: &Option<Radius>, t: f32) -> Optio
     }
 }
 
+/// Blends two font size values.
 fn blend_font_val(from: &FontVal, to: &FontVal, t: f32) -> FontVal {
     match (from, to) {
         (FontVal::Px(a), FontVal::Px(b)) => FontVal::Px(lerp(*a, *b, t)),
@@ -813,6 +845,7 @@ fn blend_font_val(from: &FontVal, to: &FontVal, t: f32) -> FontVal {
     }
 }
 
+/// Blends optional font sizes when both are set.
 fn blend_font_val_opt(from: &Option<FontVal>, to: &Option<FontVal>, t: f32) -> Option<FontVal> {
     match (from, to) {
         (Some(a), Some(b)) => Some(blend_font_val(a, b, t)),
@@ -822,12 +855,14 @@ fn blend_font_val_opt(from: &Option<FontVal>, to: &Option<FontVal>, t: f32) -> O
     }
 }
 
+/// Blends two rotations.
 fn blend_rot2(from: Rot2, to: Rot2, t: f32) -> Rot2 {
     let from_angle = from.as_radians();
     let to_angle = to.as_radians();
     Rot2::radians(lerp(from_angle, to_angle, t))
 }
 
+/// Blends optional vectors when both are set.
 fn blend_vec2_opt(from: Option<Vec2>, to: Option<Vec2>, t: f32) -> Option<Vec2> {
     match (from, to) {
         (Some(a), Some(b)) => Some(a.lerp(b, t)),
@@ -837,6 +872,7 @@ fn blend_vec2_opt(from: Option<Vec2>, to: Option<Vec2>, t: f32) -> Option<Vec2> 
     }
 }
 
+/// Blends optional floats when both are set.
 fn blend_f32_opt(from: Option<f32>, to: Option<f32>, t: f32) -> Option<f32> {
     match (from, to) {
         (Some(a), Some(b)) => Some(lerp(a, b, t)),
@@ -846,6 +882,7 @@ fn blend_f32_opt(from: Option<f32>, to: Option<f32>, t: f32) -> Option<f32> {
     }
 }
 
+/// Blends optional colors when both are set.
 fn blend_color(from: Option<Color>, to: Option<Color>, t: f32) -> Option<Color> {
     match (from, to) {
         (Some(a), Some(b)) => {
@@ -864,6 +901,7 @@ fn blend_color(from: Option<Color>, to: Option<Color>, t: f32) -> Option<Color> 
     }
 }
 
+/// Blends background colors and images.
 fn blend_background(
     from: Option<crate::styles::Background>,
     to: Option<crate::styles::Background>,
@@ -880,6 +918,7 @@ fn blend_background(
     }
 }
 
+/// Computes the current animation style state and applies it.
 fn update_style_animation_state(
     commands: &mut Commands,
     entity: Entity,
@@ -950,6 +989,7 @@ fn update_style_animation_state(
     }
 }
 
+/// Computes eased animation progress based on spec and cycle.
 fn animation_progress(spec: &AnimationSpec, cycle_index: u32, cycle_progress: f32) -> f32 {
     let mut progress = cycle_progress.clamp(0.0, 1.0);
     let is_odd = cycle_index % 2 == 1;
@@ -970,6 +1010,7 @@ fn animation_progress(spec: &AnimationSpec, cycle_index: u32, cycle_progress: f3
     spec.timing.apply(progress)
 }
 
+/// Samples a style from keyframes at the given progress.
 fn sample_animation_style(keyframes: &[AnimationKeyframe], progress: f32) -> Style {
     if keyframes.is_empty() {
         return Style::default();
@@ -994,10 +1035,12 @@ fn sample_animation_style(keyframes: &[AnimationKeyframe], progress: f32) -> Sty
     prev.style.clone()
 }
 
+/// Linearly interpolates between two floats.
 fn lerp(from: f32, to: f32, t: f32) -> f32 {
     from + (to - from) * t
 }
 
+/// Returns true if the selector's pseudo state matches the widget state.
 fn selector_matches_state(selector: &str, state: &UIWidgetState) -> bool {
     for part in selector.split_whitespace() {
         let segments: Vec<&str> = part.split(':').collect();
@@ -1016,6 +1059,7 @@ fn selector_matches_state(selector: &str, state: &UIWidgetState) -> bool {
     true
 }
 
+/// Computes a simple specificity score for a selector.
 fn selector_specificity(selector: &str) -> u32 {
     let mut spec = 0;
     for part in selector.split_whitespace() {
@@ -1037,6 +1081,7 @@ fn selector_specificity(selector: &str) -> u32 {
     spec
 }
 
+/// Applies layout-related style fields to a Bevy `Node`.
 fn apply_style_to_node(style: &Style, node: Option<&mut Node>) {
     if let Some(node) = node {
         node.width = style.width.unwrap_or_default();
@@ -1101,6 +1146,7 @@ fn apply_style_to_node(style: &Style, node: Option<&mut Node>) {
     }
 }
 
+/// Loads a font asset from a folder based on weight tokens.
 fn load_weighted_font_from_folder(
     asset_server: &AssetServer,
     folder: &str,
@@ -1125,6 +1171,7 @@ fn load_weighted_font_from_folder(
     asset_server.load::<Font>(path_primary)
 }
 
+/// Maps a font weight to its exact token used in filenames.
 fn weight_token_exact(weight: FontWeight) -> &'static str {
     match weight {
         FontWeight::Thin => "Thin",
@@ -1139,6 +1186,7 @@ fn weight_token_exact(weight: FontWeight) -> &'static str {
     }
 }
 
+/// Returns the last path segment of a folder path.
 fn folder_basename(folder: &str) -> &str {
     folder
         .trim_end_matches('/')
@@ -1147,6 +1195,7 @@ fn folder_basename(folder: &str) -> &str {
         .unwrap_or(folder)
 }
 
+/// Propagates inheritable style fields down the widget tree.
 pub fn propagate_style_inheritance(
     root_query: Query<Entity, (With<UiStyle>, Without<ChildOf>)>,
     children_query: Query<&Children>,
@@ -1172,6 +1221,7 @@ pub fn propagate_style_inheritance(
     }
 }
 
+/// Recursively applies inherited styles to children.
 fn propagate_recursive(
     entity: Entity,
     inherited_style: Option<&Style>,

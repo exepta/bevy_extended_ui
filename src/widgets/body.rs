@@ -6,17 +6,21 @@ use crate::{CurrentWidgetState, ExtendedUiConfiguration};
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
 
+/// Marker component for the internal body node.
 #[derive(Component)]
 struct BodyBase;
 
+/// Plugin that wires up body widget behavior.
 pub struct BodyWidget;
 
 impl Plugin for BodyWidget {
+    /// Registers systems for body widget setup.
     fn build(&self, app: &mut App) {
         app.add_systems(Update, internal_node_creation_system);
     }
 }
 
+/// Spawns internal Bevy UI nodes for body widgets.
 fn internal_node_creation_system(
     mut commands: Commands,
     mut query: Query<

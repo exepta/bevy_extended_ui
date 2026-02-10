@@ -6,6 +6,7 @@ use crate::widgets::{
     ValidationRules,
 };
 
+/// Updates widget validation state based on configured rules and input values.
 pub fn update_validation_states(
     mut query: Query<
         (

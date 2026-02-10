@@ -28,13 +28,6 @@ use std::collections::HashMap;
 /// - `ParsedCss` on success, containing styles and keyframes.
 /// - Empty maps if the file cannot be parsed, but no panic occurs.
 ///
-/// # Example
-/// ```rust
-/// use bevy_extended_ui::styling::css::load_css;
-/// let styles = load_css("assets/theme.css");
-/// let button_style = styles.styles.get(".button:hover");
-/// ```
-///
 /// # Notes
 /// - This uses [`grass_compiler::StyleSheet`] to parse the file.
 /// - Supports standard properties like `width`, `height`, `padding`, `color`, `background`, `font-size`, `z-index`, etc.
@@ -175,6 +168,7 @@ pub fn load_css(css: &str) -> ParsedCss {
     }
 }
 
+/// Resolves a `var(...)` reference using the collected CSS variables.
 fn resolve_var(value: &str, css_vars: &HashMap<String, String>) -> String {
     if let Some(var_name) = value.strip_prefix("var(").and_then(|s| s.strip_suffix(')')) {
         if let Some(var_value) = css_vars.get(var_name.trim()) {
@@ -205,14 +199,6 @@ fn resolve_var(value: &str, css_vars: &HashMap<String, String>) -> String {
 /// - If a property or value is unsupported or invalid, it is silently ignored.
 /// - Some shorthand values (e.g. `padding-left`) are expanded into full [`UiRect`]s or `Val`s.
 ///
-/// # Example
-/// ```rust
-/// use bevy_extended_ui::styling::css::apply_property_to_style;
-/// use bevy_extended_ui::styling::Style;
-/// let mut style = Style::default();
-/// apply_property_to_style(&mut style, "padding", "10px 20px");
-/// apply_property_to_style(&mut style, "color", "white");
-/// ```
 pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
     match name {
         "width" => style.width = convert_to_val(value.to_string()),
@@ -378,6 +364,7 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
     }
 }
 
+/// Converts a keyframe selector into a normalized progress value.
 fn keyframe_selector_progress(selector: &KeyframeSelector) -> Option<f32> {
     match selector {
         KeyframeSelector::Percentage(p) => Some(p.0.clamp(0.0, 1.0)),
@@ -387,6 +374,7 @@ fn keyframe_selector_progress(selector: &KeyframeSelector) -> Option<f32> {
     }
 }
 
+/// Parses a CSS time token into seconds.
 fn parse_time_seconds(token: &str) -> Option<f32> {
     let token = token.trim().to_ascii_lowercase();
     if let Some(value) = token.strip_suffix("ms") {
@@ -400,6 +388,7 @@ fn parse_time_seconds(token: &str) -> Option<f32> {
     None
 }
 
+/// Parses a CSS transition shorthand into a `TransitionSpec`.
 fn parse_transition(value: &str) -> Option<TransitionSpec> {
     let mut spec = TransitionSpec::default();
     let mut has_duration = false;
@@ -454,6 +443,7 @@ fn parse_transition(value: &str) -> Option<TransitionSpec> {
     }
 }
 
+/// Parses a CSS animation shorthand into an `AnimationSpec`.
 fn parse_animation(value: &str) -> Option<AnimationSpec> {
     let mut spec = AnimationSpec::default();
     let mut has_duration = false;
@@ -508,10 +498,12 @@ fn parse_animation(value: &str) -> Option<AnimationSpec> {
     }
 }
 
+/// Ensures a style has an animation spec and returns a mutable reference to it.
 fn ensure_animation_spec(style: &mut Style) -> &mut AnimationSpec {
     style.animation.get_or_insert_with(AnimationSpec::default)
 }
 
+/// Applies an animation name, clearing animation when set to none.
 fn apply_animation_name(style: &mut Style, value: &str) {
     let name = value.trim();
     if name.eq_ignore_ascii_case("none") || name.is_empty() {
@@ -523,6 +515,7 @@ fn apply_animation_name(style: &mut Style, value: &str) {
     spec.name = name.to_string();
 }
 
+/// Applies an animation duration value.
 fn apply_animation_duration(style: &mut Style, value: &str) {
     if let Some(duration) = parse_time_seconds(value) {
         let spec = ensure_animation_spec(style);
@@ -530,6 +523,7 @@ fn apply_animation_duration(style: &mut Style, value: &str) {
     }
 }
 
+/// Applies an animation delay value.
 fn apply_animation_delay(style: &mut Style, value: &str) {
     if let Some(delay) = parse_time_seconds(value) {
         let spec = ensure_animation_spec(style);
@@ -537,6 +531,7 @@ fn apply_animation_delay(style: &mut Style, value: &str) {
     }
 }
 
+/// Applies an animation timing function value.
 fn apply_animation_timing(style: &mut Style, value: &str) {
     if let Some(timing) = TransitionTiming::from_name(value) {
         let spec = ensure_animation_spec(style);
@@ -544,6 +539,7 @@ fn apply_animation_timing(style: &mut Style, value: &str) {
     }
 }
 
+/// Applies an animation iteration count value.
 fn apply_animation_iterations(style: &mut Style, value: &str) {
     let trimmed = value.trim();
     let spec = ensure_animation_spec(style);
@@ -558,6 +554,7 @@ fn apply_animation_iterations(style: &mut Style, value: &str) {
     }
 }
 
+/// Applies an animation direction value.
 fn apply_animation_direction(style: &mut Style, value: &str) {
     if let Some(direction) = AnimationDirection::from_name(value) {
         let spec = ensure_animation_spec(style);
@@ -565,6 +562,7 @@ fn apply_animation_direction(style: &mut Style, value: &str) {
     }
 }
 
+/// Parses a font-weight value into the corresponding enum.
 fn convert_to_font_weight(value: String) -> Option<FontWeight> {
     let in_value = value.trim();
     if in_value.is_empty() {
@@ -593,13 +591,6 @@ fn convert_to_font_weight(value: String) -> Option<FontWeight> {
 /// - `Some(Val)` if parsing succeeds.
 /// - `None` if the format is invalid or cannot be parsed.
 ///
-/// # Example
-/// ```
-/// use bevy::prelude::Val;
-/// use bevy_extended_ui::styling::css::convert_to_val;
-/// assert_eq!(convert_to_val("42px".to_string()), Some(Val::Px(42.0)));
-/// assert_eq!(convert_to_val("80%".to_string()), Some(Val::Percent(80.0)));
-/// ```
 pub fn convert_to_val(value: String) -> Option<Val> {
     let mut val = None;
     let trimmed = value.trim();
@@ -615,6 +606,7 @@ pub fn convert_to_val(value: String) -> Option<Val> {
     val
 }
 
+/// Parses a two-value length into a `Val2`, defaulting the second to zero.
 fn parse_val2(value: &str) -> Option<Val2> {
     let parts: Vec<&str> = value.split_whitespace().collect();
     match parts.as_slice() {
@@ -628,6 +620,7 @@ fn parse_val2(value: &str) -> Option<Val2> {
     }
 }
 
+/// Applies parsed transform functions to the given `TransformStyle`.
 fn apply_transform_functions(value: &str, transform: &mut TransformStyle) {
     let mut remainder = value.trim();
     while let Some(open_idx) = remainder.find('(') {
@@ -682,10 +675,12 @@ fn apply_transform_functions(value: &str, transform: &mut TransformStyle) {
     }
 }
 
+/// Parses a scale value into an `f32`.
 fn parse_scale_value(value: &str) -> Option<f32> {
     value.trim().parse::<f32>().ok()
 }
 
+/// Parses scale values into a `Vec2`.
 fn parse_scale_vec2(value: &str) -> Option<Vec2> {
     let parts: Vec<&str> = value.split_whitespace().collect();
     match parts.as_slice() {
@@ -699,6 +694,7 @@ fn parse_scale_vec2(value: &str) -> Option<Vec2> {
     }
 }
 
+/// Parses a rotation value into radians.
 fn parse_rotation(value: &str) -> Option<f32> {
     let token = value.trim().to_ascii_lowercase();
     if let Some(deg) = token.strip_suffix("deg") {
@@ -723,6 +719,7 @@ fn parse_rotation(value: &str) -> Option<f32> {
         .map(|v| nudge_problematic_rotation(v.to_radians()))
 }
 
+/// Nudges rotations that are very close to quadrant boundaries to avoid artifacts.
 fn nudge_problematic_rotation(rad: f32) -> f32 {
     let tau = std::f32::consts::TAU;
     let half_pi = std::f32::consts::FRAC_PI_2;
@@ -748,12 +745,6 @@ fn nudge_problematic_rotation(rad: f32) -> f32 {
 /// - `Some(i32)` if parsing succeeds and the string is a valid integer.
 /// - `None` if the input is non-numeric or contains invalid characters.
 ///
-/// # Example
-/// ```
-/// use bevy_extended_ui::styling::css::convert_to_i32;
-/// assert_eq!(convert_to_i32("123".to_string()), Some(123));
-/// assert_eq!(convert_to_i32("abc".to_string()), None);
-/// ```
 pub fn convert_to_i32(value: String) -> Option<i32> {
     let trimmed = value.trim();
 
@@ -766,6 +757,7 @@ pub fn convert_to_i32(value: String) -> Option<i32> {
     }
 }
 
+/// Parses a numeric string into a floating-point value.
 pub fn convert_to_f32(value: String) -> Option<f32> {
     let trimmed = value.trim();
     trimmed.parse::<f32>().ok()
@@ -784,13 +776,6 @@ pub fn convert_to_f32(value: String) -> Option<f32> {
 /// - `Some(FontVal)` if the value can be parsed.
 /// - `None` if the value is malformed or unsupported.
 ///
-/// # Example
-/// ```
-/// use bevy_extended_ui::styling::css::convert_to_font_size;
-/// use bevy_extended_ui::styling::FontVal;
-/// assert_eq!(convert_to_font_size("14px".to_string()), Some(FontVal::Px(14.0)));
-/// assert_eq!(convert_to_font_size("1.5rem".to_string()), Some(FontVal::Rem(1.5)));
-/// ```
 pub fn convert_to_font_size(value: String) -> Option<FontVal> {
     let mut val = None;
     let trimmed = value.trim();
@@ -819,14 +804,6 @@ pub fn convert_to_font_size(value: String) -> Option<FontVal> {
 /// - `Some(Color)` if parsing succeeds.
 /// - `None` if the format is invalid or unsupported.
 ///
-/// # Example
-/// ```
-/// use bevy::prelude::Color;
-/// use bevy_extended_ui::styling::css::convert_to_color;
-/// assert_eq!(convert_to_color("red".to_string()), Some(Color::WHITE));
-/// assert_eq!(convert_to_color("rgba(0,0,0,0)".to_string()), Some(Color::NONE));
-/// assert!(convert_to_color("#123456".to_string()).is_some());
-/// ```
 pub fn convert_to_color(value: String) -> Option<Color> {
     let mut color = None;
     let trimmed = value.trim();
@@ -887,12 +864,6 @@ pub fn convert_to_color(value: String) -> Option<Color> {
 /// - `Some(Background)` if a valid image URL or color is parsed.
 /// - `None` if parsing fails or `all_types` is false and the value is not a `url(...)`.
 ///
-/// # Example
-/// ```
-/// use bevy_extended_ui::styling::css::convert_to_background;
-/// convert_to_background("url(\"icon.png\")".to_string(), false);
-/// convert_to_background("red".to_string(), true);
-/// ```
 pub fn convert_to_background(value: String, all_types: bool) -> Option<Background> {
     let trimmed = value.trim();
 
@@ -928,13 +899,6 @@ pub fn convert_to_background(value: String, all_types: bool) -> Option<Backgroun
 /// # Returns
 /// - `Some(Display)` with a best-effort fallback.
 ///
-/// # Example
-/// ```
-/// use bevy::prelude::Display;
-/// use bevy_extended_ui::styling::css::convert_to_display;
-/// assert_eq!(convert_to_display("flex".to_string()), Some(Display::Flex));
-/// assert_eq!(convert_to_display("unknown".to_string()), Some(Display::Block));
-/// ```
 pub fn convert_to_display(value: String) -> Option<Display> {
     let trimmed = value.trim();
     match trimmed {
@@ -960,12 +924,6 @@ pub fn convert_to_display(value: String) -> Option<Display> {
 /// # Returns
 /// - `Some(PositionType)`
 ///
-/// # Example
-/// ```
-/// use bevy::prelude::PositionType;
-/// use bevy_extended_ui::styling::css::convert_to_position;
-/// assert_eq!(convert_to_position("absolute".to_string()), Some(PositionType::Absolute));
-/// ```
 pub fn convert_to_position(value: String) -> Option<PositionType> {
     let trimmed = value.trim();
     match trimmed {
@@ -975,6 +933,7 @@ pub fn convert_to_position(value: String) -> Option<PositionType> {
     }
 }
 
+/// Converts a CSS `box-sizing` value into a Bevy `BoxSizing`.
 pub fn convert_to_box_sizing(value: String) -> Option<BoxSizing> {
     let trimmed = value.trim();
     match trimmed {
@@ -999,12 +958,6 @@ pub fn convert_to_box_sizing(value: String) -> Option<BoxSizing> {
 /// - `Some(Radius)` if parsing succeeds.
 /// - `None` if the input format is invalid.
 ///
-/// # Example
-/// ```
-/// use bevy_extended_ui::styling::css::convert_to_radius;
-/// convert_to_radius("10px".to_string());
-/// convert_to_radius("10px 20px 30px 40px".to_string());
-/// ```
 pub fn convert_to_radius(value: String) -> Option<Radius> {
     let vals = parse_radius_values(&value)?;
 
@@ -1059,12 +1012,6 @@ pub fn convert_to_radius(value: String) -> Option<Radius> {
 /// - `Some(UiRect)` if parsing succeeds.
 /// - `None` if the value format is invalid.
 ///
-/// # Example
-/// ```
-/// use bevy_extended_ui::styling::css::convert_to_ui_rect;
-/// convert_to_ui_rect("10px".to_string());
-/// convert_to_ui_rect("10px 20px 5px 15px".to_string());
-/// ```
 pub fn convert_to_ui_rect(value: String) -> Option<UiRect> {
     let vals = parse_radius_values(&value)?;
 
@@ -1125,11 +1072,6 @@ pub fn convert_to_ui_rect(value: String) -> Option<UiRect> {
 /// - `Some(BoxShadow)` if parsing succeeds.
 /// - `None` on failure.
 ///
-/// # Example
-/// ```
-/// use bevy_extended_ui::styling::css::convert_to_bevy_box_shadow;
-/// convert_to_bevy_box_shadow("5px 10px 15px 3px rgba(0,0,0,0.5)".to_string());
-/// ```
 pub fn convert_to_bevy_box_shadow(value: String) -> Option<BoxShadow> {
     let parts: Vec<&str> = value.split_whitespace().collect();
     let mut vals = vec![];
@@ -1197,13 +1139,8 @@ pub fn convert_to_bevy_box_shadow(value: String) -> Option<BoxShadow> {
 /// - `Some((UiRect, Color))` on successful parsing, where `UiRect` sets all borders to the given width.
 /// - `None` if the width is missing or cannot be parsed.
 ///
-/// # Example
-/// ```
-/// use bevy_extended_ui::styling::css::convert_css_border;
-/// convert_css_border("5px #ff0000".to_string());
-/// convert_css_border("0".to_string()); // transparent border
-/// ```
 pub fn convert_css_border(value: String) -> Option<(UiRect, Color)> {
+    /// Parses a single border width token into a `Val`.
     fn parse_val(input: &str) -> Option<Val> {
         if input.ends_with("px") {
             input
@@ -1250,6 +1187,7 @@ pub fn convert_css_border(value: String) -> Option<(UiRect, Color)> {
  * @param value The CSS justify-content value as a string slice.
  * @return Some(JustifyContent) if the value is recognized, None otherwise.
  */
+/// Converts a string into a `JustifyContent` value.
 pub fn convert_to_bevy_justify_content(value: String) -> Option<JustifyContent> {
     let trimmed = value.trim();
     match trimmed {
@@ -1275,6 +1213,7 @@ pub fn convert_to_bevy_justify_content(value: String) -> Option<JustifyContent> 
  * @param value The CSS align-item value as a string slice.
  * @return Some(AlignItems) if the value is recognized, None otherwise.
  */
+/// Converts a string into an `AlignItems` value.
 pub fn convert_to_bevy_align_items(value: String) -> Option<AlignItems> {
     let trimmed = value.trim();
     match trimmed {
@@ -1297,6 +1236,7 @@ pub fn convert_to_bevy_align_items(value: String) -> Option<AlignItems> {
  * @param value The CSS flex-direction value as a string slice.
  * @return Some(FlexDirection) if the value is recognized, None otherwise.
  */
+/// Converts a string into a `FlexDirection` value.
 pub fn convert_to_bevy_flex_direction(value: String) -> Option<FlexDirection> {
     let trimmed = value.trim();
     match trimmed {
@@ -1316,6 +1256,7 @@ pub fn convert_to_bevy_flex_direction(value: String) -> Option<FlexDirection> {
  * @param value The CSS flex-wrap value as a string slice.
  * @return Some(FlexWrap) if the value is recognized, None otherwise.
  */
+/// Converts a string into a `FlexWrap` value.
 pub fn convert_to_bevy_flex_wrap(value: String) -> Option<FlexWrap> {
     let trimmed = value.trim();
     match trimmed {
@@ -1334,6 +1275,7 @@ pub fn convert_to_bevy_flex_wrap(value: String) -> Option<FlexWrap> {
  * @param value The CSS line-break value as a string slice.
  * @return Some(LineBreak) if the value is recognized, None otherwise.
  */
+/// Converts a string into a `LineBreak` value.
 pub fn convert_to_bevy_line_break(value: String) -> Option<LineBreak> {
     let trimmed = value.trim();
     match trimmed {
@@ -1361,13 +1303,6 @@ pub fn convert_to_bevy_line_break(value: String) -> Option<LineBreak> {
 /// - `Some(Pickable::IGNORE)` if the value is `"none"`
 /// - `Some(Pickable::default())` for any other input
 ///
-/// # Example
-/// ```
-/// use bevy::prelude::Pickable;
-/// use bevy_extended_ui::styling::css::convert_to_bevy_pick_able;
-/// let pickable = convert_to_bevy_pick_able("none".to_string());
-/// assert_eq!(pickable, Some(Pickable::IGNORE));
-/// ```
 pub fn convert_to_bevy_pick_able(value: String) -> Option<Pickable> {
     let trimmed = value.trim();
     match trimmed {
@@ -1395,6 +1330,7 @@ pub fn convert_to_cursor_style(value: String) -> Option<CursorStyle> {
     None
 }
 
+/// Maps a CSS cursor keyword to a system cursor icon.
 fn parse_cursor_keyword(token: &str) -> Option<SystemCursorIcon> {
     let token = token
         .trim()
@@ -1445,6 +1381,7 @@ fn parse_cursor_keyword(token: &str) -> Option<SystemCursorIcon> {
     }
 }
 
+/// Extracts a custom cursor path from a token if present.
 fn parse_cursor_path(token: &str) -> Option<String> {
     let trimmed = token.trim();
     let lower = trimmed.to_ascii_lowercase();
@@ -1481,6 +1418,7 @@ fn parse_cursor_path(token: &str) -> Option<String> {
  * @param value The CSS grid-auto-flow value as a string slice.
  * @return Some(GridAutoFlow) if the value is recognized, None otherwise.
  */
+/// Converts a string into a `GridAutoFlow` value.
 pub fn convert_to_bevy_grid_flow(value: String) -> Option<GridAutoFlow> {
     let trimmed = value.trim();
     match trimmed {
@@ -1503,6 +1441,7 @@ pub fn convert_to_bevy_grid_flow(value: String) -> Option<GridAutoFlow> {
  * @param value is The CSS grid placement string as a string slice.
  * @return Some(GridPlacement) if the value is valid and parsed, None otherwise.
  */
+/// Converts a string into a `GridPlacement` value.
 pub fn convert_to_bevy_grid_placement(value: String) -> Option<GridPlacement> {
     let trimmed = value.trim();
 
@@ -1546,6 +1485,7 @@ pub fn convert_to_bevy_grid_placement(value: String) -> Option<GridPlacement> {
  * @param value The CSS grid track definition as a string.
  * @return Some(Vec<GridTrack>) if all parts are successfully parsed; None otherwise.
  */
+/// Converts a string into a list of `GridTrack` values.
 pub fn convert_to_bevy_grid_track(value: String) -> Option<Vec<GridTrack>> {
     value
         .split_whitespace()
@@ -1568,6 +1508,7 @@ pub fn convert_to_bevy_grid_track(value: String) -> Option<Vec<GridTrack>> {
  * @param value The CSS grid-template string.
  * @return Some(Vec<RepeatedGridTrack>) if parsing succeeds, None otherwise.
  */
+/// Converts a string into a list of `RepeatedGridTrack` values.
 pub fn convert_to_bevy_grid_template(value: String) -> Option<Vec<RepeatedGridTrack>> {
     let input = value.trim();
     let mut result = Vec::new();
@@ -1615,6 +1556,7 @@ pub fn convert_to_bevy_grid_template(value: String) -> Option<Vec<RepeatedGridTr
  * @param input is The CSS grid track string.
  * @return Some(GridTrack) if parsing succeeds, None otherwise.
  */
+/// Parses a single grid track definition.
 fn parse_single_grid_track(input: &str) -> Option<GridTrack> {
     let input = input.trim();
     match input {
@@ -1659,6 +1601,7 @@ fn parse_single_grid_track(input: &str) -> Option<GridTrack> {
  * @param input is The CSS min track sizing string.
  * @return Some(MinTrackSizingFunction) if parsing succeeds, None otherwise.
  */
+/// Parses a minimum track sizing function.
 fn parse_min_sizing(input: &str) -> Option<MinTrackSizingFunction> {
     match input {
         "auto" => Some(MinTrackSizingFunction::Auto),
@@ -1686,6 +1629,7 @@ fn parse_min_sizing(input: &str) -> Option<MinTrackSizingFunction> {
  *  @param input is The CSS max track sizing string.
  * @return Some(MaxTrackSizingFunction) if parsing succeeds, None otherwise.
  */
+/// Parses a maximum track sizing function.
 fn parse_max_sizing(input: &str) -> Option<MaxTrackSizingFunction> {
     match input {
         "auto" => Some(MaxTrackSizingFunction::Auto),
@@ -1723,6 +1667,7 @@ fn parse_max_sizing(input: &str) -> Option<MaxTrackSizingFunction> {
  * @param which The axis specifier ("x", "y", "all", etc.).
  * @return Some (Overflow) if valid input, None otherwise.
  */
+/// Converts a CSS overflow value into a Bevy `Overflow`.
 pub fn convert_overflow(value: String, which: &str) -> Option<Overflow> {
     let trimmed = value.trim();
     let overflow_axis = match trimmed {
@@ -1764,6 +1709,7 @@ pub fn convert_overflow(value: String, which: &str) -> Option<Overflow> {
  * @param value is The CSS radius string.
  * @return Some(Vec<Val>) if parsing succeeds, None otherwise.
  */
+/// Parses radius values into a list of `Val`.
 fn parse_radius_values(value: &str) -> Option<Vec<Val>> {
     let mut vals = Vec::new();
     for part in value.split_whitespace() {

@@ -10,39 +10,46 @@ use crate::styles::{CssClass, CssSource, TagName};
 use crate::widgets::{BindToID, Div, Scrollbar, UIGenID, UIWidgetState, WidgetId, WidgetKind};
 use crate::{CurrentWidgetState, ExtendedUiConfiguration};
 
+/// Marker component for initialized div widgets.
 #[derive(Component)]
 struct DivBase;
 
+/// Marker for the scroll content node inside a div.
 #[derive(Component)]
 struct DivScrollContent;
 
+/// Component storing the root content entity for a div.
 #[derive(Component, Deref)]
 struct DivContentRoot(Entity);
 
+/// Component storing the vertical scrollbar entity for a div.
 #[derive(Component, Deref)]
 struct DivScrollbar(Entity);
 
+/// Component storing the horizontal scrollbar entity for a div.
 #[derive(Component, Deref)]
 struct DivScrollbarH(Entity);
 
-/// Mark which Div owns this scroll-content subtree.
+/// Marks which div owns a scroll-content subtree.
 #[derive(Component, Deref)]
 struct DivContentOwner(Entity);
 
-/// Mark which Div owns this scrollbar overlay.
+/// Marks which div owns a scrollbar overlay.
 #[derive(Component, Deref)]
 struct DivScrollbarOwner(Entity);
 
-/// Robust hover tracking.
+/// Tracks hover counts for div widgets.
 #[derive(Resource, Default)]
 struct HoveredDivTracker {
     div_ref: HashMap<Entity, u32>,
     last_div: Option<Entity>,
 }
 
+/// Plugin that wires up div widget behavior.
 pub struct DivWidget;
 
 impl Plugin for DivWidget {
+    /// Registers systems for div widget setup and scrolling.
     fn build(&self, app: &mut App) {
         app.init_resource::<HoveredDivTracker>();
 
@@ -60,7 +67,7 @@ impl Plugin for DivWidget {
     }
 }
 
-/// Creates the base node for <div>
+/// Creates the base node for div widgets.
 fn internal_node_creation_system(
     mut commands: Commands,
     query: Query<(Entity, &Div, Option<&CssSource>), (With<Div>, Without<DivBase>)>,
@@ -102,6 +109,7 @@ fn internal_node_creation_system(
     }
 }
 
+/// Ensures the div has scroll content and scrollbar nodes when needed.
 fn ensure_div_scroll_structure(
     mut commands: Commands,
     mut div_q: Query<
@@ -376,7 +384,7 @@ fn ensure_div_scroll_structure(
     }
 }
 
-/// Global hover routing.
+/// Routes hover state to the owning div.
 fn route_hover_from_pointer_messages(
     mut over: MessageReader<Pointer<Over>>,
     mut out: MessageReader<Pointer<Out>>,
@@ -388,6 +396,7 @@ fn route_hover_from_pointer_messages(
     mut div_state_q: Query<&mut UIWidgetState, With<Div>>,
     mut hovered: ResMut<HoveredDivTracker>,
 ) {
+    /// Walks up the hierarchy to find the owning div entity.
     fn find_owner_div(
         mut e: Entity,
         parents: &Query<&ChildOf>,
@@ -470,6 +479,7 @@ fn route_hover_from_pointer_messages(
 }
 
 /// Wheel scroll uses the "last hovered div" and scrolls its DivScrollContent (Y only).
+/// Handles mouse wheel scrolling for div content.
 fn handle_div_scroll_wheel(
     mut wheel_events: MessageReader<MouseWheel>,
     hovered: Res<HoveredDivTracker>,
@@ -517,6 +527,7 @@ fn handle_div_scroll_wheel(
     }
 }
 
+/// Synchronizes scrollbar values from scrollable content.
 fn sync_scrollbar_from_content(
     div_q: Query<(Option<&DivContentRoot>, Option<&DivScrollbar>, Option<&DivScrollbarH>), With<Div>>,
     content_q: Query<&ComputedNode, With<DivScrollContent>>,
@@ -577,6 +588,7 @@ fn sync_scrollbar_from_content(
     }
 }
 
+/// Updates scrollbar state if content dimensions have changed.
 fn check_scroll_bar_state<T>(
     sb_node_q: &mut Query<&mut Node, With<Scrollbar>>,
     sb_vis_q: &mut Query<&mut Visibility, With<Scrollbar>>,
@@ -604,6 +616,7 @@ fn check_scroll_bar_state<T>(
 
 
 
+/// Sets focus on div click and updates the current widget state.
 fn on_div_click(
     mut trigger: On<Pointer<Click>>,
     mut query: Query<(&mut UIWidgetState, &UIGenID), With<Div>>,

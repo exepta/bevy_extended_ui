@@ -5,24 +5,29 @@ use crate::widgets::{ToggleButton, FieldKind, FieldSelectionMulti, FieldSet, Fie
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
 
+/// Marker component for initialized field set widgets.
 #[derive(Component)]
 struct FieldSetBase;
 
+/// Tracks whether field set warnings were already logged.
 #[derive(Component, Default)]
 struct FieldSetWarned {
     mixed: bool,
     unsupported: bool,
 }
 
+/// Plugin that registers field set widget behavior.
 pub struct FieldSetWidget;
 
 impl Plugin for FieldSetWidget {
+    /// Registers systems for field set setup and validation.
     fn build(&self, app: &mut App) {
         app.add_systems(Update, internal_node_creation_system);
         app.add_systems(Update, detect_fieldset_kind_system);
     }
 }
 
+/// Initializes UI nodes for field set widgets.
 fn internal_node_creation_system(
     mut commands: Commands,
     query: Query<(Entity, &FieldSet, Option<&CssSource>), (With<FieldSet>, Without<FieldSetBase>)>,
@@ -67,6 +72,7 @@ fn internal_node_creation_system(
     }
 }
 
+/// Detects field set child types and updates selection mode.
 fn detect_fieldset_kind_system(
     mut commands: Commands,
     mut fieldsets: Query<(Entity, &mut FieldSet, Option<&Children>, &mut FieldSetWarned)>,

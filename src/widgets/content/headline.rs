@@ -4,12 +4,15 @@ use crate::{CurrentWidgetState, ExtendedUiConfiguration};
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
 
+/// Marker component for initialized headline widgets.
 #[derive(Component)]
 struct HeadlineBase;
 
+/// Plugin that registers headline widget behavior.
 pub struct HeadlineWidget;
 
 impl Plugin for HeadlineWidget {
+    /// Registers systems for headline widget setup and updates.
     fn build(&self, app: &mut App) {
         app.add_systems(Update, (internal_node_creation_system, update_text));
     }

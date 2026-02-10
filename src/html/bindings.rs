@@ -9,20 +9,24 @@ use crate::widgets::{
     UIGenID, UIWidgetState,
 };
 
+/// Component tracking focus state for HTML widgets.
 #[derive(Component, Default, Clone, Copy)]
 pub(crate) struct HtmlFocusTracker {
     focused: bool,
 }
 
+/// Resource tracking scroll positions for HTML widgets.
 #[derive(Resource, Default)]
 pub(crate) struct HtmlScrollTracker {
     positions: HashMap<usize, Vec2>,
     scrollbar_values: HashMap<Entity, f32>,
 }
 
+/// Plugin that wires HTML event bindings into Bevy observers and systems.
 pub struct HtmlEventBindingsPlugin;
 
 impl Plugin for HtmlEventBindingsPlugin {
+    /// Registers observers and systems for HTML events.
     fn build(&self, app: &mut App) {
         app.init_resource::<HtmlScrollTracker>();
 
@@ -87,6 +91,7 @@ impl Plugin for HtmlEventBindingsPlugin {
 //                        Click
 // =================================================
 
+/// Emits click events for widgets with `onclick` bindings.
 pub(crate) fn emit_html_click_events(
     ev: On<Pointer<Click>>,
     mut commands: Commands,
@@ -119,6 +124,7 @@ pub(crate) fn emit_html_click_events(
     }
 }
 
+/// Dispatches registered click handlers for HTML widgets.
 pub(crate) fn on_html_click(
     click: On<HtmlClick>,
     mut commands: Commands,
@@ -143,6 +149,7 @@ pub(crate) fn on_html_click(
 //                        Over
 // =================================================
 
+/// Emits mouse-over events for widgets with `onmouseover` bindings.
 pub(crate) fn emit_html_mouse_over_events(
     ev: On<Pointer<Over>>,
     mut commands: Commands,
@@ -156,6 +163,7 @@ pub(crate) fn emit_html_mouse_over_events(
     }
 }
 
+/// Dispatches registered mouse-over handlers for HTML widgets.
 pub(crate) fn on_html_mouse_over(
     over: On<HtmlMouseOver>,
     mut commands: Commands,
@@ -180,6 +188,7 @@ pub(crate) fn on_html_mouse_over(
 //                        Out
 // =================================================
 
+/// Emits mouse-out events for widgets with `onmouseout` bindings.
 pub(crate) fn emit_html_mouse_out_events(
     ev: On<Pointer<Out>>,
     mut commands: Commands,
@@ -193,6 +202,7 @@ pub(crate) fn emit_html_mouse_out_events(
     }
 }
 
+/// Dispatches registered mouse-out handlers for HTML widgets.
 pub(crate) fn on_html_mouse_out(
     out: On<HtmlMouseOut>,
     mut commands: Commands,
@@ -217,6 +227,7 @@ pub(crate) fn on_html_mouse_out(
 //                        Init
 // =================================================
 
+/// Emits init events after widgets become visible.
 pub(crate) fn emit_html_init_events(
     mut commands: Commands,
     mut pending: ResMut<HtmlInitDelay>,
@@ -233,6 +244,7 @@ pub(crate) fn emit_html_init_events(
     pending.0 = None;
 }
 
+/// Tracks visibility and marks widgets that are ready to emit init events.
 fn track_html_init_visibility(
     mut events: MessageReader<HtmlAllWidgetsVisible>,
     mut pending: ResMut<HtmlInitDelay>,
@@ -242,6 +254,7 @@ fn track_html_init_visibility(
     }
 }
 
+/// Advances the global init delay counter.
 fn advance_html_init_delay(mut pending: ResMut<HtmlInitDelay>) {
     if let Some(steps) = pending.0.as_mut() {
         if *steps > 0 {
@@ -250,6 +263,7 @@ fn advance_html_init_delay(mut pending: ResMut<HtmlInitDelay>) {
     }
 }
 
+/// Dispatches registered init handlers for HTML widgets.
 pub(crate) fn on_html_init(
     init: On<HtmlInit>,
     mut commands: Commands,
@@ -276,6 +290,7 @@ pub(crate) fn on_html_init(
 // =================================================
 
 /// CheckBox
+/// Emits change events for checkbox widgets.
 pub(crate) fn emit_checkbox_change(
     mut commands: Commands,
     query: Query<(Entity, &HtmlEventBindings), Changed<CheckBox>>,
@@ -286,6 +301,7 @@ pub(crate) fn emit_checkbox_change(
 }
 
 /// ChoiceBox
+/// Emits change events for choice box widgets.
 pub(crate) fn emit_choice_box_change(
     mut commands: Commands,
     query: Query<(Entity, &HtmlEventBindings), Changed<ChoiceBox>>,
@@ -296,6 +312,7 @@ pub(crate) fn emit_choice_box_change(
 }
 
 /// FieldSet
+/// Emits change events for field set widgets.
 pub(crate) fn emit_field_set_change(
     mut commands: Commands,
     query: Query<
@@ -313,6 +330,7 @@ pub(crate) fn emit_field_set_change(
 }
 
 /// Slider
+/// Emits change events for slider widgets.
 pub(crate) fn emit_slider_change(
     mut commands: Commands,
     query: Query<(Entity, &HtmlEventBindings), Changed<Slider>>,
@@ -322,6 +340,7 @@ pub(crate) fn emit_slider_change(
     }
 }
 
+/// Emits change events for input widgets.
 pub(crate) fn emit_input_change(
     mut commands: Commands,
     query: Query<(Entity, &HtmlEventBindings), Changed<InputValue>>,
@@ -331,6 +350,7 @@ pub(crate) fn emit_input_change(
     }
 }
 
+/// Emits a change event when a binding is present.
 fn emit_change_if_bound(
     commands: &mut Commands,
     bindings: &HtmlEventBindings,
@@ -342,6 +362,7 @@ fn emit_change_if_bound(
     }
 }
 
+/// Dispatches registered change handlers for HTML widgets.
 pub(crate) fn on_html_change(
     init: On<HtmlChange>,
     mut commands: Commands,
@@ -367,6 +388,7 @@ pub(crate) fn on_html_change(
 //                        Focus
 // =================================================
 
+/// Emits focus events based on pointer focus changes.
 pub(crate) fn emit_html_focus_events(
     mut commands: Commands,
     mut query: Query<
@@ -402,6 +424,7 @@ pub(crate) fn emit_html_focus_events(
     }
 }
 
+/// Dispatches registered focus handlers for HTML widgets.
 pub(crate) fn on_html_focus(
     focus: On<HtmlFocus>,
     mut commands: Commands,
@@ -426,6 +449,7 @@ pub(crate) fn on_html_focus(
 //                        Scroll
 // =================================================
 
+/// Emits scroll events based on cursor wheel input.
 pub(crate) fn emit_html_scroll_events(
     mut commands: Commands,
     scroll_q: Query<(&ScrollPosition, &BindToID), Changed<ScrollPosition>>,
@@ -464,6 +488,7 @@ pub(crate) fn emit_html_scroll_events(
     }
 }
 
+/// Emits scroll events based on scrollbar changes.
 pub(crate) fn emit_html_scrollbar_events(
     mut commands: Commands,
     query: Query<(Entity, &Scrollbar, &HtmlEventBindings, Option<&UIWidgetState>), Changed<Scrollbar>>,
@@ -489,6 +514,7 @@ pub(crate) fn emit_html_scrollbar_events(
     }
 }
 
+/// Dispatches registered scroll handlers for HTML widgets.
 pub(crate) fn on_html_scroll(
     scroll: On<HtmlScroll>,
     mut commands: Commands,
@@ -513,6 +539,7 @@ pub(crate) fn on_html_scroll(
 //                       Keyboard
 // =================================================
 
+/// Emits key-down events for the focused widget.
 pub(crate) fn emit_html_key_down_events(
     mut commands: Commands,
     keyboard: Res<ButtonInput<KeyCode>>,
@@ -553,6 +580,7 @@ pub(crate) fn emit_html_key_down_events(
     }
 }
 
+/// Emits key-up events for the focused widget.
 pub(crate) fn emit_html_key_up_events(
     mut commands: Commands,
     keyboard: Res<ButtonInput<KeyCode>>,
@@ -593,6 +621,7 @@ pub(crate) fn emit_html_key_up_events(
     }
 }
 
+/// Dispatches registered key-down handlers for HTML widgets.
 pub(crate) fn on_html_key_down(
     keydown: On<HtmlKeyDown>,
     mut commands: Commands,
@@ -613,6 +642,7 @@ pub(crate) fn on_html_key_down(
     }
 }
 
+/// Dispatches registered key-up handlers for HTML widgets.
 pub(crate) fn on_html_key_up(
     keyup: On<HtmlKeyUp>,
     mut commands: Commands,
@@ -637,6 +667,7 @@ pub(crate) fn on_html_key_up(
 //                         Drag
 // =================================================
 
+/// Emits drag-start events for widgets with drag bindings.
 pub(crate) fn emit_html_drag_start_events(
     ev: On<Pointer<DragStart>>,
     mut commands: Commands,
@@ -656,6 +687,7 @@ pub(crate) fn emit_html_drag_start_events(
     }
 }
 
+/// Dispatches registered drag-start handlers for HTML widgets.
 pub(crate) fn on_html_drag_start(
     drag: On<HtmlDragStart>,
     mut commands: Commands,
@@ -676,6 +708,7 @@ pub(crate) fn on_html_drag_start(
     }
 }
 
+/// Emits drag events for widgets with drag bindings.
 pub(crate) fn emit_html_drag_events(
     ev: On<Pointer<Drag>>,
     mut commands: Commands,
@@ -695,6 +728,7 @@ pub(crate) fn emit_html_drag_events(
     }
 }
 
+/// Dispatches registered drag handlers for HTML widgets.
 pub(crate) fn on_html_drag(
     drag: On<HtmlDrag>,
     mut commands: Commands,
@@ -715,6 +749,7 @@ pub(crate) fn on_html_drag(
     }
 }
 
+/// Emits drag-stop events for widgets with drag bindings.
 pub(crate) fn emit_html_drag_stop_events(
     ev: On<Pointer<DragEnd>>,
     mut commands: Commands,
@@ -734,6 +769,7 @@ pub(crate) fn emit_html_drag_stop_events(
     }
 }
 
+/// Dispatches registered drag-stop handlers for HTML widgets.
 pub(crate) fn on_html_drag_stop(
     drag: On<HtmlDragStop>,
     mut commands: Commands,

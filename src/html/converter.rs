@@ -9,15 +9,20 @@ use crate::html::{
     HtmlStyle, HtmlSystemSet, HtmlWidgetNode,
 };
 use crate::io::{CssAsset, DefaultCssHandle, HtmlAsset};
+use crate::lang::{localize_html, vars_fingerprint, UiLangState, UiLangVariables, UILang};
 use crate::styles::IconPlace;
 use crate::widgets::Button;
 use crate::widgets::*;
+use crate::ExtendedUiConfiguration;
 
+/// Default CSS asset path applied to every HTML UI.
 pub const DEFAULT_UI_CSS: &str = "default/extended_ui.css";
 
+/// Plugin that parses HTML assets into widget trees.
 pub struct HtmlConverterSystem;
 
 impl Plugin for HtmlConverterSystem {
+    /// Registers the HTML conversion system.
     fn build(&self, app: &mut App) {
         app.add_systems(Update, update_html_ui.in_set(HtmlSystemSet::Convert));
     }
@@ -26,15 +31,21 @@ impl Plugin for HtmlConverterSystem {
 /// Marker component used for HtmlSource entities whose HtmlAsset wasn't ready yet.
 /// This enables robust re-try parsing on later frames (important for WASM async loading).
 #[derive(Component, Debug, Default)]
+/// Marker component for HtmlSource entities that need a retry parse.
 struct PendingHtmlParse;
 
 /// Converts HtmlAsset content into HtmlStructureMap entries.
 /// Also resolves <link rel="stylesheet" href="..."> into Handle<CssAsset>.
+/// Updates parsed HTML structures from assets and language state.
 fn update_html_ui(
     mut commands: Commands,
     mut structure_map: ResMut<HtmlStructureMap>,
     mut html_dirty: ResMut<HtmlDirty>,
+    mut ui_lang: ResMut<UILang>,
+    mut lang_state: ResMut<UiLangState>,
 
+    lang_vars: Res<UiLangVariables>,
+    config: Res<ExtendedUiConfiguration>,
     asset_server: Res<AssetServer>,
     html_assets: Res<Assets<HtmlAsset>>,
     mut html_asset_events: MessageReader<AssetEvent<HtmlAsset>>,
@@ -44,6 +55,27 @@ fn update_html_ui(
     query_pending: Query<Entity, With<PendingHtmlParse>>,
     query_all: Query<(Entity, &HtmlSource)>,
 ) {
+    let resolved = ui_lang.resolved().map(|lang| lang.to_string());
+    let mut lang_dirty = false;
+    let vars_hash = vars_fingerprint(&lang_vars);
+
+    if lang_state.last_resolved != resolved {
+        lang_state.last_resolved = resolved;
+        lang_dirty = true;
+    }
+
+    if lang_state.last_language_path.as_deref() != Some(config.language_path.as_str()) {
+        lang_state
+            .last_language_path
+            .replace(config.language_path.clone());
+        lang_dirty = true;
+    }
+
+    if lang_state.last_vars_fingerprint != Some(vars_hash) {
+        lang_state.last_vars_fingerprint = Some(vars_hash);
+        lang_dirty = true;
+    }
+
     // Entities that need reparse (new HtmlSource, pending retry, or changed HtmlAsset).
     let mut dirty_entities: Vec<Entity> = query_added.iter().map(|(e, _)| e).collect();
     dirty_entities.extend(query_pending.iter());
@@ -67,6 +99,12 @@ fn update_html_ui(
     dirty_entities.sort();
     dirty_entities.dedup();
 
+    if lang_dirty {
+        dirty_entities.extend(query_all.iter().map(|(e, _)| e));
+        dirty_entities.sort();
+        dirty_entities.dedup();
+    }
+
     if dirty_entities.is_empty() {
         return;
     }
@@ -86,7 +124,26 @@ fn update_html_ui(
         commands.entity(entity).remove::<PendingHtmlParse>();
 
         let content = html_asset.html.clone();
-        let document = kuchiki::parse_html().one(content);
+        let raw_document = kuchiki::parse_html().one(content.clone());
+        let html_lang = raw_document
+            .select_first("html")
+            .ok()
+            .and_then(|node| node.attributes.borrow().get("lang").map(|s| s.to_string()));
+
+        ui_lang.apply_html_lang(html_lang.as_deref());
+        lang_state.last_resolved = ui_lang.resolved().map(|lang| lang.to_string());
+
+        let localized = localize_html(
+            &content,
+            ui_lang.resolved(),
+            &config.language_path,
+            &lang_vars,
+        );
+        let document = if localized == content {
+            raw_document
+        } else {
+            kuchiki::parse_html().one(localized)
+        };
 
         // Extract unique UI key from <meta name="...">
         let Some(meta_key) = document
@@ -708,6 +765,7 @@ fn parse_html_node(
     }
 }
 
+/// Extracts HTML event bindings from element attributes.
 fn bind_html_func(attributes: &Attributes) -> HtmlEventBindings {
     HtmlEventBindings {
         onclick: attributes.get("onclick").map(|s| s.to_string()),
@@ -731,6 +789,7 @@ fn bind_html_func(attributes: &Attributes) -> HtmlEventBindings {
     }
 }
 
+/// Parses validation rules from element attributes.
 fn parse_validation_attributes(attributes: &Attributes) -> Option<ValidationRules> {
     let mut rules = attributes
         .get("validation")
@@ -779,6 +838,7 @@ pub fn resolve_relative_asset_path(html_path: &str, href: &str) -> String {
     base.join(href).to_string_lossy().replace('\\', "/")
 }
 
+/// Ensures the default CSS handle is the first in the list.
 fn with_default_css_first(
     default_css: &DefaultCssHandle,
     mut css: Vec<Handle<CssAsset>>,
@@ -794,6 +854,7 @@ fn with_default_css_first(
     css
 }
 
+/// Parses an optional icon source and determines its placement relative to text.
 fn parse_icon_and_text(node: &NodeRef) -> (Option<String>, IconPlace) {
     let mut icon_path = None;
     let mut icon_place = IconPlace::Left;

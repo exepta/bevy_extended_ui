@@ -13,6 +13,7 @@ use crate::html::bindings::HtmlEventBindingsPlugin;
 use crate::html::builder::HtmlBuilderSystem;
 use crate::html::converter::HtmlConverterSystem;
 use crate::html::reload::HtmlReloadPlugin;
+use crate::lang::{UiLangState, UiLangVariables, UILang};
 
 use crate::io::{CssAsset, HtmlAsset};
 use crate::styles::Style;
@@ -21,6 +22,7 @@ use crate::widgets::{Body, Button, CheckBox, ChoiceBox, Div, Divider, FieldSet, 
 
 pub static HTML_ID_COUNTER: AtomicUsize = AtomicUsize::new(1);
 
+/// System set ordering for the HTML UI pipeline.
 #[derive(SystemSet, Debug, Hash, PartialEq, Eq, Clone)]
 pub enum HtmlSystemSet {
     Convert,
@@ -29,6 +31,7 @@ pub enum HtmlSystemSet {
     Bindings,
 }
 
+/// Component that points to an HTML asset and related metadata.
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
 pub struct HtmlSource {
@@ -38,6 +41,7 @@ pub struct HtmlSource {
 }
 
 impl HtmlSource {
+    /// Creates a new `HtmlSource` from an asset handle.
     pub fn from_handle(handle: Handle<HtmlAsset>) -> Self {
         Self {
             handle,
@@ -58,27 +62,34 @@ impl HtmlSource {
     }
 }
 
+/// Event fired when all widgets have been spawned.
 #[derive(Event, Message)]
 pub struct HtmlAllWidgetsSpawned;
 
+/// Event fired when all widgets are visible.
 #[derive(Event, Message)]
 pub struct HtmlAllWidgetsVisible;
 
+/// Marker component used to prevent double init events.
 #[derive(Component, Default)]
 pub struct HtmlInitEmitted;
 
+/// Resource used to delay init until a configurable number of frames.
 #[derive(Resource, Default)]
 pub struct HtmlInitDelay(pub Option<u8>);
 
+/// Marker component for nodes that should start hidden.
 #[derive(Component)]
 pub struct NeedHidden;
 
+/// Timer resource used to stagger widget visibility.
 #[derive(Resource, Default)]
 pub struct ShowWidgetsTimer {
     pub timer: Timer,
     pub active: bool,
 }
 
+/// Event emitted when an HTML change is detected.
 #[derive(Event, Message)]
 pub struct HtmlChangeEvent;
 
@@ -89,12 +100,13 @@ pub struct HtmlChangeEvent;
 pub struct HtmlDirty(pub bool);
 
 /// Component storing parsed inline CSS (`style="..."`) as your custom Style struct.
+/// Component storing parsed inline CSS (`style="..."`) as a `Style`.
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
 pub struct HtmlStyle(pub Style);
 
 impl HtmlStyle {
-    /// Parses inline CSS style declarations ("key: value; ...") into Style.
+    /// Parses inline CSS style declarations into a `Style`.
     pub fn from_str(style_code: &str) -> HtmlStyle {
         let mut style = Style::default();
 
@@ -119,6 +131,7 @@ impl HtmlStyle {
     }
 }
 
+/// Metadata collected from HTML attributes.
 #[derive(Debug, Clone, Default)]
 pub struct HtmlMeta {
     /// All referenced CSS assets for this node.
@@ -129,6 +142,7 @@ pub struct HtmlMeta {
     pub validation: Option<ValidationRules>,
 }
 
+/// Common HTML state flags for nodes.
 #[derive(Debug, Clone, Default)]
 pub struct HtmlStates {
     pub hidden: bool,
@@ -291,6 +305,7 @@ pub enum HtmlWidgetNode {
 }
 
 /// Stores all parsed HTML structures keyed by `<meta name="...">`.
+/// Stores parsed HTML trees keyed by their `<meta name="...">` value.
 #[derive(Resource)]
 pub struct HtmlStructureMap {
     pub html_map: HashMap<String, Vec<HtmlWidgetNode>>,
@@ -298,6 +313,7 @@ pub struct HtmlStructureMap {
 }
 
 impl Default for HtmlStructureMap {
+    /// Creates an empty structure map with no active HTML.
     fn default() -> Self {
         Self {
             html_map: HashMap::new(),
@@ -306,15 +322,18 @@ impl Default for HtmlStructureMap {
     }
 }
 
+/// Unique identifier for HTML nodes.
 #[derive(Clone, Debug, PartialEq, Component)]
 pub struct HtmlID(pub usize);
 
 impl Default for HtmlID {
+    /// Allocates a new HTML ID from the global counter.
     fn default() -> Self {
         Self(HTML_ID_COUNTER.fetch_add(1, Ordering::Relaxed))
     }
 }
 
+/// Registry entry for HTML event handler builders.
 pub enum HtmlFnRegistration {
     HtmlEvent {
         name: &'static str,
@@ -372,16 +391,19 @@ pub enum HtmlFnRegistration {
 
 inventory::collect!(HtmlFnRegistration);
 
+/// Basic event wrapper passed to untyped HTML handlers.
 #[derive(Clone, Copy)]
 pub struct HtmlEvent {
     pub entity: Entity,
 }
 
 impl HtmlEvent {
+    /// Returns the target entity for the event.
     pub fn target(&self) -> Entity { self.entity }
 
 }
 
+/// Registry of HTML event handlers by name and event type.
 #[derive(Default, Resource)]
 pub struct HtmlFunctionRegistry {
     pub click: HashMap<String, SystemId<In<HtmlEvent>>>,
@@ -410,6 +432,7 @@ pub struct HtmlFunctionRegistry {
     pub dragstop_typed: HashMap<String, SystemId<In<HtmlDragStop>>>,
 }
 
+/// Component storing event handler names attached in HTML.
 #[derive(Component, Reflect, Default, Clone, Debug)]
 #[reflect(Component)]
 pub struct HtmlEventBindings {
@@ -427,6 +450,7 @@ pub struct HtmlEventBindings {
     pub ondragstop: Option<String>,
 }
 
+/// Click event sent from HTML widgets.
 #[derive(EntityEvent, Clone, Copy)]
 pub struct HtmlClick {
     #[event_target]
@@ -435,18 +459,21 @@ pub struct HtmlClick {
     pub inner_position: Vec2,
 }
 
+/// Mouse-over event sent from HTML widgets.
 #[derive(EntityEvent, Clone, Copy)]
 pub struct HtmlMouseOver {
     #[event_target]
     pub entity: Entity,
 }
 
+/// Mouse-out event sent from HTML widgets.
 #[derive(EntityEvent, Clone, Copy)]
 pub struct HtmlMouseOut {
     #[event_target]
     pub entity: Entity,
 }
 
+/// Change action types for HTML change events.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HtmlChangeAction {
     State,
@@ -454,6 +481,7 @@ pub enum HtmlChangeAction {
     Unknown,
 }
 
+/// Change event emitted by HTML widgets.
 #[derive(EntityEvent, Clone, Copy)]
 pub struct HtmlChange {
     #[event_target]
@@ -461,18 +489,21 @@ pub struct HtmlChange {
     pub action: HtmlChangeAction,
 }
 
+/// Init event emitted after widgets are constructed.
 #[derive(EntityEvent, Clone, Copy)]
 pub struct HtmlInit {
     #[event_target]
     pub entity: Entity,
 }
 
+/// Focus transition state for focus events.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HtmlFocusState {
     Gained,
     Lost,
 }
 
+/// Focus event emitted by HTML widgets.
 #[derive(EntityEvent, Clone, Copy)]
 pub struct HtmlFocus {
     #[event_target]
@@ -480,6 +511,7 @@ pub struct HtmlFocus {
     pub state: HtmlFocusState,
 }
 
+/// Scroll event emitted by HTML widgets.
 #[derive(EntityEvent, Clone, Copy)]
 pub struct HtmlScroll {
     #[event_target]
@@ -489,6 +521,7 @@ pub struct HtmlScroll {
     pub y: f32,
 }
 
+/// Key-down event emitted by HTML widgets.
 #[derive(EntityEvent, Clone, Copy)]
 pub struct HtmlKeyDown {
     #[event_target]
@@ -496,6 +529,7 @@ pub struct HtmlKeyDown {
     pub key: KeyCode,
 }
 
+/// Key-up event emitted by HTML widgets.
 #[derive(EntityEvent, Clone, Copy)]
 pub struct HtmlKeyUp {
     #[event_target]
@@ -503,6 +537,7 @@ pub struct HtmlKeyUp {
     pub key: KeyCode,
 }
 
+/// Drag-start event emitted by HTML widgets.
 #[derive(EntityEvent, Clone, Copy)]
 pub struct HtmlDragStart {
     #[event_target]
@@ -510,6 +545,7 @@ pub struct HtmlDragStart {
     pub position: Vec2,
 }
 
+/// Drag event emitted by HTML widgets.
 #[derive(EntityEvent, Clone, Copy)]
 pub struct HtmlDrag {
     #[event_target]
@@ -517,6 +553,7 @@ pub struct HtmlDrag {
     pub position: Vec2,
 }
 
+/// Drag-stop event emitted by HTML widgets.
 #[derive(EntityEvent, Clone, Copy)]
 pub struct HtmlDragStop {
     #[event_target]
@@ -528,6 +565,7 @@ pub struct HtmlDragStop {
 pub struct ExtendedUiHtmlPlugin;
 
 impl Plugin for ExtendedUiHtmlPlugin {
+    /// Registers HTML resources, systems, and plugins.
     fn build(&self, app: &mut App) {
         app.add_message::<HtmlChangeEvent>();
 
@@ -535,6 +573,9 @@ impl Plugin for ExtendedUiHtmlPlugin {
         app.init_resource::<HtmlFunctionRegistry>();
         app.init_resource::<HtmlDirty>();
         app.init_resource::<HtmlInitDelay>();
+        app.init_resource::<UILang>();
+        app.init_resource::<UiLangState>();
+        app.init_resource::<UiLangVariables>();
 
         app.register_type::<HtmlEventBindings>();
         app.register_type::<HtmlSource>();
@@ -561,6 +602,7 @@ impl Plugin for ExtendedUiHtmlPlugin {
     }
 }
 
+/// Registers all HTML event handlers collected via `inventory`.
 pub fn register_html_fns(world: &mut World) {
     let mut to_insert: Vec<(String, SystemId<In<HtmlEvent>>)> = Vec::new();
 

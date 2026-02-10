@@ -3,6 +3,7 @@ use bevy::window::WindowResolution;
 
 use crate::ExtendedUiPlugin;
 
+/// Creates a Bevy `App` configured for the extended UI examples.
 pub fn make_app(title: impl Into<String>) -> App {
     let mut app = App::new();
 
