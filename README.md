@@ -249,6 +249,8 @@ If anyone has any ideas, I'd be happy to hear them.
 <br>
 [Link to Event Rules](EVENT.md)
 <br>
+[Link to Language Rules](LANGUAGE.md)
+<br>
 [Link to CSS Properties](CSS_USAGE.md)
 <br>
 [Link to Patches](PATCH.md)

@@ -7,6 +7,7 @@ use bevy_extended_ui::styles::CssID;
 use bevy_extended_ui::widgets::{ChoiceBox, Headline};
 use bevy_extended_ui_macros::html_fn;
 
+/// Runs the choice box example app.
 fn main() {
     let mut app = make_app("Debug Html UI - test");
 
@@ -18,6 +19,7 @@ fn main() {
     app.run();
 }
 
+/// Updates headline text when a choice box selection changes.
 #[html_fn("on_select_change")]
 fn on_select_change(
     In(event): In<HtmlEvent>,

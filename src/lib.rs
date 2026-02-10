@@ -61,30 +61,12 @@ impl Default for ExtendedUiConfiguration {
     }
 }
 
-/// Defines which camera setup should be used by the extended UI / rendering pipeline.
+/// Defines which camera setup should be used by the extended UI rendering pipeline.
 ///
 /// This enum is typically used as a configuration option to select a specific camera mode:
-/// - [`ExtendedCam::Default`] uses the recommended / default camera configuration.
+/// - [`ExtendedCam::Default`] uses the recommended default camera configuration.
 /// - [`ExtendedCam::Simple`] uses a minimal camera setup (useful for lightweight scenes or testing).
 /// - [`ExtendedCam::None`] disables automatic camera spawning/handling completely.
-///
-/// # Examples
-/// ```rust
-/// # use your_crate::ExtendedCam;
-/// let cam_mode = ExtendedCam::Default;
-///
-/// match cam_mode {
-///     ExtendedCam::Default => {
-///         // spawn default camera setup
-///     }
-///     ExtendedCam::Simple => {
-///         // spawn a simple camera setup
-///     }
-///     ExtendedCam::None => {
-///         // do not spawn/manage any camera
-///     }
-/// }
-/// ```
 #[derive(Debug, Clone, Default)]
 pub enum ExtendedCam {
     /// Use the recommended default camera setup.
@@ -113,14 +95,14 @@ impl Default for CurrentWidgetState {
 }
 
 /// Marker component for the UI camera entity.
-///
-/// This component tags the camera entity used for rendering the UI.
 #[derive(Component)]
 struct UiCamera;
 
+/// Bevy plugin that wires up all extended UI subsystems.
 pub struct ExtendedUiPlugin;
 
 impl Plugin for ExtendedUiPlugin {
+    /// Registers resources, plugins, and systems required by the extended UI.
     fn build(&self, app: &mut App) {
         app.init_resource::<ExtendedUiConfiguration>();
         app.init_resource::<ImageCache>();
@@ -143,12 +125,9 @@ impl Plugin for ExtendedUiPlugin {
     }
 }
 
-/// System that manages the lifecycle and configuration of the UI camera.
+/// Manages the lifecycle and configuration of the UI camera.
 ///
-/// Uses `ExtendedUiConfiguration.camera` to decide which camera setup is active:
-/// - `ExtendedCam::Default`: managed UI camera with layers/order/HDR
-/// - `ExtendedCam::Simple`: simple Camera2d named "Extended UI Camera"
-/// - `ExtendedCam::None`: despawn all UI cameras
+/// Uses `ExtendedUiConfiguration.camera` to decide which camera setup is active.
 fn load_ui_camera_system(
     mut commands: Commands,
     configuration: Res<ExtendedUiConfiguration>,

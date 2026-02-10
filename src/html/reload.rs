@@ -5,17 +5,21 @@ use std::collections::HashSet;
 use crate::io::CssAsset;
 use crate::styles::CssSource;
 
+/// Marker component indicating an entity needs CSS reprocessing.
 #[derive(Component)]
 pub struct CssDirty;
 
+/// Plugin that marks CSS users dirty when assets change.
 pub struct HtmlReloadPlugin;
 
 impl Plugin for HtmlReloadPlugin {
+    /// Registers the CSS change tracking system.
     fn build(&self, app: &mut App) {
         app.add_systems(Update, mark_css_users_dirty_on_css_change);
     }
 }
 
+/// Marks entities referencing changed CSS assets as dirty.
 fn mark_css_users_dirty_on_css_change(
     mut commands: Commands,
     mut css_events: MessageReader<AssetEvent<CssAsset>>,

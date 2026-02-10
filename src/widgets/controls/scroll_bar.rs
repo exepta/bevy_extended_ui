@@ -10,14 +10,18 @@ use crate::styles::{CssClass, CssSource, TagName};
 use crate::widgets::{BindToID, Scrollbar, UIWidgetState, WidgetId, WidgetKind};
 use crate::{CurrentWidgetState, ExtendedUiConfiguration};
 
+/// Marker component for initialized scrollbar widgets.
 #[derive(Component)]
 struct ScrollBase;
+/// Marker component for the scrollbar track.
 #[derive(Component)]
 struct ScrollTrack;
+/// Component storing scrollbar thumb state.
 #[derive(Component)]
 struct ScrollThumb {
     current_center: f32,
 }
+/// Snapshot of scroll state to detect changes.
 #[derive(Component)]
 struct PreviousScrollState {
     value: f32,
@@ -26,12 +30,15 @@ struct PreviousScrollState {
     content_extent: f32,
 }
 
+/// Marker component indicating scroll bar needs initial layout.
 #[derive(Component)]
 struct ScrollNeedInit;
 
+/// Plugin that registers scrollbar widget behavior.
 pub struct ScrollWidget;
 
 impl Plugin for ScrollWidget {
+    /// Registers systems for scrollbar setup and updates.
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
@@ -45,6 +52,7 @@ impl Plugin for ScrollWidget {
     }
 }
 
+/// Initializes UI nodes for scrollbar widgets.
 fn internal_node_creation_system(
     mut commands: Commands,
     query: Query<(Entity, &Scrollbar, Option<&CssSource>), (With<Scrollbar>, Without<ScrollBase>)>,
@@ -159,6 +167,7 @@ fn internal_node_creation_system(
     }
 }
 
+/// Focuses the scrollbar widget on click.
 fn on_internal_click(
     mut trigger: On<Pointer<Click>>,
     mut query: Query<(&mut UIWidgetState, &Scrollbar), With<Scrollbar>>,
@@ -171,6 +180,7 @@ fn on_internal_click(
     trigger.propagate(false);
 }
 
+/// Sets hovered state when the cursor enters a scrollbar.
 fn on_internal_cursor_entered(
     mut trigger: On<Pointer<Over>>,
     mut query: Query<&mut UIWidgetState, With<Scrollbar>>,
@@ -181,6 +191,7 @@ fn on_internal_cursor_entered(
     trigger.propagate(false);
 }
 
+/// Clears hovered state when the cursor leaves a scrollbar.
 fn on_internal_cursor_leave(
     mut trigger: On<Pointer<Out>>,
     mut query: Query<&mut UIWidgetState, With<Scrollbar>>,
@@ -191,6 +202,7 @@ fn on_internal_cursor_leave(
     trigger.propagate(false);
 }
 
+/// Handles clicks on the scrollbar track to update value.
 fn on_track_click(
     mut trigger: On<Pointer<Click>>,
     ui_scale: Res<UiScale>,
@@ -242,6 +254,7 @@ fn on_track_click(
     trigger.propagate(false);
 }
 
+/// Handles dragging the scrollbar thumb to update value.
 fn on_thumb_drag(
     event: On<Pointer<Drag>>,
     parent_q: Query<&ChildOf>,
@@ -287,6 +300,7 @@ fn on_thumb_drag(
     );
 }
 
+/// Applies scroll value based on track position using scroll data.
 fn apply_from_track_top_scroll(
     scroll: &mut Scrollbar,
     desired_top: f32,
@@ -357,6 +371,7 @@ fn apply_from_track_top_scroll(
     }
 }
 
+/// Applies scroll value based on track position using UI ID.
 fn apply_from_track_top_uid(
     target_entry: usize,
     desired_top: f32,
@@ -381,6 +396,7 @@ fn apply_from_track_top_uid(
     }
 }
 
+/// Detects scroll value changes and updates thumb visuals.
 fn detect_change_scroll_values(
     mut scroll_q: Query<(&mut Scrollbar, &UIWidgetState, &mut PreviousScrollState), With<Scrollbar>>,
     track_q: Query<(&ComputedNode, &BindToID), With<ScrollTrack>>,
@@ -457,6 +473,7 @@ fn detect_change_scroll_values(
     }
 }
 
+/// Initializes scrollbar thumb size and position after layout.
 fn initialize_scroll_visual_state(
     mut commands: Commands,
     mut scroll_q: Query<(Entity, &mut Scrollbar, Option<&ScrollNeedInit>), With<Scrollbar>>,
@@ -496,6 +513,7 @@ fn initialize_scroll_visual_state(
     }
 }
 
+/// Finds a scroll extent bound to a given entity.
 fn find_bound_extent<Q>(
     entry: usize,
     query: &Query<(&ComputedNode, &BindToID), Q>,
@@ -511,6 +529,7 @@ where
         .map(|(computed, _)| axis_size(vertical, computed.size(), scale_factor))
 }
 
+/// Returns the axis size scaled for the given orientation.
 fn axis_size(vertical: bool, size: Vec2, scale: f32) -> f32 {
     if vertical {
         (size.y / scale).max(1.0)
@@ -519,10 +538,12 @@ fn axis_size(vertical: bool, size: Vec2, scale: f32) -> f32 {
     }
 }
 
+/// Returns the usable track extent along the scroll axis.
 fn track_extent(vertical: bool, size: Vec2, scale: f32) -> f32 {
     axis_size(vertical, size, scale)
 }
 
+/// Computes the thumb size based on scroll metrics.
 fn compute_thumb_extent(scroll: &Scrollbar, track_extent: f32, fallback_extent: f32) -> f32 {
     compute_thumb_extent_from_metrics(
         scroll.viewport_extent,
@@ -533,6 +554,7 @@ fn compute_thumb_extent(scroll: &Scrollbar, track_extent: f32, fallback_extent: 
     )
 }
 
+/// Computes the thumb size using derived metrics.
 fn compute_thumb_extent_from_metrics(
     viewport_extent: f32,
     content_extent: f32,
@@ -557,6 +579,7 @@ fn compute_thumb_extent_from_metrics(
     fallback_extent.max(1.0).min(track_extent)
 }
 
+/// Computes common scroll metrics for a scrollbar.
 fn scroll_metrics(
     entry: usize,
     scroll_q: &mut Query<&mut Scrollbar, With<Scrollbar>>,

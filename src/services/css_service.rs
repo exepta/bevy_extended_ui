@@ -16,14 +16,17 @@ use crate::html::reload::CssDirty;
 static PARSED_CSS_CACHE: Lazy<RwLock<HashMap<AssetId<CssAsset>, ParsedCss>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
 
+/// Tracks which entities reference which CSS assets.
 #[derive(Resource, Default)]
 pub struct CssUsers {
     pub users: HashMap<AssetId<CssAsset>, HashSet<Entity>>,
 }
 
+/// Plugin that keeps UI styles in sync with CSS assets.
 pub struct CssService;
 
 impl Plugin for CssService {
+    /// Registers resources and systems for CSS processing.
     fn build(&self, app: &mut App) {
         app.init_resource::<ExistingCssIDs>();
         app.init_resource::<CssUsers>();
@@ -39,6 +42,7 @@ impl Plugin for CssService {
     }
 }
 
+/// Invalidates cached parsed CSS when assets change.
 fn invalidate_css_cache_on_asset_change(mut ev: MessageReader<AssetEvent<CssAsset>>) {
     for e in ev.read() {
         match e {
@@ -52,6 +56,7 @@ fn invalidate_css_cache_on_asset_change(mut ev: MessageReader<AssetEvent<CssAsse
     }
 }
 
+/// Updates the reverse index of entities using each CSS asset.
 fn update_css_users_index(
     mut css_users: ResMut<CssUsers>,
     query_changed: Query<(Entity, &CssSource), Or<(Added<CssSource>, Changed<CssSource>)>>,
@@ -69,6 +74,7 @@ fn update_css_users_index(
     }
 }
 
+/// Applies merged CSS styles to entities that are dirty or affected by changes.
 fn apply_css_to_entities(
     mut commands: Commands,
 
@@ -178,6 +184,7 @@ fn apply_css_to_entities(
     }
 }
 
+/// Loads and merges CSS styles from multiple sources with selector matching.
 fn load_and_merge_styles_from_assets(
     sources: &Vec<Handle<CssAsset>>,
     css_assets: &Assets<CssAsset>,
@@ -245,6 +252,7 @@ fn load_and_merge_styles_from_assets(
     }
 }
 
+/// Recursively matches a selector chain against an element and its parents.
 fn matches_selector_chain(
     selectors: &[&str],
     id_opt: Option<&CssID>,
@@ -291,6 +299,7 @@ fn matches_selector_chain(
     false
 }
 
+/// Matches a single selector against an element's id, class, and tag.
 fn matches_selector(
     selector: &str,
     id_opt: Option<&CssID>,

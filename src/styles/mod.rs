@@ -32,19 +32,23 @@ pub struct CssClass(pub Vec<String>);
 #[reflect(Component)]
 pub struct CssID(pub String);
 
+/// Component that stores one or more CSS asset handles for an entity.
 #[derive(Component, Reflect, Debug, Clone, Default)]
 #[reflect(Component)]
 pub struct CssSource(pub Vec<Handle<CssAsset>>);
 
 impl CssSource {
+    /// Creates a CSS source from a single asset path.
     pub fn from_path(asset_server: &AssetServer, path: &str) -> Self {
         Self(vec![asset_server.load::<CssAsset>(path.to_string())])
     }
 
+    /// Appends another CSS asset path to the source list.
     pub fn push_path(&mut self, asset_server: &AssetServer, path: &str) {
         self.0.push(asset_server.load::<CssAsset>(path.to_string()));
     }
 
+    /// Creates a CSS source from multiple asset paths.
     pub fn from_paths(
         asset_server: &AssetServer,
         paths: impl IntoIterator<Item = impl Into<String>>,
@@ -68,12 +72,7 @@ pub struct Radius {
 }
 
 impl Radius {
-    /**
-     * Creates a `Radius` where all corners have the same radius value.
-     *
-     * @param val The radius value to use for all four corners.
-     * @return A new `Radius` with uniform corner radii.
-     */
+    /// Creates a `Radius` where all corners have the same radius value.
     pub fn all(val: Val) -> Self {
         Self {
             top_left: val,
@@ -92,9 +91,7 @@ pub struct Background {
 }
 
 impl Default for Background {
-    /**
-     * Creates a default `Background` with transparent color and no image.
-     */
+    /// Creates a default `Background` with transparent color and no image.
     fn default() -> Self {
         Self {
             color: Color::NONE,
@@ -176,9 +173,7 @@ pub enum IconPlace {
 }
 
 impl Default for IconPlace {
-    /**
-     * Returns the default icon placement (`Right`).
-     */
+    /// Returns the default icon placement (`Right`).
     fn default() -> Self {
         IconPlace::Right
     }
@@ -192,21 +187,14 @@ pub enum FontVal {
 }
 
 impl Default for FontVal {
-    /**
-     * Returns the default font size of 12 pixels.
-     */
+    /// Returns the default font size of 12 pixels.
     fn default() -> Self {
         FontVal::Px(12.0)
     }
 }
 
 impl FontVal {
-    /**
-     * Computes the absolute font size in pixels, resolving rem units using a base size.
-     *
-     * @param base Optional base font size in pixels for rem calculations. Defaults to 1.0 if not provided.
-     * @return The computed font size in pixels.
-     */
+    /// Computes the absolute font size in pixels, resolving rem units using a base size.
     pub fn get(&self, base: Option<f32>) -> f32 {
         match self {
             FontVal::Px(x) => x.clone(),
@@ -215,9 +203,11 @@ impl FontVal {
     }
 }
 
+/// Font family name wrapper for style parsing.
 #[derive(Reflect, Debug, Clone, PartialEq)]
 pub struct FontFamily(pub String);
 
+/// Timing functions for transitions and animations.
 #[derive(Reflect, Debug, Clone, PartialEq, Eq, Copy)]
 pub enum TransitionTiming {
     Linear,
@@ -228,6 +218,7 @@ pub enum TransitionTiming {
 }
 
 impl TransitionTiming {
+    /// Applies the timing function to a normalized progress value.
     pub fn apply(self, t: f32) -> f32 {
         match self {
             TransitionTiming::Linear => t,
@@ -244,6 +235,7 @@ impl TransitionTiming {
         }
     }
 
+    /// Parses a timing function name into a variant.
     pub fn from_name(value: &str) -> Option<Self> {
         match value.trim().to_ascii_lowercase().as_str() {
             "linear" => Some(Self::Linear),
@@ -257,11 +249,13 @@ impl TransitionTiming {
 }
 
 impl Default for TransitionTiming {
+    /// Returns the default timing function.
     fn default() -> Self {
         TransitionTiming::EaseInOut
     }
 }
 
+/// Direction modes for CSS animations.
 #[derive(Reflect, Debug, Clone, PartialEq, Eq, Copy)]
 pub enum AnimationDirection {
     Normal,
@@ -271,6 +265,7 @@ pub enum AnimationDirection {
 }
 
 impl AnimationDirection {
+    /// Parses an animation-direction name into a variant.
     pub fn from_name(value: &str) -> Option<Self> {
         match value.trim().to_ascii_lowercase().as_str() {
             "normal" => Some(Self::Normal),
@@ -283,11 +278,13 @@ impl AnimationDirection {
 }
 
 impl Default for AnimationDirection {
+    /// Returns the default animation direction.
     fn default() -> Self {
         AnimationDirection::Normal
     }
 }
 
+/// Properties that can be targeted by transitions.
 #[derive(Reflect, Debug, Clone, PartialEq, Eq, Copy)]
 pub enum TransitionProperty {
     All,
@@ -297,11 +294,13 @@ pub enum TransitionProperty {
 }
 
 impl Default for TransitionProperty {
+    /// Returns the default transition property selection.
     fn default() -> Self {
         TransitionProperty::All
     }
 }
 
+/// Parsed animation specification from CSS.
 #[derive(Reflect, Debug, Clone, PartialEq)]
 pub struct AnimationSpec {
     pub name: String,
@@ -313,6 +312,7 @@ pub struct AnimationSpec {
 }
 
 impl Default for AnimationSpec {
+    /// Creates a default animation specification.
     fn default() -> Self {
         Self {
             name: String::new(),
@@ -325,6 +325,7 @@ impl Default for AnimationSpec {
     }
 }
 
+/// Parsed transition specification from CSS.
 #[derive(Reflect, Debug, Clone, PartialEq)]
 pub struct TransitionSpec {
     pub properties: Vec<TransitionProperty>,
@@ -334,6 +335,7 @@ pub struct TransitionSpec {
 }
 
 impl Default for TransitionSpec {
+    /// Creates a default transition specification.
     fn default() -> Self {
         Self {
             properties: vec![TransitionProperty::All],
@@ -344,18 +346,21 @@ impl Default for TransitionSpec {
     }
 }
 
+/// Parsed keyframe entry for a CSS animation.
 #[derive(Reflect, Default, Debug, Clone, PartialEq)]
 pub struct AnimationKeyframe {
     pub progress: f32,
     pub style: Style,
 }
 
+/// Parsed CSS result for styles and keyframes.
 #[derive(Reflect, Default, Debug, Clone, PartialEq)]
 pub struct ParsedCss {
     pub styles: HashMap<String, StylePair>,
     pub keyframes: HashMap<String, Vec<AnimationKeyframe>>,
 }
 
+/// Pair of normal and !important styles with origin tracking.
 #[derive(Reflect, Default, Debug, Clone, PartialEq)]
 pub struct StylePair {
     pub important: Style,
@@ -363,6 +368,7 @@ pub struct StylePair {
     pub origin: usize,
 }
 
+/// Transforms parsed from CSS transform properties.
 #[derive(Reflect, Default, Debug, Clone, PartialEq)]
 pub struct TransformStyle {
     pub translation: Option<Val2>,
@@ -375,6 +381,7 @@ pub struct TransformStyle {
 }
 
 impl TransformStyle {
+    /// Returns true when no transform values are set.
     pub fn is_empty(&self) -> bool {
         self.translation.is_none()
             && self.translation_x.is_none()
@@ -386,6 +393,7 @@ impl TransformStyle {
     }
 }
 
+/// Cursor styling, either a system cursor or a custom asset path.
 #[derive(Reflect, Debug, Clone, PartialEq)]
 pub enum CursorStyle {
     System(SystemCursorIcon),
@@ -451,12 +459,7 @@ pub struct Style {
 }
 
 impl Style {
-    /**
-     * Merges another `Style` into this one.
-     * For each field, if the other style has a value set (`Some`), it overwrites this style's value.
-     *
-     * @param other The other style to merge from.
-     */
+    /// Merges another `Style` into this one, overriding any set fields.
     pub fn merge(&mut self, other: &Style) {
         merge_opt(&mut self.display, &other.display);
         merge_opt(&mut self.box_sizing, &other.box_sizing);
@@ -551,6 +554,7 @@ impl Style {
     }
 }
 
+/// Copies a source value into a destination if the source is set.
 #[inline]
 fn merge_opt<T: Clone>(dst: &mut Option<T>, src: &Option<T>) {
     if let Some(v) = src.as_ref() {
@@ -558,9 +562,11 @@ fn merge_opt<T: Clone>(dst: &mut Option<T>, src: &Option<T>) {
     }
 }
 
+/// Bevy plugin registering style-related reflection data.
 pub struct ExtendedStylingPlugin;
 
 impl Plugin for ExtendedStylingPlugin {
+    /// Registers reflected style-related components.
     fn build(&self, app: &mut App) {
         app.register_type::<UiStyle>();
         app.register_type::<CssClass>();

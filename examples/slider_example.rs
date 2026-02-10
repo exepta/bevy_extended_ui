@@ -8,6 +8,7 @@ use bevy_extended_ui::styles::CssID;
 use bevy_extended_ui::widgets::{Headline, Slider};
 use bevy_extended_ui_macros::html_fn;
 
+/// Runs the slider example app.
 fn main() {
     let mut app = make_app("Debug Html UI - test");
 
@@ -19,6 +20,7 @@ fn main() {
     app.run();
 }
 
+/// Updates the headline with the current slider value.
 #[html_fn("update_value")]
 fn update_value(
     In(event): In<HtmlEvent>,

@@ -5,21 +5,27 @@ use crate::{CurrentWidgetState, ExtendedUiConfiguration};
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
 
+/// Marker component for initialized radio button widgets.
 #[derive(Component)]
 struct RadioButtonBase;
 
+/// Marker component for radio button label nodes.
 #[derive(Component)]
 struct RadioButtonLabel;
 
+/// Marker component for the radio selection dot.
 #[derive(Component)]
 pub struct RadioButtonDot;
 
+/// Tracks whether a missing field set warning was logged.
 #[derive(Resource, Default)]
 struct RadioMissingFieldSetWarned(bool);
 
+/// Plugin that registers radio button widget behavior.
 pub struct RadioButtonWidget;
 
 impl Plugin for RadioButtonWidget {
+    /// Registers systems for radio button setup and selection logic.
     fn build(&self, app: &mut App) {
         app.init_resource::<RadioMissingFieldSetWarned>();
         app.add_systems(Update, internal_node_creation_system);
@@ -28,6 +34,7 @@ impl Plugin for RadioButtonWidget {
     }
 }
 
+/// Initializes UI nodes for radio button widgets.
 fn internal_node_creation_system(
     mut commands: Commands,
     mut query: Query<
@@ -149,6 +156,7 @@ fn internal_node_creation_system(
     }
 }
 
+/// Handles click events on radio buttons and updates selection state.
 fn on_internal_click(
     mut trigger: On<Pointer<Click>>,
     mut commands: Commands,
@@ -311,6 +319,7 @@ fn on_internal_cursor_leave(
     trigger.propagate(false);
 }
 
+/// Finds the nearest ancestor field set entity.
 fn find_fieldset_ancestor(
     mut entity: Entity,
     parents: &Query<&ChildOf>,
@@ -332,6 +341,7 @@ fn find_fieldset_ancestor(
     }
 }
 
+/// Adds a visual dot to the selected radio button.
 fn add_checked_dot_to_radio(
     gen_id: usize,
     radio_entry: usize,
@@ -373,6 +383,7 @@ fn add_checked_dot_to_radio(
     }
 }
 
+/// Removes a visual dot from a radio button by bind ID.
 fn remove_checked_dot_by_bind_id(
     gen_id: usize,
     dot_q: &Query<(Entity, &BindToID, Option<&Children>, &ComputedNode), With<RadioButtonDot>>,
@@ -394,6 +405,7 @@ fn remove_checked_dot_by_bind_id(
     }
 }
 
+/// Ensures radio buttons reflect their checked state visually.
 fn ensure_checked_dots_system(
     mut commands: Commands,
     radio_q: Query<(&UIGenID, &RadioButton, &CssSource, &UIWidgetState)>,
@@ -423,6 +435,7 @@ fn ensure_checked_dots_system(
     }
 }
 
+/// Ensures field set selection state stays consistent.
 fn ensure_fieldset_selection_system(
     radios: Query<(Entity, &InFieldSet, &UIWidgetState), With<RadioButton>>,
     mut fieldsets: Query<(&FieldSet, Option<&mut FieldSelectionSingle>)>,

@@ -4,15 +4,19 @@ use crate::widgets::{Divider, DividerAlignment, WidgetId, WidgetKind};
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
 
+/// Marker component for initialized divider widgets.
 #[derive(Component)]
 struct DividerBase;
 
+/// Plugin that registers divider widget behavior.
 pub struct DividerWidget;
 
+/// Tracks the previous alignment for change detection.
 #[derive(Component, Deref, DerefMut)]
 struct PrevDividerAlignment(DividerAlignment);
 
 impl Plugin for DividerWidget {
+    /// Registers systems for divider widget setup.
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
@@ -20,6 +24,8 @@ impl Plugin for DividerWidget {
         );
     }
 }
+
+/// Spawns the divider UI node with initial alignment classes.
 fn internal_node_creation_system(
     mut commands: Commands,
     query: Query<(Entity, &Divider, Option<&CssSource>), (With<Divider>, Without<DividerBase>)>,
@@ -56,6 +62,7 @@ fn internal_node_creation_system(
     }
 }
 
+/// Updates CSS classes when the divider alignment changes.
 fn update_divider_alignment(
     mut q: Query<
         (&Divider, &mut CssClass, &mut PrevDividerAlignment),
@@ -74,6 +81,7 @@ fn update_divider_alignment(
     }
 }
 
+/// Returns the CSS class name for a given alignment.
 fn alignment_class(a: &DividerAlignment) -> &'static str {
     match a {
         DividerAlignment::Vertical => "divider-vert",
@@ -81,6 +89,7 @@ fn alignment_class(a: &DividerAlignment) -> &'static str {
     }
 }
 
+/// Applies the alignment class to a CSS class list.
 fn set_alignment_class(classes: &mut CssClass, a: &DividerAlignment) {
     classes
         .0

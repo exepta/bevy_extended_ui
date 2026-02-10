@@ -10,41 +10,52 @@ use crate::utils::keycode_to_char;
 use crate::widgets::{BindToID, InputCap, InputField, InputType, InputValue, UIGenID, UIWidgetState, WidgetId, WidgetKind};
 use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
 
+/// Marker component for initialized input fields.
 #[derive(Component)]
 struct InputFieldBase;
 
+/// Marker component for the input text node.
 #[derive(Component)]
 struct InputFieldText;
 
+/// Marker component for the input icon container.
 #[derive(Component)]
 struct InputFieldIcon;
 
+/// Marker component for the input icon image.
 #[derive(Component)]
 struct InputFieldIconImage;
 
+/// Marker component for the blinking cursor node.
 #[derive(Component)]
 struct InputCursor;
 
+/// Marker component for the text container node.
 #[derive(Component)]
 struct InputContainer;
 
+/// Marker component for the overlay label node.
 #[derive(Component)]
 struct OverlayLabel;
 
+/// Tracks key repeat timers for continuous input.
 #[derive(Resource, Default)]
 struct KeyRepeatTimers {
     timers: HashMap<KeyCode, Timer>,
 }
 
+/// Stores the original width of an input text container.
 #[derive(Component)]
 struct OriginalWidth(pub f32);
 
+/// Resource controlling cursor blink timing.
 #[derive(Resource)]
 pub struct CursorBlinkTimer {
     pub timer: Timer,
 }
 
 impl Default for CursorBlinkTimer {
+    /// Creates the default cursor blink timer.
     fn default() -> Self {
         Self {
             timer: Timer::from_seconds(0.95, TimerMode::Repeating),
@@ -52,9 +63,11 @@ impl Default for CursorBlinkTimer {
     }
 }
 
+/// Plugin that registers input field widget behavior.
 pub struct InputWidget;
 
 impl Plugin for InputWidget {
+    /// Registers systems for input field setup and interaction.
     fn build(&self, app: &mut App) {
         app.insert_resource(KeyRepeatTimers::default());
         app.insert_resource(CursorBlinkTimer::default());
@@ -259,6 +272,7 @@ fn internal_node_creation_system(
     }
 }
 
+/// Syncs input field text and state to UI components.
 fn sync_input_field_updates(
     mut commands: Commands,
     config: Res<ExtendedUiConfiguration>,
@@ -397,6 +411,7 @@ fn sync_input_field_updates(
 ///   - Masks the text with `*` characters if the input type is `Password`.
 ///   - Shows placeholder text if the input is empty.
 /// - Hides the cursor and clears the text display when the input field is unfocused.
+/// Updates cursor visibility based on focus and blink timer.
 fn update_cursor_visibility(
     time: Res<Time>,
     mut cursor_blink_timer: ResMut<CursorBlinkTimer>,
@@ -415,6 +430,7 @@ fn update_cursor_visibility(
     cursor_blink_timer.timer.tick(time.delta());
 
     // Build a compact lookup map by UI id to avoid nested loops.
+    /// Lightweight view of input field state for cursor rendering.
     #[derive(Clone)]
     struct FieldView {
         focused: bool,
@@ -503,6 +519,7 @@ fn update_cursor_visibility(
 /// - Handles left and right arrow keys with initial delay and repeat rate timers.
 /// - Calculates the horizontal pixel position of the cursor based on text font metrics.
 /// - Updates the cursor node's CSS left position to reflect the cursor's position in the text.
+/// Positions the cursor within the input text container.
 fn update_cursor_position(
     mut key_repeat: ResMut<KeyRepeatTimers>,
     mut cursor_query: Query<(&mut Node, &mut UiStyle, &BindToID), With<InputCursor>>,
@@ -600,6 +617,7 @@ fn update_cursor_position(
 ///
 /// - If the input field has an icon, reduces the text container width by a fixed percentage to accommodate the icon.
 /// - Caches the original width to avoid repeated adjustments.
+/// Adjusts the text container width based on content and cap rules.
 fn calculate_correct_text_container_width(
     query: Query<
         (&InputField, &UIGenID),
@@ -651,6 +669,7 @@ fn calculate_correct_text_container_width(
 /// - Calculates the cursor's horizontal pixel position based on the cursor index and character width.
 /// - Adjusts the scroll offset of the input container to ensure the cursor is within the visible bounds.
 /// - Resets scroll to zero if the total text width fits inside the visible container.
+/// Handles horizontal scrolling when input text exceeds available width.
 fn handle_input_horizontal_scroll(
     query: Query<(&InputField, &UIGenID, &UIWidgetState), With<InputFieldBase>>,
     mut scroll_query: Query<(&mut ScrollPosition, &BindToID), With<InputContainer>>,
@@ -711,6 +730,7 @@ fn handle_input_horizontal_scroll(
 /// - Updates the visible text and cursor position accordingly.
 /// - Masks input with `*` characters if an input type is `Password`.
 /// - Updates text color on changes.
+/// Processes keyboard input for focused input fields.
 fn handle_typing(
     time: Res<Time>,
     mut key_repeat: ResMut<KeyRepeatTimers>,
@@ -897,6 +917,7 @@ fn handle_typing(
 ///
 /// It also adjusts the label's horizontal position if the input field has an icon,
 /// shifting the label right to avoid overlapping the icon.
+/// Shows or hides overlay labels based on input focus and content.
 fn handle_overlay_label(
     query: Query<
         (&UIWidgetState, &UIGenID, &InputField, &UiStyle, &Children),
@@ -983,6 +1004,7 @@ fn handle_overlay_label(
 // ===============================================
 
 /// Calculates the horizontal pixel position of the cursor within the input text.
+/// Calculates the cursor X position from a text index.
 fn calculate_cursor_x_position(
     text_field: &InputField,
     cursor_pos: usize,
@@ -1000,11 +1022,13 @@ fn calculate_cursor_x_position(
 }
 
 /// Estimates the pixel width of a given text string based on font size.
+/// Estimates the width of a text string for cursor placement.
 fn calculate_text_width(text: &str, style: &TextFont) -> f32 {
     text.len() as f32 * style.font_size * 0.6
 }
 
 /// Retrieves the active text color from a widget style, falling back to white.
+/// Resolves the active text color from the UI style.
 fn get_active_text_color(style: &UiStyle) -> Color {
     style
         .active_style
@@ -1013,6 +1037,7 @@ fn get_active_text_color(style: &UiStyle) -> Color {
         .unwrap_or(Color::WHITE)
 }
 
+/// Applies input text to the visible `Text` component.
 fn set_visible_text(in_field: &InputField, out: &mut Text) {
     if in_field.text.is_empty() {
         out.0 = in_field.placeholder.clone();
@@ -1028,6 +1053,7 @@ fn set_visible_text(in_field: &InputField, out: &mut Text) {
 // ===============================================
 
 /// Handles click events on input fields.
+/// Focuses the input field on click and updates the current widget state.
 fn on_internal_click(
     mut trigger: On<Pointer<Click>>,
     mut query: Query<(&mut UIWidgetState, &UIGenID), With<InputField>>,
@@ -1053,6 +1079,7 @@ fn on_internal_click(
 }
 
 /// Handles pointer cursor entering input fields.
+/// Sets hovered state when the cursor enters an input field.
 fn on_internal_cursor_entered(
     mut trigger: On<Pointer<Over>>,
     mut query: Query<(&mut UIWidgetState, &UIGenID), With<InputField>>,
@@ -1071,6 +1098,7 @@ fn on_internal_cursor_entered(
 }
 
 /// Handles pointer cursor leaving input fields.
+/// Clears hovered state when the cursor leaves an input field.
 fn on_internal_cursor_leave(
     mut trigger: On<Pointer<Out>>,
     mut query: Query<(&mut UIWidgetState, &UIGenID), With<InputField>>,

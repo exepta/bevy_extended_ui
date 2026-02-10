@@ -6,18 +6,23 @@ use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
 
+/// Marker component for initialized checkbox widgets.
 #[derive(Component)]
 struct CheckBoxBase;
 
+/// Marker component for checkbox label nodes.
 #[derive(Component)]
 struct CheckBoxLabel;
 
+/// Marker component for checkbox mark nodes.
 #[derive(Component)]
 pub struct CheckBoxMark;
 
+/// Plugin that registers checkbox widget behavior.
 pub struct CheckBoxWidget;
 
 impl Plugin for CheckBoxWidget {
+    /// Registers systems for checkbox widget setup.
     fn build(&self, app: &mut App) {
         app.add_systems(Update, internal_node_creation_system);
     }
@@ -249,6 +254,7 @@ fn on_internal_click(
 /// # Parameters
 /// - `trigger`: A [`On<Pointer<Over>>`] when the pointer enters the checkbox area.
 /// - `query`: Query for the UI widget state to be modified.
+/// Sets hovered state when the cursor enters a checkbox.
 fn on_internal_cursor_entered(
     mut trigger: On<Pointer<Over>>,
     mut query: Query<&mut UIWidgetState, With<CheckBox>>,
@@ -268,6 +274,7 @@ fn on_internal_cursor_entered(
 /// # Parameters
 /// - `trigger`: A [`On<Pointer<Out>>`] when the pointer leaves the checkbox area.
 /// - `query`: Query for the UI widget state to be modified.
+/// Clears hovered state when the cursor leaves a checkbox.
 fn on_internal_cursor_leave(
     mut trigger: On<Pointer<Out>>,
     mut query: Query<&mut UIWidgetState, With<CheckBox>>,

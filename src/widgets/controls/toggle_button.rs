@@ -6,21 +6,26 @@ use crate::styles::paint::Colored;
 use crate::widgets::{BindToID, FieldMode, FieldSelectionMulti, FieldSet, FieldSelectionSingle, InFieldSet, ToggleButton, UIGenID, UIWidgetState, WidgetId, WidgetKind};
 use crate::widgets::controls::place_icon_if;
 
+/// Marker component for initialized toggle button widgets.
 #[derive(Component)]
 struct ToggleButtonBase;
 
+/// Marker component for toggle button text nodes.
 #[derive(Component)]
 struct ToggleButtonText;
 
+/// Plugin that registers toggle button widget behavior.
 pub struct ToggleButtonWidget;
 
 impl Plugin for ToggleButtonWidget {
+    /// Registers systems for toggle button setup and selection logic.
     fn build(&self, app: &mut App) {
         app.add_systems(Update, internal_node_creation_system);
         app.add_systems(Update, ensure_fieldset_selection_system);
     }
 }
 
+/// Initializes UI nodes for toggle button widgets.
 fn internal_node_creation_system(
     mut commands: Commands,
     mut query: Query<
@@ -160,6 +165,7 @@ fn internal_node_creation_system(
     }
 }
 
+/// Ensures field set selection state stays in sync with toggle buttons.
 fn ensure_fieldset_selection_system(
     toggles: Query<(Entity, &InFieldSet, &UIWidgetState), With<ToggleButton>>,
     mut fieldsets: Query<(
@@ -190,6 +196,7 @@ fn ensure_fieldset_selection_system(
     }
 }
 
+/// Handles click events on toggle buttons and updates selection state.
 fn on_internal_click(
     mut trigger: On<Pointer<Click>>,
     mut toggles_q: Query<
@@ -322,6 +329,7 @@ fn on_internal_click(
     trigger.propagate(false);
 }
 
+/// Sets hovered state when the cursor enters a toggle button.
 fn on_internal_cursor_entered(
     mut trigger: On<Pointer<Over>>,
     mut query: Query<&mut UIWidgetState, With<ToggleButton>>,
@@ -333,6 +341,7 @@ fn on_internal_cursor_entered(
     trigger.propagate(false);
 }
 
+/// Clears hovered state when the cursor leaves a toggle button.
 fn on_internal_cursor_leave(
     mut trigger: On<Pointer<Out>>,
     mut query: Query<&mut UIWidgetState, With<ToggleButton>>,
@@ -344,6 +353,7 @@ fn on_internal_cursor_leave(
     trigger.propagate(false);
 }
 
+/// Finds an optional ancestor field set for the entity.
 fn find_fieldset_ancestor_optional(
     mut entity: Entity,
     parents: &Query<&ChildOf>,

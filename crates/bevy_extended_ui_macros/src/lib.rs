@@ -14,11 +14,13 @@ use syn::{
     TypePath,
 };
 
+/// Parsed attribute arguments for the `html_fn` macro.
 struct HtmlFnAttr {
     name: LitStr,
 }
 
 impl Parse for HtmlFnAttr {
+    /// Parses the macro attribute input into `HtmlFnAttr`.
     fn parse(input: ParseStream) -> Result<Self> {
         if input.peek(Eq) {
             let _eq: Eq = input.parse()?;
@@ -29,6 +31,7 @@ impl Parse for HtmlFnAttr {
     }
 }
 
+/// Registers a function as an HTML event handler.
 #[proc_macro_attribute]
 pub fn html_fn(attr: TokenStream, item: TokenStream) -> TokenStream {
     let HtmlFnAttr { name } = parse_macro_input!(attr as HtmlFnAttr);
@@ -67,6 +70,7 @@ pub fn html_fn(attr: TokenStream, item: TokenStream) -> TokenStream {
     expanded.into()
 }
 
+/// Extracts the expected HTML event type from the first function argument.
 fn extract_event_type(input_fn: &ItemFn) -> Result<Option<(syn::Ident, Type)>> {
     let Some(first_arg) = input_fn.sig.inputs.iter().next() else {
         return Ok(None);

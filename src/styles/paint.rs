@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 
+/// CSS color table and helpers for parsing color values.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Colored;
 
@@ -145,6 +146,7 @@ impl Colored {
     pub const YELLOW: Color = Color::Srgba(Srgba::new(1.0, 1.0, 0.0, 1.0));
     pub const YELLOW_GREEN: Color = Color::Srgba(Srgba::new(0.604, 0.804, 0.196, 1.0));
 
+    /// Converts a hex color string into a `Color`.
     pub fn hex_to_color(hex: &str) -> Color {
         // Remove the "#" prefix if it exists
         let hex = hex.trim_start_matches('#');
@@ -201,6 +203,7 @@ impl Colored {
         })
     }
 
+    /// Looks up a named CSS color and returns its `Color`.
     pub fn named(name: &str) -> Option<Color> {
         match name.to_lowercase().as_str() {
             "aliceblue" => Some(Self::ALICE_BLUE),

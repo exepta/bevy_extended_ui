@@ -15,11 +15,14 @@ use crate::widgets::Button;
 use crate::widgets::*;
 use crate::ExtendedUiConfiguration;
 
+/// Default CSS asset path applied to every HTML UI.
 pub const DEFAULT_UI_CSS: &str = "default/extended_ui.css";
 
+/// Plugin that parses HTML assets into widget trees.
 pub struct HtmlConverterSystem;
 
 impl Plugin for HtmlConverterSystem {
+    /// Registers the HTML conversion system.
     fn build(&self, app: &mut App) {
         app.add_systems(Update, update_html_ui.in_set(HtmlSystemSet::Convert));
     }
@@ -28,10 +31,12 @@ impl Plugin for HtmlConverterSystem {
 /// Marker component used for HtmlSource entities whose HtmlAsset wasn't ready yet.
 /// This enables robust re-try parsing on later frames (important for WASM async loading).
 #[derive(Component, Debug, Default)]
+/// Marker component for HtmlSource entities that need a retry parse.
 struct PendingHtmlParse;
 
 /// Converts HtmlAsset content into HtmlStructureMap entries.
 /// Also resolves <link rel="stylesheet" href="..."> into Handle<CssAsset>.
+/// Updates parsed HTML structures from assets and language state.
 fn update_html_ui(
     mut commands: Commands,
     mut structure_map: ResMut<HtmlStructureMap>,
@@ -760,6 +765,7 @@ fn parse_html_node(
     }
 }
 
+/// Extracts HTML event bindings from element attributes.
 fn bind_html_func(attributes: &Attributes) -> HtmlEventBindings {
     HtmlEventBindings {
         onclick: attributes.get("onclick").map(|s| s.to_string()),
@@ -783,6 +789,7 @@ fn bind_html_func(attributes: &Attributes) -> HtmlEventBindings {
     }
 }
 
+/// Parses validation rules from element attributes.
 fn parse_validation_attributes(attributes: &Attributes) -> Option<ValidationRules> {
     let mut rules = attributes
         .get("validation")
@@ -831,6 +838,7 @@ pub fn resolve_relative_asset_path(html_path: &str, href: &str) -> String {
     base.join(href).to_string_lossy().replace('\\', "/")
 }
 
+/// Ensures the default CSS handle is the first in the list.
 fn with_default_css_first(
     default_css: &DefaultCssHandle,
     mut css: Vec<Handle<CssAsset>>,
@@ -846,6 +854,7 @@ fn with_default_css_first(
     css
 }
 
+/// Parses an optional icon source and determines its placement relative to text.
 fn parse_icon_and_text(node: &NodeRef) -> (Option<String>, IconPlace) {
     let mut icon_path = None;
     let mut icon_place = IconPlace::Left;

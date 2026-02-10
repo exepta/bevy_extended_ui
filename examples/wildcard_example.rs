@@ -4,12 +4,14 @@ use bevy_extended_ui::html::HtmlSource;
 use bevy_extended_ui::io::HtmlAsset;
 use bevy_extended_ui::registry::UiRegistry;
 
+/// Runs the wildcard selector example app.
 fn main() {
     let mut app = make_app("Wildcard Selector Test");
     app.add_systems(Startup, setup);
     app.run();
 }
 
+/// Loads and registers the wildcard test UI.
 fn setup(mut registry: ResMut<UiRegistry>, asset_server: Res<AssetServer>) {
     let handle: Handle<HtmlAsset> = asset_server.load("examples/wildcard.html");
     // Register the wildcard test UI

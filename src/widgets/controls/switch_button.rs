@@ -7,26 +7,33 @@ use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
 
+/// Marker component for initialized switch button widgets.
 #[derive(Component)]
 struct SwitchButtonBase;
 
+/// Marker component for the switch track.
 #[derive(Component)]
 pub struct SwitchButtonTrack;
 
+/// Marker component for the switch dot.
 #[derive(Component)]
 pub struct SwitchButtonDot;
 
+/// Marker component for the switch label node.
 #[derive(Component)]
 struct SwitchButtonLabel;
 
+/// Plugin that registers switch button widget behavior.
 pub struct SwitchButtonWidget;
 
 impl Plugin for SwitchButtonWidget {
+    /// Registers systems for switch button setup and interaction.
     fn build(&self, app: &mut App) {
         app.add_systems(Update, internal_node_creation_system);
     }
 }
 
+/// Initializes UI nodes for switch button widgets.
 fn internal_node_creation_system(
     mut commands: Commands,
     query: Query<
@@ -153,6 +160,7 @@ fn internal_node_creation_system(
     }
 }
 
+/// Handles click events for switch buttons and toggles state.
 fn on_internal_click(
     mut trigger: On<Pointer<Click>>,
     mut switch_q: Query<(&mut UIWidgetState, &UIGenID), With<SwitchButton>>,
@@ -170,6 +178,7 @@ fn on_internal_click(
     trigger.propagate(false);
 }
 
+/// Sets hovered state when the cursor enters a switch button.
 fn on_internal_cursor_entered(
     mut trigger: On<Pointer<Over>>,
     mut query: Query<&mut UIWidgetState, With<SwitchButton>>,
@@ -180,6 +189,7 @@ fn on_internal_cursor_entered(
     trigger.propagate(false);
 }
 
+/// Clears hovered state when the cursor leaves a switch button.
 fn on_internal_cursor_leave(
     mut trigger: On<Pointer<Out>>,
     mut query: Query<&mut UIWidgetState, With<SwitchButton>>,

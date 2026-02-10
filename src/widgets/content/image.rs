@@ -7,9 +7,11 @@ use crate::styles::{CssSource, TagName};
 use crate::widgets::{Img, UIGenID, UIWidgetState, WidgetId, WidgetKind};
 use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
 
+/// Marker component for initialized image widgets.
 #[derive(Component)]
 struct ImageBase;
 
+/// Marker component for the alt-text text node.
 #[derive(Component)]
 struct AltTextNode;
 
@@ -29,9 +31,11 @@ enum ImgFallbackState {
 #[derive(Component, Debug, Clone, PartialEq, Eq)]
 struct AltTextCached(String);
 
+/// Plugin that registers image widget behavior.
 pub struct ImageWidget;
 
 impl Plugin for ImageWidget {
+    /// Registers systems for image widget setup and updates.
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
@@ -218,6 +222,7 @@ fn update_src(
 
 /// Keeps alt-text in sync with the actual load state.
 /// This is required because asset loading is async and does NOT trigger Changed<Img>.
+/// Shows or hides alt text based on image load state.
 fn sync_alt_text_with_image_state(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
@@ -299,6 +304,7 @@ fn sync_alt_text_with_image_state(
 
 /// Loads an image handle from img.src if non-empty and assigns it to ImageNode.
 /// This avoids duplicating the get_or_load_image logic.
+/// Assigns an image handle from the `Img` source, if present.
 fn assign_image_from_src(
     image_node: &mut ImageNode,
     img: &Img,
@@ -312,6 +318,7 @@ fn assign_image_from_src(
     }
 }
 
+/// Returns true when the image source is empty or missing.
 fn is_src_empty(img: &Img) -> bool {
     img.src
         .as_ref()
@@ -319,6 +326,7 @@ fn is_src_empty(img: &Img) -> bool {
         .unwrap_or(true)
 }
 
+/// Updates the cached alt text when it changes.
 fn set_cached_alt_if_changed(
     commands: &mut Commands,
     parent: Entity,
@@ -332,6 +340,7 @@ fn set_cached_alt_if_changed(
     }
 }
 
+/// Spawns or updates the alt-text child node.
 fn spawn_or_update_alt_text_child(
     commands: &mut Commands,
     parent: Entity,
@@ -367,6 +376,7 @@ fn spawn_or_update_alt_text_child(
     Some(child)
 }
 
+/// Removes any existing alt-text children from an image entity.
 fn remove_alt_text_children(
     commands: &mut Commands,
     parent: Entity,
@@ -390,6 +400,7 @@ fn remove_alt_text_children(
 /// # Affects:
 /// - `UIWidgetState::focused`
 /// - `CurrentWidgetState::widget_id`
+/// Sets focus when an image widget is clicked.
 fn on_internal_click(
     mut trigger: On<Pointer<Click>>,
     mut query: Query<(&mut UIWidgetState, &UIGenID), With<Img>>,
@@ -410,6 +421,7 @@ fn on_internal_click(
 ///
 /// # Affects:
 /// - `UIWidgetState::hovered`
+/// Sets hovered state when the cursor enters an image widget.
 fn on_internal_cursor_entered(
     mut trigger: On<Pointer<Over>>,
     mut query: Query<&mut UIWidgetState, With<Img>>,
@@ -428,6 +440,7 @@ fn on_internal_cursor_entered(
 ///
 /// # Affects:
 /// - `UIWidgetState::hovered`
+/// Clears hovered state when the cursor leaves an image widget.
 fn on_internal_cursor_leave(
     mut trigger: On<Pointer<Out>>,
     mut query: Query<&mut UIWidgetState, With<Img>>,

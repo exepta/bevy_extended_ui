@@ -25,9 +25,12 @@ use once_cell::sync::Lazy;
 #[cfg(any(feature = "fluent", feature = "properties-lang"))]
 use regex::Regex;
 
+/// Represents the source of the HTML `lang` setting after parsing.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HtmlLangSetting {
+    /// Let the system and app selection decide the language.
     Auto,
+    /// Force a specific language tag from the HTML attribute.
     Forced(String),
 }
 
@@ -45,6 +48,7 @@ pub struct UILang {
 }
 
 impl Default for UILang {
+    /// Creates a language state seeded with the detected system language.
     fn default() -> Self {
         Self {
             forced: None,
@@ -55,6 +59,7 @@ impl Default for UILang {
 }
 
 impl Default for UiLangState {
+    /// Creates a fresh language resolution cache state.
     fn default() -> Self {
         Self {
             last_resolved: None,
@@ -65,6 +70,7 @@ impl Default for UiLangState {
 }
 
 impl UILang {
+    /// Returns the currently resolved language tag in priority order.
     pub fn resolved(&self) -> Option<&str> {
         self.forced
             .as_deref()
@@ -72,6 +78,7 @@ impl UILang {
             .or(self.system.as_deref())
     }
 
+    /// Sets the selected language and returns whether it changed.
     pub fn set_selected(&mut self, lang: Option<&str>) -> bool {
         let normalized = normalize_lang_tag(lang);
         if self.selected == normalized {
@@ -81,6 +88,7 @@ impl UILang {
         true
     }
 
+    /// Applies a `lang` value from HTML and returns whether it changed the forced state.
     pub fn apply_html_lang(&mut self, lang: Option<&str>) -> bool {
         let new_forced = match parse_html_lang(lang) {
             HtmlLangSetting::Auto => None,
@@ -96,6 +104,7 @@ impl UILang {
     }
 }
 
+/// Cached resolution information for language resources.
 #[derive(Resource, Debug, Clone)]
 pub struct UiLangState {
     pub last_resolved: Option<String>,
@@ -103,17 +112,20 @@ pub struct UiLangState {
     pub last_vars_fingerprint: Option<u64>,
 }
 
+/// Runtime variables used for placeholder substitution during localization.
 #[derive(Resource, Debug, Default, Clone)]
 pub struct UiLangVariables {
     pub vars: HashMap<String, String>,
 }
 
 impl UiLangVariables {
+    /// Inserts or replaces a localization variable.
     pub fn set(&mut self, key: impl Into<String>, value: impl Into<String>) {
         self.vars.insert(key.into(), value.into());
     }
 }
 
+/// Parses an HTML `lang` attribute into a normalized setting.
 fn parse_html_lang(lang: Option<&str>) -> HtmlLangSetting {
     let Some(tag) = normalize_lang_tag(lang) else {
         return HtmlLangSetting::Auto;
@@ -126,6 +138,7 @@ fn parse_html_lang(lang: Option<&str>) -> HtmlLangSetting {
     }
 }
 
+/// Detects the system language from environment variables.
 fn detect_system_language() -> Option<String> {
     const KEYS: [&str; 4] = ["LC_ALL", "LC_MESSAGES", "LANG", "LANGUAGE"];
 
@@ -140,6 +153,7 @@ fn detect_system_language() -> Option<String> {
     None
 }
 
+/// Normalizes an environment language string into a language tag.
 fn normalize_env_lang(value: &str) -> Option<String> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
@@ -155,6 +169,7 @@ fn normalize_env_lang(value: &str) -> Option<String> {
     normalize_lang_tag(Some(first))
 }
 
+/// Normalizes a raw language tag into lowercase hyphenated form.
 fn normalize_lang_tag(raw: Option<&str>) -> Option<String> {
     let raw = raw?.trim();
     if raw.is_empty() {
@@ -173,6 +188,7 @@ fn normalize_lang_tag(raw: Option<&str>) -> Option<String> {
 static PLACEHOLDER_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?s)\{\{\s*(.+?)\s*\}\}").unwrap());
 
+/// Returns the input HTML unchanged when no localization backends are enabled.
 #[cfg(not(any(feature = "fluent", feature = "properties-lang")))]
 pub fn localize_html(
     html: &str,
@@ -183,6 +199,7 @@ pub fn localize_html(
     html.to_string()
 }
 
+/// Localizes HTML placeholders using the enabled backend(s).
 #[cfg(any(feature = "fluent", feature = "properties-lang"))]
 pub fn localize_html(
     html: &str,
@@ -213,6 +230,7 @@ pub fn localize_html(
     localized
 }
 
+/// Localizes HTML using Fluent files if available.
 #[cfg(feature = "fluent")]
 fn localize_html_fluent(
     html: &str,
@@ -259,6 +277,7 @@ fn localize_html_fluent(
     Some(localized)
 }
 
+/// Localizes HTML using Java properties files if available.
 #[cfg(feature = "properties-lang")]
 fn localize_html_properties(
     html: &str,
@@ -284,6 +303,7 @@ fn localize_html_properties(
     Some(localized)
 }
 
+/// Parses a .properties file into a key/value map.
 #[cfg(feature = "properties-lang")]
 fn parse_properties(content: &str) -> HashMap<String, String> {
     let mut map = HashMap::new();
@@ -315,6 +335,7 @@ fn parse_properties(content: &str) -> HashMap<String, String> {
     map
 }
 
+/// Finds the most suitable language file, falling back to English if needed.
 #[cfg(any(feature = "fluent", feature = "properties-lang"))]
 fn find_lang_file(base: &Path, lang: &str, extension: &str) -> Option<PathBuf> {
     let Some(primary) = find_lang_file_for(base, lang, extension) else {
@@ -328,6 +349,7 @@ fn find_lang_file(base: &Path, lang: &str, extension: &str) -> Option<PathBuf> {
     Some(primary)
 }
 
+/// Locates a language file by checking candidate filenames and directory entries.
 #[cfg(any(feature = "fluent", feature = "properties-lang"))]
 fn find_lang_file_for(base: &Path, lang: &str, extension: &str) -> Option<PathBuf> {
     if !base.exists() {
@@ -370,6 +392,7 @@ fn find_lang_file_for(base: &Path, lang: &str, extension: &str) -> Option<PathBu
     None
 }
 
+/// Builds a list of candidate language tags for lookup.
 #[cfg(any(feature = "fluent", feature = "properties-lang"))]
 fn build_lang_candidates(lang: &str) -> Vec<String> {
     let Some(normalized) = normalize_lang_tag(Some(lang)) else {
@@ -399,6 +422,7 @@ fn build_lang_candidates(lang: &str) -> Vec<String> {
     candidates
 }
 
+/// Computes a stable fingerprint for the current localization variables.
 pub fn vars_fingerprint(vars: &UiLangVariables) -> u64 {
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
@@ -415,6 +439,7 @@ pub fn vars_fingerprint(vars: &UiLangVariables) -> u64 {
     hasher.finish()
 }
 
+/// Resolves a placeholder token, returning `None` if unchanged.
 #[cfg(any(feature = "fluent", feature = "properties-lang"))]
 fn resolve_placeholder<F>(
     inner: &str,
@@ -432,6 +457,7 @@ where
     }
 }
 
+/// Resolves variables and translation keys within a placeholder string.
 #[cfg(any(feature = "fluent", feature = "properties-lang"))]
 fn resolve_inner_tokens<F>(inner: &str, translate: &mut F, vars: &UiLangVariables) -> String
 where
@@ -508,6 +534,7 @@ where
     out
 }
 
+/// Returns true for characters that are valid in translation keys.
 #[cfg(any(feature = "fluent", feature = "properties-lang"))]
 fn is_key_char(ch: char) -> bool {
     ch.is_ascii_alphanumeric() || matches!(ch, '_' | '.' | ':' | '-')

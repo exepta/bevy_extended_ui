@@ -4,12 +4,14 @@ use bevy_extended_ui::io::{CssAsset, DefaultCssHandle};
 use bevy_extended_ui::styles::{CssClass, CssSource};
 use bevy_extended_ui::widgets::{Body, Button, CheckBox, Div, InputField, InputType};
 
+/// Runs the contact form example without HTML parsing.
 fn main() {
     let mut app = make_app("Contact Form (CSS only)");
     app.add_systems(PostStartup, setup);
     app.run();
 }
 
+/// Builds the contact form UI tree directly in code.
 fn setup(
     mut commands: Commands,
     asset_server: Res<AssetServer>,

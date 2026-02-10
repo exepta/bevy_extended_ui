@@ -2,9 +2,11 @@ use crate::CurrentWidgetState;
 use crate::widgets::{BindToID, IgnoreParentState, UIGenID, UIWidgetState};
 use bevy::prelude::*;
 
+/// Plugin that manages widget focus and state propagation.
 pub struct StateService;
 
 impl Plugin for StateService {
+    /// Registers widget state systems.
     fn build(&self, app: &mut App) {
         app.register_type::<Pickable>();
         app.add_systems(Update, update_widget_states);
@@ -142,6 +144,7 @@ fn handle_tab_focus(
     }
 }
 
+/// Clears focus from widgets that became disabled.
 fn unfocus_disabled(mut q: Query<&mut UIWidgetState, Changed<UIWidgetState>>) {
     for mut s in &mut q {
         if s.disabled && s.focused {
