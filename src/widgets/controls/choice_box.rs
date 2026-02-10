@@ -417,14 +417,6 @@ fn handle_scroll_events(
     let smooth_factor = 30.0;
 
     for event in scroll_events.read() {
-        let raw = match event.unit {
-            MouseScrollUnit::Line => event.y * 25.0,
-            MouseScrollUnit::Pixel => event.y,
-        };
-
-        // Wheel down -> scroll down -> increase scroll.y
-        let delta = -raw;
-
         for (layout_entity, visibility, children, mut scroll, layout_computed) in
             layout_query.iter_mut()
         {
@@ -432,6 +424,15 @@ fn handle_scroll_events(
             if !is_visible {
                 continue;
             }
+
+            let inv_sf = layout_computed.inverse_scale_factor.max(f32::EPSILON);
+            let raw = match event.unit {
+                MouseScrollUnit::Line => event.y * 25.0,
+                MouseScrollUnit::Pixel => event.y * inv_sf,
+            };
+
+            // Wheel down -> scroll down -> increase scroll.y
+            let delta = -raw;
 
             if children.len() <= 3 {
                 scroll.y = 0.0;
@@ -442,7 +443,8 @@ fn handle_scroll_events(
             let mut option_height = None;
             for (opt_computed, parent) in option_query.iter() {
                 if parent.parent() == layout_entity {
-                    option_height = Some(opt_computed.size().y.max(1.0));
+                    let opt_inv_sf = opt_computed.inverse_scale_factor.max(f32::EPSILON);
+                    option_height = Some((opt_computed.size().y * opt_inv_sf).max(1.0));
                     break;
                 }
             }
@@ -453,7 +455,7 @@ fn handle_scroll_events(
             // Visible viewport height (what is clipped). If this comes out too big because
             // the container grows with content, max_scroll becomes too small.
             // If your CSS sets a fixed height, this is fine. Otherwise, we clamp it to "3 options".
-            let measured_viewport = layout_computed.size().y.max(1.0);
+            let measured_viewport = (layout_computed.size().y * inv_sf).max(1.0);
             let viewport_h = measured_viewport.min(option_h * 3.0);
 
             let content_h = children.len() as f32 * option_h;
