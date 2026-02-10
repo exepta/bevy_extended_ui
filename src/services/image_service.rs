@@ -83,7 +83,7 @@ pub fn get_or_load_image(
                 CompressedImageFormats::empty(),
                 true,
                 ImageSampler::default(),
-                RenderAssetUsages::MAIN_WORLD,
+                RenderAssetUsages::default(),
             )
             .expect("Failed to create image from embedded PNG");
 
