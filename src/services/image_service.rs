@@ -7,9 +7,11 @@ use std::path::Path;
 pub const DEFAULT_CHECK_MARK_KEY: &str = "extended_ui/icons/check-mark.png";
 pub const DEFAULT_CHOICE_BOX_KEY: &str = "extended_ui/icons/drop-arrow.png";
 
+/// Plugin that manages image caching and preload.
 pub struct ImageCacheService;
 
 impl Plugin for ImageCacheService {
+    /// Registers image cleanup and preload systems.
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
@@ -94,6 +96,7 @@ pub fn get_or_load_image(
     handle
 }
 
+/// Preloads images from the configured assets folder into the cache.
 pub fn pre_load_assets(
     extended_ui_configuration: Res<ExtendedUiConfiguration>,
     asset_server: Res<AssetServer>,

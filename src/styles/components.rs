@@ -9,6 +9,7 @@ use std::sync::RwLock;
 static CSS_CACHE: Lazy<RwLock<HashMap<AssetId<CssAsset>, ParsedCss>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
 
+/// Component that stores parsed CSS styles and keyframes for an entity.
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
 pub struct UiStyle {
@@ -19,6 +20,7 @@ pub struct UiStyle {
 }
 
 impl UiStyle {
+    /// Creates a `UiStyle` by parsing or reusing cached CSS data.
     pub fn from_asset_handle(css: Handle<CssAsset>, css_assets: &Assets<CssAsset>) -> Self {
         let id = css.id();
 
@@ -58,6 +60,7 @@ impl UiStyle {
         }
     }
 
+    /// Reloads the CSS data by invalidating the cache for this asset.
     pub fn reload_from_assets(&mut self, css_assets: &Assets<CssAsset>) {
         let id = self.css.id();
 
@@ -68,6 +71,7 @@ impl UiStyle {
         *self = UiStyle::from_asset_handle(self.css.clone(), css_assets);
     }
 
+    /// Returns a clone containing only rules relevant for the given selectors.
     pub fn filtered_clone(
         &self,
         id: Option<&CssID>,
@@ -114,6 +118,8 @@ impl UiStyle {
         if let Some(tag) = tag {
             insert_with_pseudo(&tag.0, 3);
         }
+
+        insert_with_pseudo("*", 0);
 
         if let Some(classes) = classes {
             for class in &classes.0 {

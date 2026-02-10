@@ -4,12 +4,15 @@ use crate::{CurrentWidgetState, ExtendedUiConfiguration};
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
 
+/// Marker component for initialized paragraph widgets.
 #[derive(Component)]
 struct ParagraphBase;
 
+/// Plugin that registers paragraph widget behavior.
 pub struct ParagraphWidget;
 
 impl Plugin for ParagraphWidget {
+    /// Registers systems for paragraph widget setup and updates.
     fn build(&self, app: &mut App) {
         app.add_systems(Update, (internal_node_creation_system, update_text));
     }

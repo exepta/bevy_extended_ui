@@ -6,17 +6,25 @@ use bevy_extended_ui::registry::UiRegistry;
 use bevy_extended_ui::styles::CssID;
 use bevy_extended_ui_macros::html_fn;
 
+/// Runs the checkbox example app.
 fn main() {
     let mut app = make_app("Debug Html UI - test");
 
-    app.add_systems(Startup, |mut reg: ResMut<UiRegistry>, asset_server: Res<AssetServer>| {
-        let handle: Handle<HtmlAsset> = asset_server.load("examples/check_box.html");
-        reg.add_and_use("check_box_test".to_string(), HtmlSource::from_handle(handle));
-    });
+    app.add_systems(
+        Startup,
+        |mut reg: ResMut<UiRegistry>, asset_server: Res<AssetServer>| {
+            let handle: Handle<HtmlAsset> = asset_server.load("examples/check_box.html");
+            reg.add_and_use(
+                "check_box_test".to_string(),
+                HtmlSource::from_handle(handle),
+            );
+        },
+    );
 
     app.run();
 }
 
+/// Toggles visibility of the first headline.
 #[html_fn("show_h1")]
 fn show_h1(In(_target): In<HtmlEvent>, mut query: Query<(&mut Visibility, &CssID), With<CssID>>) {
     for (mut visibility, id) in query.iter_mut() {
@@ -26,6 +34,7 @@ fn show_h1(In(_target): In<HtmlEvent>, mut query: Query<(&mut Visibility, &CssID
     }
 }
 
+/// Toggles visibility of the second headline.
 #[html_fn("show_h2")]
 fn show_h2(In(_target): In<HtmlEvent>, mut query: Query<(&mut Visibility, &CssID), With<CssID>>) {
     for (mut visibility, id) in query.iter_mut() {
@@ -35,6 +44,7 @@ fn show_h2(In(_target): In<HtmlEvent>, mut query: Query<(&mut Visibility, &CssID
     }
 }
 
+/// Flips a visibility value between visible and hidden.
 fn change_visibility(visibility: &mut Visibility) {
     if *visibility == Visibility::Visible || *visibility == Visibility::Inherited {
         *visibility = Visibility::Hidden;

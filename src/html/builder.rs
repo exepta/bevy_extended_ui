@@ -8,6 +8,7 @@ use crate::widgets::{Body, UIWidgetState, Widget};
 pub struct HtmlBuilderSystem;
 
 impl Plugin for HtmlBuilderSystem {
+    /// Registers systems to build HTML structures into UI entities.
     fn build(&self, app: &mut App) {
         app.add_message::<HtmlAllWidgetsSpawned>();
         app.add_message::<HtmlAllWidgetsVisible>();
@@ -74,6 +75,7 @@ pub fn build_html_source(
     }
 }
 
+/// Spawns UI nodes for the active HTML key.
 fn spawn_structure_for_active(
     commands: &mut Commands,
     active: &str,
@@ -91,6 +93,7 @@ fn spawn_structure_for_active(
     }
 }
 
+/// Starts the delayed visibility timer after widgets are spawned.
 fn show_all_widgets_start(
     mut events: MessageReader<HtmlAllWidgetsSpawned>,
     mut timer: ResMut<ShowWidgetsTimer>,
@@ -102,6 +105,7 @@ fn show_all_widgets_start(
     }
 }
 
+/// Makes all widgets visible after the delay elapses.
 fn show_all_widgets_finish(
     time: Res<Time>,
     mut timer: ResMut<ShowWidgetsTimer>,
@@ -148,6 +152,7 @@ fn show_all_widgets_finish(
     }
 }
 
+/// Collects all HTML IDs from a node tree.
 fn collect_html_ids(nodes: &Vec<HtmlWidgetNode>, ids: &mut Vec<HtmlID>) {
     for node in nodes {
         match node {

@@ -15,7 +15,7 @@ use std::fmt;
 
 /// Marker component for UI elements that should ignore the parent widget state.
 ///
-/// Used to mark UI nodes that do not inherit state like `focused`, `hovered`, etc.
+/// Used to mark UI nodes that do not inherit state like `focused` or `hovered`.
 #[derive(Component)]
 pub struct IgnoreParentState;
 
@@ -34,6 +34,7 @@ impl Default for UIGenID {
 }
 
 impl UIGenID {
+    /// Returns the underlying numeric ID.
     pub fn get(&self) -> usize {
         self.0
     }
@@ -47,6 +48,7 @@ impl UIGenID {
 pub struct BindToID(pub usize);
 
 impl BindToID {
+    /// Returns the bound widget ID.
     pub fn get(&self) -> usize {
         self.0
     }
@@ -67,9 +69,11 @@ pub struct UIWidgetState {
     pub invalid: bool,
 }
 
+/// Component storing an optional widget controller name.
 #[derive(Component, Default, Clone, Debug)]
 pub struct Widget(pub Option<String>);
 
+/// Validation rules parsed from HTML attributes.
 #[derive(Component, Reflect, Debug, Clone, Default)]
 #[reflect(Component)]
 pub struct ValidationRules {
@@ -80,6 +84,7 @@ pub struct ValidationRules {
 }
 
 impl ValidationRules {
+    /// Parses validation rules from a `validation` attribute string.
     pub fn from_attribute(value: &str) -> Option<Self> {
         let mut rules = ValidationRules::default();
 
@@ -113,11 +118,13 @@ impl ValidationRules {
         }
     }
 
+    /// Returns true when no rules are configured.
     fn is_empty(&self) -> bool {
         !self.required && self.min_length.is_none() && self.max_length.is_none() && self.pattern.is_none()
     }
 }
 
+/// Applies length-related validation rules from arguments.
 fn apply_length_rules(args: &str, rules: &mut ValidationRules) {
     let parts: Vec<&str> = args.split(',').map(|part| part.trim()).collect();
     if parts.is_empty() {
@@ -145,6 +152,7 @@ fn apply_length_rules(args: &str, rules: &mut ValidationRules) {
     }
 }
 
+/// Applies a pattern rule from arguments.
 fn apply_pattern_rule(args: &str, rules: &mut ValidationRules) {
     let trimmed = args.trim();
     let stripped = trimmed
@@ -160,12 +168,14 @@ fn apply_pattern_rule(args: &str, rules: &mut ValidationRules) {
     rules.pattern = Some(stripped.to_string());
 }
 
+/// Component carrying a widget ID and its kind.
 #[derive(Component, Clone, Copy, Debug)]
 pub struct WidgetId {
     pub id: usize,
     pub kind: WidgetKind,
 }
 
+/// Enumerates the supported widget kinds.
 #[derive(Debug, Clone, Copy)]
 pub enum WidgetKind {
     Body,
@@ -187,9 +197,11 @@ pub enum WidgetKind {
     ToggleButton,
 }
 
+/// Plugin that registers all built-in widget types.
 pub struct ExtendedWidgetPlugin;
 
 impl Plugin for ExtendedWidgetPlugin {
+    /// Registers widget components and systems.
     fn build(&self, app: &mut App) {
         app.register_type::<UIGenID>();
         app.register_type::<BindToID>();
@@ -210,6 +222,7 @@ impl Plugin for ExtendedWidgetPlugin {
 //                       Body
 // ===============================================
 
+/// Root widget representing the HTML `<body>` element.
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, GlobalTransform, InheritedVisibility, Widget)]
@@ -219,6 +232,7 @@ pub struct Body {
 }
 
 impl Default for Body {
+    /// Creates a default body widget with a unique entry ID.
     fn default() -> Self {
         let entry = BODY_ID_POOL.lock().unwrap().acquire();
 
@@ -233,12 +247,14 @@ impl Default for Body {
 //                       Div
 // ===============================================
 
+/// Container widget representing a `<div>` element.
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, GlobalTransform, InheritedVisibility, Widget)]
 pub struct Div(pub usize);
 
 impl Default for Div {
+    /// Creates a default div widget with a unique entry ID.
     fn default() -> Self {
         let entry = DIV_ID_POOL.lock().unwrap().acquire();
         Self(entry)
@@ -249,6 +265,7 @@ impl Default for Div {
 //                     Button
 // ===============================================
 
+/// Button widget with optional icon.
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, Widget)]
@@ -260,6 +277,7 @@ pub struct Button {
 }
 
 impl Default for Button {
+    /// Creates a default button widget.
     fn default() -> Self {
         let entry = BUTTON_ID_POOL.lock().unwrap().acquire();
 
@@ -276,6 +294,7 @@ impl Default for Button {
 //                     CheckBox
 // ===============================================
 
+/// Checkbox widget with label and checked state.
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, Widget)]
@@ -287,6 +306,7 @@ pub struct CheckBox {
 }
 
 impl Default for CheckBox {
+    /// Creates a default checkbox widget.
     fn default() -> Self {
         let entry = CHECK_BOX_ID_POOL.lock().unwrap().acquire();
 
@@ -303,6 +323,7 @@ impl Default for CheckBox {
 //                   ChoiceBox
 // ===============================================
 
+/// Choice box widget with selectable options.
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, Widget)]
@@ -315,6 +336,7 @@ pub struct ChoiceBox {
 }
 
 impl Default for ChoiceBox {
+    /// Creates a default choice box widget.
     fn default() -> Self {
         let entry = CHOICE_BOX_ID_POOL.lock().unwrap().acquire();
 
@@ -328,6 +350,7 @@ impl Default for ChoiceBox {
     }
 }
 
+/// Single option entry used by choice boxes.
 #[derive(Component, Reflect, Debug, Clone, PartialEq, Eq)]
 pub struct ChoiceOption {
     pub text: String,
@@ -336,6 +359,7 @@ pub struct ChoiceOption {
 }
 
 impl Default for ChoiceOption {
+    /// Creates a default option labeled "Please Select".
     fn default() -> Self {
         Self {
             text: String::from("Please Select"),
@@ -346,6 +370,7 @@ impl Default for ChoiceOption {
 }
 
 impl ChoiceOption {
+    /// Creates an option using the provided text.
     pub fn new(text: &str) -> Self {
         Self {
             text: text.to_string(),
@@ -359,6 +384,7 @@ impl ChoiceOption {
 //                   Divider
 // ===============================================
 
+/// Divider widget with an alignment direction.
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, Widget)]
@@ -368,6 +394,7 @@ pub struct Divider {
 }
 
 impl Default for Divider {
+    /// Creates a default divider widget.
     fn default() -> Self {
         let entry = DIVIDER_ID_POOL.lock().unwrap().acquire();
         Self {
@@ -377,6 +404,7 @@ impl Default for Divider {
     }
 }
 
+/// Orientation of a divider widget.
 #[derive(Reflect, Default, Debug, Clone, Eq, PartialEq)]
 pub enum DividerAlignment {
     #[default]
@@ -385,6 +413,7 @@ pub enum DividerAlignment {
 }
 
 impl DividerAlignment {
+    /// Parses a divider alignment from a string.
     pub fn from_str(s: &str) -> Option<Self> {
         match s.trim().to_ascii_lowercase().as_str() {
             "vertical" | "vert" | "v" => Some(Self::Vertical),
@@ -395,6 +424,7 @@ impl DividerAlignment {
 }
 
 impl fmt::Display for DividerAlignment {
+    /// Formats the alignment as a lowercase string.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match self {
             DividerAlignment::Horizontal => "horizontal",
@@ -408,6 +438,7 @@ impl fmt::Display for DividerAlignment {
 //                   FieldSet
 // ===============================================
 
+/// Field set widget grouping selectable children.
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, Widget)]
@@ -419,6 +450,7 @@ pub struct FieldSet {
 }
 
 impl Default for FieldSet {
+    /// Creates a default field set widget.
     fn default() -> Self {
         let entry = FIELDSET_ID_POOL.lock().unwrap().acquire();
         Self {
@@ -430,12 +462,14 @@ impl Default for FieldSet {
     }
 }
 
+/// Field set content kind.
 #[derive(Reflect, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FieldKind {
     Radio,
     Toggle,
 }
 
+/// Selection mode for field sets.
 #[derive(Reflect, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FieldMode {
     Multi,
@@ -444,6 +478,7 @@ pub enum FieldMode {
 }
 
 impl FieldMode {
+    /// Parses a field mode from a string.
     pub fn from_str(s: &str) -> Option<Self> {
         match s.trim().to_ascii_lowercase().as_str() {
             "single" | "solo" | "one" => Some(Self::Single),
@@ -454,13 +489,16 @@ impl FieldMode {
     }
 }
 
+/// Component marking that an entity belongs to a field set.
 #[derive(Component, Reflect, Debug)]
 #[reflect(Component)]
 pub struct InFieldSet(pub Entity);
 
+/// Tracks a single selected entity within a field set.
 #[derive(Component, Reflect, Debug, Default)]
 pub struct FieldSelectionSingle(pub Option<Entity>);
 
+/// Tracks multiple selected entities within a field set.
 #[derive(Component, Reflect, Debug, Default)]
 pub struct FieldSelectionMulti(pub Vec<Entity>);
 
@@ -468,6 +506,7 @@ pub struct FieldSelectionMulti(pub Vec<Entity>);
 //                   Headline
 // ===============================================
 
+/// Headline widget with a selectable heading level.
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, Widget)]
@@ -478,6 +517,7 @@ pub struct Headline {
 }
 
 impl Default for Headline {
+    /// Creates a default headline widget.
     fn default() -> Self {
         let entry = HEADLINE_ID_POOL.lock().unwrap().acquire();
         Self {
@@ -488,6 +528,7 @@ impl Default for Headline {
     }
 }
 
+/// Heading level for headline widgets.
 #[derive(Reflect, Default, Debug, Clone, Eq, PartialEq)]
 pub enum HeadlineType {
     #[default]
@@ -500,6 +541,7 @@ pub enum HeadlineType {
 }
 
 impl fmt::Display for HeadlineType {
+    /// Formats the heading level as a lowercase string.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match self {
             HeadlineType::H1 => "h1",
@@ -517,6 +559,7 @@ impl fmt::Display for HeadlineType {
 //                       Image
 // ===============================================
 
+/// Image widget referencing an optional source path.
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, GlobalTransform, InheritedVisibility, Widget)]
@@ -527,6 +570,7 @@ pub struct Img {
 }
 
 impl Default for Img {
+    /// Creates a default image widget.
     fn default() -> Self {
         let entry = IMAGE_ID_POOL.lock().unwrap().acquire();
 
@@ -542,6 +586,7 @@ impl Default for Img {
 //                   InputField
 // ===============================================
 
+/// Input field widget with text and validation settings.
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, Widget, InputValue)]
@@ -558,6 +603,7 @@ pub struct InputField {
 }
 
 impl Default for InputField {
+    /// Creates a default input field widget.
     fn default() -> Self {
         let entry = INPUT_ID_POOL.lock().unwrap().acquire();
 
@@ -575,6 +621,7 @@ impl Default for InputField {
     }
 }
 
+/// Supported input types for input fields.
 #[derive(Reflect, Default, Debug, Clone, Eq, PartialEq)]
 pub enum InputType {
     #[default]
@@ -586,6 +633,7 @@ pub enum InputType {
 }
 
 impl InputType {
+    /// Returns true if the character is allowed for this input type.
     pub fn is_valid_char(&self, c: char) -> bool {
         match self {
             InputType::Text | InputType::Password => true,
@@ -595,6 +643,7 @@ impl InputType {
         }
     }
 
+    /// Parses an input type from a string.
     pub fn from_str(value: &str) -> Option<InputType> {
         match value.to_lowercase().as_str() {
             "text" => Some(InputType::Text),
@@ -607,6 +656,7 @@ impl InputType {
     }
 }
 
+/// Input length capping configuration.
 #[derive(Reflect, Default, Debug, Clone, Eq, PartialEq)]
 pub enum InputCap {
     #[default]
@@ -616,6 +666,7 @@ pub enum InputCap {
 }
 
 impl InputCap {
+    /// Returns the configured maximum length or zero for no cap.
     pub fn get_value(&self) -> usize {
         match self {
             Self::CapAt(value) => *value,
@@ -625,6 +676,7 @@ impl InputCap {
     }
 }
 
+/// Component storing the raw input value for a widget.
 #[derive(Component, Reflect, Debug, Clone, Default)]
 #[reflect(Component)]
 pub struct InputValue(pub String);
@@ -633,6 +685,7 @@ pub struct InputValue(pub String);
 //                     Paragraph
 // ===============================================
 
+/// Paragraph widget for body text.
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, Widget)]
@@ -642,6 +695,7 @@ pub struct Paragraph {
 }
 
 impl Default for Paragraph {
+    /// Creates a default paragraph widget.
     fn default() -> Self {
         let entry = PARAGRAPH_ID_POOL.lock().unwrap().acquire();
 
@@ -656,6 +710,7 @@ impl Default for Paragraph {
 //                    ProgressBar
 // ===============================================
 
+/// Progress bar widget with numeric range.
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, InheritedVisibility, Widget)]
@@ -667,6 +722,7 @@ pub struct ProgressBar {
 }
 
 impl Default for ProgressBar {
+    /// Creates a default progress bar widget.
     fn default() -> Self {
         let entry = PROGRESS_BAR_ID_POOL.lock().unwrap().acquire();
 
@@ -683,6 +739,7 @@ impl Default for ProgressBar {
 //                   Radio Button
 // ===============================================
 
+/// Radio button widget with a selectable value.
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, Widget)]
@@ -694,6 +751,7 @@ pub struct RadioButton {
 }
 
 impl Default for RadioButton {
+    /// Creates a default radio button widget.
     fn default() -> Self {
         let entry = RADIO_BUTTON_ID_POOL.lock().unwrap().acquire();
 
@@ -710,6 +768,7 @@ impl Default for RadioButton {
 //                     Scrollbar
 // ===============================================
 
+/// Scrollbar widget for scrollable containers.
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, Widget)]
@@ -726,6 +785,7 @@ pub struct Scrollbar {
 }
 
 impl Default for Scrollbar {
+    /// Creates a default scrollbar widget.
     fn default() -> Self {
         let entry = SCROLL_ID_POOL.lock().unwrap().acquire();
         Self {
@@ -746,6 +806,7 @@ impl Default for Scrollbar {
 //                      Slider
 // ===============================================
 
+/// Slider widget with numeric range.
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, Widget)]
@@ -758,6 +819,7 @@ pub struct Slider {
 }
 
 impl Default for Slider {
+    /// Creates a default slider widget.
     fn default() -> Self {
         let entry = SLIDER_ID_POOL.lock().unwrap().acquire();
 
@@ -775,6 +837,7 @@ impl Default for Slider {
 //                   Switch Button
 // ===============================================
 
+/// Switch button widget with a label and optional icon.
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, Widget)]
@@ -785,6 +848,7 @@ pub struct SwitchButton {
 }
 
 impl Default for SwitchButton {
+    /// Creates a default switch button widget.
     fn default() -> Self {
         let entry = SWITCH_BUTTON_ID_POOL.lock().unwrap().acquire();
 
@@ -800,6 +864,7 @@ impl Default for SwitchButton {
 //                   Toggle Button
 // ===============================================
 
+/// Toggle button widget with selectable state.
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, Widget)]
@@ -813,6 +878,7 @@ pub struct ToggleButton {
 }
 
 impl Default for ToggleButton {
+    /// Creates a default toggle button widget.
     fn default() -> Self {
         let entry = TOGGLE_BUTTON_ID_POOL.lock().unwrap().acquire();
 

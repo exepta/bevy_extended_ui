@@ -6,6 +6,7 @@ use bevy_extended_ui::html::HtmlSource;
 use bevy_extended_ui::io::HtmlAsset;
 use bevy_extended_ui::registry::UiRegistry;
 
+/// Runs the key frame animation example app.
 fn main() {
     let mut app = make_app("Debug Html UI - test");
 
