@@ -426,13 +426,8 @@ fn handle_scroll_events(
             }
 
             let inv_sf = layout_computed.inverse_scale_factor.max(f32::EPSILON);
-            let raw = match event.unit {
-                MouseScrollUnit::Line => event.y * 25.0,
-                MouseScrollUnit::Pixel => event.y * inv_sf,
-            };
-
             // Wheel down -> scroll down -> increase scroll.y
-            let delta = -raw;
+            let delta = -wheel_delta_y(event, inv_sf);
 
             if children.len() <= 3 {
                 scroll.y = 0.0;
@@ -467,6 +462,20 @@ fn handle_scroll_events(
             let smoothed = scroll.y + (target - scroll.y) * smooth_factor * time.delta_secs();
             scroll.y = smoothed.clamp(0.0, max_scroll);
         }
+    }
+}
+
+fn wheel_delta_y(event: &MouseWheel, inv_scale_factor: f32) -> f32 {
+    match event.unit {
+        MouseScrollUnit::Line => {
+            let line_delta = event.y;
+            if line_delta.abs() > 10.0 {
+                line_delta * inv_scale_factor
+            } else {
+                line_delta * 25.0
+            }
+        }
+        MouseScrollUnit::Pixel => event.y * inv_scale_factor,
     }
 }
 

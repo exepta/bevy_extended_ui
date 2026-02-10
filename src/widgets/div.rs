@@ -508,17 +508,27 @@ fn handle_div_scroll_wheel(
         }
 
         let inv_sf = computed.inverse_scale_factor.max(f32::EPSILON);
-        let raw = match event.unit {
-            MouseScrollUnit::Line => event.y * 25.0,
-            MouseScrollUnit::Pixel => event.y * inv_sf,
-        };
-        let delta = -raw;
+        let delta = -wheel_delta_y(event, inv_sf);
 
         let viewport_h = (computed.size().y * inv_sf).max(1.0);
         let content_h = (computed.content_size.y * inv_sf).max(viewport_h);
         let max_scroll = (content_h - viewport_h).max(0.0);
 
         scroll.y = (scroll.y + delta).clamp(0.0, max_scroll);
+    }
+}
+
+fn wheel_delta_y(event: &MouseWheel, inv_scale_factor: f32) -> f32 {
+    match event.unit {
+        MouseScrollUnit::Line => {
+            let line_delta = event.y;
+            if line_delta.abs() > 10.0 {
+                line_delta * inv_scale_factor
+            } else {
+                line_delta * 25.0
+            }
+        }
+        MouseScrollUnit::Pixel => event.y * inv_scale_factor,
     }
 }
 
