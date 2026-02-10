@@ -64,7 +64,6 @@ checkbox .mark-box {
     border-radius: 4px;
     border: 2px;
     border-color: var(--text-color);
-    transition: all 0.3s;
 }
 
 checkbox .mark-box .mark {
