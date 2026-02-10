@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use std::collections::HashMap;
 use std::env;
 #[cfg(any(feature = "fluent", feature = "properties-lang"))]
 use std::collections::HashSet;
@@ -14,9 +15,6 @@ use i18n_fluent::{FluentBundle, FluentResource};
 
 #[cfg(feature = "fluent")]
 use unic_langid::LanguageIdentifier;
-
-#[cfg(feature = "properties-lang")]
-use std::collections::HashMap;
 
 #[cfg(feature = "properties-lang")]
 use i18n_properties::try_split;
@@ -56,6 +54,16 @@ impl Default for UILang {
     }
 }
 
+impl Default for UiLangState {
+    fn default() -> Self {
+        Self {
+            last_resolved: None,
+            last_language_path: None,
+            last_vars_fingerprint: None,
+        }
+    }
+}
+
 impl UILang {
     pub fn resolved(&self) -> Option<&str> {
         self.forced
@@ -88,10 +96,22 @@ impl UILang {
     }
 }
 
-#[derive(Resource, Debug, Default, Clone)]
+#[derive(Resource, Debug, Clone)]
 pub struct UiLangState {
     pub last_resolved: Option<String>,
     pub last_language_path: Option<String>,
+    pub last_vars_fingerprint: Option<u64>,
+}
+
+#[derive(Resource, Debug, Default, Clone)]
+pub struct UiLangVariables {
+    pub vars: HashMap<String, String>,
+}
+
+impl UiLangVariables {
+    pub fn set(&mut self, key: impl Into<String>, value: impl Into<String>) {
+        self.vars.insert(key.into(), value.into());
+    }
 }
 
 fn parse_html_lang(lang: Option<&str>) -> HtmlLangSetting {
@@ -151,15 +171,25 @@ fn normalize_lang_tag(raw: Option<&str>) -> Option<String> {
 
 #[cfg(any(feature = "fluent", feature = "properties-lang"))]
 static PLACEHOLDER_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\{\{\s*([A-Za-z0-9_.:-]+)\s*\}\}").unwrap());
+    Lazy::new(|| Regex::new(r"(?s)\{\{\s*(.+?)\s*\}\}").unwrap());
 
 #[cfg(not(any(feature = "fluent", feature = "properties-lang")))]
-pub fn localize_html(html: &str, _lang: Option<&str>, _language_path: &str) -> String {
+pub fn localize_html(
+    html: &str,
+    _lang: Option<&str>,
+    _language_path: &str,
+    _vars: &UiLangVariables,
+) -> String {
     html.to_string()
 }
 
 #[cfg(any(feature = "fluent", feature = "properties-lang"))]
-pub fn localize_html(html: &str, lang: Option<&str>, language_path: &str) -> String {
+pub fn localize_html(
+    html: &str,
+    lang: Option<&str>,
+    language_path: &str,
+    vars: &UiLangVariables,
+) -> String {
     if !PLACEHOLDER_RE.is_match(html) {
         return html.to_string();
     }
@@ -171,12 +201,12 @@ pub fn localize_html(html: &str, lang: Option<&str>, language_path: &str) -> Str
     let mut localized = html.to_string();
 
     #[cfg(feature = "fluent")]
-    if let Some(out) = localize_html_fluent(&localized, &normalized, language_path) {
+    if let Some(out) = localize_html_fluent(&localized, &normalized, language_path, vars) {
         localized = out;
     }
 
     #[cfg(feature = "properties-lang")]
-    if let Some(out) = localize_html_properties(&localized, &normalized, language_path) {
+    if let Some(out) = localize_html_properties(&localized, &normalized, language_path, vars) {
         localized = out;
     }
 
@@ -184,7 +214,12 @@ pub fn localize_html(html: &str, lang: Option<&str>, language_path: &str) -> Str
 }
 
 #[cfg(feature = "fluent")]
-fn localize_html_fluent(html: &str, lang: &str, language_path: &str) -> Option<String> {
+fn localize_html_fluent(
+    html: &str,
+    lang: &str,
+    language_path: &str,
+    vars: &UiLangVariables,
+) -> Option<String> {
     let base = Path::new(language_path);
     let path = find_lang_file(base, lang, "ftl")?;
     let content = fs::read_to_string(path).ok()?;
@@ -203,20 +238,21 @@ fn localize_html_fluent(html: &str, lang: &str, language_path: &str) -> Option<S
     let mut errors = Vec::new();
     let localized = PLACEHOLDER_RE
         .replace_all(html, |caps: &regex::Captures| {
-            let key = caps.get(1).map(|m| m.as_str()).unwrap_or_default();
-            let Some(message) = bundle.get_message(key) else {
-                return caps.get(0).map(|m| m.as_str()).unwrap_or_default().to_string();
-            };
-            let Some(pattern) = message.value() else {
-                return caps.get(0).map(|m| m.as_str()).unwrap_or_default().to_string();
-            };
-            errors.clear();
-            let value = bundle.format_pattern(pattern, None, &mut errors);
-            if errors.is_empty() {
-                value.to_string()
-            } else {
+            let inner = caps.get(1).map(|m| m.as_str()).unwrap_or_default();
+            let resolved = resolve_placeholder(inner, |key| {
+                let message = bundle.get_message(key)?;
+                let pattern = message.value()?;
+                errors.clear();
+                let value = bundle.format_pattern(pattern, None, &mut errors);
+                if errors.is_empty() {
+                    Some(value.to_string())
+                } else {
+                    None
+                }
+            }, vars);
+            resolved.unwrap_or_else(|| {
                 caps.get(0).map(|m| m.as_str()).unwrap_or_default().to_string()
-            }
+            })
         })
         .into_owned();
 
@@ -224,7 +260,12 @@ fn localize_html_fluent(html: &str, lang: &str, language_path: &str) -> Option<S
 }
 
 #[cfg(feature = "properties-lang")]
-fn localize_html_properties(html: &str, lang: &str, language_path: &str) -> Option<String> {
+fn localize_html_properties(
+    html: &str,
+    lang: &str,
+    language_path: &str,
+    vars: &UiLangVariables,
+) -> Option<String> {
     let base = Path::new(language_path);
     let path = find_lang_file(base, lang, "properties")?;
     let content = fs::read_to_string(path).ok()?;
@@ -232,10 +273,11 @@ fn localize_html_properties(html: &str, lang: &str, language_path: &str) -> Opti
 
     let localized = PLACEHOLDER_RE
         .replace_all(html, |caps: &regex::Captures| {
-            let key = caps.get(1).map(|m| m.as_str()).unwrap_or_default();
-            map.get(key)
-                .cloned()
-                .unwrap_or_else(|| caps.get(0).map(|m| m.as_str()).unwrap_or_default().to_string())
+            let inner = caps.get(1).map(|m| m.as_str()).unwrap_or_default();
+            let resolved = resolve_placeholder(inner, |key| map.get(key).cloned(), vars);
+            resolved.unwrap_or_else(|| {
+                caps.get(0).map(|m| m.as_str()).unwrap_or_default().to_string()
+            })
         })
         .into_owned();
 
@@ -355,6 +397,120 @@ fn build_lang_candidates(lang: &str) -> Vec<String> {
     let mut seen = HashSet::new();
     candidates.retain(|item| seen.insert(item.clone()));
     candidates
+}
+
+pub fn vars_fingerprint(vars: &UiLangVariables) -> u64 {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+
+    let mut items: Vec<_> = vars.vars.iter().collect();
+    items.sort_by(|(a, _), (b, _)| a.cmp(b));
+
+    let mut hasher = DefaultHasher::new();
+    for (key, value) in items {
+        key.hash(&mut hasher);
+        value.hash(&mut hasher);
+    }
+
+    hasher.finish()
+}
+
+#[cfg(any(feature = "fluent", feature = "properties-lang"))]
+fn resolve_placeholder<F>(
+    inner: &str,
+    mut translate: F,
+    vars: &UiLangVariables,
+) -> Option<String>
+where
+    F: FnMut(&str) -> Option<String>,
+{
+    let resolved = resolve_inner_tokens(inner, &mut translate, vars);
+    if resolved == inner {
+        None
+    } else {
+        Some(resolved)
+    }
+}
+
+#[cfg(any(feature = "fluent", feature = "properties-lang"))]
+fn resolve_inner_tokens<F>(inner: &str, translate: &mut F, vars: &UiLangVariables) -> String
+where
+    F: FnMut(&str) -> Option<String>,
+{
+    let mut out = String::new();
+    let mut chars = inner.chars().peekable();
+
+    while let Some(ch) = chars.next() {
+        if ch.is_whitespace() {
+            out.push(ch);
+            continue;
+        }
+
+        if ch == '%' {
+            let mut name = String::new();
+            let mut closed = false;
+            let mut valid = true;
+
+            while let Some(next) = chars.next() {
+                if next == '%' {
+                    closed = true;
+                    break;
+                }
+                if !is_key_char(next) {
+                    valid = false;
+                }
+                name.push(next);
+            }
+
+            if closed && valid && !name.is_empty() {
+                if let Some(value) = vars.vars.get(&name) {
+                    out.push_str(value);
+                } else {
+                    out.push('%');
+                    out.push_str(&name);
+                    out.push('%');
+                }
+            } else {
+                out.push('%');
+                out.push_str(&name);
+                if closed {
+                    out.push('%');
+                }
+            }
+
+            continue;
+        }
+
+        if is_key_char(ch) {
+            let mut key = String::new();
+            key.push(ch);
+            while let Some(next) = chars.peek().copied() {
+                if is_key_char(next) {
+                    chars.next();
+                    key.push(next);
+                } else {
+                    break;
+                }
+            }
+
+            if let Some(value) = translate(&key) {
+                out.push_str(&value);
+            } else {
+                out.push_str(&key);
+            }
+
+            continue;
+        }
+
+        out.push(ch);
+    }
+
+    out
+}
+
+#[cfg(any(feature = "fluent", feature = "properties-lang"))]
+fn is_key_char(ch: char) -> bool {
+    ch.is_ascii_alphanumeric() || matches!(ch, '_' | '.' | ':' | '-')
 }
 
 #[cfg(any(feature = "fluent", feature = "properties-lang"))]

@@ -1,6 +1,5 @@
 use crate::html::ExtendedUiHtmlPlugin;
 use crate::io::ExtendedIoPlugin;
-use crate::lang::UILang;
 use crate::services::ExtendedServicePlugin;
 use crate::styles::ExtendedStylingPlugin;
 use crate::widgets::ExtendedWidgetPlugin;
@@ -19,6 +18,7 @@ pub mod styles;
 pub mod utils;
 pub mod widgets;
 pub mod example_utils;
+pub use lang::{UiLangVariables, UILang};
 
 /// A cache mapping image paths to their loaded handles,
 /// preventing duplicate loads and allowing cleanup of unused images.
@@ -126,6 +126,7 @@ impl Plugin for ExtendedUiPlugin {
         app.init_resource::<ImageCache>();
         app.init_resource::<CurrentWidgetState>();
         app.init_resource::<UILang>();
+        app.init_resource::<UiLangVariables>();
         app.register_type::<Camera>();
         app.add_plugins((
             ExtendedRegistryPlugin,

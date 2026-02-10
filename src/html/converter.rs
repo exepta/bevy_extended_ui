@@ -9,7 +9,7 @@ use crate::html::{
     HtmlStyle, HtmlSystemSet, HtmlWidgetNode,
 };
 use crate::io::{CssAsset, DefaultCssHandle, HtmlAsset};
-use crate::lang::{localize_html, UiLangState, UILang};
+use crate::lang::{localize_html, vars_fingerprint, UiLangState, UiLangVariables, UILang};
 use crate::styles::IconPlace;
 use crate::widgets::Button;
 use crate::widgets::*;
@@ -39,6 +39,7 @@ fn update_html_ui(
     mut ui_lang: ResMut<UILang>,
     mut lang_state: ResMut<UiLangState>,
 
+    lang_vars: Res<UiLangVariables>,
     config: Res<ExtendedUiConfiguration>,
     asset_server: Res<AssetServer>,
     html_assets: Res<Assets<HtmlAsset>>,
@@ -51,6 +52,7 @@ fn update_html_ui(
 ) {
     let resolved = ui_lang.resolved().map(|lang| lang.to_string());
     let mut lang_dirty = false;
+    let vars_hash = vars_fingerprint(&lang_vars);
 
     if lang_state.last_resolved != resolved {
         lang_state.last_resolved = resolved;
@@ -61,6 +63,11 @@ fn update_html_ui(
         lang_state
             .last_language_path
             .replace(config.language_path.clone());
+        lang_dirty = true;
+    }
+
+    if lang_state.last_vars_fingerprint != Some(vars_hash) {
+        lang_state.last_vars_fingerprint = Some(vars_hash);
         lang_dirty = true;
     }
 
@@ -121,7 +128,12 @@ fn update_html_ui(
         ui_lang.apply_html_lang(html_lang.as_deref());
         lang_state.last_resolved = ui_lang.resolved().map(|lang| lang.to_string());
 
-        let localized = localize_html(&content, ui_lang.resolved(), &config.language_path);
+        let localized = localize_html(
+            &content,
+            ui_lang.resolved(),
+            &config.language_path,
+            &lang_vars,
+        );
         let document = if localized == content {
             raw_document
         } else {

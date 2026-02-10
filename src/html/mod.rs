@@ -13,7 +13,7 @@ use crate::html::bindings::HtmlEventBindingsPlugin;
 use crate::html::builder::HtmlBuilderSystem;
 use crate::html::converter::HtmlConverterSystem;
 use crate::html::reload::HtmlReloadPlugin;
-use crate::lang::{UiLangState, UILang};
+use crate::lang::{UiLangState, UiLangVariables, UILang};
 
 use crate::io::{CssAsset, HtmlAsset};
 use crate::styles::Style;
@@ -538,6 +538,7 @@ impl Plugin for ExtendedUiHtmlPlugin {
         app.init_resource::<HtmlInitDelay>();
         app.init_resource::<UILang>();
         app.init_resource::<UiLangState>();
+        app.init_resource::<UiLangVariables>();
 
         app.register_type::<HtmlEventBindings>();
         app.register_type::<HtmlSource>();
