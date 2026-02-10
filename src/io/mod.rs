@@ -3,33 +3,43 @@ use bevy::asset::{AssetLoader, LoadContext};
 use bevy::prelude::*;
 use std::path::{Path, PathBuf};
 
+/// Asset containing raw CSS text.
 #[derive(Asset, TypePath, Debug, Clone)]
 pub struct CssAsset {
     pub text: String,
 }
 
+/// Built-in default stylesheet bundled with the crate.
 pub const DEFAULT_UI_CSS_TEXT: &str = include_str!("../../assets/default/extended_ui.css");
 
+/// Resource holding the default CSS asset handle.
 #[derive(Resource, Clone)]
 pub struct DefaultCssHandle(pub Handle<CssAsset>);
 
+/// Asset containing HTML text and discovered stylesheet handles.
 #[derive(Asset, TypePath, Debug, Clone)]
 pub struct HtmlAsset {
     pub html: String,
     pub stylesheets: Vec<Handle<CssAsset>>,
 }
 
+/// Asset loader for `.css` files.
 #[derive(Default, TypePath)]
 pub struct CssLoader;
 
+/// Asset loader for `.html` and `.htm` files.
 #[derive(Default, TypePath)]
 pub struct HtmlLoader;
 
 impl AssetLoader for CssLoader {
+    /// The asset type produced by this loader.
     type Asset = CssAsset;
+    /// The settings type used by this loader.
     type Settings = ();
+    /// The error type produced by this loader.
     type Error = std::io::Error;
 
+    /// Loads a CSS asset from the provided reader.
     async fn load(
         &self,
         reader: &mut dyn Reader,
@@ -43,16 +53,21 @@ impl AssetLoader for CssLoader {
         })
     }
 
+    /// Returns the file extensions this loader supports.
     fn extensions(&self) -> &[&str] {
         &["css"]
     }
 }
 
 impl AssetLoader for HtmlLoader {
+    /// The asset type produced by this loader.
     type Asset = HtmlAsset;
+    /// The settings type used by this loader.
     type Settings = ();
+    /// The error type produced by this loader.
     type Error = std::io::Error;
 
+    /// Loads an HTML asset and resolves linked stylesheets.
     async fn load(
         &self,
         reader: &mut dyn Reader,
@@ -82,14 +97,17 @@ impl AssetLoader for HtmlLoader {
         Ok(HtmlAsset { html, stylesheets })
     }
 
+    /// Returns the file extensions this loader supports.
     fn extensions(&self) -> &[&str] {
         &["html", "htm"]
     }
 }
 
+/// Plugin registering HTML/CSS assets and loaders.
 pub struct ExtendedIoPlugin;
 
 impl Plugin for ExtendedIoPlugin {
+    /// Registers asset types, loaders, and the default CSS asset.
     fn build(&self, app: &mut App) {
         app.init_asset::<HtmlAsset>();
         app.init_asset_loader::<HtmlLoader>();
@@ -99,6 +117,7 @@ impl Plugin for ExtendedIoPlugin {
     }
 }
 
+/// Inserts the default CSS asset into the asset store and resource.
 fn register_default_css_asset(mut commands: Commands, mut css_assets: ResMut<Assets<CssAsset>>) {
     let handle = css_assets.add(CssAsset {
         text: DEFAULT_UI_CSS_TEXT.to_string(),
@@ -107,11 +126,13 @@ fn register_default_css_asset(mut commands: Commands, mut css_assets: ResMut<Ass
     commands.insert_resource(DefaultCssHandle(handle));
 }
 
+/// Resolves a relative path against a base directory.
 fn resolve_relative(base_dir: &PathBuf, raw: &str) -> PathBuf {
     let p = PathBuf::from(raw.trim());
     if p.is_absolute() { p } else { base_dir.join(p) }
 }
 
+/// Extracts CSS link hrefs from an HTML string using a lenient scan.
 fn extract_css_links_lenient(html: &str) -> Vec<String> {
     let mut out = Vec::new();
 
@@ -135,6 +156,7 @@ fn extract_css_links_lenient(html: &str) -> Vec<String> {
     out
 }
 
+/// Extracts a quoted attribute value from an HTML tag string.
 fn extract_attr(tag: &str, name: &str) -> Option<String> {
     let needle = format!("{name}=");
     let idx = tag.find(&needle)?;

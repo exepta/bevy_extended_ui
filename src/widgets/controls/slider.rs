@@ -10,29 +10,37 @@ use crate::styles::{CssClass, CssSource, TagName};
 use crate::widgets::{BindToID, Slider, UIGenID, UIWidgetState, WidgetId, WidgetKind};
 use crate::{CurrentWidgetState, ExtendedUiConfiguration};
 
+/// Marker component for initialized slider widgets.
 #[derive(Component)]
 struct SliderBase;
 
+/// Marker component for the slider track container.
 #[derive(Component)]
 struct SliderTrackContainer;
 
+/// Marker component for the slider track fill node.
 #[derive(Component)]
 struct SliderTrackFill;
 
+/// Component storing slider thumb state.
 #[derive(Component, Reflect, Debug, Clone)]
 struct SliderThumb {
     current_center_x: f32,
 }
 
+/// Stores the previous slider value to detect changes.
 #[derive(Component, Deref, DerefMut)]
 struct PreviousSliderValue(f32);
 
+/// Marker component indicating slider needs initial layout.
 #[derive(Component)]
 struct SliderNeedInit;
 
+/// Plugin that registers slider widget behavior.
 pub struct SliderWidget;
 
 impl Plugin for SliderWidget {
+    /// Registers systems for slider setup and updates.
     fn build(&self, app: &mut App) {
         app.register_type::<SliderThumb>();
         app.add_systems(
@@ -47,6 +55,7 @@ impl Plugin for SliderWidget {
     }
 }
 
+/// Initializes UI nodes for slider widgets.
 fn internal_node_creation_system(
     mut commands: Commands,
     query: Query<
@@ -170,6 +179,7 @@ fn internal_node_creation_system(
     }
 }
 
+/// Focuses the slider widget on click.
 fn on_internal_click(
     mut trigger: On<Pointer<Click>>,
     mut query: Query<(&mut UIWidgetState, &UIGenID), With<Slider>>,
@@ -186,6 +196,7 @@ fn on_internal_click(
     trigger.propagate(false);
 }
 
+/// Sets hovered state when the cursor enters a slider.
 fn on_internal_cursor_entered(
     mut trigger: On<Pointer<Over>>,
     mut query: Query<&mut UIWidgetState, With<Slider>>,
@@ -196,6 +207,7 @@ fn on_internal_cursor_entered(
     trigger.propagate(false);
 }
 
+/// Clears hovered state when the cursor leaves a slider.
 fn on_internal_cursor_leave(
     mut trigger: On<Pointer<Out>>,
     mut query: Query<&mut UIWidgetState, With<Slider>>,
@@ -206,6 +218,7 @@ fn on_internal_cursor_leave(
     trigger.propagate(false);
 }
 
+/// Handles clicks on the slider track to update value.
 fn on_track_click(
     mut trigger: On<Pointer<Click>>,
     ui_scale: Res<UiScale>,
@@ -268,6 +281,7 @@ fn on_track_click(
     trigger.propagate(false);
 }
 
+/// Handles dragging the slider thumb to update value.
 fn on_thumb_drag(
     event: On<Pointer<Drag>>,
     parent_q: Query<&ChildOf>,
@@ -328,6 +342,7 @@ fn on_thumb_drag(
     );
 }
 
+/// Applies slider value based on a track X position.
 fn apply_from_track_left_x(
     target_ui_id: usize,
     desired_left_x: f32,
@@ -359,6 +374,7 @@ fn apply_from_track_left_x(
     }
 }
 
+/// Applies slider value based on thumb position.
 fn apply_slider_from_thumb_left(
     desired_left: f32,
     slider: &mut Slider,
@@ -417,6 +433,7 @@ fn apply_slider_from_thumb_left(
     slider.value = (raw / step).round() * step;
 }
 
+/// Detects slider value changes and updates visuals.
 fn detect_change_slider_values(
     keyboard: Res<ButtonInput<KeyCode>>,
     mut slider_q: Query<
@@ -489,6 +506,7 @@ fn detect_change_slider_values(
     }
 }
 
+/// Initializes slider visuals after layout is available.
 fn initialize_slider_visual_state(
     mut commands: Commands,
     mut slider_q: Query<(Entity, &mut Slider, &UIGenID, Option<&SliderNeedInit>), With<Slider>>,
@@ -538,6 +556,7 @@ fn initialize_slider_visual_state(
     }
 }
 
+/// Finds a bound width for a given slider entity.
 fn find_bound_width<Q>(
     ui_id: usize,
     query: &Query<(&ComputedNode, &BindToID), Q>,
@@ -552,6 +571,7 @@ where
         .map(|(computed, _)| (computed.size().x / scale_factor).max(1.0))
 }
 
+/// Returns true if the slider is disabled.
 fn is_slider_disabled(
     ui_id: usize,
     query: &Query<(&UIGenID, &UIWidgetState), With<Slider>>,

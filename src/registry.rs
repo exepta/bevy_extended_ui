@@ -172,6 +172,7 @@ impl UiRegistry {
         self.collection.get(name)
     }
 
+    /// Retrieves a mutable UI source by name.
     pub fn get_mut(&mut self, name: &str) -> Option<&mut HtmlSource> {
         self.collection.get_mut(name)
     }
@@ -242,6 +243,7 @@ struct LastUiUsage(pub Option<Vec<String>>);
 pub struct ExtendedRegistryPlugin;
 
 impl Plugin for ExtendedRegistryPlugin {
+    /// Initializes registry resources and hooks update systems.
     fn build(&self, app: &mut App) {
         app.init_resource::<UiInitResource>();
         app.init_resource::<UiRegistry>();

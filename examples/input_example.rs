@@ -1,4 +1,4 @@
-use bevy_extended_ui::html::HtmlEvent;
+use bevy_extended_ui::html::{HtmlEvent};
 use bevy::prelude::*;
 use bevy_extended_ui::example_utils::make_app;
 use bevy_extended_ui::html::HtmlSource;
@@ -8,6 +8,7 @@ use bevy_extended_ui::styles::CssID;
 use bevy_extended_ui::widgets::{Headline, InputValue};
 use bevy_extended_ui_macros::html_fn;
 
+/// Runs the input field example app.
 fn main() {
     let mut app = make_app("Debug Html UI - test");
 
@@ -19,6 +20,7 @@ fn main() {
     app.run();
 }
 
+/// Updates the headline when the input text changes.
 #[html_fn("on_text_change")]
 fn on_text_change(
     In(event): In<HtmlEvent>,

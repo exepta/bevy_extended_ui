@@ -4,45 +4,51 @@ use bevy::camera::visibility::RenderLayers;
 use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
 use bevy::prelude::*;
 use bevy::ui::ScrollPosition;
-use bevy::window::PrimaryWindow;
 use crate::styles::paint::Colored;
 use crate::styles::{CssClass, CssSource, TagName};
-use crate::widgets::{Div, Scrollbar, UIGenID, UIWidgetState, WidgetId, WidgetKind};
+use crate::widgets::{BindToID, Div, Scrollbar, UIGenID, UIWidgetState, WidgetId, WidgetKind};
 use crate::{CurrentWidgetState, ExtendedUiConfiguration};
 
+/// Marker component for initialized div widgets.
 #[derive(Component)]
 struct DivBase;
 
+/// Marker for the scroll content node inside a div.
 #[derive(Component)]
 struct DivScrollContent;
 
+/// Component storing the root content entity for a div.
 #[derive(Component, Deref)]
 struct DivContentRoot(Entity);
 
+/// Component storing the vertical scrollbar entity for a div.
 #[derive(Component, Deref)]
 struct DivScrollbar(Entity);
 
+/// Component storing the horizontal scrollbar entity for a div.
 #[derive(Component, Deref)]
 struct DivScrollbarH(Entity);
 
-/// Mark which Div owns this scroll-content subtree.
+/// Marks which div owns a scroll-content subtree.
 #[derive(Component, Deref)]
 struct DivContentOwner(Entity);
 
-/// Mark which Div owns this scrollbar overlay.
+/// Marks which div owns a scrollbar overlay.
 #[derive(Component, Deref)]
 struct DivScrollbarOwner(Entity);
 
-/// Robust hover tracking.
+/// Tracks hover counts for div widgets.
 #[derive(Resource, Default)]
 struct HoveredDivTracker {
     div_ref: HashMap<Entity, u32>,
     last_div: Option<Entity>,
 }
 
+/// Plugin that wires up div widget behavior.
 pub struct DivWidget;
 
 impl Plugin for DivWidget {
+    /// Registers systems for div widget setup and scrolling.
     fn build(&self, app: &mut App) {
         app.init_resource::<HoveredDivTracker>();
 
@@ -60,7 +66,7 @@ impl Plugin for DivWidget {
     }
 }
 
-/// Creates the base node for <div>
+/// Creates the base node for div widgets.
 fn internal_node_creation_system(
     mut commands: Commands,
     query: Query<(Entity, &Div, Option<&CssSource>), (With<Div>, Without<DivBase>)>,
@@ -102,12 +108,14 @@ fn internal_node_creation_system(
     }
 }
 
+/// Ensures the div has scroll content and scrollbar nodes when needed.
 fn ensure_div_scroll_structure(
     mut commands: Commands,
     mut div_q: Query<
         (
             Entity,
             &Div,
+            &UIGenID,
             &mut Node,
             Option<&Children>,
             Option<&CssSource>,
@@ -126,6 +134,7 @@ fn ensure_div_scroll_structure(
     for (
         div_entity,
         div,
+        ui_id,
         mut div_node,
         children_opt,
         source_opt,
@@ -176,6 +185,7 @@ fn ensure_div_scroll_structure(
                     TagName("div".to_string()),
                     DivScrollContent,
                     DivContentOwner(div_entity),
+                    BindToID(ui_id.get()),
                     Visibility::Inherited,
                     InheritedVisibility::default(),
                     Transform::default(),
@@ -195,6 +205,7 @@ fn ensure_div_scroll_structure(
 
             content_entity
         };
+        commands.entity(content_entity).insert(BindToID(ui_id.get()));
 
         let mut sb_y_entity = sb_y_opt.map(|s| **s);
         let mut sb_x_entity = sb_x_opt.map(|s| **s);
@@ -372,7 +383,7 @@ fn ensure_div_scroll_structure(
     }
 }
 
-/// Global hover routing.
+/// Routes hover state to the owning div.
 fn route_hover_from_pointer_messages(
     mut over: MessageReader<Pointer<Over>>,
     mut out: MessageReader<Pointer<Out>>,
@@ -384,6 +395,7 @@ fn route_hover_from_pointer_messages(
     mut div_state_q: Query<&mut UIWidgetState, With<Div>>,
     mut hovered: ResMut<HoveredDivTracker>,
 ) {
+    /// Walks up the hierarchy to find the owning div entity.
     fn find_owner_div(
         mut e: Entity,
         parents: &Query<&ChildOf>,
@@ -466,21 +478,17 @@ fn route_hover_from_pointer_messages(
 }
 
 /// Wheel scroll uses the "last hovered div" and scrolls its DivScrollContent (Y only).
+/// Handles mouse wheel scrolling for div content.
 fn handle_div_scroll_wheel(
     mut wheel_events: MessageReader<MouseWheel>,
     hovered: Res<HoveredDivTracker>,
     div_q: Query<(&DivContentRoot, &Visibility), With<Div>>,
     mut content_q: Query<(&Node, &ComputedNode, &mut ScrollPosition), With<DivScrollContent>>,
-    window_q: Query<&Window, With<PrimaryWindow>>,
-    ui_scale: Res<UiScale>,
 ) {
     let Some(active_div) = hovered.last_div else {
         wheel_events.clear();
         return;
     };
-
-    let Ok(window) = window_q.single() else { return; };
-    let sf = window.scale_factor() * ui_scale.0;
 
     let Ok((root, vis)) = div_q.get(active_div) else {
         return;
@@ -491,12 +499,6 @@ fn handle_div_scroll_wheel(
     }
 
     for event in wheel_events.read() {
-        let raw = match event.unit {
-            MouseScrollUnit::Line => event.y * 25.0,
-            MouseScrollUnit::Pixel => event.y / sf,
-        };
-        let delta = -raw;
-
         let Ok((node, computed, mut scroll)) = content_q.get_mut(**root) else {
             continue;
         };
@@ -505,14 +507,32 @@ fn handle_div_scroll_wheel(
             continue;
         }
 
-        let viewport_h = (computed.size().y / sf).max(1.0);
-        let content_h = (computed.content_size.y / sf).max(viewport_h);
+        let inv_sf = computed.inverse_scale_factor.max(f32::EPSILON);
+        let delta = -wheel_delta_y(event, inv_sf);
+
+        let viewport_h = (computed.size().y * inv_sf).max(1.0);
+        let content_h = (computed.content_size.y * inv_sf).max(viewport_h);
         let max_scroll = (content_h - viewport_h).max(0.0);
 
         scroll.y = (scroll.y + delta).clamp(0.0, max_scroll);
     }
 }
 
+fn wheel_delta_y(event: &MouseWheel, inv_scale_factor: f32) -> f32 {
+    match event.unit {
+        MouseScrollUnit::Line => {
+            let line_delta = event.y;
+            if line_delta.abs() > 10.0 {
+                line_delta * inv_scale_factor
+            } else {
+                line_delta * 25.0
+            }
+        }
+        MouseScrollUnit::Pixel => event.y * inv_scale_factor,
+    }
+}
+
+/// Synchronizes scrollbar values from scrollable content.
 fn sync_scrollbar_from_content(
     div_q: Query<(Option<&DivContentRoot>, Option<&DivScrollbar>, Option<&DivScrollbarH>), With<Div>>,
     content_q: Query<&ComputedNode, With<DivScrollContent>>,
@@ -520,20 +540,16 @@ fn sync_scrollbar_from_content(
     target_pos_q: Query<&ScrollPosition, With<DivScrollContent>>,
     mut sb_node_q: Query<&mut Node, With<Scrollbar>>,
     mut sb_vis_q: Query<&mut Visibility, With<Scrollbar>>,
-    window_q: Query<&Window, With<PrimaryWindow>>,
-    ui_scale: Res<UiScale>,
 ) {
-    let Ok(window) = window_q.single() else { return; };
-    let sf = window.scale_factor() * ui_scale.0;
-
     for (root_opt, sb_y_opt, sb_x_opt) in div_q.iter() {
         let Some(root) = root_opt else { continue; };
 
         let Ok(content_comp) = content_q.get(**root) else { continue; };
         let Ok(scroll_pos) = target_pos_q.get(**root) else { continue; };
 
-        let viewport = content_comp.size() / sf;
-        let content = content_comp.content_size / sf;
+        let inv_sf = content_comp.inverse_scale_factor.max(f32::EPSILON);
+        let viewport = content_comp.size() * inv_sf;
+        let content = content_comp.content_size * inv_sf;
 
         // -------- Y --------
         if let Some(sb) = sb_y_opt {
@@ -573,6 +589,7 @@ fn sync_scrollbar_from_content(
     }
 }
 
+/// Updates scrollbar state if content dimensions have changed.
 fn check_scroll_bar_state<T>(
     sb_node_q: &mut Query<&mut Node, With<Scrollbar>>,
     sb_vis_q: &mut Query<&mut Visibility, With<Scrollbar>>,
@@ -600,6 +617,7 @@ fn check_scroll_bar_state<T>(
 
 
 
+/// Sets focus on div click and updates the current widget state.
 fn on_div_click(
     mut trigger: On<Pointer<Click>>,
     mut query: Query<(&mut UIWidgetState, &UIGenID), With<Div>>,

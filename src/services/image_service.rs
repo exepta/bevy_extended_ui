@@ -6,10 +6,14 @@ use std::fs;
 use std::path::Path;
 pub const DEFAULT_CHECK_MARK_KEY: &str = "extended_ui/icons/check-mark.png";
 pub const DEFAULT_CHOICE_BOX_KEY: &str = "extended_ui/icons/drop-arrow.png";
+const EMBEDDED_CHECK_MARK: &[u8] = include_bytes!("../../assets/extended_ui/icons/check-mark.png");
+const EMBEDDED_DROP_ARROW: &[u8] = include_bytes!("../../assets/extended_ui/icons/drop-arrow.png");
 
+/// Plugin that manages image caching and preload.
 pub struct ImageCacheService;
 
 impl Plugin for ImageCacheService {
+    /// Registers image cleanup and preload systems.
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
@@ -66,34 +70,56 @@ pub fn get_or_load_image(
         return handle.clone();
     }
 
+    if let Some(embedded_png) = embedded_icon_bytes(path) {
+        if !asset_exists_in_project(path) {
+            warn!(
+                "Image not found at '{}', using embedded fallback.",
+                path
+            );
+
+            let image = Image::from_buffer(
+                embedded_png,
+                ImageType::Extension("png"),
+                CompressedImageFormats::empty(),
+                true,
+                ImageSampler::default(),
+                RenderAssetUsages::default(),
+            )
+            .expect("Failed to create image from embedded PNG");
+
+            let fallback_handle = images.add(image);
+            image_cache
+                .map
+                .insert(path.to_string(), fallback_handle.clone());
+            return fallback_handle;
+        }
+    }
+
     let owned_path = path.to_string();
     let handle: Handle<Image> = asset_server.load(owned_path.clone());
-
-    if handle.path().is_none() {
-        warn!("Image not found at '{}', using embedded fallback.", path);
-
-        let embedded_png = include_bytes!("../../assets/extended_ui/icons/check-mark.png");
-        let image = Image::from_buffer(
-            embedded_png,
-            ImageType::Extension("png"),
-            CompressedImageFormats::empty(),
-            true,
-            ImageSampler::default(),
-            RenderAssetUsages::MAIN_WORLD,
-        )
-        .expect("Failed to create image from embedded PNG");
-
-        let fallback_handle = images.add(image);
-        image_cache
-            .map
-            .insert(path.to_string(), fallback_handle.clone());
-        return fallback_handle;
-    }
 
     image_cache.map.insert(path.to_string(), handle.clone());
     handle
 }
 
+fn embedded_icon_bytes(path: &str) -> Option<&'static [u8]> {
+    match path {
+        DEFAULT_CHECK_MARK_KEY => Some(EMBEDDED_CHECK_MARK),
+        DEFAULT_CHOICE_BOX_KEY => Some(EMBEDDED_DROP_ARROW),
+        _ => None,
+    }
+}
+
+fn asset_exists_in_project(path: &str) -> bool {
+    let path = Path::new(path);
+    if path.is_absolute() {
+        return path.exists();
+    }
+
+    Path::new("assets").join(path).exists()
+}
+
+/// Preloads images from the configured assets folder into the cache.
 pub fn pre_load_assets(
     extended_ui_configuration: Res<ExtendedUiConfiguration>,
     asset_server: Res<AssetServer>,

@@ -1,4 +1,4 @@
-use bevy_extended_ui::html::{HtmlEvent, HtmlEventObject};
+use bevy_extended_ui::html::HtmlChange;
 use bevy::prelude::*;
 use bevy_extended_ui::example_utils::make_app;
 use bevy_extended_ui::html::HtmlSource;
@@ -10,6 +10,7 @@ use bevy_extended_ui::styles::paint::Colored;
 use bevy_extended_ui::widgets::{FieldSelectionMulti, Headline, ToggleButton};
 use bevy_extended_ui_macros::html_fn;
 
+/// Runs the toggle button example app.
 fn main() {
     let mut app = make_app("Debug Html UI - test");
 
@@ -21,21 +22,18 @@ fn main() {
     app.run();
 }
 
+/// Updates text formatting based on toggle selections.
 #[html_fn("text_format")]
 fn text_color_from_set(
-    In(event): In<HtmlEvent>,
+    In(event): In<HtmlChange>,
     text_query: Query<(&CssID, &mut UiStyle), With<Headline>>,
     set_q: Query<&FieldSelectionMulti>,
     toggle_q: Query<&ToggleButton>,
 ) {
-    match event.object {
-        HtmlEventObject::Change(_) | HtmlEventObject::Init(_) => {
-            apply_selected_radio_color_to_text(text_query, set_q, toggle_q, event.entity);
-        }
-        _ => {}
-    }
+    apply_selected_radio_color_to_text(text_query, set_q, toggle_q, event.entity);
 }
 
+/// Applies toggle selections to the headline style.
 fn apply_selected_radio_color_to_text(
     mut text_query: Query<(&CssID, &mut UiStyle), With<Headline>>,
     set_q: Query<&FieldSelectionMulti>,

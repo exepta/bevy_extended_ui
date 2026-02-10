@@ -7,6 +7,7 @@ use bevy_extended_ui::registry::UiRegistry;
 use bevy_extended_ui::styles::CssID;
 use bevy_extended_ui::widgets::{ProgressBar, UIWidgetState};
 
+/// Runs the progress bar example app.
 fn main() {
     let mut app = make_app("Debug Html UI - test");
 
@@ -20,6 +21,7 @@ fn main() {
     app.run();
 }
 
+/// Updates the progress bar value based on hover state.
 pub fn update_progress_bar(
     time: Res<Time>,
     container_q: Query<(&CssID, &UIWidgetState)>,
@@ -55,4 +57,3 @@ pub fn update_progress_bar(
         };
     }
 }
-

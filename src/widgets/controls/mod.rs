@@ -28,12 +28,15 @@ pub mod switch_button;
 mod progress_bar;
 mod scroll_bar;
 
+/// Marker component for spawned button icon images.
 #[derive(Component)]
 pub struct ButtonImage;
 
+/// Plugin that registers control widgets.
 pub struct ExtendedControlWidgets;
 
 impl Plugin for ExtendedControlWidgets {
+    /// Adds all control widget plugins.
     fn build(&self, app: &mut App) {
         app.add_plugins((
             ButtonWidget,
@@ -51,6 +54,7 @@ impl Plugin for ExtendedControlWidgets {
     }
 }
 
+/// Spawns an icon when the desired placement matches.
 pub fn place_icon_if(
     builder: &mut RelatedSpawnerCommands<ChildOf>,
     icon_place: IconPlace,
@@ -79,9 +83,7 @@ pub fn place_icon_if(
     }
 }
 
-/// Handle pointer hover leave events for [`Button`] components.
-///
-/// Clears the `hovered` flag on the widget's UI state.
+/// Spawns the icon image node for a control widget.
 fn place_icon(
     builder: &mut RelatedSpawnerCommands<ChildOf>,
     icon_path: &Option<String>,

@@ -8,6 +8,7 @@ use bevy_extended_ui::styles::CssID;
 use bevy_extended_ui::widgets::{Headline, UIWidgetState};
 use bevy_extended_ui_macros::html_fn;
 
+/// Runs the switch button example app.
 fn main() {
     let mut app = make_app("Debug Html UI - test");
 
@@ -21,6 +22,7 @@ fn main() {
     app.run();
 }
 
+/// Updates headline text based on switch button state.
 #[html_fn("text_click")]
 fn text_click(
     In(event): In<HtmlEvent>,

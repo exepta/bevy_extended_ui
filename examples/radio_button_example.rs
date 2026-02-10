@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use bevy_extended_ui::example_utils::make_app;
-use bevy_extended_ui::html::{HtmlEvent, HtmlEventObject, HtmlSource};
+use bevy_extended_ui::html::{HtmlChange, HtmlSource};
 use bevy_extended_ui::io::HtmlAsset;
 use bevy_extended_ui::registry::UiRegistry;
 use bevy_extended_ui::styles::components::UiStyle;
@@ -9,6 +9,7 @@ use bevy_extended_ui::styles::paint::Colored;
 use bevy_extended_ui::widgets::{FieldSelectionSingle, Headline, RadioButton};
 use bevy_extended_ui_macros::html_fn;
 
+/// Runs the radio button example app.
 fn main() {
     let mut app = make_app("Debug Html UI - test");
 
@@ -20,21 +21,18 @@ fn main() {
     app.run();
 }
 
+/// Updates text color based on radio button selection.
 #[html_fn("text_color")]
 fn text_color_from_set(
-    In(event): In<HtmlEvent>,
+    In(event): In<HtmlChange>,
     text_query: Query<(&CssID, &mut UiStyle), With<Headline>>,
     set_q: Query<(&CssID, &FieldSelectionSingle)>,
     radio_q: Query<&RadioButton>,
 ) {
-    match event.object {
-        HtmlEventObject::Change(_) => {
-            apply_selected_radio_color_to_text(text_query, set_q, radio_q, event.entity);
-        }
-        _ => {}
-    }
+    apply_selected_radio_color_to_text(text_query, set_q, radio_q, event.entity);
 }
 
+/// Applies the selected radio button color to the headline style.
 fn apply_selected_radio_color_to_text(
     mut text_query: Query<(&CssID, &mut UiStyle), With<Headline>>,
     set_q: Query<(&CssID, &FieldSelectionSingle)>,
@@ -63,6 +61,7 @@ fn apply_selected_radio_color_to_text(
     text_style.active_style = None;
 }
 
+/// Parses a color value from a string.
 fn parse_color(s: &str) -> Option<Color> {
     let s = s.trim();
     if let Some(hex) = s.strip_prefix('#') {

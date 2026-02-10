@@ -7,18 +7,23 @@ use crate::styles::components::UiStyle;
 use crate::styles::paint::Colored;
 use crate::widgets::{BindToID, ProgressBar, UIGenID, UIWidgetState, WidgetId, WidgetKind};
 
+/// Marker component for initialized progress bar widgets.
 #[derive(Component)]
 struct ProgressBarBase;
 
+/// Marker component for the progress bar fill track.
 #[derive(Component)]
 struct ProgressBarTrack;
 
+/// Marker component indicating the progress bar needs initial layout.
 #[derive(Component)]
 struct ProgressBarNeedInit;
 
+/// Plugin that registers progress bar widget behavior.
 pub struct ProgressBarWidget;
 
 impl Plugin for ProgressBarWidget {
+    /// Registers systems for progress bar setup and updates.
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
@@ -28,6 +33,7 @@ impl Plugin for ProgressBarWidget {
     }
 }
 
+/// Initializes UI nodes for progress bar widgets.
 fn internal_node_creation_system(
     mut commands: Commands,
     query: Query<(Entity, &UIGenID, &ProgressBar, Option<&CssSource>), (With<ProgressBar>, Without<ProgressBarBase>)>,
@@ -82,6 +88,7 @@ fn internal_node_creation_system(
     }
 }
 
+/// Updates progress bar fill widths based on current values.
 fn update_progress_bars(
     ui_scale: Res<UiScale>,
     window_query: Query<&Window, With<PrimaryWindow>>,
@@ -111,6 +118,7 @@ fn update_progress_bars(
     }
 }
 
+/// Initializes progress bar visuals after layout is available.
 fn initialize_progress_bar_visual_state(
     mut commands: Commands,
     ui_scale: Res<UiScale>,

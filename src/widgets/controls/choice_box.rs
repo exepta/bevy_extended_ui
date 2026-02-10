@@ -12,27 +12,35 @@ use bevy::ecs::relationship::RelatedSpawnerCommands;
 use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
 use bevy::prelude::*;
 
+/// Marker component for initialized choice box widgets.
 #[derive(Component)]
 struct ChoiceBase;
 
+/// Marker component for individual choice option entries.
 #[derive(Component)]
 struct ChoiceOptionBase;
 
+/// Marker component for the selected option display.
 #[derive(Component)]
 struct SelectedOptionBase;
 
+/// Marker component for the dropdown caret/indicator.
 #[derive(Component)]
 struct DropBase;
 
+/// Marker component for the overlay label node.
 #[derive(Component)]
 struct OverlayLabel;
 
+/// Marker component for the dropdown content layout box.
 #[derive(Component)]
 struct ChoiceLayoutBoxBase;
 
+/// Plugin that registers choice box widget behavior.
 pub struct ChoiceBoxWidget;
 
 impl Plugin for ChoiceBoxWidget {
+    /// Registers systems for choice box setup and interaction.
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
@@ -57,16 +65,8 @@ impl Plugin for ChoiceBoxWidget {
 ///
 /// Each `ChoiceBox` entity that hasn't yet been initialized (i.e., is missing [`ChoiceBase`])
 /// gets the following structure:
-///
-/// ```text
-/// ChoiceBox (Tag: <select>)
-/// ├── SelectLabel (optional static label)
-/// ├── SelectedOption (currently selected visual representation)
-/// └── ContentBox (dropdown menu, hidden by default)
-///     ├── Option 1 (with optional icon and text)
-///     ├── Option 2 ...
-///     └── ...
-/// ```
+/// - main select node with label and selected option
+/// - content box containing option entries
 ///
 /// # Behavior
 /// - Observers are attached to the main box and each option to respond to hover and click.
@@ -305,6 +305,7 @@ fn internal_node_creation_system(
 /// - `TextFont::font_size`
 /// - `WidgetStyle::top`
 /// - `WidgetStyle::font_size`
+/// Shows or hides the overlay label based on selection state.
 fn handle_overlay_label(
     query: Query<(&UIWidgetState, &UIGenID, &ChoiceBox, &Children), With<ChoiceBox>>,
     mut label_query: Query<(&BindToID, &mut Node, &mut TextFont, &mut UiStyle), With<OverlayLabel>>,
@@ -351,6 +352,7 @@ fn handle_overlay_label(
 /// # Affects:
 /// - `UIWidgetState::open`
 /// - `Visibility`
+/// Toggles dropdown visibility based on widget state.
 fn update_content_box_visibility(
     mut query: Query<(&mut UIWidgetState, &UIGenID), (With<ChoiceBox>, Changed<UIWidgetState>)>,
     mut content_query: Query<(&mut Visibility, &BindToID), With<ChoiceLayoutBoxBase>>,
@@ -396,6 +398,7 @@ fn update_content_box_visibility(
 /// # Affects:
 /// - `Node::top` on [`ChoiceOptionBase`] children
 /// - `WidgetStyle::top`
+/// Handles mouse wheel scrolling within the dropdown content.
 fn handle_scroll_events(
     mut scroll_events: MessageReader<MouseWheel>,
     mut layout_query: Query<
@@ -414,14 +417,6 @@ fn handle_scroll_events(
     let smooth_factor = 30.0;
 
     for event in scroll_events.read() {
-        let raw = match event.unit {
-            MouseScrollUnit::Line => event.y * 25.0,
-            MouseScrollUnit::Pixel => event.y,
-        };
-
-        // Wheel down -> scroll down -> increase scroll.y
-        let delta = -raw;
-
         for (layout_entity, visibility, children, mut scroll, layout_computed) in
             layout_query.iter_mut()
         {
@@ -429,6 +424,10 @@ fn handle_scroll_events(
             if !is_visible {
                 continue;
             }
+
+            let inv_sf = layout_computed.inverse_scale_factor.max(f32::EPSILON);
+            // Wheel down -> scroll down -> increase scroll.y
+            let delta = -wheel_delta_y(event, inv_sf);
 
             if children.len() <= 3 {
                 scroll.y = 0.0;
@@ -439,7 +438,8 @@ fn handle_scroll_events(
             let mut option_height = None;
             for (opt_computed, parent) in option_query.iter() {
                 if parent.parent() == layout_entity {
-                    option_height = Some(opt_computed.size().y.max(1.0));
+                    let opt_inv_sf = opt_computed.inverse_scale_factor.max(f32::EPSILON);
+                    option_height = Some((opt_computed.size().y * opt_inv_sf).max(1.0));
                     break;
                 }
             }
@@ -450,7 +450,7 @@ fn handle_scroll_events(
             // Visible viewport height (what is clipped). If this comes out too big because
             // the container grows with content, max_scroll becomes too small.
             // If your CSS sets a fixed height, this is fine. Otherwise, we clamp it to "3 options".
-            let measured_viewport = layout_computed.size().y.max(1.0);
+            let measured_viewport = (layout_computed.size().y * inv_sf).max(1.0);
             let viewport_h = measured_viewport.min(option_h * 3.0);
 
             let content_h = children.len() as f32 * option_h;
@@ -462,6 +462,20 @@ fn handle_scroll_events(
             let smoothed = scroll.y + (target - scroll.y) * smooth_factor * time.delta_secs();
             scroll.y = smoothed.clamp(0.0, max_scroll);
         }
+    }
+}
+
+fn wheel_delta_y(event: &MouseWheel, inv_scale_factor: f32) -> f32 {
+    match event.unit {
+        MouseScrollUnit::Line => {
+            let line_delta = event.y;
+            if line_delta.abs() > 10.0 {
+                line_delta * inv_scale_factor
+            } else {
+                line_delta * 25.0
+            }
+        }
+        MouseScrollUnit::Pixel => event.y * inv_scale_factor,
     }
 }
 
@@ -485,6 +499,7 @@ fn handle_scroll_events(
 /// - `UIWidgetState::focused`
 /// - `UIWidgetState::open`
 /// - `CurrentWidgetState::widget_id`
+/// Handles clicks on the choice box to open or close the dropdown.
 fn on_internal_click(
     mut trigger: On<Pointer<Click>>,
     mut query: Query<(&mut UIWidgetState, &UIGenID), With<ChoiceBox>>,
@@ -508,6 +523,7 @@ fn on_internal_click(
 ///
 /// # Affects:
 /// - `UIWidgetState::hovered`
+/// Sets hovered state when the cursor enters the choice box.
 fn on_internal_cursor_entered(
     mut trigger: On<Pointer<Over>>,
     mut query: Query<&mut UIWidgetState, With<ChoiceBox>>,
@@ -526,6 +542,7 @@ fn on_internal_cursor_entered(
 ///
 /// # Affects:
 /// - `UIWidgetState::hovered`
+/// Clears hovered state when the cursor leaves the choice box.
 fn on_internal_cursor_leave(
     mut trigger: On<Pointer<Out>>,
     mut query: Query<&mut UIWidgetState, With<ChoiceBox>>,
@@ -557,6 +574,7 @@ fn on_internal_cursor_leave(
 /// - `UIWidgetState::open`
 /// - `Text` in `SelectedOptionBase`
 /// - Optional: `UIWidgetState::focused`
+/// Handles clicks on choice box options to update selection.
 fn on_internal_option_click(
     trigger: On<Pointer<Click>>,
     mut option_query: Query<
@@ -636,6 +654,7 @@ fn on_internal_option_click(
 ///
 /// # Affects:
 /// - `UIWidgetState::hovered` on option and visual children
+/// Sets hovered state when the cursor enters an option.
 fn on_internal_option_cursor_entered(
     trigger: On<Pointer<Over>>,
     mut query: Query<(&mut UIWidgetState, &Children), With<ChoiceOptionBase>>,
@@ -659,6 +678,7 @@ fn on_internal_option_cursor_entered(
 ///
 /// # Affects:
 /// - `UIWidgetState::hovered` on option and visual children
+/// Clears hovered state when the cursor leaves an option.
 fn on_internal_option_cursor_leave(
     trigger: On<Pointer<Out>>,
     mut query: Query<(&mut UIWidgetState, &Children), With<ChoiceOptionBase>>,
@@ -711,6 +731,7 @@ fn on_internal_option_cursor_leave(
 /// - [`Name`], [`Node`], [`BackgroundColor`], [`ImageNode`], [`BorderColor`], [`BorderRadius`]
 /// - [`UIWidgetState`], [`CssSource`], [`CssClass`], [`RenderLayers`], [`Pickable`], [`BindToID`]
 /// - Marker: [`SelectedOptionBase`], [`DropBase`]
+/// Spawns the selected option display node.
 fn generate_child_selected_option(
     builder: &mut RelatedSpawnerCommands<ChildOf>,
     css_source: &CssSource,

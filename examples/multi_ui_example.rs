@@ -8,6 +8,7 @@ use bevy_extended_ui::registry::UiRegistry;
 use bevy_extended_ui::widgets::Body;
 use bevy_extended_ui_macros::html_fn;
 
+/// Tracks overlay UI visibility for the multi-UI example.
 #[derive(Resource)]
 struct OverlayState {
     visible: bool,
@@ -15,6 +16,7 @@ struct OverlayState {
 }
 
 impl Default for OverlayState {
+    /// Creates the default overlay state.
     fn default() -> Self {
         Self {
             visible: false,
@@ -23,6 +25,7 @@ impl Default for OverlayState {
     }
 }
 
+/// Runs the multi-UI example app.
 fn main() {
     let mut app = make_app("Debug Html UI - test");
 
@@ -43,6 +46,7 @@ fn main() {
     app.run();
 }
 
+/// Toggles overlay UI visibility.
 #[html_fn("change_ui_state")]
 fn change_ui(
     In(_target): In<HtmlEvent>,
@@ -64,6 +68,7 @@ fn change_ui(
     }
 }
 
+/// Applies the initial hidden state for the overlay UI.
 fn apply_initial_overlay_state(
     mut state: ResMut<OverlayState>,
     mut q: Query<(&Body, &mut Visibility)>,
@@ -87,6 +92,7 @@ fn apply_initial_overlay_state(
     }
 }
 
+/// Ensures overlay visibility matches the stored state.
 fn enforce_overlay_visibility(
     state: Res<OverlayState>,
     mut q: Query<(&Body, &mut Visibility)>,
