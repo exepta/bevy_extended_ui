@@ -4,15 +4,15 @@ use crate::services::image_service::get_or_load_image;
 use crate::services::state_service::update_widget_states;
 use crate::styles::components::UiStyle;
 use crate::styles::{
-    AnimationDirection, AnimationKeyframe, AnimationSpec, CursorStyle, FontVal, FontWeight, Radius,
-    Style, TransformStyle, TransitionProperty, TransitionSpec,
+    AnimationDirection, AnimationKeyframe, AnimationSpec, CalcContext, CursorStyle, FontVal,
+    FontWeight, Radius, Style, TransformStyle, TransitionProperty, TransitionSpec,
 };
 use crate::widgets::UIWidgetState;
 
 use bevy::color::Srgba;
 use bevy::math::Rot2;
 use bevy::prelude::*;
-use bevy::ui::{UiTransform, Val2};
+use bevy::ui::{ComputedNode, UiTransform, Val2};
 use bevy::window::{
     CursorIcon, CustomCursor, CustomCursorImage, PrimaryWindow, SystemCursorIcon,
 };
@@ -30,7 +30,8 @@ impl Plugin for StyleService {
                 update_widget_styles_system.after(update_widget_states),
                 update_style_transitions.after(update_widget_styles_system),
                 update_style_animations.after(update_style_transitions),
-                propagate_style_inheritance.after(update_style_animations),
+                apply_calc_styles_system.after(update_style_animations),
+                propagate_style_inheritance.after(apply_calc_styles_system),
                 sync_last_ui_transform.after(propagate_style_inheritance),
                 update_css_cursor_icons.after(update_widget_styles_system),
             ),
@@ -495,6 +496,144 @@ pub fn update_style_animations(
                 &mut image_cache,
                 &mut images,
             );
+        }
+    }
+}
+
+fn apply_calc_styles_system(
+    mut query: Query<(
+        Entity,
+        &UiStyle,
+        Option<&StyleTransition>,
+        Option<&StyleAnimation>,
+        Option<&ChildOf>,
+        Option<&mut Node>,
+    )>,
+    computed_query: Query<&ComputedNode>,
+    window_q: Query<&Window, With<PrimaryWindow>>,
+) {
+    let viewport = window_q
+        .iter()
+        .next()
+        .map(|window| window.resolution.size())
+        .unwrap_or_default();
+
+    for (_entity, ui_style, transition_opt, animation_opt, parent_opt, node_opt) in query.iter_mut()
+    {
+        let Some(mut node) = node_opt else {
+            continue;
+        };
+
+        let style = if let Some(transition) = transition_opt {
+            transition.current_style.as_ref().unwrap_or(&transition.to)
+        } else if let Some(animation) = animation_opt {
+            animation.current_style.as_ref().unwrap_or(&animation.base)
+        } else {
+            let Some(active) = ui_style.active_style.as_ref() else {
+                continue;
+            };
+            active
+        };
+
+        let (base_w, base_h) = if let Some(parent) = parent_opt {
+            if let Ok(parent_node) = computed_query.get(parent.parent()) {
+                (parent_node.size.x, parent_node.size.y)
+            } else {
+                (viewport.x, viewport.y)
+            }
+        } else {
+            (viewport.x, viewport.y)
+        };
+
+        let ctx_w = CalcContext {
+            base: base_w,
+            viewport,
+        };
+        let ctx_h = CalcContext {
+            base: base_h,
+            viewport,
+        };
+
+        if let Some(expr) = style.width_calc.as_ref() {
+            if let Some(px) = expr.eval_length(ctx_w) {
+                node.width = Val::Px(px);
+            }
+        }
+        if let Some(expr) = style.min_width_calc.as_ref() {
+            if let Some(px) = expr.eval_length(ctx_w) {
+                node.min_width = Val::Px(px);
+            }
+        }
+        if let Some(expr) = style.max_width_calc.as_ref() {
+            if let Some(px) = expr.eval_length(ctx_w) {
+                node.max_width = Val::Px(px);
+            }
+        }
+        if let Some(expr) = style.height_calc.as_ref() {
+            if let Some(px) = expr.eval_length(ctx_h) {
+                node.height = Val::Px(px);
+            }
+        }
+        if let Some(expr) = style.min_height_calc.as_ref() {
+            if let Some(px) = expr.eval_length(ctx_h) {
+                node.min_height = Val::Px(px);
+            }
+        }
+        if let Some(expr) = style.max_height_calc.as_ref() {
+            if let Some(px) = expr.eval_length(ctx_h) {
+                node.max_height = Val::Px(px);
+            }
+        }
+
+        if let Some(expr) = style.left_calc.as_ref() {
+            if let Some(px) = expr.eval_length(ctx_w) {
+                node.left = Val::Px(px);
+            }
+        }
+        if let Some(expr) = style.right_calc.as_ref() {
+            if let Some(px) = expr.eval_length(ctx_w) {
+                node.right = Val::Px(px);
+            }
+        }
+        if let Some(expr) = style.top_calc.as_ref() {
+            if let Some(px) = expr.eval_length(ctx_h) {
+                node.top = Val::Px(px);
+            }
+        }
+        if let Some(expr) = style.bottom_calc.as_ref() {
+            if let Some(px) = expr.eval_length(ctx_h) {
+                node.bottom = Val::Px(px);
+            }
+        }
+
+        if let Some(expr) = style.flex_basis_calc.as_ref() {
+            let base_main = match node.flex_direction {
+                FlexDirection::Row | FlexDirection::RowReverse => base_w,
+                _ => base_h,
+            };
+            let ctx_main = CalcContext {
+                base: base_main,
+                viewport,
+            };
+            if let Some(px) = expr.eval_length(ctx_main) {
+                node.flex_basis = Val::Px(px);
+            }
+        }
+
+        if let Some(expr) = style.gap_calc.as_ref() {
+            if let Some(px) = expr.eval_length(ctx_w) {
+                let gap_val = Val::Px(px);
+                match node.flex_direction {
+                    FlexDirection::Row | FlexDirection::RowReverse => {
+                        node.column_gap = gap_val;
+                        node.row_gap = Val::Auto;
+                    }
+                    _ => {
+                        node.row_gap = gap_val;
+                        node.column_gap = Val::Auto;
+                    }
+                }
+            }
         }
     }
 }

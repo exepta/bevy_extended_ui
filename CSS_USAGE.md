@@ -53,6 +53,7 @@ properties or values are ignored silently.
 - `grid-auto-flow`
 - `grid-template-rows`, `grid-template-columns`
 - `grid-auto-rows`, `grid-auto-columns`
+- `minmax()` is supported for grid tracks; its min/max arguments can use `calc`, `min`, `max`, and `sin`
 
 ### Typography
 
@@ -101,11 +102,14 @@ Used by width/height, padding/margin, border widths, translation, etc.
 - Supported units: `px`, `%`
 - Also supports `0` / `0.0` (treated as `0px`)
 - Anything else is ignored
+- Math functions: `calc`, `min`, `max`, `sin` (unitless radians), and nested usage
+- Mixed units in `calc` (e.g. `calc(100% - 10px)`) are resolved at runtime using the parent size (or window if no parent)
 
 ### Font Size (`font-size`)
 
 - `px` -> `FontVal::Px`
 - `rem` -> `FontVal::Rem`
+- Math functions: `calc`, `min`, `max`, `sin` (unitless radians)
 
 ### Colors
 

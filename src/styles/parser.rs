@@ -1,8 +1,8 @@
 use crate::styles::paint::Colored;
 use crate::styles::{
-    AnimationDirection, AnimationKeyframe, AnimationSpec, Background, CursorStyle, FontFamily,
-    FontVal, FontWeight, ParsedCss, Radius, Style, StylePair, TransformStyle, TransitionProperty,
-    TransitionSpec, TransitionTiming,
+    AnimationDirection, AnimationKeyframe, AnimationSpec, Background, CalcExpr, CalcUnit, CalcValue,
+    CursorStyle, FontFamily, FontVal, FontWeight, ParsedCss, Radius, Style, StylePair,
+    TransformStyle, TransitionProperty, TransitionSpec, TransitionTiming,
 };
 use bevy::ui::Val2;
 use bevy::prelude::*;
@@ -362,12 +362,12 @@ fn split_var_args(input: &str) -> (&str, Option<&str>) {
 ///
 pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
     match name {
-        "width" => style.width = convert_to_val(value.to_string()),
-        "min-width" => style.min_width = convert_to_val(value.to_string()),
-        "max-width" => style.max_width = convert_to_val(value.to_string()),
-        "height" => style.height = convert_to_val(value.to_string()),
-        "min-height" => style.min_height = convert_to_val(value.to_string()),
-        "max-height" => style.max_height = convert_to_val(value.to_string()),
+        "width" => apply_length_property(value, &mut style.width, &mut style.width_calc),
+        "min-width" => apply_length_property(value, &mut style.min_width, &mut style.min_width_calc),
+        "max-width" => apply_length_property(value, &mut style.max_width, &mut style.max_width_calc),
+        "height" => apply_length_property(value, &mut style.height, &mut style.height_calc),
+        "min-height" => apply_length_property(value, &mut style.min_height, &mut style.min_height_calc),
+        "max-height" => apply_length_property(value, &mut style.max_height, &mut style.max_height_calc),
 
         "padding" => style.padding = convert_to_ui_rect(value.to_string()),
         "padding-left" => style.padding = convert_to_ui_rect(format!("{} 0 0 0", value)),
@@ -383,16 +383,16 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
 
         "color" => style.color = convert_to_color(value.to_string()),
 
-        "left" => style.left = convert_to_val(value.to_string()),
-        "right" => style.right = convert_to_val(value.to_string()),
-        "top" => style.top = convert_to_val(value.to_string()),
-        "bottom" => style.bottom = convert_to_val(value.to_string()),
+        "left" => apply_length_property(value, &mut style.left, &mut style.left_calc),
+        "right" => apply_length_property(value, &mut style.right, &mut style.right_calc),
+        "top" => apply_length_property(value, &mut style.top, &mut style.top_calc),
+        "bottom" => apply_length_property(value, &mut style.bottom, &mut style.bottom_calc),
 
         "display" => style.display = convert_to_display(value.to_string()),
         "position" => style.position_type = convert_to_position(value.to_string()),
         "box-sizing" => style.box_sizing = convert_to_box_sizing(value.to_string()),
         "scroll-width" => style.scrollbar_width = convert_to_f32(value.to_string()),
-        "gap" => style.gap = convert_to_val(value.to_string()),
+        "gap" => apply_length_property(value, &mut style.gap, &mut style.gap_calc),
         "transition" => style.transition = parse_transition(value),
         "transform" => apply_transform_functions(value, &mut style.transform),
         "animation" => style.animation = parse_animation(value),
@@ -411,7 +411,7 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
         }
         "flex-grow" => style.flex_grow = value.trim().parse::<f32>().ok(),
         "flex-shrink" => style.flex_shrink = value.trim().parse::<f32>().ok(),
-        "flex-basis" => style.flex_basis = convert_to_val(value.to_string()),
+        "flex-basis" => apply_length_property(value, &mut style.flex_basis, &mut style.flex_basis_calc),
         "flex-wrap" => {
             style.flex_wrap = convert_to_bevy_flex_wrap(value.to_string());
         }
@@ -739,6 +739,565 @@ fn convert_to_font_weight(value: String) -> Option<FontWeight> {
     FontWeight::from_name(in_value)
 }
 
+struct MathParser<'a> {
+    input: &'a str,
+    pos: usize,
+}
+
+impl<'a> MathParser<'a> {
+    fn new(input: &'a str) -> Self {
+        Self { input, pos: 0 }
+    }
+
+    fn parse_expression(&mut self) -> Option<CalcValue> {
+        let mut left = self.parse_term()?;
+        loop {
+            self.skip_ws();
+            if self.consume('+') {
+                let right = self.parse_term()?;
+                left = add_values(left, right)?;
+            } else if self.consume('-') {
+                let right = self.parse_term()?;
+                left = sub_values(left, right)?;
+            } else {
+                break;
+            }
+        }
+        Some(left)
+    }
+
+    fn parse_term(&mut self) -> Option<CalcValue> {
+        let mut left = self.parse_factor()?;
+        loop {
+            self.skip_ws();
+            if self.consume('*') {
+                let right = self.parse_factor()?;
+                left = mul_values(left, right)?;
+            } else if self.consume('/') {
+                let right = self.parse_factor()?;
+                left = div_values(left, right)?;
+            } else {
+                break;
+            }
+        }
+        Some(left)
+    }
+
+    fn parse_factor(&mut self) -> Option<CalcValue> {
+        self.skip_ws();
+        if self.consume('+') {
+            return self.parse_factor();
+        }
+        if self.consume('-') {
+            let inner = self.parse_factor()?;
+            return Some(CalcValue::new(-inner.value, inner.unit));
+        }
+        if self.consume('(') {
+            let value = self.parse_expression()?;
+            self.expect(')')?;
+            return Some(value);
+        }
+
+        if let Some(name) = self.parse_identifier() {
+            self.skip_ws();
+            if self.consume('(') {
+                return self.parse_function(&name);
+            }
+            return None;
+        }
+
+        self.parse_number()
+    }
+
+    fn parse_function(&mut self, name: &str) -> Option<CalcValue> {
+        match name {
+            "calc" => {
+                let value = self.parse_expression()?;
+                self.expect(')')?;
+                Some(value)
+            }
+            "min" | "max" => {
+                let mut values = Vec::new();
+                loop {
+                    let value = self.parse_expression()?;
+                    values.push(value);
+                    self.skip_ws();
+                    if self.consume(',') {
+                        continue;
+                    }
+                    break;
+                }
+                self.expect(')')?;
+                reduce_min_max(name == "min", &values)
+            }
+            "sin" => {
+                let value = self.parse_expression()?;
+                self.expect(')')?;
+                let radians = to_radians(value)?;
+                Some(CalcValue::new(radians.sin(), CalcUnit::None))
+            }
+            "minmax" => {
+                let _ = self.parse_expression()?;
+                self.skip_ws();
+                if self.consume(',') {
+                    let _ = self.parse_expression()?;
+                }
+                self.expect(')')?;
+                None
+            }
+            _ => None,
+        }
+    }
+
+    fn parse_number(&mut self) -> Option<CalcValue> {
+        self.skip_ws();
+        let start = self.pos;
+        let mut has_digit = false;
+        let mut seen_dot = false;
+
+        while let Some(ch) = self.peek_char() {
+            if ch.is_ascii_digit() {
+                has_digit = true;
+                self.pos += ch.len_utf8();
+            } else if ch == '.' && !seen_dot {
+                seen_dot = true;
+                self.pos += 1;
+            } else {
+                break;
+            }
+        }
+
+        if !has_digit {
+            return None;
+        }
+
+        let number_str = &self.input[start..self.pos];
+        let value = number_str.parse::<f32>().ok()?;
+
+        let unit = if self.consume('%') {
+            CalcUnit::Percent
+        } else if let Some(unit_str) = self.parse_unit() {
+            match unit_str.as_str() {
+                "px" => CalcUnit::Px,
+                "rem" => CalcUnit::Rem,
+                "deg" => CalcUnit::Deg,
+                "rad" => CalcUnit::Rad,
+                "turn" => CalcUnit::Turn,
+                "fr" => CalcUnit::Fr,
+                _ => return None,
+            }
+        } else {
+            CalcUnit::None
+        };
+
+        Some(CalcValue::new(value, unit))
+    }
+
+    fn parse_identifier(&mut self) -> Option<String> {
+        self.skip_ws();
+        let start = self.pos;
+        let mut found = false;
+        while let Some(ch) = self.peek_char() {
+            if ch.is_ascii_alphabetic() || ch == '-' {
+                found = true;
+                self.pos += ch.len_utf8();
+            } else {
+                break;
+            }
+        }
+        if !found {
+            return None;
+        }
+        Some(self.input[start..self.pos].to_ascii_lowercase())
+    }
+
+    fn parse_unit(&mut self) -> Option<String> {
+        let start = self.pos;
+        let mut found = false;
+        while let Some(ch) = self.peek_char() {
+            if ch.is_ascii_alphabetic() {
+                found = true;
+                self.pos += ch.len_utf8();
+            } else {
+                break;
+            }
+        }
+        if !found {
+            return None;
+        }
+        Some(self.input[start..self.pos].to_ascii_lowercase())
+    }
+
+    fn skip_ws(&mut self) {
+        while let Some(ch) = self.peek_char() {
+            if ch.is_whitespace() {
+                self.pos += ch.len_utf8();
+            } else {
+                break;
+            }
+        }
+    }
+
+    fn consume(&mut self, expected: char) -> bool {
+        if self.peek_char() == Some(expected) {
+            self.pos += expected.len_utf8();
+            true
+        } else {
+            false
+        }
+    }
+
+    fn expect(&mut self, expected: char) -> Option<()> {
+        self.skip_ws();
+        if self.consume(expected) {
+            Some(())
+        } else {
+            None
+        }
+    }
+
+    fn peek_char(&self) -> Option<char> {
+        self.input[self.pos..].chars().next()
+    }
+
+    fn is_eof(&self) -> bool {
+        self.pos >= self.input.len()
+    }
+}
+
+fn parse_math_value(input: &str) -> Option<CalcValue> {
+    let mut parser = MathParser::new(input);
+    let value = parser.parse_expression()?;
+    parser.skip_ws();
+    if parser.is_eof() {
+        Some(value)
+    } else {
+        None
+    }
+}
+
+fn add_values(a: CalcValue, b: CalcValue) -> Option<CalcValue> {
+    if a.unit == b.unit {
+        Some(CalcValue::new(a.value + b.value, a.unit))
+    } else {
+        None
+    }
+}
+
+fn sub_values(a: CalcValue, b: CalcValue) -> Option<CalcValue> {
+    if a.unit == b.unit {
+        Some(CalcValue::new(a.value - b.value, a.unit))
+    } else {
+        None
+    }
+}
+
+fn mul_values(a: CalcValue, b: CalcValue) -> Option<CalcValue> {
+    match (a.unit, b.unit) {
+        (CalcUnit::None, unit) => Some(CalcValue::new(a.value * b.value, unit)),
+        (unit, CalcUnit::None) => Some(CalcValue::new(a.value * b.value, unit)),
+        _ => None,
+    }
+}
+
+fn div_values(a: CalcValue, b: CalcValue) -> Option<CalcValue> {
+    if b.value == 0.0 {
+        return None;
+    }
+    match (a.unit, b.unit) {
+        (unit, CalcUnit::None) => Some(CalcValue::new(a.value / b.value, unit)),
+        _ => None,
+    }
+}
+
+fn reduce_min_max(is_min: bool, values: &[CalcValue]) -> Option<CalcValue> {
+    let first = values.first().copied()?;
+    let mut best = first;
+    for value in values.iter().copied().skip(1) {
+        if value.unit != best.unit {
+            return None;
+        }
+        if is_min {
+            if value.value < best.value {
+                best = value;
+            }
+        } else if value.value > best.value {
+            best = value;
+        }
+    }
+    Some(best)
+}
+
+fn to_radians(value: CalcValue) -> Option<f32> {
+    match value.unit {
+        CalcUnit::None => Some(value.value),
+        CalcUnit::Deg => Some(value.value.to_radians()),
+        CalcUnit::Rad => Some(value.value),
+        CalcUnit::Turn => Some(value.value * std::f32::consts::TAU),
+        _ => None,
+    }
+}
+
+struct CalcParser<'a> {
+    input: &'a str,
+    pos: usize,
+}
+
+impl<'a> CalcParser<'a> {
+    fn new(input: &'a str) -> Self {
+        Self { input, pos: 0 }
+    }
+
+    fn parse_expression(&mut self) -> Option<CalcExpr> {
+        let mut left = self.parse_term()?;
+        loop {
+            self.skip_ws();
+            if self.consume('+') {
+                let right = self.parse_term()?;
+                left = CalcExpr::Add(Box::new(left), Box::new(right));
+            } else if self.consume('-') {
+                let right = self.parse_term()?;
+                left = CalcExpr::Sub(Box::new(left), Box::new(right));
+            } else {
+                break;
+            }
+        }
+        Some(left)
+    }
+
+    fn parse_term(&mut self) -> Option<CalcExpr> {
+        let mut left = self.parse_factor()?;
+        loop {
+            self.skip_ws();
+            if self.consume('*') {
+                let right = self.parse_factor()?;
+                left = CalcExpr::Mul(Box::new(left), Box::new(right));
+            } else if self.consume('/') {
+                let right = self.parse_factor()?;
+                left = CalcExpr::Div(Box::new(left), Box::new(right));
+            } else {
+                break;
+            }
+        }
+        Some(left)
+    }
+
+    fn parse_factor(&mut self) -> Option<CalcExpr> {
+        self.skip_ws();
+        if self.consume('+') {
+            return self.parse_factor();
+        }
+        if self.consume('-') {
+            let inner = self.parse_factor()?;
+            return Some(CalcExpr::Mul(
+                Box::new(CalcExpr::Value(CalcValue::new(-1.0, CalcUnit::None))),
+                Box::new(inner),
+            ));
+        }
+        if self.consume('(') {
+            let expr = self.parse_expression()?;
+            self.expect(')')?;
+            return Some(expr);
+        }
+
+        if let Some(name) = self.parse_identifier() {
+            self.skip_ws();
+            if self.consume('(') {
+                return self.parse_function(&name);
+            }
+            return None;
+        }
+
+        self.parse_number()
+    }
+
+    fn parse_function(&mut self, name: &str) -> Option<CalcExpr> {
+        match name {
+            "calc" => {
+                let expr = self.parse_expression()?;
+                self.expect(')')?;
+                Some(expr)
+            }
+            "min" | "max" => {
+                let mut values = Vec::new();
+                loop {
+                    let expr = self.parse_expression()?;
+                    values.push(expr);
+                    self.skip_ws();
+                    if self.consume(',') {
+                        continue;
+                    }
+                    break;
+                }
+                self.expect(')')?;
+                if name == "min" {
+                    Some(CalcExpr::Min(values))
+                } else {
+                    Some(CalcExpr::Max(values))
+                }
+            }
+            "sin" => {
+                let expr = self.parse_expression()?;
+                self.expect(')')?;
+                Some(CalcExpr::Sin(Box::new(expr)))
+            }
+            "minmax" => {
+                let _ = self.parse_expression()?;
+                self.skip_ws();
+                if self.consume(',') {
+                    let _ = self.parse_expression()?;
+                }
+                self.expect(')')?;
+                None
+            }
+            _ => None,
+        }
+    }
+
+    fn parse_number(&mut self) -> Option<CalcExpr> {
+        self.skip_ws();
+        let start = self.pos;
+        let mut has_digit = false;
+        let mut seen_dot = false;
+
+        while let Some(ch) = self.peek_char() {
+            if ch.is_ascii_digit() {
+                has_digit = true;
+                self.pos += ch.len_utf8();
+            } else if ch == '.' && !seen_dot {
+                seen_dot = true;
+                self.pos += 1;
+            } else {
+                break;
+            }
+        }
+
+        if !has_digit {
+            return None;
+        }
+
+        let number_str = &self.input[start..self.pos];
+        let value = number_str.parse::<f32>().ok()?;
+
+        let unit = if self.consume('%') {
+            CalcUnit::Percent
+        } else if let Some(unit_str) = self.parse_unit() {
+            match unit_str.as_str() {
+                "px" => CalcUnit::Px,
+                "rem" => CalcUnit::Rem,
+                "vw" => CalcUnit::Vw,
+                "vh" => CalcUnit::Vh,
+                "vmin" => CalcUnit::VMin,
+                "vmax" => CalcUnit::VMax,
+                "deg" => CalcUnit::Deg,
+                "rad" => CalcUnit::Rad,
+                "turn" => CalcUnit::Turn,
+                "fr" => CalcUnit::Fr,
+                _ => return None,
+            }
+        } else {
+            CalcUnit::None
+        };
+
+        Some(CalcExpr::Value(CalcValue::new(value, unit)))
+    }
+
+    fn parse_identifier(&mut self) -> Option<String> {
+        self.skip_ws();
+        let start = self.pos;
+        let mut found = false;
+        while let Some(ch) = self.peek_char() {
+            if ch.is_ascii_alphabetic() || ch == '-' {
+                found = true;
+                self.pos += ch.len_utf8();
+            } else {
+                break;
+            }
+        }
+        if !found {
+            return None;
+        }
+        Some(self.input[start..self.pos].to_ascii_lowercase())
+    }
+
+    fn parse_unit(&mut self) -> Option<String> {
+        let start = self.pos;
+        let mut found = false;
+        while let Some(ch) = self.peek_char() {
+            if ch.is_ascii_alphabetic() {
+                found = true;
+                self.pos += ch.len_utf8();
+            } else {
+                break;
+            }
+        }
+        if !found {
+            return None;
+        }
+        Some(self.input[start..self.pos].to_ascii_lowercase())
+    }
+
+    fn skip_ws(&mut self) {
+        while let Some(ch) = self.peek_char() {
+            if ch.is_whitespace() {
+                self.pos += ch.len_utf8();
+            } else {
+                break;
+            }
+        }
+    }
+
+    fn consume(&mut self, expected: char) -> bool {
+        if self.peek_char() == Some(expected) {
+            self.pos += expected.len_utf8();
+            true
+        } else {
+            false
+        }
+    }
+
+    fn expect(&mut self, expected: char) -> Option<()> {
+        self.skip_ws();
+        if self.consume(expected) {
+            Some(())
+        } else {
+            None
+        }
+    }
+
+    fn peek_char(&self) -> Option<char> {
+        self.input[self.pos..].chars().next()
+    }
+
+    fn is_eof(&self) -> bool {
+        self.pos >= self.input.len()
+    }
+}
+
+fn parse_calc_expr(input: &str) -> Option<CalcExpr> {
+    let mut parser = CalcParser::new(input);
+    let expr = parser.parse_expression()?;
+    parser.skip_ws();
+    if parser.is_eof() {
+        Some(expr)
+    } else {
+        None
+    }
+}
+
+fn apply_length_property(value: &str, dest: &mut Option<Val>, dest_calc: &mut Option<CalcExpr>) {
+    if let Some(val) = convert_to_val(value.to_string()) {
+        *dest = Some(val);
+        *dest_calc = None;
+        return;
+    }
+
+    if let Some(expr) = parse_calc_expr(value) {
+        *dest = None;
+        *dest_calc = Some(expr);
+    }
+}
+
 /// Converts a string representation of a CSS value into a Bevy [`Val`].
 ///
 /// # Supported Formats
@@ -753,18 +1312,13 @@ fn convert_to_font_weight(value: String) -> Option<FontWeight> {
 /// - `None` if the format is invalid or cannot be parsed.
 ///
 pub fn convert_to_val(value: String) -> Option<Val> {
-    let mut val = None;
-    let trimmed = value.trim();
-    if trimmed.ends_with("px") {
-        let count = trimmed.replace("px", "").parse::<f32>().ok()?;
-        val = Some(Val::Px(count));
-    } else if trimmed.ends_with("%") {
-        let count = trimmed.replace("%", "").parse::<f32>().ok()?;
-        val = Some(Val::Percent(count));
-    } else if trimmed == "0" || trimmed == "0.0" || trimmed == "-0" || trimmed == "-0.0" {
-        val = Some(Val::Px(0.0));
+    let parsed = parse_math_value(value.trim())?;
+    match parsed.unit {
+        CalcUnit::Px => Some(Val::Px(parsed.value)),
+        CalcUnit::Percent => Some(Val::Percent(parsed.value)),
+        CalcUnit::None if parsed.value == 0.0 => Some(Val::Px(0.0)),
+        _ => None,
     }
-    val
 }
 
 /// Parses a two-value length into a `Val2`, defaulting the second to zero.
@@ -838,7 +1392,9 @@ fn apply_transform_functions(value: &str, transform: &mut TransformStyle) {
 
 /// Parses a scale value into an `f32`.
 fn parse_scale_value(value: &str) -> Option<f32> {
-    value.trim().parse::<f32>().ok()
+    parse_math_value(value)
+        .filter(|val| val.unit == CalcUnit::None)
+        .map(|val| val.value)
 }
 
 /// Parses scale values into a `Vec2`.
@@ -857,27 +1413,14 @@ fn parse_scale_vec2(value: &str) -> Option<Vec2> {
 
 /// Parses a rotation value into radians.
 fn parse_rotation(value: &str) -> Option<f32> {
-    let token = value.trim().to_ascii_lowercase();
-    if let Some(deg) = token.strip_suffix("deg") {
-        return deg
-            .trim()
-            .parse::<f32>()
-            .ok()
-            .map(|v| nudge_problematic_rotation(v.to_radians()));
-    }
-
-    if let Some(rad) = token.strip_suffix("rad") {
-        return rad
-            .trim()
-            .parse::<f32>()
-            .ok()
-            .map(nudge_problematic_rotation);
-    }
-
-    token
-        .parse::<f32>()
-        .ok()
-        .map(|v| nudge_problematic_rotation(v.to_radians()))
+    let parsed = parse_math_value(value.trim())?;
+    let radians = match parsed.unit {
+        CalcUnit::None | CalcUnit::Deg => parsed.value.to_radians(),
+        CalcUnit::Rad => parsed.value,
+        CalcUnit::Turn => parsed.value * std::f32::consts::TAU,
+        _ => return None,
+    };
+    Some(nudge_problematic_rotation(radians))
 }
 
 /// Nudges rotations that are very close to quadrant boundaries to avoid artifacts.
@@ -920,8 +1463,9 @@ pub fn convert_to_i32(value: String) -> Option<i32> {
 
 /// Parses a numeric string into a floating-point value.
 pub fn convert_to_f32(value: String) -> Option<f32> {
-    let trimmed = value.trim();
-    trimmed.parse::<f32>().ok()
+    parse_math_value(value.trim())
+        .filter(|val| val.unit == CalcUnit::None)
+        .map(|val| val.value)
 }
 
 /// Converts a CSS font-size string into a [`FontVal`] (custom type).
@@ -938,16 +1482,13 @@ pub fn convert_to_f32(value: String) -> Option<f32> {
 /// - `None` if the value is malformed or unsupported.
 ///
 pub fn convert_to_font_size(value: String) -> Option<FontVal> {
-    let mut val = None;
-    let trimmed = value.trim();
-    if trimmed.ends_with("px") {
-        let count = trimmed.replace("px", "").parse::<f32>().ok()?;
-        val = Some(FontVal::Px(count));
-    } else if trimmed.ends_with("rem") {
-        let count = trimmed.replace("rem", "").parse::<f32>().ok()?;
-        val = Some(FontVal::Rem(count));
+    let parsed = parse_math_value(value.trim())?;
+    match parsed.unit {
+        CalcUnit::Px => Some(FontVal::Px(parsed.value)),
+        CalcUnit::Rem => Some(FontVal::Rem(parsed.value)),
+        CalcUnit::None if parsed.value == 0.0 => Some(FontVal::Px(0.0)),
+        _ => None,
     }
-    val
 }
 
 /// Converts a CSS color string into a Bevy [`Color`].
@@ -1731,22 +2272,15 @@ fn parse_single_grid_track(input: &str) -> Option<GridTrack> {
             let max = parse_max_sizing(parts.next()?)?;
             Some(GridTrack::minmax(min, max))
         }
-        _ if input.ends_with("px") => input
-            .strip_suffix("px")?
-            .parse::<f32>()
-            .ok()
-            .map(GridTrack::px),
-        _ if input.ends_with('%') => input
-            .strip_suffix('%')?
-            .parse::<f32>()
-            .ok()
-            .map(GridTrack::percent),
-        _ if input.ends_with("fr") => input
-            .strip_suffix("fr")?
-            .parse::<f32>()
-            .ok()
-            .map(GridTrack::fr),
-        _ => None,
+        _ => match parse_math_value(input) {
+            Some(value) => match value.unit {
+                CalcUnit::Px => Some(GridTrack::px(value.value)),
+                CalcUnit::Percent => Some(GridTrack::percent(value.value)),
+                CalcUnit::Fr => Some(GridTrack::fr(value.value)),
+                _ => None,
+            },
+            None => None,
+        },
     }
 }
 
@@ -1768,12 +2302,14 @@ fn parse_min_sizing(input: &str) -> Option<MinTrackSizingFunction> {
         "auto" => Some(MinTrackSizingFunction::Auto),
         "min-content" => Some(MinTrackSizingFunction::MinContent),
         "max-content" => Some(MinTrackSizingFunction::MaxContent),
-        _ if input.ends_with("px") => input
-            .strip_suffix("px")?
-            .parse::<f32>()
-            .ok()
-            .map(MinTrackSizingFunction::Px),
-        _ => None,
+        _ => match parse_math_value(input) {
+            Some(value) => match value.unit {
+                CalcUnit::Px => Some(MinTrackSizingFunction::Px(value.value)),
+                CalcUnit::Percent => Some(MinTrackSizingFunction::Percent(value.value)),
+                _ => None,
+            },
+            None => None,
+        },
     }
 }
 
@@ -1796,17 +2332,15 @@ fn parse_max_sizing(input: &str) -> Option<MaxTrackSizingFunction> {
         "auto" => Some(MaxTrackSizingFunction::Auto),
         "min-content" => Some(MaxTrackSizingFunction::MinContent),
         "max-content" => Some(MaxTrackSizingFunction::MaxContent),
-        _ if input.ends_with("px") => input
-            .strip_suffix("px")?
-            .parse::<f32>()
-            .ok()
-            .map(MaxTrackSizingFunction::Px),
-        _ if input.ends_with("fr") => input
-            .strip_suffix("fr")?
-            .parse::<f32>()
-            .ok()
-            .map(MaxTrackSizingFunction::Fraction),
-        _ => None,
+        _ => match parse_math_value(input) {
+            Some(value) => match value.unit {
+                CalcUnit::Px => Some(MaxTrackSizingFunction::Px(value.value)),
+                CalcUnit::Percent => Some(MaxTrackSizingFunction::Percent(value.value)),
+                CalcUnit::Fr => Some(MaxTrackSizingFunction::Fraction(value.value)),
+                _ => None,
+            },
+            None => None,
+        },
     }
 }
 
