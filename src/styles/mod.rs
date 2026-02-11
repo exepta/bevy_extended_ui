@@ -83,11 +83,12 @@ impl Radius {
     }
 }
 
-/// Defines the background style including color and optional image.
+/// Defines the background style including color, optional image, and optional gradient.
 #[derive(Reflect, Debug, Clone, PartialEq)]
 pub struct Background {
     pub color: Color,
     pub image: Option<String>,
+    pub gradient: Option<LinearGradient>,
 }
 
 impl Default for Background {
@@ -96,8 +97,30 @@ impl Default for Background {
         Self {
             color: Color::NONE,
             image: None,
+            gradient: None,
         }
     }
+}
+
+/// Represents a parsed CSS `linear-gradient(...)` definition.
+#[derive(Reflect, Debug, Clone, PartialEq)]
+pub struct LinearGradient {
+    pub angle: f32,
+    pub stops: Vec<GradientStop>,
+}
+
+/// Represents a single color stop in a linear gradient.
+#[derive(Reflect, Debug, Clone, PartialEq)]
+pub struct GradientStop {
+    pub color: Color,
+    pub position: Option<GradientStopPosition>,
+}
+
+/// Represents a gradient stop position.
+#[derive(Reflect, Debug, Clone, PartialEq)]
+pub enum GradientStopPosition {
+    Percent(f32),
+    Px(f32),
 }
 
 /// Constants for common font weight values.

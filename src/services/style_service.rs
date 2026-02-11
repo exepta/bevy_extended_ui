@@ -5,14 +5,18 @@ use crate::services::state_service::update_widget_states;
 use crate::styles::components::UiStyle;
 use crate::styles::{
     AnimationDirection, AnimationKeyframe, AnimationSpec, CalcContext, CalcExpr, CursorStyle,
-    FontVal, FontWeight, Radius, Style, TransformStyle, TransitionProperty, TransitionSpec,
+    FontVal, FontWeight, GradientStopPosition, LinearGradient, Radius, Style, TransformStyle,
+    TransitionProperty, TransitionSpec,
 };
 use crate::widgets::UIWidgetState;
 
 use bevy::color::Srgba;
+use bevy::asset::RenderAssetUsages;
+use bevy::image::ImageSampler;
 use bevy::math::Rot2;
 use bevy::prelude::*;
-use bevy::ui::{ComputedNode, UiTransform, Val2};
+use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
+use bevy::ui::{ComputedNode, UiSystems, UiTransform, Val2};
 use bevy::window::{
     CursorIcon, CustomCursor, CustomCursorImage, PrimaryWindow, SystemCursorIcon,
 };
@@ -31,6 +35,9 @@ impl Plugin for StyleService {
                 update_style_transitions.after(update_widget_styles_system),
                 update_style_animations.after(update_style_transitions),
                 apply_calc_styles_system.after(update_style_animations),
+                apply_background_gradients_system
+                    .after(apply_calc_styles_system)
+                    .after(UiSystems::Layout),
                 propagate_style_inheritance.after(apply_calc_styles_system),
                 sync_last_ui_transform.after(propagate_style_inheritance),
                 update_css_cursor_icons.after(update_widget_styles_system),
@@ -587,6 +594,70 @@ fn apply_calc_styles_system(
     }
 }
 
+fn apply_background_gradients_system(
+    mut query: Query<(
+        Entity,
+        &UiStyle,
+        Option<&StyleTransition>,
+        Option<&StyleAnimation>,
+        &ComputedNode,
+        Option<&mut ImageNode>,
+    )>,
+    mut image_cache: ResMut<ImageCache>,
+    mut images: ResMut<Assets<Image>>,
+) {
+    for (_entity, ui_style, transition_opt, animation_opt, computed, img_node_opt) in
+        query.iter_mut()
+    {
+        let Some(mut img_node) = img_node_opt else {
+            continue;
+        };
+
+        let style = if let Some(transition) = transition_opt {
+            transition.current_style.as_ref().unwrap_or(&transition.to)
+        } else if let Some(animation) = animation_opt {
+            animation.current_style.as_ref().unwrap_or(&animation.base)
+        } else {
+            let Some(active) = ui_style.active_style.as_ref() else {
+                continue;
+            };
+            active
+        };
+
+        let Some(background) = style.background.as_ref() else {
+            continue;
+        };
+        let Some(gradient) = background.gradient.as_ref() else {
+            continue;
+        };
+
+        img_node.color = Color::WHITE;
+
+        let size = computed.size;
+        if size.x <= 0.0 || size.y <= 0.0 {
+            continue;
+        }
+
+        let width = size.x.round().max(1.0) as u32;
+        let height = size.y.round().max(1.0) as u32;
+        let size = UVec2::new(width, height);
+        let inv_sf = computed.inverse_scale_factor.max(f32::EPSILON);
+        let scale_factor = inv_sf.recip();
+
+        let key = gradient_cache_key(gradient, size);
+        let handle = if let Some(handle) = image_cache.map.get(&key) {
+            handle.clone()
+        } else {
+            let image = render_linear_gradient_image(gradient, size, scale_factor);
+            let handle = images.add(image);
+            image_cache.map.insert(key, handle.clone());
+            handle
+        };
+
+        img_node.image = handle;
+    }
+}
+
 type StyleCandidate<'a> = (&'a String, u32, usize);
 
 fn sort_style_candidates(candidates: &mut [StyleCandidate<'_>]) {
@@ -632,6 +703,207 @@ fn apply_transform_style_if_blocked(
 
 fn shrink_axis(size: f32, min_inset: f32, max_inset: f32) -> f32 {
     (size - min_inset - max_inset).max(0.0)
+}
+
+fn gradient_cache_key(gradient: &LinearGradient, size: UVec2) -> String {
+    let mut key = format!("__linear-gradient__:{:.4}", gradient.angle);
+    for stop in &gradient.stops {
+        let color = stop.color.to_srgba();
+        let r = (color.red * 255.0).round() as u8;
+        let g = (color.green * 255.0).round() as u8;
+        let b = (color.blue * 255.0).round() as u8;
+        let a = (color.alpha * 255.0).round() as u8;
+        key.push_str(&format!(":{r:02x}{g:02x}{b:02x}{a:02x}"));
+        match stop.position {
+            Some(GradientStopPosition::Percent(value)) => {
+                key.push_str(&format!("@{value:.4}%"));
+            }
+            Some(GradientStopPosition::Px(value)) => {
+                key.push_str(&format!("@{value:.4}px"));
+            }
+            None => key.push_str("@auto"),
+        }
+    }
+    key.push_str(&format!(":{}x{}", size.x, size.y));
+    key
+}
+
+fn render_linear_gradient_image(
+    gradient: &LinearGradient,
+    size: UVec2,
+    scale_factor: f32,
+) -> Image {
+    let width = size.x.max(1) as usize;
+    let height = size.y.max(1) as usize;
+    let width_f = width as f32;
+    let height_f = height as f32;
+
+    let angle = gradient.angle.to_radians();
+    let direction = Vec2::new(angle.sin(), -angle.cos());
+    let line_length = (direction.x.abs() * width_f + direction.y.abs() * height_f).max(1.0);
+    let stops = resolve_gradient_stops(gradient, line_length, scale_factor);
+
+    let mut data = Vec::with_capacity(width * height * 4);
+    let half_w = width_f / 2.0;
+    let half_h = height_f / 2.0;
+
+    for y in 0..height {
+        let fy = y as f32 + 0.5 - half_h;
+        for x in 0..width {
+            let fx = x as f32 + 0.5 - half_w;
+            let projection = fx * direction.x + fy * direction.y;
+            let t = ((projection + line_length / 2.0) / line_length).clamp(0.0, 1.0);
+            let color = sample_gradient_color(&stops, t);
+            data.push((color.red * 255.0).round() as u8);
+            data.push((color.green * 255.0).round() as u8);
+            data.push((color.blue * 255.0).round() as u8);
+            data.push((color.alpha * 255.0).round() as u8);
+        }
+    }
+
+    let mut image = Image::new(
+        Extent3d {
+            width: width as u32,
+            height: height as u32,
+            depth_or_array_layers: 1,
+        },
+        TextureDimension::D2,
+        data,
+        TextureFormat::Rgba8UnormSrgb,
+        RenderAssetUsages::default(),
+    );
+    image.sampler = ImageSampler::linear();
+    image
+}
+
+#[derive(Clone, Copy)]
+struct ResolvedGradientStop {
+    color: Srgba,
+    position: f32,
+}
+
+fn resolve_gradient_stops(
+    gradient: &LinearGradient,
+    line_length: f32,
+    scale_factor: f32,
+) -> Vec<ResolvedGradientStop> {
+    let mut stops: Vec<(Srgba, Option<f32>)> = gradient
+        .stops
+        .iter()
+        .map(|stop| {
+            let position = match stop.position {
+                Some(GradientStopPosition::Percent(value)) => Some(value / 100.0),
+                Some(GradientStopPosition::Px(value)) => {
+                    Some((value * scale_factor) / line_length)
+                }
+                None => None,
+            };
+            (stop.color.to_srgba(), position)
+        })
+        .collect();
+
+    if stops.is_empty() {
+        return Vec::new();
+    }
+
+    if stops.len() == 1 {
+        let color = stops[0].0;
+        return vec![
+            ResolvedGradientStop {
+                color,
+                position: 0.0,
+            },
+            ResolvedGradientStop {
+                color,
+                position: 1.0,
+            },
+        ];
+    }
+
+    if stops.first().and_then(|stop| stop.1).is_none() {
+        stops[0].1 = Some(0.0);
+    }
+    if stops.last().and_then(|stop| stop.1).is_none() {
+        let last = stops.len() - 1;
+        stops[last].1 = Some(1.0);
+    }
+
+    let mut i = 0usize;
+    while i < stops.len() {
+        if stops[i].1.is_some() {
+            i += 1;
+            continue;
+        }
+
+        let start = i - 1;
+        let mut end = i;
+        while end < stops.len() && stops[end].1.is_none() {
+            end += 1;
+        }
+
+        let start_pos = stops[start].1.unwrap();
+        let end_pos = stops[end].1.unwrap_or(start_pos);
+        let span = (end - start) as f32;
+        let step = if span > 0.0 {
+            (end_pos - start_pos) / span
+        } else {
+            0.0
+        };
+
+        for idx in i..end {
+            stops[idx].1 = Some(start_pos + step * (idx - start) as f32);
+        }
+
+        i = end;
+    }
+
+    let mut resolved: Vec<ResolvedGradientStop> = Vec::with_capacity(stops.len());
+    let mut prev = stops[0].1.unwrap_or(0.0);
+    resolved.push(ResolvedGradientStop {
+        color: stops[0].0,
+        position: prev,
+    });
+
+    for (color, pos_opt) in stops.into_iter().skip(1) {
+        let mut pos = pos_opt.unwrap_or(prev);
+        if pos < prev {
+            pos = prev;
+        }
+        resolved.push(ResolvedGradientStop { color, position: pos });
+        prev = pos;
+    }
+
+    resolved
+}
+
+fn sample_gradient_color(stops: &[ResolvedGradientStop], t: f32) -> Srgba {
+    if stops.is_empty() {
+        return Srgba::new(0.0, 0.0, 0.0, 0.0);
+    }
+    if t <= stops[0].position {
+        return stops[0].color;
+    }
+
+    for window in stops.windows(2) {
+        let left = window[0];
+        let right = window[1];
+        if t <= right.position {
+            let span = (right.position - left.position).max(f32::EPSILON);
+            let local = ((t - left.position) / span).clamp(0.0, 1.0);
+            return lerp_srgba(left.color, right.color, local);
+        }
+    }
+
+    stops.last().map(|stop| stop.color).unwrap_or_default()
+}
+
+fn lerp_srgba(a: Srgba, b: Srgba, t: f32) -> Srgba {
+    Srgba {
+        red: lerp(a.red, b.red, t),
+        green: lerp(a.green, b.green, t),
+        blue: lerp(a.blue, b.blue, t),
+        alpha: lerp(a.alpha, b.alpha, t),
+    }
 }
 
 fn apply_calc_length(expr: Option<&CalcExpr>, ctx: CalcContext, target: &mut Val) {
@@ -1054,6 +1326,7 @@ fn blend_background(
         (Some(a), Some(b)) => Some(crate::styles::Background {
             color: blend_color(Some(a.color), Some(b.color), t).unwrap_or(a.color),
             image: if t >= 1.0 { b.image } else { a.image },
+            gradient: if t >= 1.0 { b.gradient } else { a.gradient },
         }),
         (Some(value), None) => Some(value),
         (None, Some(value)) => Some(value),

@@ -1,8 +1,9 @@
 use crate::styles::paint::Colored;
 use crate::styles::{
     AnimationDirection, AnimationKeyframe, AnimationSpec, Background, CalcExpr, CalcUnit, CalcValue,
-    CursorStyle, FontFamily, FontVal, FontWeight, ParsedCss, Radius, Style, StylePair,
-    TransformStyle, TransitionProperty, TransitionSpec, TransitionTiming,
+    CursorStyle, FontFamily, FontVal, FontWeight, GradientStop, GradientStopPosition,
+    LinearGradient, ParsedCss, Radius, Style, StylePair, TransformStyle, TransitionProperty,
+    TransitionSpec, TransitionTiming,
 };
 use bevy::ui::Val2;
 use bevy::prelude::*;
@@ -1569,6 +1570,13 @@ pub fn convert_to_color(value: String) -> Option<Color> {
 pub fn convert_to_background(value: String, all_types: bool) -> Option<Background> {
     let trimmed = value.trim();
 
+    if let Some(gradient) = parse_linear_gradient(trimmed) {
+        return Some(Background {
+            gradient: Some(gradient),
+            ..default()
+        });
+    }
+
     if trimmed.starts_with("url(") {
         let url = trimmed.trim_start_matches("url(").trim_end_matches(")");
         Some(Background {
@@ -1583,6 +1591,209 @@ pub fn convert_to_background(value: String, all_types: bool) -> Option<Backgroun
 
         None
     }
+}
+
+fn parse_linear_gradient(value: &str) -> Option<LinearGradient> {
+    let trimmed = value.trim();
+    let lower = trimmed.to_ascii_lowercase();
+    let open = lower.find('(')?;
+    let name = lower[..open].trim();
+    if name != "linear-gradient" || !trimmed.ends_with(')') {
+        return None;
+    }
+
+    let inner = &trimmed[open + 1..trimmed.len() - 1];
+    let mut parts = split_top_level_commas(inner);
+    if parts.len() < 2 {
+        return None;
+    }
+
+    let mut angle = None;
+    if let Some(candidate) = parts.first() {
+        if let Some(parsed) = parse_gradient_direction(candidate) {
+            angle = Some(parsed);
+            parts.remove(0);
+        }
+    }
+
+    let angle = angle.unwrap_or(180.0);
+    let mut stops = Vec::new();
+    for part in parts {
+        let mut parsed = parse_gradient_stop(&part)?;
+        stops.append(&mut parsed);
+    }
+
+    if stops.is_empty() {
+        return None;
+    }
+
+    Some(LinearGradient { angle, stops })
+}
+
+fn split_top_level_commas(input: &str) -> Vec<String> {
+    let mut parts = Vec::new();
+    let mut depth = 0i32;
+    let mut start = 0usize;
+
+    for (idx, ch) in input.char_indices() {
+        match ch {
+            '(' => depth += 1,
+            ')' => depth = (depth - 1).max(0),
+            ',' if depth == 0 => {
+                let segment = input[start..idx].trim();
+                if !segment.is_empty() {
+                    parts.push(segment.to_string());
+                }
+                start = idx + 1;
+            }
+            _ => {}
+        }
+    }
+
+    let tail = input[start..].trim();
+    if !tail.is_empty() {
+        parts.push(tail.to_string());
+    }
+
+    parts
+}
+
+fn parse_gradient_direction(value: &str) -> Option<f32> {
+    let trimmed = value.trim();
+    let lower = trimmed.to_ascii_lowercase();
+
+    if let Some(angle) = parse_angle_degrees(&lower) {
+        return Some(normalize_angle(angle));
+    }
+
+    let lower = lower.strip_prefix("to ")?;
+    let mut dx: f32 = 0.0;
+    let mut dy = 0.0;
+
+    for token in lower.split_whitespace() {
+        match token {
+            "left" => dx = -1.0,
+            "right" => dx = 1.0,
+            "top" => dy = -1.0,
+            "bottom" => dy = 1.0,
+            _ => return None,
+        }
+    }
+
+    if dx == 0.0 && dy == 0.0 {
+        return None;
+    }
+
+    let angle = dx.atan2(-dy).to_degrees();
+    Some(normalize_angle(angle))
+}
+
+fn parse_angle_degrees(value: &str) -> Option<f32> {
+    let trimmed = value.trim();
+    if let Some(num) = trimmed.strip_suffix("deg") {
+        return num.trim().parse::<f32>().ok();
+    }
+    if let Some(num) = trimmed.strip_suffix("rad") {
+        let radians = num.trim().parse::<f32>().ok()?;
+        return Some(radians.to_degrees());
+    }
+    if let Some(num) = trimmed.strip_suffix("turn") {
+        let turns = num.trim().parse::<f32>().ok()?;
+        return Some(turns * 360.0);
+    }
+    None
+}
+
+fn normalize_angle(angle: f32) -> f32 {
+    angle.rem_euclid(360.0)
+}
+
+fn parse_gradient_stop(value: &str) -> Option<Vec<GradientStop>> {
+    let (color_text, rest) = split_color_and_positions(value)?;
+    let color = convert_to_color(color_text)?;
+    let positions = parse_stop_positions(rest);
+
+    let mut stops = Vec::new();
+    match positions.len() {
+        0 => stops.push(GradientStop {
+            color,
+            position: None,
+        }),
+        1 => stops.push(GradientStop {
+            color,
+            position: Some(positions[0].clone()),
+        }),
+        _ => {
+            stops.push(GradientStop {
+                color,
+                position: Some(positions[0].clone()),
+            });
+            stops.push(GradientStop {
+                color,
+                position: Some(positions[1].clone()),
+            });
+        }
+    }
+
+    Some(stops)
+}
+
+fn split_color_and_positions(value: &str) -> Option<(String, &str)> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    let lower = trimmed.to_ascii_lowercase();
+    let (color, rest) = if lower.starts_with("rgb(") || lower.starts_with("rgba(") {
+        let end = trimmed.find(')')?;
+        let color = trimmed[..=end].to_string();
+        (color, &trimmed[end + 1..])
+    } else if trimmed.starts_with('#') {
+        let end = trimmed
+            .find(char::is_whitespace)
+            .unwrap_or(trimmed.len());
+        (trimmed[..end].to_string(), &trimmed[end..])
+    } else {
+        let end = trimmed
+            .find(char::is_whitespace)
+            .unwrap_or(trimmed.len());
+        (trimmed[..end].to_string(), &trimmed[end..])
+    };
+
+    Some((color, rest))
+}
+
+fn parse_stop_positions(value: &str) -> Vec<GradientStopPosition> {
+    value
+        .split_whitespace()
+        .filter_map(parse_stop_position)
+        .collect()
+}
+
+fn parse_stop_position(value: &str) -> Option<GradientStopPosition> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    if let Some(num) = trimmed.strip_suffix('%') {
+        return num
+            .trim()
+            .parse::<f32>()
+            .ok()
+            .map(GradientStopPosition::Percent);
+    }
+    if let Some(num) = trimmed.strip_suffix("px") {
+        return num
+            .trim()
+            .parse::<f32>()
+            .ok()
+            .map(GradientStopPosition::Px);
+    }
+    if trimmed == "0" {
+        return Some(GradientStopPosition::Px(0.0));
+    }
+    None
 }
 
 /// Converts a CSS `display` value into a Bevy [`Display`] enum.

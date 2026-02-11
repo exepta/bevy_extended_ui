@@ -121,8 +121,8 @@ Used by width/height, padding/margin, border widths, translation, etc.
 
 ### Background
 
-- `background`: supports `url("...")` or a color
-- `background-image`: supports only `url("...")`
+- `background`: supports `url("...")`, a color, or `linear-gradient(...)`
+- `background-image`: supports `url("...")` or `linear-gradient(...)`
 - `background-color`: color only
 
 ### Border
