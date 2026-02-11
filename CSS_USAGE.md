@@ -9,6 +9,12 @@ properties or values are ignored silently.
 - Use them as `var(--name)` with no fallback support.
 - The parser only resolves the exact `var(...)` form; nested or chained vars are not resolved.
 
+## Selectors
+
+- Descendant selectors use whitespace (`parent child`).
+- Direct child selectors use `>` (`parent > child`).
+- Nested rules are supported with `&` for the parent selector (e.g. `button { &:hover { ... } }`).
+
 ## Supported Properties
 
 ### Box Model / Sizing

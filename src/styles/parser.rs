@@ -9,7 +9,7 @@ use bevy::prelude::*;
 use bevy::window::SystemCursorIcon;
 use lightningcss::rules::CssRule;
 use lightningcss::rules::keyframes::KeyframeSelector;
-use lightningcss::stylesheet::{ParserOptions, PrinterOptions, StyleSheet};
+use lightningcss::stylesheet::{ParserFlags, ParserOptions, PrinterOptions, StyleSheet};
 use lightningcss::traits::ToCss;
 use regex::Regex;
 use std::cmp::Ordering;
@@ -33,7 +33,10 @@ use std::collections::HashMap;
 /// - Supports standard properties like `width`, `height`, `padding`, `color`, `background`, `font-size`, `z-index`, etc.
 /// - Ignores unsupported or malformed declarations silently.
 pub fn load_css(css: &str) -> ParsedCss {
-    let stylesheet = match StyleSheet::parse(css, ParserOptions::default()) {
+    let mut options = ParserOptions::default();
+    options.flags.insert(ParserFlags::NESTING);
+
+    let stylesheet = match StyleSheet::parse(css, options) {
         Ok(stylesheet) => stylesheet,
         Err(err) => {
             error!("Css Parsing failed: {:?}", err);
@@ -45,114 +48,13 @@ pub fn load_css(css: &str) -> ParsedCss {
     let mut style_map = HashMap::new();
     let mut keyframes_map: HashMap<String, Vec<AnimationKeyframe>> = HashMap::new();
 
-    for rule in &stylesheet.rules.0 {
-        if let CssRule::Style(style_rule) = rule {
-            let selector = match style_rule
-                .selectors
-                .to_css_string(PrinterOptions::default())
-            {
-                Ok(s) => s,
-                Err(_) => continue,
-            };
-
-            let mut style = StylePair {
-                origin: 0,
-                ..Default::default()
-            };
-            let decls = &style_rule.declarations;
-
-            if selector.trim() == ":root" {
-                for property in decls
-                    .declarations
-                    .iter()
-                    .chain(decls.important_declarations.iter())
-                {
-                    let property_id = property.property_id();
-                    let name = property_id.name();
-                    if name.starts_with("--") {
-                        if let Ok(value) = property.value_to_css_string(PrinterOptions::default()) {
-                            css_vars.insert(name.to_string(), value);
-                        }
-                    }
-                }
-                continue;
-            }
-
-            // 1) normale Declarations
-            for property in &decls.declarations {
-                let property_id = property.property_id();
-                let name = property_id.name();
-
-                let value = match property.value_to_css_string(PrinterOptions::default()) {
-                    Ok(v) => v,
-                    Err(_) => continue,
-                };
-
-                let resolved = resolve_var(&value, &css_vars);
-                apply_property_to_style(&mut style.normal, name, &resolved);
-            }
-
-            for property in &decls.important_declarations {
-                let property_id = property.property_id();
-                let name = property_id.name();
-
-                let value = match property.value_to_css_string(PrinterOptions::default()) {
-                    Ok(v) => v,
-                    Err(_) => continue,
-                };
-
-                let resolved = resolve_var(&value, &css_vars);
-                apply_property_to_style(&mut style.important, name, &resolved);
-            }
-
-            style_map.insert(selector, style);
-        }
-
-        if let CssRule::Keyframes(keyframes_rule) = rule {
-            let name = match keyframes_rule.name.to_css_string(PrinterOptions::default()) {
-                Ok(name) => name,
-                Err(_) => continue,
-            };
-
-            let entry = keyframes_map.entry(name).or_default();
-
-            for keyframe in &keyframes_rule.keyframes {
-                let mut style = Style::default();
-                let decls = &keyframe.declarations;
-
-                for property in &decls.declarations {
-                    let property_id = property.property_id();
-                    let name = property_id.name();
-                    let value = match property.value_to_css_string(PrinterOptions::default()) {
-                        Ok(v) => v,
-                        Err(_) => continue,
-                    };
-                    let resolved = resolve_var(&value, &css_vars);
-                    apply_property_to_style(&mut style, name, &resolved);
-                }
-
-                for property in &decls.important_declarations {
-                    let property_id = property.property_id();
-                    let name = property_id.name();
-                    let value = match property.value_to_css_string(PrinterOptions::default()) {
-                        Ok(v) => v,
-                        Err(_) => continue,
-                    };
-                    let resolved = resolve_var(&value, &css_vars);
-                    apply_property_to_style(&mut style, name, &resolved);
-                }
-
-                for selector in &keyframe.selectors {
-                    if let Some(progress) = keyframe_selector_progress(selector) {
-                        entry.push(AnimationKeyframe {
-                            progress,
-                            style: style.clone(),
-                        });
-                    }
-                }
-            }
-        }
-    }
+    collect_css_rules(
+        &stylesheet.rules,
+        None,
+        &mut css_vars,
+        &mut style_map,
+        &mut keyframes_map,
+    );
 
     for keyframes in keyframes_map.values_mut() {
         keyframes.sort_by(|a, b| {
@@ -166,6 +68,229 @@ pub fn load_css(css: &str) -> ParsedCss {
         styles: style_map,
         keyframes: keyframes_map,
     }
+}
+
+fn collect_css_rules(
+    rules: &lightningcss::rules::CssRuleList<'_>,
+    parent_selectors: Option<&[String]>,
+    css_vars: &mut HashMap<String, String>,
+    style_map: &mut HashMap<String, StylePair>,
+    keyframes_map: &mut HashMap<String, Vec<AnimationKeyframe>>,
+) {
+    for rule in &rules.0 {
+        match rule {
+            CssRule::Style(style_rule) => collect_style_rule(
+                style_rule,
+                parent_selectors,
+                css_vars,
+                style_map,
+                keyframes_map,
+            ),
+            CssRule::Nesting(nesting_rule) => collect_style_rule(
+                &nesting_rule.style,
+                parent_selectors,
+                css_vars,
+                style_map,
+                keyframes_map,
+            ),
+            CssRule::NestedDeclarations(nested_rule) => {
+                if let Some(parent_selectors) = parent_selectors {
+                    let mut style = StylePair {
+                        origin: 0,
+                        ..Default::default()
+                    };
+                    apply_declaration_list(
+                        &mut style.normal,
+                        &nested_rule.declarations.declarations,
+                        css_vars,
+                    );
+                    apply_declaration_list(
+                        &mut style.important,
+                        &nested_rule.declarations.important_declarations,
+                        css_vars,
+                    );
+                    for selector in parent_selectors {
+                        merge_style_map(style_map, selector, &style);
+                    }
+                }
+            }
+            CssRule::Keyframes(keyframes_rule) => {
+                collect_keyframes_rule(keyframes_rule, css_vars, keyframes_map);
+            }
+            _ => {}
+        }
+    }
+}
+
+fn collect_style_rule(
+    style_rule: &lightningcss::rules::style::StyleRule<'_>,
+    parent_selectors: Option<&[String]>,
+    css_vars: &mut HashMap<String, String>,
+    style_map: &mut HashMap<String, StylePair>,
+    keyframes_map: &mut HashMap<String, Vec<AnimationKeyframe>>,
+) {
+    let selectors = selector_list_to_strings(&style_rule.selectors);
+    if parent_selectors.is_none()
+        && selectors.len() == 1
+        && selectors[0].trim() == ":root"
+    {
+        collect_css_vars(&style_rule.declarations, css_vars);
+        return;
+    }
+
+    let full_selectors = expand_selectors(parent_selectors, selectors);
+
+    let mut style = StylePair {
+        origin: 0,
+        ..Default::default()
+    };
+    let decls = &style_rule.declarations;
+
+    apply_declaration_list(&mut style.normal, &decls.declarations, css_vars);
+    apply_declaration_list(
+        &mut style.important,
+        &decls.important_declarations,
+        css_vars,
+    );
+
+    for selector in &full_selectors {
+        merge_style_map(style_map, selector, &style);
+    }
+
+    collect_css_rules(
+        &style_rule.rules,
+        Some(&full_selectors),
+        css_vars,
+        style_map,
+        keyframes_map,
+    );
+}
+
+fn collect_keyframes_rule(
+    keyframes_rule: &lightningcss::rules::keyframes::KeyframesRule<'_>,
+    css_vars: &HashMap<String, String>,
+    keyframes_map: &mut HashMap<String, Vec<AnimationKeyframe>>,
+) {
+    let name = match keyframes_rule.name.to_css_string(PrinterOptions::default()) {
+        Ok(name) => name,
+        Err(_) => return,
+    };
+
+    let entry = keyframes_map.entry(name).or_default();
+
+    for keyframe in &keyframes_rule.keyframes {
+        let mut style = Style::default();
+        let decls = &keyframe.declarations;
+
+        apply_declaration_list(&mut style, &decls.declarations, css_vars);
+        apply_declaration_list(&mut style, &decls.important_declarations, css_vars);
+
+        for selector in &keyframe.selectors {
+            if let Some(progress) = keyframe_selector_progress(selector) {
+                entry.push(AnimationKeyframe {
+                    progress,
+                    style: style.clone(),
+                });
+            }
+        }
+    }
+}
+
+fn selector_list_to_strings(
+    selectors: &lightningcss::selector::SelectorList<'_>,
+) -> Vec<String> {
+    let mut out = Vec::new();
+    for selector in selectors.0.iter() {
+        if let Ok(s) = selector.to_css_string(PrinterOptions::default()) {
+            out.push(s);
+        }
+    }
+    out
+}
+
+fn expand_selectors(parent_selectors: Option<&[String]>, selectors: Vec<String>) -> Vec<String> {
+    let Some(parents) = parent_selectors else {
+        return selectors
+            .into_iter()
+            .map(|s| normalize_selector(&s))
+            .collect();
+    };
+
+    let mut expanded = Vec::new();
+    for parent in parents {
+        for selector in &selectors {
+            let combined = combine_selector(parent, selector);
+            expanded.push(normalize_selector(&combined));
+        }
+    }
+    expanded
+}
+
+fn combine_selector(parent: &str, nested: &str) -> String {
+    let trimmed = nested.trim();
+    if trimmed.contains('&') {
+        return trimmed.replace('&', parent);
+    }
+    if trimmed.starts_with('>') {
+        return format!("{parent} {trimmed}");
+    }
+    format!("{parent} {trimmed}")
+}
+
+fn normalize_selector(selector: &str) -> String {
+    selector
+        .replace('>', " > ")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn collect_css_vars(
+    decls: &lightningcss::declaration::DeclarationBlock<'_>,
+    css_vars: &mut HashMap<String, String>,
+) {
+    for property in decls
+        .declarations
+        .iter()
+        .chain(decls.important_declarations.iter())
+    {
+        let property_id = property.property_id();
+        let name = property_id.name();
+        if name.starts_with("--") {
+            if let Ok(value) = property.value_to_css_string(PrinterOptions::default()) {
+                css_vars.insert(name.to_string(), value);
+            }
+        }
+    }
+}
+
+fn apply_declaration_list(
+    style: &mut Style,
+    declarations: &[lightningcss::properties::Property<'_>],
+    css_vars: &HashMap<String, String>,
+) {
+    for property in declarations {
+        let property_id = property.property_id();
+        let name = property_id.name();
+
+        let value = match property.value_to_css_string(PrinterOptions::default()) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+
+        let resolved = resolve_var(&value, css_vars);
+        apply_property_to_style(style, name, &resolved);
+    }
+}
+
+fn merge_style_map(style_map: &mut HashMap<String, StylePair>, selector: &str, style: &StylePair) {
+    style_map
+        .entry(selector.to_string())
+        .and_modify(|existing| {
+            existing.normal.merge(&style.normal);
+            existing.important.merge(&style.important);
+        })
+        .or_insert_with(|| style.clone());
 }
 
 /// Resolves a `var(...)` reference using the collected CSS variables.

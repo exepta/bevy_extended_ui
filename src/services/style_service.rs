@@ -1042,7 +1042,10 @@ fn lerp(from: f32, to: f32, t: f32) -> f32 {
 
 /// Returns true if the selector's pseudo state matches the widget state.
 fn selector_matches_state(selector: &str, state: &UIWidgetState) -> bool {
-    for part in selector.split_whitespace() {
+    for part in selector.replace('>', " > ").split_whitespace() {
+        if part == ">" {
+            continue;
+        }
         let segments: Vec<&str> = part.split(':').collect();
         for pseudo in &segments[1..] {
             match *pseudo {
@@ -1062,7 +1065,10 @@ fn selector_matches_state(selector: &str, state: &UIWidgetState) -> bool {
 /// Computes a simple specificity score for a selector.
 fn selector_specificity(selector: &str) -> u32 {
     let mut spec = 0;
-    for part in selector.split_whitespace() {
+    for part in selector.replace('>', " > ").split_whitespace() {
+        if part == ">" {
+            continue;
+        }
         let segments: Vec<&str> = part.split(':').collect();
         let base = segments[0];
 
