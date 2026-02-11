@@ -6,8 +6,9 @@ properties or values are ignored silently.
 ## Variables
 
 - Define CSS variables only in `:root` using `--name: value`.
-- Use them as `var(--name)` with no fallback support.
-- The parser only resolves the exact `var(...)` form; nested or chained vars are not resolved.
+- Use them as `var(--name)` or with fallback `var(--name, #000)`.
+- Fallbacks may be another variable, e.g. `var(--primary, var(--default))`.
+- The parser only resolves the exact `var(...)` form; var() inside other functions is not resolved.
 
 ## Selectors
 

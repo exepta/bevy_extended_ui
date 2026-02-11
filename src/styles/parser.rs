@@ -295,12 +295,48 @@ fn merge_style_map(style_map: &mut HashMap<String, StylePair>, selector: &str, s
 
 /// Resolves a `var(...)` reference using the collected CSS variables.
 fn resolve_var(value: &str, css_vars: &HashMap<String, String>) -> String {
-    if let Some(var_name) = value.strip_prefix("var(").and_then(|s| s.strip_suffix(')')) {
-        if let Some(var_value) = css_vars.get(var_name.trim()) {
-            return var_value.clone();
+    resolve_var_inner(value, css_vars, 0)
+}
+
+fn resolve_var_inner(value: &str, css_vars: &HashMap<String, String>, depth: u8) -> String {
+    if depth >= 8 {
+        return value.to_string();
+    }
+
+    let trimmed = value.trim();
+    if !trimmed.starts_with("var(") || !trimmed.ends_with(')') {
+        return value.to_string();
+    }
+
+    let inner = &trimmed[4..trimmed.len() - 1];
+    let (name, fallback) = split_var_args(inner);
+    let name = name.trim();
+
+    if let Some(var_value) = css_vars.get(name) {
+        return resolve_var_inner(var_value, css_vars, depth + 1);
+    }
+
+    if let Some(fallback) = fallback {
+        return resolve_var_inner(fallback.trim(), css_vars, depth + 1);
+    }
+
+    value.to_string()
+}
+
+fn split_var_args(input: &str) -> (&str, Option<&str>) {
+    let mut depth = 0u8;
+    for (idx, ch) in input.char_indices() {
+        match ch {
+            '(' => depth = depth.saturating_add(1),
+            ')' => depth = depth.saturating_sub(1),
+            ',' if depth == 0 => {
+                let (name, fallback) = input.split_at(idx);
+                return (name, Some(&fallback[1..]));
+            }
+            _ => {}
         }
     }
-    value.to_string()
+    (input, None)
 }
 
 /// Applies a single CSS property to a mutable [`Style`] object.
