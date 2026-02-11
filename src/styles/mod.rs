@@ -102,6 +102,66 @@ impl Default for Background {
     }
 }
 
+/// Defines how a background image is positioned.
+#[derive(Reflect, Debug, Clone, PartialEq)]
+pub struct BackgroundPosition {
+    pub x: BackgroundPositionValue,
+    pub y: BackgroundPositionValue,
+}
+
+impl Default for BackgroundPosition {
+    fn default() -> Self {
+        Self {
+            x: BackgroundPositionValue::Percent(0.0),
+            y: BackgroundPositionValue::Percent(0.0),
+        }
+    }
+}
+
+/// Represents a single background position axis value.
+#[derive(Reflect, Debug, Clone, PartialEq)]
+pub enum BackgroundPositionValue {
+    Percent(f32),
+    Px(f32),
+}
+
+/// Defines how a background image is sized.
+#[derive(Reflect, Debug, Clone, PartialEq)]
+pub enum BackgroundSize {
+    Auto,
+    Cover,
+    Contain,
+    Explicit(BackgroundSizeValue, BackgroundSizeValue),
+}
+
+impl Default for BackgroundSize {
+    fn default() -> Self {
+        Self::Auto
+    }
+}
+
+/// Represents a single background size axis value.
+#[derive(Reflect, Debug, Clone, PartialEq)]
+pub enum BackgroundSizeValue {
+    Auto,
+    Percent(f32),
+    Px(f32),
+}
+
+/// Defines how the background image is attached.
+#[derive(Reflect, Debug, Clone, PartialEq)]
+pub enum BackgroundAttachment {
+    Scroll,
+    Fixed,
+    Local,
+}
+
+impl Default for BackgroundAttachment {
+    fn default() -> Self {
+        Self::Scroll
+    }
+}
+
 /// Represents a parsed CSS `linear-gradient(...)` definition.
 #[derive(Reflect, Debug, Clone, PartialEq)]
 pub struct LinearGradient {
@@ -689,6 +749,9 @@ pub struct Style {
     pub overflow: Option<Overflow>,
     pub color: Option<Color>,
     pub background: Option<Background>,
+    pub background_position: Option<BackgroundPosition>,
+    pub background_size: Option<BackgroundSize>,
+    pub background_attachment: Option<BackgroundAttachment>,
     pub border_color: Option<Color>,
     pub border_width: Option<Val>,
     pub border_radius: Option<Radius>,
@@ -807,6 +870,9 @@ impl Style {
 
         merge_opt(&mut self.color, &other.color);
         merge_opt(&mut self.background, &other.background);
+        merge_opt(&mut self.background_position, &other.background_position);
+        merge_opt(&mut self.background_size, &other.background_size);
+        merge_opt(&mut self.background_attachment, &other.background_attachment);
 
         merge_opt(&mut self.border_color, &other.border_color);
         merge_opt(&mut self.border_width, &other.border_width);

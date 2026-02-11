@@ -4,9 +4,10 @@ use crate::services::image_service::get_or_load_image;
 use crate::services::state_service::update_widget_states;
 use crate::styles::components::UiStyle;
 use crate::styles::{
-    AnimationDirection, AnimationKeyframe, AnimationSpec, CalcContext, CalcExpr, CursorStyle,
-    FontVal, FontWeight, GradientStopPosition, LinearGradient, Radius, Style, TransformStyle,
-    TransitionProperty, TransitionSpec,
+    AnimationDirection, AnimationKeyframe, AnimationSpec, BackgroundAttachment, BackgroundPosition,
+    BackgroundPositionValue, BackgroundSize, BackgroundSizeValue, CalcContext, CalcExpr,
+    CursorStyle, FontVal, FontWeight, GradientStopPosition, LinearGradient, Radius, Style,
+    TransformStyle, TransitionProperty, TransitionSpec,
 };
 use crate::widgets::UIWidgetState;
 
@@ -16,7 +17,9 @@ use bevy::image::ImageSampler;
 use bevy::math::Rot2;
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
-use bevy::ui::{ComputedNode, UiSystems, UiTransform, Val2};
+use bevy::ui::{
+    ComputedNode, ComputedUiRenderTargetInfo, UiGlobalTransform, UiSystems, UiTransform, Val2,
+};
 use bevy::window::{
     CursorIcon, CustomCursor, CustomCursorImage, PrimaryWindow, SystemCursorIcon,
 };
@@ -37,6 +40,9 @@ impl Plugin for StyleService {
                 apply_calc_styles_system.after(update_style_animations),
                 apply_background_gradients_system
                     .after(apply_calc_styles_system)
+                    .after(UiSystems::Layout),
+                apply_background_images_system
+                    .after(apply_background_gradients_system)
                     .after(UiSystems::Layout),
                 propagate_style_inheritance.after(apply_calc_styles_system),
                 sync_last_ui_transform.after(propagate_style_inheritance),
@@ -631,7 +637,9 @@ fn apply_background_gradients_system(
             continue;
         };
 
-        img_node.color = Color::WHITE;
+        if img_node.color != Color::WHITE {
+            img_node.color = Color::WHITE;
+        }
 
         let size = computed.size;
         if size.x <= 0.0 || size.y <= 0.0 {
@@ -654,7 +662,160 @@ fn apply_background_gradients_system(
             handle
         };
 
-        img_node.image = handle;
+        if img_node.image != handle {
+            img_node.image = handle;
+        }
+    }
+}
+
+fn apply_background_images_system(
+    mut query: Query<(
+        Entity,
+        &UiStyle,
+        Option<&StyleTransition>,
+        Option<&StyleAnimation>,
+        &ComputedNode,
+        &ComputedUiRenderTargetInfo,
+        Option<&UiGlobalTransform>,
+        Option<&mut ImageNode>,
+    )>,
+    asset_server: Res<AssetServer>,
+    mut image_cache: ResMut<ImageCache>,
+    mut images: ResMut<Assets<Image>>,
+) {
+    for (
+        _entity,
+        ui_style,
+        transition_opt,
+        animation_opt,
+        computed,
+        render_target,
+        global_transform,
+        img_node_opt,
+    ) in query.iter_mut()
+    {
+        let Some(mut img_node) = img_node_opt else {
+            continue;
+        };
+
+        let style = if let Some(transition) = transition_opt {
+            transition.current_style.as_ref().unwrap_or(&transition.to)
+        } else if let Some(animation) = animation_opt {
+            animation.current_style.as_ref().unwrap_or(&animation.base)
+        } else {
+            let Some(active) = ui_style.active_style.as_ref() else {
+                continue;
+            };
+            active
+        };
+
+        let Some(background) = style.background.as_ref() else {
+            continue;
+        };
+        if background.gradient.is_some() {
+            continue;
+        }
+        let Some(image_path) = background.image.as_ref() else {
+            continue;
+        };
+
+        if img_node.color != Color::WHITE {
+            img_node.color = Color::WHITE;
+        }
+
+        let size = computed.size;
+        if size.x <= 0.0 || size.y <= 0.0 {
+            continue;
+        }
+
+        let container_size = UVec2::new(
+            size.x.round().max(1.0) as u32,
+            size.y.round().max(1.0) as u32,
+        );
+        let inv_sf = computed.inverse_scale_factor.max(f32::EPSILON);
+        let scale_factor = inv_sf.recip();
+
+        let attachment = style
+            .background_attachment
+            .clone()
+            .unwrap_or_default();
+        let position = style
+            .background_position
+            .clone()
+            .unwrap_or_default();
+        let bg_size = style.background_size.clone().unwrap_or_default();
+
+        let source_handle =
+            get_or_load_image(image_path.as_str(), &mut image_cache, &mut images, &asset_server);
+        let Some(source_image) = images.get(source_handle.id()) else {
+            continue;
+        };
+
+        let source_size = source_image.size();
+        if source_size.x == 0 || source_size.y == 0 {
+            continue;
+        }
+
+        let viewport_size = render_target.physical_size();
+        let viewport_size = if viewport_size.x == 0 || viewport_size.y == 0 {
+            container_size
+        } else {
+            viewport_size
+        };
+        let positioning_size = if matches!(attachment, BackgroundAttachment::Fixed) {
+            viewport_size
+        } else {
+            container_size
+        };
+
+        let draw_size = resolve_background_draw_size(
+            &bg_size,
+            source_size,
+            positioning_size,
+            scale_factor,
+        );
+        if draw_size.x == 0 || draw_size.y == 0 {
+            continue;
+        }
+
+        let mut offset =
+            resolve_background_position(&position, positioning_size, draw_size, scale_factor);
+        if matches!(attachment, BackgroundAttachment::Fixed) {
+            if let Some(transform) = global_transform {
+                let half = size * 0.5;
+                let top_left = transform.affine().transform_point2(-half);
+                offset -= top_left;
+            }
+        } else if matches!(attachment, BackgroundAttachment::Local) {
+            offset -= computed.scroll_position;
+        }
+
+        let cache_key = background_image_cache_key(
+            &source_handle,
+            container_size,
+            draw_size,
+            offset,
+            attachment,
+        );
+        let handle = if let Some(handle) = image_cache.map.get(&cache_key) {
+            handle.clone()
+        } else {
+            let Some(image) = render_background_image(
+                source_image,
+                container_size,
+                draw_size,
+                offset,
+            ) else {
+                continue;
+            };
+            let handle = images.add(image);
+            image_cache.map.insert(cache_key, handle.clone());
+            handle
+        };
+
+        if img_node.image != handle {
+            img_node.image = handle;
+        }
     }
 }
 
@@ -726,6 +887,191 @@ fn gradient_cache_key(gradient: &LinearGradient, size: UVec2) -> String {
     }
     key.push_str(&format!(":{}x{}", size.x, size.y));
     key
+}
+
+fn background_image_cache_key(
+    source: &Handle<Image>,
+    container_size: UVec2,
+    draw_size: UVec2,
+    offset: Vec2,
+    attachment: BackgroundAttachment,
+) -> String {
+    let id = format!("{:?}", source.id());
+    let offset_x = offset.x.round();
+    let offset_y = offset.y.round();
+    format!(
+        "__background-image__:{id}:{}x{}:{}x{}:{offset_x:.1}:{offset_y:.1}:{attachment:?}",
+        container_size.x, container_size.y, draw_size.x, draw_size.y
+    )
+}
+
+fn resolve_background_draw_size(
+    size: &BackgroundSize,
+    source: UVec2,
+    area: UVec2,
+    scale_factor: f32,
+) -> UVec2 {
+    let source_w = source.x.max(1) as f32;
+    let source_h = source.y.max(1) as f32;
+    let area_w = area.x.max(1) as f32;
+    let area_h = area.y.max(1) as f32;
+
+    let (target_w, target_h) = match size {
+        BackgroundSize::Auto => (source_w, source_h),
+        BackgroundSize::Cover => {
+            let scale = (area_w / source_w).max(area_h / source_h);
+            (source_w * scale, source_h * scale)
+        }
+        BackgroundSize::Contain => {
+            let scale = (area_w / source_w).min(area_h / source_h);
+            (source_w * scale, source_h * scale)
+        }
+        BackgroundSize::Explicit(width, height) => {
+            let mut w = resolve_background_size_value(width, area_w, scale_factor);
+            let mut h = resolve_background_size_value(height, area_h, scale_factor);
+            if w.is_none() && h.is_none() {
+                w = Some(source_w);
+                h = Some(source_h);
+            } else if w.is_none() {
+                let ratio = source_w / source_h;
+                w = Some(h.unwrap_or(source_h) * ratio);
+            } else if h.is_none() {
+                let ratio = source_h / source_w;
+                h = Some(w.unwrap_or(source_w) * ratio);
+            }
+            (w.unwrap_or(source_w), h.unwrap_or(source_h))
+        }
+    };
+
+    UVec2::new(
+        target_w.max(1.0).round() as u32,
+        target_h.max(1.0).round() as u32,
+    )
+}
+
+fn resolve_background_size_value(
+    value: &BackgroundSizeValue,
+    area: f32,
+    scale_factor: f32,
+) -> Option<f32> {
+    match value {
+        BackgroundSizeValue::Auto => None,
+        BackgroundSizeValue::Percent(percent) => Some(area * percent / 100.0),
+        BackgroundSizeValue::Px(px) => Some(px * scale_factor),
+    }
+}
+
+fn resolve_background_position(
+    position: &BackgroundPosition,
+    area: UVec2,
+    image: UVec2,
+    scale_factor: f32,
+) -> Vec2 {
+    let area_w = area.x as f32;
+    let area_h = area.y as f32;
+    let image_w = image.x as f32;
+    let image_h = image.y as f32;
+
+    let x = resolve_background_position_axis(
+        &position.x,
+        area_w,
+        image_w,
+        scale_factor,
+    );
+    let y = resolve_background_position_axis(
+        &position.y,
+        area_h,
+        image_h,
+        scale_factor,
+    );
+    Vec2::new(x, y)
+}
+
+fn resolve_background_position_axis(
+    value: &BackgroundPositionValue,
+    area: f32,
+    image: f32,
+    scale_factor: f32,
+) -> f32 {
+    match value {
+        BackgroundPositionValue::Percent(percent) => (area - image) * percent / 100.0,
+        BackgroundPositionValue::Px(px) => px * scale_factor,
+    }
+}
+
+fn render_background_image(
+    source: &Image,
+    container_size: UVec2,
+    draw_size: UVec2,
+    offset: Vec2,
+) -> Option<Image> {
+    let source_format = source.texture_descriptor.format;
+    let supported = matches!(
+        source_format,
+        TextureFormat::Rgba8Unorm | TextureFormat::Rgba8UnormSrgb
+    );
+    if !supported {
+        return None;
+    }
+
+    let data = source.data.as_ref()?;
+    let source_size = source.size();
+    let src_w = source_size.x as usize;
+    let src_h = source_size.y as usize;
+    if src_w == 0 || src_h == 0 {
+        return None;
+    }
+
+    let out_w = container_size.x as usize;
+    let out_h = container_size.y as usize;
+    let mut out = vec![0u8; out_w * out_h * 4];
+
+    let draw_w = draw_size.x as usize;
+    let draw_h = draw_size.y as usize;
+    if draw_w == 0 || draw_h == 0 {
+        return None;
+    }
+
+    let offset_x = offset.x.round() as i32;
+    let offset_y = offset.y.round() as i32;
+
+    for y in 0..draw_h {
+        let dest_y = offset_y + y as i32;
+        if dest_y < 0 || dest_y >= out_h as i32 {
+            continue;
+        }
+        let src_y = ((y as f32 + 0.5) * src_h as f32 / draw_h as f32)
+            .floor()
+            .clamp(0.0, (src_h - 1) as f32) as usize;
+
+        for x in 0..draw_w {
+            let dest_x = offset_x + x as i32;
+            if dest_x < 0 || dest_x >= out_w as i32 {
+                continue;
+            }
+            let src_x = ((x as f32 + 0.5) * src_w as f32 / draw_w as f32)
+                .floor()
+                .clamp(0.0, (src_w - 1) as f32) as usize;
+
+            let src_idx = (src_y * src_w + src_x) * 4;
+            let dst_idx = (dest_y as usize * out_w + dest_x as usize) * 4;
+            out[dst_idx..dst_idx + 4].copy_from_slice(&data[src_idx..src_idx + 4]);
+        }
+    }
+
+    let mut image = Image::new(
+        Extent3d {
+            width: out_w as u32,
+            height: out_h as u32,
+            depth_or_array_layers: 1,
+        },
+        TextureDimension::D2,
+        out,
+        source_format,
+        RenderAssetUsages::default(),
+    );
+    image.sampler = ImageSampler::linear();
+    Some(image)
 }
 
 fn render_linear_gradient_image(

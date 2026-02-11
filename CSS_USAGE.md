@@ -124,6 +124,9 @@ Used by width/height, padding/margin, border widths, translation, etc.
 - `background`: supports `url("...")`, a color, or `linear-gradient(...)`
 - `background-image`: supports `url("...")` or `linear-gradient(...)`
 - `background-color`: color only
+- `background-position`: supports keywords (`left`, `right`, `top`, `bottom`, `center`) and `%`/`px`
+- `background-size`: supports `auto`, `cover`, `contain`, or `%`/`px` values
+- `background-attachment`: supports `scroll`, `fixed`, `local`
 
 ### Border
 

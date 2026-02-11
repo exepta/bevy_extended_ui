@@ -1,9 +1,10 @@
 use crate::styles::paint::Colored;
 use crate::styles::{
-    AnimationDirection, AnimationKeyframe, AnimationSpec, Background, CalcExpr, CalcUnit, CalcValue,
-    CursorStyle, FontFamily, FontVal, FontWeight, GradientStop, GradientStopPosition,
-    LinearGradient, ParsedCss, Radius, Style, StylePair, TransformStyle, TransitionProperty,
-    TransitionSpec, TransitionTiming,
+    AnimationDirection, AnimationKeyframe, AnimationSpec, Background, BackgroundAttachment,
+    BackgroundPosition, BackgroundPositionValue, BackgroundSize, BackgroundSizeValue, CalcExpr,
+    CalcUnit, CalcValue, CursorStyle, FontFamily, FontVal, FontWeight, GradientStop,
+    GradientStopPosition, LinearGradient, ParsedCss, Radius, Style, StylePair, TransformStyle,
+    TransitionProperty, TransitionSpec, TransitionTiming,
 };
 use bevy::ui::Val2;
 use bevy::prelude::*;
@@ -371,16 +372,16 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
         "max-height" => apply_length_property(value, &mut style.max_height, &mut style.max_height_calc),
 
         "padding" => style.padding = convert_to_ui_rect(value.to_string()),
-        "padding-left" => style.padding = convert_to_ui_rect(format!("{} 0 0 0", value)),
-        "padding-right" => style.padding = convert_to_ui_rect(format!("0 {} 0 0", value)),
-        "padding-top" => style.padding = convert_to_ui_rect(format!("0 0 {} 0", value)),
-        "padding-bottom" => style.padding = convert_to_ui_rect(format!("0 0 0 {}", value)),
+        "padding-left" => apply_rect_side(value, RectSide::Left, &mut style.padding),
+        "padding-right" => apply_rect_side(value, RectSide::Right, &mut style.padding),
+        "padding-top" => apply_rect_side(value, RectSide::Top, &mut style.padding),
+        "padding-bottom" => apply_rect_side(value, RectSide::Bottom, &mut style.padding),
 
         "margin" => style.margin = convert_to_ui_rect(value.to_string()),
-        "margin-left" => style.margin = convert_to_ui_rect(format!("{} 0 0 0", value)),
-        "margin-right" => style.margin = convert_to_ui_rect(format!("0 {} 0 0", value)),
-        "margin-top" => style.margin = convert_to_ui_rect(format!("0 0 {} 0", value)),
-        "margin-bottom" => style.margin = convert_to_ui_rect(format!("0 0 0 {}", value)),
+        "margin-left" => apply_rect_side(value, RectSide::Left, &mut style.margin),
+        "margin-right" => apply_rect_side(value, RectSide::Right, &mut style.margin),
+        "margin-top" => apply_rect_side(value, RectSide::Top, &mut style.margin),
+        "margin-bottom" => apply_rect_side(value, RectSide::Bottom, &mut style.margin),
 
         "color" => style.color = convert_to_color(value.to_string()),
 
@@ -446,10 +447,22 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
             });
         }
         "background" => {
+            style.background_position = None;
+            style.background_size = None;
+            style.background_attachment = None;
             style.background = convert_to_background(value.to_string(), true);
         }
         "background-image" => {
             style.background = convert_to_background(value.to_string(), false);
+        }
+        "background-position" => {
+            style.background_position = parse_background_position(value);
+        }
+        "background-size" => {
+            style.background_size = parse_background_size(value);
+        }
+        "background-attachment" => {
+            style.background_attachment = parse_background_attachment(value);
         }
 
         "font-size" => style.font_size = convert_to_font_size(value.to_string()),
@@ -473,30 +486,10 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
                 style.border_color = Some(color);
             }
         }
-        "border-left" => {
-            let val = convert_to_val(value.to_string()).unwrap_or(Val::Px(0.));
-            let mut border = style.border.unwrap_or_default();
-            border.left = val;
-            style.border = Some(border);
-        }
-        "border-right" => {
-            let val = convert_to_val(value.to_string()).unwrap_or(Val::Px(0.));
-            let mut border = style.border.unwrap_or_default();
-            border.right = val;
-            style.border = Some(border);
-        }
-        "border-top" => {
-            let val = convert_to_val(value.to_string()).unwrap_or(Val::Px(0.));
-            let mut border = style.border.unwrap_or_default();
-            border.top = val;
-            style.border = Some(border);
-        }
-        "border-bottom" => {
-            let val = convert_to_val(value.to_string()).unwrap_or(Val::Px(0.));
-            let mut border = style.border.unwrap_or_default();
-            border.bottom = val;
-            style.border = Some(border);
-        }
+        "border-left" => apply_border_side(value, RectSide::Left, &mut style.border),
+        "border-right" => apply_border_side(value, RectSide::Right, &mut style.border),
+        "border-top" => apply_border_side(value, RectSide::Top, &mut style.border),
+        "border-bottom" => apply_border_side(value, RectSide::Bottom, &mut style.border),
         "border-radius" => style.border_radius = convert_to_radius(value.to_string()),
         "border-color" => style.border_color = convert_to_color(value.to_string()),
         "border-width" => style.border = convert_to_ui_rect(value.to_string()),
@@ -504,18 +497,8 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
         "box-shadow" => style.box_shadow = convert_to_bevy_box_shadow(value.to_string()),
 
         "overflow" => style.overflow = convert_overflow(value.to_string(), "all"),
-        "overflow-y" => {
-            let val = convert_overflow(value.to_string(), "y");
-            let mut overflow = style.overflow.unwrap_or_default();
-            overflow.y = val.unwrap_or_default().y;
-            style.overflow = Some(overflow);
-        }
-        "overflow-x" => {
-            let val = convert_overflow(value.to_string(), "x");
-            let mut overflow = style.overflow.unwrap_or_default();
-            overflow.x = val.unwrap_or_default().x;
-            style.overflow = Some(overflow);
-        }
+        "overflow-y" => apply_overflow_axis(style, value, OverflowAxisSelector::Y),
+        "overflow-x" => apply_overflow_axis(style, value, OverflowAxisSelector::X),
 
         "text-wrap" => style.text_wrap = convert_to_bevy_line_break(value.to_string()),
         "z-index" => style.z_index = convert_to_i32(value.to_string()),
@@ -523,6 +506,75 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
         "cursor" => style.cursor = convert_to_cursor_style(value.to_string()),
 
         _ => {}
+    }
+}
+
+#[derive(Clone, Copy)]
+enum RectSide {
+    Left,
+    Right,
+    Top,
+    Bottom,
+}
+
+#[derive(Clone, Copy)]
+enum OverflowAxisSelector {
+    X,
+    Y,
+}
+
+fn apply_rect_side(value: &str, side: RectSide, target: &mut Option<UiRect>) {
+    *target = rect_from_side(value, side);
+}
+
+fn apply_border_side(value: &str, side: RectSide, target: &mut Option<UiRect>) {
+    let val = convert_to_val(value.to_string()).unwrap_or(Val::Px(0.0));
+    let mut rect = target.unwrap_or_default();
+    set_rect_side(&mut rect, side, val);
+    *target = Some(rect);
+}
+
+fn apply_overflow_axis(style: &mut Style, value: &str, axis: OverflowAxisSelector) {
+    let val = match axis {
+        OverflowAxisSelector::X => convert_overflow(value.to_string(), "x"),
+        OverflowAxisSelector::Y => convert_overflow(value.to_string(), "y"),
+    };
+    let mut overflow = style.overflow.unwrap_or_default();
+    match axis {
+        OverflowAxisSelector::X => overflow.x = val.unwrap_or_default().x,
+        OverflowAxisSelector::Y => overflow.y = val.unwrap_or_default().y,
+    }
+    style.overflow = Some(overflow);
+}
+
+fn rect_from_side(value: &str, side: RectSide) -> Option<UiRect> {
+    let val = parse_single_rect_value(value)?;
+    let zero = Val::Px(0.0);
+    let mut rect = UiRect {
+        left: zero,
+        right: zero,
+        top: zero,
+        bottom: zero,
+    };
+    set_rect_side(&mut rect, side, val);
+    Some(rect)
+}
+
+fn parse_single_rect_value(value: &str) -> Option<Val> {
+    let vals = parse_radius_values(value)?;
+    if vals.len() == 1 {
+        vals.into_iter().next()
+    } else {
+        None
+    }
+}
+
+fn set_rect_side(rect: &mut UiRect, side: RectSide, value: Val) {
+    match side {
+        RectSide::Left => rect.left = value,
+        RectSide::Right => rect.right = value,
+        RectSide::Top => rect.top = value,
+        RectSide::Bottom => rect.bottom = value,
     }
 }
 
@@ -665,6 +717,22 @@ fn ensure_animation_spec(style: &mut Style) -> &mut AnimationSpec {
     style.animation.get_or_insert_with(AnimationSpec::default)
 }
 
+#[derive(Clone, Copy)]
+enum AnimationTimeField {
+    Duration,
+    Delay,
+}
+
+fn apply_animation_time(style: &mut Style, value: &str, field: AnimationTimeField) {
+    if let Some(time) = parse_time_seconds(value) {
+        let spec = ensure_animation_spec(style);
+        match field {
+            AnimationTimeField::Duration => spec.duration = time,
+            AnimationTimeField::Delay => spec.delay = time,
+        }
+    }
+}
+
 /// Applies an animation name, clearing animation when set to none.
 fn apply_animation_name(style: &mut Style, value: &str) {
     let name = value.trim();
@@ -679,18 +747,12 @@ fn apply_animation_name(style: &mut Style, value: &str) {
 
 /// Applies an animation duration value.
 fn apply_animation_duration(style: &mut Style, value: &str) {
-    if let Some(duration) = parse_time_seconds(value) {
-        let spec = ensure_animation_spec(style);
-        spec.duration = duration;
-    }
+    apply_animation_time(style, value, AnimationTimeField::Duration);
 }
 
 /// Applies an animation delay value.
 fn apply_animation_delay(style: &mut Style, value: &str) {
-    if let Some(delay) = parse_time_seconds(value) {
-        let spec = ensure_animation_spec(style);
-        spec.delay = delay;
-    }
+    apply_animation_time(style, value, AnimationTimeField::Delay);
 }
 
 /// Applies an animation timing function value.
@@ -1511,7 +1573,7 @@ pub fn convert_to_color(value: String) -> Option<Color> {
     let mut color = None;
     let trimmed = value.trim();
     if trimmed.eq_ignore_ascii_case("transparent") || trimmed.eq_ignore_ascii_case("none") {
-        return Some(Color::NONE);
+        return color;
     }
 
     if trimmed.starts_with("#") {
@@ -1520,38 +1582,30 @@ pub fn convert_to_color(value: String) -> Option<Color> {
         } else {
             color = Some(Colored::hex_to_color(trimmed));
         }
-    } else if trimmed.starts_with("rgb(") {
-        let correct = trimmed.trim_start_matches("rgb(").trim_end_matches(")");
-        let parts: Vec<_> = correct.split(',').map(str::trim).collect();
-
-        if parts.len() == 3 {
-            let r = parts[0].parse::<u8>().ok()?;
-            let g = parts[1].parse::<u8>().ok()?;
-            let b = parts[2].parse::<u8>().ok()?;
-
-            color = Some(Color::srgb_u8(r, g, b));
-        }
-    } else if trimmed.starts_with("rgba(") {
-        if trimmed.eq("rgba(0, 0, 0, 0)") {
-            color = Some(Color::NONE);
-        } else {
-            let correct = trimmed.trim_start_matches("rgba(").trim_end_matches(")");
-            let parts: Vec<_> = correct.split(',').map(str::trim).collect();
-
-            if parts.len() == 4 {
-                let r = parts[0].parse::<u8>().ok()?;
-                let g = parts[1].parse::<u8>().ok()?;
-                let b = parts[2].parse::<u8>().ok()?;
-                let a = parts[3].parse::<u8>().ok()?;
-
-                color = Some(Color::srgba_u8(r, g, b, a));
-            }
-        }
+    } else if let Some(parts) = parse_color_components(trimmed, "rgb", 3) {
+        color = Some(Color::srgb_u8(parts[0], parts[1], parts[2]));
+    } else if let Some(parts) = parse_color_components(trimmed, "rgba", 4) {
+        color = Some(Color::srgba_u8(parts[0], parts[1], parts[2], parts[3]));
     } else {
         color = Colored::named(trimmed);
     }
 
     color
+}
+
+fn parse_color_components(value: &str, name: &str, expected: usize) -> Option<Vec<u8>> {
+    let prefix = format!("{name}(");
+    let inner = value.strip_prefix(&prefix)?.strip_suffix(')')?;
+    let parts: Vec<_> = inner.split(',').map(str::trim).collect();
+    if parts.len() != expected {
+        return None;
+    }
+
+    let mut values = Vec::with_capacity(expected);
+    for part in parts {
+        values.push(part.parse::<u8>().ok()?);
+    }
+    Some(values)
 }
 
 /// Converts a CSS `background` value into a [`Background`] struct.
@@ -1590,6 +1644,110 @@ pub fn convert_to_background(value: String, all_types: bool) -> Option<Backgroun
         }
 
         None
+    }
+}
+
+fn parse_background_position(value: &str) -> Option<BackgroundPosition> {
+    let segment = value.split(',').next().unwrap_or(value);
+    let tokens: Vec<&str> = segment.split_whitespace().collect();
+    if tokens.is_empty() {
+        return None;
+    }
+
+    let mut x: Option<BackgroundPositionValue> = None;
+    let mut y: Option<BackgroundPositionValue> = None;
+
+    for token in tokens {
+        let lower = token.to_ascii_lowercase();
+        match lower.as_str() {
+            "left" => x = Some(BackgroundPositionValue::Percent(0.0)),
+            "right" => x = Some(BackgroundPositionValue::Percent(100.0)),
+            "top" => y = Some(BackgroundPositionValue::Percent(0.0)),
+            "bottom" => y = Some(BackgroundPositionValue::Percent(100.0)),
+            "center" => {
+                if x.is_none() {
+                    x = Some(BackgroundPositionValue::Percent(50.0));
+                } else if y.is_none() {
+                    y = Some(BackgroundPositionValue::Percent(50.0));
+                }
+            }
+            _ => {
+                if let Some(val) = parse_position_value(token) {
+                    if x.is_none() {
+                        x = Some(val);
+                    } else if y.is_none() {
+                        y = Some(val);
+                    }
+                }
+            }
+        }
+    }
+
+    let x = x.unwrap_or(BackgroundPositionValue::Percent(50.0));
+    let y = y.unwrap_or(BackgroundPositionValue::Percent(50.0));
+
+    Some(BackgroundPosition { x, y })
+}
+
+fn parse_position_value(value: &str) -> Option<BackgroundPositionValue> {
+    let val = convert_to_val(value.to_string())?;
+    match val {
+        Val::Px(px) => Some(BackgroundPositionValue::Px(px)),
+        Val::Percent(percent) => Some(BackgroundPositionValue::Percent(percent)),
+        _ => None,
+    }
+}
+
+fn parse_background_size(value: &str) -> Option<BackgroundSize> {
+    let segment = value.split(',').next().unwrap_or(value);
+    let tokens: Vec<&str> = segment.split_whitespace().collect();
+    if tokens.is_empty() {
+        return None;
+    }
+
+    if tokens.len() == 1 {
+        let lower = tokens[0].to_ascii_lowercase();
+        match lower.as_str() {
+            "cover" => return Some(BackgroundSize::Cover),
+            "contain" => return Some(BackgroundSize::Contain),
+            "auto" => return Some(BackgroundSize::Auto),
+            _ => {}
+        }
+
+        let width = parse_size_value(tokens[0])?;
+        return Some(BackgroundSize::Explicit(width, BackgroundSizeValue::Auto));
+    }
+
+    if tokens.len() >= 2 {
+        let width = parse_size_value(tokens[0])?;
+        let height = parse_size_value(tokens[1])?;
+        return Some(BackgroundSize::Explicit(width, height));
+    }
+
+    None
+}
+
+fn parse_size_value(value: &str) -> Option<BackgroundSizeValue> {
+    let lower = value.trim().to_ascii_lowercase();
+    if lower == "auto" {
+        return Some(BackgroundSizeValue::Auto);
+    }
+
+    let val = convert_to_val(value.to_string())?;
+    match val {
+        Val::Px(px) => Some(BackgroundSizeValue::Px(px)),
+        Val::Percent(percent) => Some(BackgroundSizeValue::Percent(percent)),
+        _ => None,
+    }
+}
+
+fn parse_background_attachment(value: &str) -> Option<BackgroundAttachment> {
+    let trimmed = value.trim().to_ascii_lowercase();
+    match trimmed.as_str() {
+        "scroll" => Some(BackgroundAttachment::Scroll),
+        "fixed" => Some(BackgroundAttachment::Fixed),
+        "local" => Some(BackgroundAttachment::Local),
+        _ => None,
     }
 }
 
