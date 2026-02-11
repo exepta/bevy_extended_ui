@@ -309,6 +309,10 @@ pub fn update_widget_styles_system(
             continue;
         }
 
+        if !has_changed {
+            continue;
+        }
+
         if let Ok(mut components) = qs.p0().get_mut(entity) {
             apply_style_components(
                 &final_style,
