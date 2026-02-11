@@ -4,8 +4,8 @@ use crate::services::image_service::get_or_load_image;
 use crate::services::state_service::update_widget_states;
 use crate::styles::components::UiStyle;
 use crate::styles::{
-    AnimationDirection, AnimationKeyframe, AnimationSpec, CalcContext, CursorStyle, FontVal,
-    FontWeight, Radius, Style, TransformStyle, TransitionProperty, TransitionSpec,
+    AnimationDirection, AnimationKeyframe, AnimationSpec, CalcContext, CalcExpr, CursorStyle,
+    FontVal, FontWeight, Radius, Style, TransformStyle, TransitionProperty, TransitionSpec,
 };
 use crate::widgets::UIWidgetState;
 
@@ -208,30 +208,16 @@ pub fn update_widget_styles_system(
 
         // Sort by origin (ascending) then specificity (ascending)
         // Later origin overrides earlier. Higher specificity overrides lower.
-        base_styles.sort_by(|a, b| match a.2.cmp(&b.2) {
-            std::cmp::Ordering::Equal => a.1.cmp(&b.1),
-            other => other,
-        });
-        pseudo_styles.sort_by(|a, b| match a.2.cmp(&b.2) {
-            std::cmp::Ordering::Equal => a.1.cmp(&b.1),
-            other => other,
-        });
+        sort_style_candidates(&mut base_styles);
+        sort_style_candidates(&mut pseudo_styles);
 
         let mut final_style = Style::default();
 
         // 1) base normal
-        for (sel, _, _) in &base_styles {
-            if let Some(pair) = ui_style.styles.get(*sel) {
-                final_style.merge(&pair.normal);
-            }
-        }
+        merge_style_candidates(&mut final_style, &ui_style, &base_styles, false);
 
         // 2) base important
-        for (sel, _, _) in &base_styles {
-            if let Some(pair) = ui_style.styles.get(*sel) {
-                final_style.merge(&pair.important);
-            }
-        }
+        merge_style_candidates(&mut final_style, &ui_style, &base_styles, true);
 
         // 3) inline html
         if let Some(html_style) = html_style_opt {
@@ -239,18 +225,10 @@ pub fn update_widget_styles_system(
         }
 
         // 4) pseudo normal
-        for (sel, _, _) in &pseudo_styles {
-            if let Some(pair) = ui_style.styles.get(*sel) {
-                final_style.merge(&pair.normal);
-            }
-        }
+        merge_style_candidates(&mut final_style, &ui_style, &pseudo_styles, false);
 
         // 5) pseudo important
-        for (sel, _, _) in &pseudo_styles {
-            if let Some(pair) = ui_style.styles.get(*sel) {
-                final_style.merge(&pair.important);
-            }
-        }
+        merge_style_candidates(&mut final_style, &ui_style, &pseudo_styles, true);
 
         let previous_style = ui_style.active_style.clone();
         let has_changed = previous_style.as_ref() != Some(&final_style);
@@ -295,13 +273,7 @@ pub fn update_widget_styles_system(
                 commands.entity(entity).insert(transition_state);
             }
 
-            if !transition_allows_transform(&copy_spec) {
-                if let Ok(mut components) = qs.p0().get_mut(entity) {
-                    if let Some(transform) = components.10.as_mut() {
-                        apply_transform_style(&final_style, transform);
-                    }
-                }
-            }
+            apply_transform_style_if_blocked(&mut qs, entity, &final_style, &copy_spec);
             continue;
         }
 
@@ -320,13 +292,7 @@ pub fn update_widget_styles_system(
             transition.from_transform = from_transform;
             transition.to_transform = to_transform;
 
-            if !transition_allows_transform(&transition.spec) {
-                if let Ok(mut components) = qs.p0().get_mut(entity) {
-                    if let Some(transform) = components.10.as_mut() {
-                        apply_transform_style(&final_style, transform);
-                    }
-                }
-            }
+            apply_transform_style_if_blocked(&mut qs, entity, &final_style, &transition.spec);
             continue;
         }
 
@@ -535,81 +501,64 @@ fn apply_calc_styles_system(
             active
         };
 
-        let (base_w, base_h) = if let Some(parent) = parent_opt {
+        let (content_w, content_h, box_w, box_h) = if let Some(parent) = parent_opt {
             if let Ok(parent_node) = computed_query.get(parent.parent()) {
-                (parent_node.size.x, parent_node.size.y)
+                // ComputedNode sizes are in physical pixels; convert to logical for Val::Px.
+                let inv_sf = parent_node.inverse_scale_factor.max(f32::EPSILON);
+                let size = parent_node.size;
+                let border = parent_node.border;
+                let padding = parent_node.padding;
+                let box_size = Vec2::new(
+                    shrink_axis(size.x, border.min_inset.x, border.max_inset.x),
+                    shrink_axis(size.y, border.min_inset.y, border.max_inset.y),
+                );
+                let content = Vec2::new(
+                    shrink_axis(box_size.x, padding.min_inset.x, padding.max_inset.x),
+                    shrink_axis(box_size.y, padding.min_inset.y, padding.max_inset.y),
+                );
+                let content = content * inv_sf;
+                let box_size = box_size * inv_sf;
+                (content.x, content.y, box_size.x, box_size.y)
             } else {
-                (viewport.x, viewport.y)
+                (viewport.x, viewport.y, viewport.x, viewport.y)
             }
         } else {
-            (viewport.x, viewport.y)
+            (viewport.x, viewport.y, viewport.x, viewport.y)
         };
 
-        let ctx_w = CalcContext {
-            base: base_w,
+        let ctx_content_w = CalcContext {
+            base: content_w,
             viewport,
         };
-        let ctx_h = CalcContext {
-            base: base_h,
+        let ctx_content_h = CalcContext {
+            base: content_h,
+            viewport,
+        };
+        let ctx_box_w = CalcContext {
+            base: box_w,
+            viewport,
+        };
+        let ctx_box_h = CalcContext {
+            base: box_h,
             viewport,
         };
 
-        if let Some(expr) = style.width_calc.as_ref() {
-            if let Some(px) = expr.eval_length(ctx_w) {
-                node.width = Val::Px(px);
-            }
-        }
-        if let Some(expr) = style.min_width_calc.as_ref() {
-            if let Some(px) = expr.eval_length(ctx_w) {
-                node.min_width = Val::Px(px);
-            }
-        }
-        if let Some(expr) = style.max_width_calc.as_ref() {
-            if let Some(px) = expr.eval_length(ctx_w) {
-                node.max_width = Val::Px(px);
-            }
-        }
-        if let Some(expr) = style.height_calc.as_ref() {
-            if let Some(px) = expr.eval_length(ctx_h) {
-                node.height = Val::Px(px);
-            }
-        }
-        if let Some(expr) = style.min_height_calc.as_ref() {
-            if let Some(px) = expr.eval_length(ctx_h) {
-                node.min_height = Val::Px(px);
-            }
-        }
-        if let Some(expr) = style.max_height_calc.as_ref() {
-            if let Some(px) = expr.eval_length(ctx_h) {
-                node.max_height = Val::Px(px);
-            }
-        }
+        apply_calc_length(style.width_calc.as_ref(), ctx_content_w, &mut node.width);
+        apply_calc_length(style.min_width_calc.as_ref(), ctx_content_w, &mut node.min_width);
+        apply_calc_length(style.max_width_calc.as_ref(), ctx_content_w, &mut node.max_width);
+        apply_calc_length(style.height_calc.as_ref(), ctx_content_h, &mut node.height);
+        apply_calc_length(style.min_height_calc.as_ref(), ctx_content_h, &mut node.min_height);
+        apply_calc_length(style.max_height_calc.as_ref(), ctx_content_h, &mut node.max_height);
 
-        if let Some(expr) = style.left_calc.as_ref() {
-            if let Some(px) = expr.eval_length(ctx_w) {
-                node.left = Val::Px(px);
-            }
-        }
-        if let Some(expr) = style.right_calc.as_ref() {
-            if let Some(px) = expr.eval_length(ctx_w) {
-                node.right = Val::Px(px);
-            }
-        }
-        if let Some(expr) = style.top_calc.as_ref() {
-            if let Some(px) = expr.eval_length(ctx_h) {
-                node.top = Val::Px(px);
-            }
-        }
-        if let Some(expr) = style.bottom_calc.as_ref() {
-            if let Some(px) = expr.eval_length(ctx_h) {
-                node.bottom = Val::Px(px);
-            }
-        }
+        apply_calc_length(style.left_calc.as_ref(), ctx_box_w, &mut node.left);
+        apply_calc_length(style.right_calc.as_ref(), ctx_box_w, &mut node.right);
+        apply_calc_length(style.top_calc.as_ref(), ctx_box_h, &mut node.top);
+        apply_calc_length(style.bottom_calc.as_ref(), ctx_box_h, &mut node.bottom);
 
         if let Some(expr) = style.flex_basis_calc.as_ref() {
             let base_main = match node.flex_direction {
-                FlexDirection::Row | FlexDirection::RowReverse => base_w,
-                _ => base_h,
+                FlexDirection::Row | FlexDirection::RowReverse => content_w,
+                _ => content_h,
             };
             let ctx_main = CalcContext {
                 base: base_main,
@@ -621,7 +570,7 @@ fn apply_calc_styles_system(
         }
 
         if let Some(expr) = style.gap_calc.as_ref() {
-            if let Some(px) = expr.eval_length(ctx_w) {
+            if let Some(px) = expr.eval_length(ctx_content_w) {
                 let gap_val = Val::Px(px);
                 match node.flex_direction {
                     FlexDirection::Row | FlexDirection::RowReverse => {
@@ -634,6 +583,61 @@ fn apply_calc_styles_system(
                     }
                 }
             }
+        }
+    }
+}
+
+type StyleCandidate<'a> = (&'a String, u32, usize);
+
+fn sort_style_candidates(candidates: &mut [StyleCandidate<'_>]) {
+    candidates.sort_by(|a, b| match a.2.cmp(&b.2) {
+        std::cmp::Ordering::Equal => a.1.cmp(&b.1),
+        other => other,
+    });
+}
+
+fn merge_style_candidates(
+    final_style: &mut Style,
+    ui_style: &UiStyle,
+    candidates: &[StyleCandidate<'_>],
+    important: bool,
+) {
+    for (sel, _, _) in candidates {
+        if let Some(pair) = ui_style.styles.get(*sel) {
+            if important {
+                final_style.merge(&pair.important);
+            } else {
+                final_style.merge(&pair.normal);
+            }
+        }
+    }
+}
+
+fn apply_transform_style_if_blocked(
+    qs: &mut ParamSet<(Query<UiStyleComponents>,)>,
+    entity: Entity,
+    style: &Style,
+    spec: &TransitionSpec,
+) {
+    if transition_allows_transform(spec) {
+        return;
+    }
+
+    if let Ok(mut components) = qs.p0().get_mut(entity) {
+        if let Some(transform) = components.10.as_mut() {
+            apply_transform_style(style, transform);
+        }
+    }
+}
+
+fn shrink_axis(size: f32, min_inset: f32, max_inset: f32) -> f32 {
+    (size - min_inset - max_inset).max(0.0)
+}
+
+fn apply_calc_length(expr: Option<&CalcExpr>, ctx: CalcContext, target: &mut Val) {
+    if let Some(expr) = expr {
+        if let Some(px) = expr.eval_length(ctx) {
+            *target = Val::Px(px);
         }
     }
 }
