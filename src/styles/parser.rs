@@ -395,6 +395,10 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
         "box-sizing" => style.box_sizing = convert_to_box_sizing(value.to_string()),
         "scroll-width" => style.scrollbar_width = convert_to_f32(value.to_string()),
         "gap" => apply_length_property(value, &mut style.gap, &mut style.gap_calc),
+        "row-gap" => apply_length_property(value, &mut style.row_gap, &mut style.row_gap_calc),
+        "column-gap" => {
+            apply_length_property(value, &mut style.column_gap, &mut style.column_gap_calc)
+        }
         "transition" => style.transition = parse_transition(value),
         "transform" => apply_transform_functions(value, &mut style.transform),
         "animation" => style.animation = parse_animation(value),
@@ -943,6 +947,10 @@ impl<'a> MathParser<'a> {
             match unit_str.as_str() {
                 "px" => CalcUnit::Px,
                 "rem" => CalcUnit::Rem,
+                "vw" => CalcUnit::Vw,
+                "vh" => CalcUnit::Vh,
+                "vmin" => CalcUnit::VMin,
+                "vmax" => CalcUnit::VMax,
                 "deg" => CalcUnit::Deg,
                 "rad" => CalcUnit::Rad,
                 "turn" => CalcUnit::Turn,
@@ -1366,6 +1374,7 @@ fn apply_length_property(value: &str, dest: &mut Option<Val>, dest_calc: &mut Op
 /// # Supported Formats
 /// - `"100px"` → `Val::Px(100.0)`
 /// - `"75%"` → `Val::Percent(75.0)`
+/// - `"10vw"` → `Val::Vw(10.0)` (and `vh`/`vmin`/`vmax`)
 ///
 /// # Parameters
 /// - `value`: A [`String`] representing a dimension value (e.g. `"20px"`, `"50%"`).
@@ -1379,6 +1388,10 @@ pub fn convert_to_val(value: String) -> Option<Val> {
     match parsed.unit {
         CalcUnit::Px => Some(Val::Px(parsed.value)),
         CalcUnit::Percent => Some(Val::Percent(parsed.value)),
+        CalcUnit::Vw => Some(Val::Vw(parsed.value)),
+        CalcUnit::Vh => Some(Val::Vh(parsed.value)),
+        CalcUnit::VMin => Some(Val::VMin(parsed.value)),
+        CalcUnit::VMax => Some(Val::VMax(parsed.value)),
         CalcUnit::None if parsed.value == 0.0 => Some(Val::Px(0.0)),
         _ => None,
     }
@@ -2125,7 +2138,8 @@ pub fn convert_to_ui_rect(value: String) -> Option<UiRect> {
 /// Converts a CSS-like box-shadow string into a Bevy [`BoxShadow`] struct.
 ///
 /// Parses shadow offset (x, y), blur radius, spread radius, and color from the input string.
-/// Supports values in pixels (e.g., `"10px"`), percentages (e.g., `"50%"`), or CSS color formats
+/// Supports values in pixels (e.g., `"10px"`), percentages (e.g., `"50%"`), viewport units (e.g., `"10vw"`),
+/// or CSS color formats
 /// (`"#rrggbb"`, `"rgb(...)"`, `"rgba(...)"`).
 ///
 /// The number of numeric values determines which parts are set:
@@ -2150,12 +2164,8 @@ pub fn convert_to_bevy_box_shadow(value: String) -> Option<BoxShadow> {
 
     for part in parts {
         let trimmed = part.trim();
-        if trimmed.ends_with("px") || trimmed.eq_ignore_ascii_case("0") {
-            let number = trimmed.trim_end_matches("px").parse::<f32>().ok()?;
-            vals.push(Val::Px(number));
-        } else if trimmed.ends_with('%') {
-            let number = trimmed.trim_end_matches('%').parse::<f32>().ok()?;
-            vals.push(Val::Percent(number));
+        if let Some(val) = convert_to_val(trimmed.to_string()) {
+            vals.push(val);
         } else if trimmed.starts_with("#")
             || trimmed.starts_with("rgb(")
             || trimmed.starts_with("rgba(")
@@ -2198,7 +2208,7 @@ pub fn convert_to_bevy_box_shadow(value: String) -> Option<BoxShadow> {
 /// Parses a CSS border shorthand string into a [`UiRect`] for border widths and a [`Color`].
 ///
 /// The input string is expected to be in the form `"WIDTH COLOR"` where:
-/// - WIDTH is a length value (e.g. `"5px"`, `"10%"`, or `"0"`).
+/// - WIDTH is a length value (e.g. `"5px"`, `"10%"`, `"10vw"`, or `"0"`).
 /// - COLOR is an optional CSS color string (e.g. `"#ff0000"`, `"rgba(255,0,0,1)"`).
 ///
 /// If the color is missing, defaults to transparent.
@@ -2213,23 +2223,7 @@ pub fn convert_to_bevy_box_shadow(value: String) -> Option<BoxShadow> {
 pub fn convert_css_border(value: String) -> Option<(UiRect, Color)> {
     /// Parses a single border width token into a `Val`.
     fn parse_val(input: &str) -> Option<Val> {
-        if input.ends_with("px") {
-            input
-                .trim_end_matches("px")
-                .parse::<f32>()
-                .ok()
-                .map(Val::Px)
-        } else if input.ends_with('%') {
-            input
-                .trim_end_matches('%')
-                .parse::<f32>()
-                .ok()
-                .map(Val::Percent)
-        } else if input == "0" {
-            Some(Val::Px(0.0))
-        } else {
-            None
-        }
+        convert_to_val(input.to_string())
     }
 
     let parts: Vec<&str> = value.split_whitespace().collect();
@@ -2622,7 +2616,7 @@ pub fn convert_to_bevy_grid_template(value: String) -> Option<Vec<RepeatedGridTr
  * - "min-content"
  * - "max-content"
  * - "minmax(min, max)"
- * - fixed sizes with units: "100px", "50%"
+ * - fixed sizes with units: "100px", "50%", "10vw"
  *
  * @param input is The CSS grid track string.
  * @return Some(GridTrack) if parsing succeeds, None otherwise.
@@ -2646,6 +2640,10 @@ fn parse_single_grid_track(input: &str) -> Option<GridTrack> {
                 CalcUnit::Px => Some(GridTrack::px(value.value)),
                 CalcUnit::Percent => Some(GridTrack::percent(value.value)),
                 CalcUnit::Fr => Some(GridTrack::fr(value.value)),
+                CalcUnit::Vw => Some(GridTrack::vw(value.value)),
+                CalcUnit::Vh => Some(GridTrack::vh(value.value)),
+                CalcUnit::VMin => Some(GridTrack::vmin(value.value)),
+                CalcUnit::VMax => Some(GridTrack::vmax(value.value)),
                 _ => None,
             },
             None => None,
@@ -2660,7 +2658,7 @@ fn parse_single_grid_track(input: &str) -> Option<GridTrack> {
  * - "auto"
  * - "min-content"
  * - "max-content"
- * - fixed size in px, e.g. "100px"
+ * - fixed size in px or viewport units, e.g. "100px", "10vw"
  *
  * @param input is The CSS min track sizing string.
  * @return Some(MinTrackSizingFunction) if parsing succeeds, None otherwise.
@@ -2675,6 +2673,10 @@ fn parse_min_sizing(input: &str) -> Option<MinTrackSizingFunction> {
             Some(value) => match value.unit {
                 CalcUnit::Px => Some(MinTrackSizingFunction::Px(value.value)),
                 CalcUnit::Percent => Some(MinTrackSizingFunction::Percent(value.value)),
+                CalcUnit::Vw => Some(MinTrackSizingFunction::Vw(value.value)),
+                CalcUnit::Vh => Some(MinTrackSizingFunction::Vh(value.value)),
+                CalcUnit::VMin => Some(MinTrackSizingFunction::VMin(value.value)),
+                CalcUnit::VMax => Some(MinTrackSizingFunction::VMax(value.value)),
                 _ => None,
             },
             None => None,
@@ -2689,7 +2691,7 @@ fn parse_min_sizing(input: &str) -> Option<MinTrackSizingFunction> {
  * - "auto"
  * - "min-content"
  * - "max-content"
- * - fixed size in px, e.g. "100px"
+ * - fixed size in px or viewport units, e.g. "100px", "10vw"
  * - fractional units, e.g. "1 fr"
  *
  *  @param input is The CSS max track sizing string.
@@ -2706,6 +2708,10 @@ fn parse_max_sizing(input: &str) -> Option<MaxTrackSizingFunction> {
                 CalcUnit::Px => Some(MaxTrackSizingFunction::Px(value.value)),
                 CalcUnit::Percent => Some(MaxTrackSizingFunction::Percent(value.value)),
                 CalcUnit::Fr => Some(MaxTrackSizingFunction::Fraction(value.value)),
+                CalcUnit::Vw => Some(MaxTrackSizingFunction::Vw(value.value)),
+                CalcUnit::Vh => Some(MaxTrackSizingFunction::Vh(value.value)),
+                CalcUnit::VMin => Some(MaxTrackSizingFunction::VMin(value.value)),
+                CalcUnit::VMax => Some(MaxTrackSizingFunction::VMax(value.value)),
                 _ => None,
             },
             None => None,
@@ -2768,6 +2774,7 @@ pub fn convert_overflow(value: String, which: &str) -> Option<Overflow> {
  * Supported units:
  * - px (pixels), e.g. "10px"
  * - percent (%), e.g. "50%"
+ * - viewport units (vw/vh/vmin/vmax), e.g. "10vw"
  * - zero ("0") without a unit
  *
  * @param value is The CSS radius string.
@@ -2777,16 +2784,8 @@ pub fn convert_overflow(value: String, which: &str) -> Option<Overflow> {
 fn parse_radius_values(value: &str) -> Option<Vec<Val>> {
     let mut vals = Vec::new();
     for part in value.split_whitespace() {
-        let trimmed = part.trim();
-        if trimmed.ends_with("px") || trimmed.eq_ignore_ascii_case("0") {
-            let number = trimmed.trim_end_matches("px").parse::<f32>().ok()?;
-            vals.push(Val::Px(number));
-        } else if trimmed.ends_with('%') {
-            let number = trimmed.trim_end_matches('%').parse::<f32>().ok()?;
-            vals.push(Val::Percent(number));
-        } else {
-            return None;
-        }
+        let val = convert_to_val(part.trim().to_string())?;
+        vals.push(val);
     }
     Some(vals)
 }

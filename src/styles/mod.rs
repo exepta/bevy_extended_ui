@@ -782,6 +782,12 @@ pub struct Style {
     pub gap: Option<Val>,
     #[reflect(ignore)]
     pub gap_calc: Option<CalcExpr>,
+    pub row_gap: Option<Val>,
+    #[reflect(ignore)]
+    pub row_gap_calc: Option<CalcExpr>,
+    pub column_gap: Option<Val>,
+    #[reflect(ignore)]
+    pub column_gap_calc: Option<CalcExpr>,
     pub text_wrap: Option<LineBreak>,
     pub z_index: Option<i32>,
     pub cursor: Option<CursorStyle>,
@@ -919,6 +925,18 @@ impl Style {
             &mut self.gap_calc,
             &other.gap,
             &other.gap_calc,
+        );
+        merge_val_with_calc(
+            &mut self.row_gap,
+            &mut self.row_gap_calc,
+            &other.row_gap,
+            &other.row_gap_calc,
+        );
+        merge_val_with_calc(
+            &mut self.column_gap,
+            &mut self.column_gap_calc,
+            &other.column_gap,
+            &other.column_gap_calc,
         );
 
         merge_opt(&mut self.text_wrap, &other.text_wrap);

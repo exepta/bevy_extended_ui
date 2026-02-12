@@ -10,8 +10,8 @@
 
 body {
     background: linear-gradient(to bottom left, #ff6336, #4f00b1);
-    width: 100%;
-    height: 100%;
+    width: 100vw;
+    height: 100vh;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -104,11 +104,11 @@ body {
 
 .grid-demo {
     width: 380px;
-    height: 200px;
+    height: 230px;
     display: grid;
     grid-template-columns: minmax(calc(80px + 20px), 1fr) minmax(120px, 2fr);
     grid-auto-rows: 46px;
-    gap: 8px;
+    row-gap: 12px;
 }
 
 .grid-cell {
