@@ -1,0 +1,121 @@
+:root {
+    --bg: #1b1e22;
+    --panel: #232831;
+    --panel-border: #313844;
+    --accent: #f97316;
+    --accent-2: #38bdf8;
+    --text: #e5e7eb;
+    --muted: #9aa3b2;
+}
+
+body {
+    background: linear-gradient(to bottom left, #ff6336, #4f00b1);
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    gap: 16px;
+    padding: 24px;
+    color: var(--text);
+}
+
+.card {
+    width: 520px;
+    background: var(--panel);
+    border: 2px solid var(--panel-border);
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.card h2 {
+    font-size: 20px;
+    color: var(--muted);
+    margin: 0;
+}
+
+.calc-box {
+    width: 380px;
+    height: 60px;
+    background: rgba(248, 113, 22, 0.15);
+    border-radius: 8px;
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    padding: 10px;
+}
+
+.calc-inner {
+    width: calc(100% - 40px);
+    height: 100%;
+    background: var(--accent);
+    border-radius: 6px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: #0f172a;
+    font-size: 12px;
+}
+
+.minmax-row {
+    width: 380px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+.min-box {
+    width: min(80%, 260px);
+    height: 46px;
+    background: rgba(56, 189, 248, 0.25);
+    border-radius: 6px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 12px;
+}
+
+.max-box {
+    width: max(40%, 180px);
+    height: 46px;
+    background: rgba(248, 113, 22, 0.25);
+    border-radius: 6px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 12px;
+}
+
+.sin-box {
+    width: 240px;
+    height: calc(40px + sin(30deg) * 40px);
+    background: rgba(148, 163, 184, 0.2);
+    border-radius: 10px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 12px;
+}
+
+.grid-demo {
+    width: 380px;
+    height: 230px;
+    display: grid;
+    grid-template-columns: minmax(calc(80px + 20px), 1fr) minmax(120px, 2fr);
+    grid-auto-rows: 46px;
+    row-gap: 12px;
+}
+
+.grid-cell {
+    background: rgba(56, 189, 248, 0.18);
+    border-radius: 6px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 12px;
+}

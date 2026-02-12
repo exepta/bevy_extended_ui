@@ -63,7 +63,7 @@ body {
 
 #fn_q_key:hover {
     z-index: 2;
-    animation: default-pulse 1.4s ease-in-out infinite alternate;
+    animation: default-pulse 0.8s ease-in-out infinite alternate;
 }
 
 input:invalid {

@@ -1,15 +1,17 @@
 use crate::styles::paint::Colored;
 use crate::styles::{
-    AnimationDirection, AnimationKeyframe, AnimationSpec, Background, CursorStyle, FontFamily,
-    FontVal, FontWeight, ParsedCss, Radius, Style, StylePair, TransformStyle, TransitionProperty,
-    TransitionSpec, TransitionTiming,
+    AnimationDirection, AnimationKeyframe, AnimationSpec, Background, BackgroundAttachment,
+    BackgroundPosition, BackgroundPositionValue, BackgroundSize, BackgroundSizeValue, CalcExpr,
+    CalcUnit, CalcValue, CursorStyle, FontFamily, FontVal, FontWeight, GradientStop,
+    GradientStopPosition, LinearGradient, ParsedCss, Radius, Style, StylePair, TransformStyle,
+    TransitionProperty, TransitionSpec, TransitionTiming,
 };
 use bevy::ui::Val2;
 use bevy::prelude::*;
 use bevy::window::SystemCursorIcon;
 use lightningcss::rules::CssRule;
 use lightningcss::rules::keyframes::KeyframeSelector;
-use lightningcss::stylesheet::{ParserOptions, PrinterOptions, StyleSheet};
+use lightningcss::stylesheet::{ParserFlags, ParserOptions, PrinterOptions, StyleSheet};
 use lightningcss::traits::ToCss;
 use regex::Regex;
 use std::cmp::Ordering;
@@ -33,7 +35,10 @@ use std::collections::HashMap;
 /// - Supports standard properties like `width`, `height`, `padding`, `color`, `background`, `font-size`, `z-index`, etc.
 /// - Ignores unsupported or malformed declarations silently.
 pub fn load_css(css: &str) -> ParsedCss {
-    let stylesheet = match StyleSheet::parse(css, ParserOptions::default()) {
+    let mut options = ParserOptions::default();
+    options.flags.insert(ParserFlags::NESTING);
+
+    let stylesheet = match StyleSheet::parse(css, options) {
         Ok(stylesheet) => stylesheet,
         Err(err) => {
             error!("Css Parsing failed: {:?}", err);
@@ -45,114 +50,13 @@ pub fn load_css(css: &str) -> ParsedCss {
     let mut style_map = HashMap::new();
     let mut keyframes_map: HashMap<String, Vec<AnimationKeyframe>> = HashMap::new();
 
-    for rule in &stylesheet.rules.0 {
-        if let CssRule::Style(style_rule) = rule {
-            let selector = match style_rule
-                .selectors
-                .to_css_string(PrinterOptions::default())
-            {
-                Ok(s) => s,
-                Err(_) => continue,
-            };
-
-            let mut style = StylePair {
-                origin: 0,
-                ..Default::default()
-            };
-            let decls = &style_rule.declarations;
-
-            if selector.trim() == ":root" {
-                for property in decls
-                    .declarations
-                    .iter()
-                    .chain(decls.important_declarations.iter())
-                {
-                    let property_id = property.property_id();
-                    let name = property_id.name();
-                    if name.starts_with("--") {
-                        if let Ok(value) = property.value_to_css_string(PrinterOptions::default()) {
-                            css_vars.insert(name.to_string(), value);
-                        }
-                    }
-                }
-                continue;
-            }
-
-            // 1) normale Declarations
-            for property in &decls.declarations {
-                let property_id = property.property_id();
-                let name = property_id.name();
-
-                let value = match property.value_to_css_string(PrinterOptions::default()) {
-                    Ok(v) => v,
-                    Err(_) => continue,
-                };
-
-                let resolved = resolve_var(&value, &css_vars);
-                apply_property_to_style(&mut style.normal, name, &resolved);
-            }
-
-            for property in &decls.important_declarations {
-                let property_id = property.property_id();
-                let name = property_id.name();
-
-                let value = match property.value_to_css_string(PrinterOptions::default()) {
-                    Ok(v) => v,
-                    Err(_) => continue,
-                };
-
-                let resolved = resolve_var(&value, &css_vars);
-                apply_property_to_style(&mut style.important, name, &resolved);
-            }
-
-            style_map.insert(selector, style);
-        }
-
-        if let CssRule::Keyframes(keyframes_rule) = rule {
-            let name = match keyframes_rule.name.to_css_string(PrinterOptions::default()) {
-                Ok(name) => name,
-                Err(_) => continue,
-            };
-
-            let entry = keyframes_map.entry(name).or_default();
-
-            for keyframe in &keyframes_rule.keyframes {
-                let mut style = Style::default();
-                let decls = &keyframe.declarations;
-
-                for property in &decls.declarations {
-                    let property_id = property.property_id();
-                    let name = property_id.name();
-                    let value = match property.value_to_css_string(PrinterOptions::default()) {
-                        Ok(v) => v,
-                        Err(_) => continue,
-                    };
-                    let resolved = resolve_var(&value, &css_vars);
-                    apply_property_to_style(&mut style, name, &resolved);
-                }
-
-                for property in &decls.important_declarations {
-                    let property_id = property.property_id();
-                    let name = property_id.name();
-                    let value = match property.value_to_css_string(PrinterOptions::default()) {
-                        Ok(v) => v,
-                        Err(_) => continue,
-                    };
-                    let resolved = resolve_var(&value, &css_vars);
-                    apply_property_to_style(&mut style, name, &resolved);
-                }
-
-                for selector in &keyframe.selectors {
-                    if let Some(progress) = keyframe_selector_progress(selector) {
-                        entry.push(AnimationKeyframe {
-                            progress,
-                            style: style.clone(),
-                        });
-                    }
-                }
-            }
-        }
-    }
+    collect_css_rules(
+        &stylesheet.rules,
+        None,
+        &mut css_vars,
+        &mut style_map,
+        &mut keyframes_map,
+    );
 
     for keyframes in keyframes_map.values_mut() {
         keyframes.sort_by(|a, b| {
@@ -168,14 +72,273 @@ pub fn load_css(css: &str) -> ParsedCss {
     }
 }
 
-/// Resolves a `var(...)` reference using the collected CSS variables.
-fn resolve_var(value: &str, css_vars: &HashMap<String, String>) -> String {
-    if let Some(var_name) = value.strip_prefix("var(").and_then(|s| s.strip_suffix(')')) {
-        if let Some(var_value) = css_vars.get(var_name.trim()) {
-            return var_value.clone();
+fn collect_css_rules(
+    rules: &lightningcss::rules::CssRuleList<'_>,
+    parent_selectors: Option<&[String]>,
+    css_vars: &mut HashMap<String, String>,
+    style_map: &mut HashMap<String, StylePair>,
+    keyframes_map: &mut HashMap<String, Vec<AnimationKeyframe>>,
+) {
+    for rule in &rules.0 {
+        match rule {
+            CssRule::Style(style_rule) => collect_style_rule(
+                style_rule,
+                parent_selectors,
+                css_vars,
+                style_map,
+                keyframes_map,
+            ),
+            CssRule::Nesting(nesting_rule) => collect_style_rule(
+                &nesting_rule.style,
+                parent_selectors,
+                css_vars,
+                style_map,
+                keyframes_map,
+            ),
+            CssRule::NestedDeclarations(nested_rule) => {
+                if let Some(parent_selectors) = parent_selectors {
+                    let mut style = StylePair {
+                        origin: 0,
+                        ..Default::default()
+                    };
+                    apply_declaration_list(
+                        &mut style.normal,
+                        &nested_rule.declarations.declarations,
+                        css_vars,
+                    );
+                    apply_declaration_list(
+                        &mut style.important,
+                        &nested_rule.declarations.important_declarations,
+                        css_vars,
+                    );
+                    for selector in parent_selectors {
+                        merge_style_map(style_map, selector, &style);
+                    }
+                }
+            }
+            CssRule::Keyframes(keyframes_rule) => {
+                collect_keyframes_rule(keyframes_rule, css_vars, keyframes_map);
+            }
+            _ => {}
         }
     }
+}
+
+fn collect_style_rule(
+    style_rule: &lightningcss::rules::style::StyleRule<'_>,
+    parent_selectors: Option<&[String]>,
+    css_vars: &mut HashMap<String, String>,
+    style_map: &mut HashMap<String, StylePair>,
+    keyframes_map: &mut HashMap<String, Vec<AnimationKeyframe>>,
+) {
+    let selectors = selector_list_to_strings(&style_rule.selectors);
+    if parent_selectors.is_none()
+        && selectors.len() == 1
+        && selectors[0].trim() == ":root"
+    {
+        collect_css_vars(&style_rule.declarations, css_vars);
+        return;
+    }
+
+    let full_selectors = expand_selectors(parent_selectors, selectors);
+
+    let mut style = StylePair {
+        origin: 0,
+        ..Default::default()
+    };
+    let decls = &style_rule.declarations;
+
+    apply_declaration_list(&mut style.normal, &decls.declarations, css_vars);
+    apply_declaration_list(
+        &mut style.important,
+        &decls.important_declarations,
+        css_vars,
+    );
+
+    for selector in &full_selectors {
+        merge_style_map(style_map, selector, &style);
+    }
+
+    collect_css_rules(
+        &style_rule.rules,
+        Some(&full_selectors),
+        css_vars,
+        style_map,
+        keyframes_map,
+    );
+}
+
+fn collect_keyframes_rule(
+    keyframes_rule: &lightningcss::rules::keyframes::KeyframesRule<'_>,
+    css_vars: &HashMap<String, String>,
+    keyframes_map: &mut HashMap<String, Vec<AnimationKeyframe>>,
+) {
+    let name = match keyframes_rule.name.to_css_string(PrinterOptions::default()) {
+        Ok(name) => name,
+        Err(_) => return,
+    };
+
+    let entry = keyframes_map.entry(name).or_default();
+
+    for keyframe in &keyframes_rule.keyframes {
+        let mut style = Style::default();
+        let decls = &keyframe.declarations;
+
+        apply_declaration_list(&mut style, &decls.declarations, css_vars);
+        apply_declaration_list(&mut style, &decls.important_declarations, css_vars);
+
+        for selector in &keyframe.selectors {
+            if let Some(progress) = keyframe_selector_progress(selector) {
+                entry.push(AnimationKeyframe {
+                    progress,
+                    style: style.clone(),
+                });
+            }
+        }
+    }
+}
+
+fn selector_list_to_strings(
+    selectors: &lightningcss::selector::SelectorList<'_>,
+) -> Vec<String> {
+    let mut out = Vec::new();
+    for selector in selectors.0.iter() {
+        if let Ok(s) = selector.to_css_string(PrinterOptions::default()) {
+            out.push(s);
+        }
+    }
+    out
+}
+
+fn expand_selectors(parent_selectors: Option<&[String]>, selectors: Vec<String>) -> Vec<String> {
+    let Some(parents) = parent_selectors else {
+        return selectors
+            .into_iter()
+            .map(|s| normalize_selector(&s))
+            .collect();
+    };
+
+    let mut expanded = Vec::new();
+    for parent in parents {
+        for selector in &selectors {
+            let combined = combine_selector(parent, selector);
+            expanded.push(normalize_selector(&combined));
+        }
+    }
+    expanded
+}
+
+fn combine_selector(parent: &str, nested: &str) -> String {
+    let trimmed = nested.trim();
+    if trimmed.contains('&') {
+        return trimmed.replace('&', parent);
+    }
+    if trimmed.starts_with('>') {
+        return format!("{parent} {trimmed}");
+    }
+    format!("{parent} {trimmed}")
+}
+
+fn normalize_selector(selector: &str) -> String {
+    selector
+        .replace('>', " > ")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn collect_css_vars(
+    decls: &lightningcss::declaration::DeclarationBlock<'_>,
+    css_vars: &mut HashMap<String, String>,
+) {
+    for property in decls
+        .declarations
+        .iter()
+        .chain(decls.important_declarations.iter())
+    {
+        let property_id = property.property_id();
+        let name = property_id.name();
+        if name.starts_with("--") {
+            if let Ok(value) = property.value_to_css_string(PrinterOptions::default()) {
+                css_vars.insert(name.to_string(), value);
+            }
+        }
+    }
+}
+
+fn apply_declaration_list(
+    style: &mut Style,
+    declarations: &[lightningcss::properties::Property<'_>],
+    css_vars: &HashMap<String, String>,
+) {
+    for property in declarations {
+        let property_id = property.property_id();
+        let name = property_id.name();
+
+        let value = match property.value_to_css_string(PrinterOptions::default()) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+
+        let resolved = resolve_var(&value, css_vars);
+        apply_property_to_style(style, name, &resolved);
+    }
+}
+
+fn merge_style_map(style_map: &mut HashMap<String, StylePair>, selector: &str, style: &StylePair) {
+    style_map
+        .entry(selector.to_string())
+        .and_modify(|existing| {
+            existing.normal.merge(&style.normal);
+            existing.important.merge(&style.important);
+        })
+        .or_insert_with(|| style.clone());
+}
+
+/// Resolves a `var(...)` reference using the collected CSS variables.
+fn resolve_var(value: &str, css_vars: &HashMap<String, String>) -> String {
+    resolve_var_inner(value, css_vars, 0)
+}
+
+fn resolve_var_inner(value: &str, css_vars: &HashMap<String, String>, depth: u8) -> String {
+    if depth >= 8 {
+        return value.to_string();
+    }
+
+    let trimmed = value.trim();
+    if !trimmed.starts_with("var(") || !trimmed.ends_with(')') {
+        return value.to_string();
+    }
+
+    let inner = &trimmed[4..trimmed.len() - 1];
+    let (name, fallback) = split_var_args(inner);
+    let name = name.trim();
+
+    if let Some(var_value) = css_vars.get(name) {
+        return resolve_var_inner(var_value, css_vars, depth + 1);
+    }
+
+    if let Some(fallback) = fallback {
+        return resolve_var_inner(fallback.trim(), css_vars, depth + 1);
+    }
+
     value.to_string()
+}
+
+fn split_var_args(input: &str) -> (&str, Option<&str>) {
+    let mut depth = 0u8;
+    for (idx, ch) in input.char_indices() {
+        match ch {
+            '(' => depth = depth.saturating_add(1),
+            ')' => depth = depth.saturating_sub(1),
+            ',' if depth == 0 => {
+                let (name, fallback) = input.split_at(idx);
+                return (name, Some(&fallback[1..]));
+            }
+            _ => {}
+        }
+    }
+    (input, None)
 }
 
 /// Applies a single CSS property to a mutable [`Style`] object.
@@ -201,37 +364,41 @@ fn resolve_var(value: &str, css_vars: &HashMap<String, String>) -> String {
 ///
 pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
     match name {
-        "width" => style.width = convert_to_val(value.to_string()),
-        "min-width" => style.min_width = convert_to_val(value.to_string()),
-        "max-width" => style.max_width = convert_to_val(value.to_string()),
-        "height" => style.height = convert_to_val(value.to_string()),
-        "min-height" => style.min_height = convert_to_val(value.to_string()),
-        "max-height" => style.max_height = convert_to_val(value.to_string()),
+        "width" => apply_length_property(value, &mut style.width, &mut style.width_calc),
+        "min-width" => apply_length_property(value, &mut style.min_width, &mut style.min_width_calc),
+        "max-width" => apply_length_property(value, &mut style.max_width, &mut style.max_width_calc),
+        "height" => apply_length_property(value, &mut style.height, &mut style.height_calc),
+        "min-height" => apply_length_property(value, &mut style.min_height, &mut style.min_height_calc),
+        "max-height" => apply_length_property(value, &mut style.max_height, &mut style.max_height_calc),
 
         "padding" => style.padding = convert_to_ui_rect(value.to_string()),
-        "padding-left" => style.padding = convert_to_ui_rect(format!("{} 0 0 0", value)),
-        "padding-right" => style.padding = convert_to_ui_rect(format!("0 {} 0 0", value)),
-        "padding-top" => style.padding = convert_to_ui_rect(format!("0 0 {} 0", value)),
-        "padding-bottom" => style.padding = convert_to_ui_rect(format!("0 0 0 {}", value)),
+        "padding-left" => apply_rect_side(value, RectSide::Left, &mut style.padding),
+        "padding-right" => apply_rect_side(value, RectSide::Right, &mut style.padding),
+        "padding-top" => apply_rect_side(value, RectSide::Top, &mut style.padding),
+        "padding-bottom" => apply_rect_side(value, RectSide::Bottom, &mut style.padding),
 
         "margin" => style.margin = convert_to_ui_rect(value.to_string()),
-        "margin-left" => style.margin = convert_to_ui_rect(format!("{} 0 0 0", value)),
-        "margin-right" => style.margin = convert_to_ui_rect(format!("0 {} 0 0", value)),
-        "margin-top" => style.margin = convert_to_ui_rect(format!("0 0 {} 0", value)),
-        "margin-bottom" => style.margin = convert_to_ui_rect(format!("0 0 0 {}", value)),
+        "margin-left" => apply_rect_side(value, RectSide::Left, &mut style.margin),
+        "margin-right" => apply_rect_side(value, RectSide::Right, &mut style.margin),
+        "margin-top" => apply_rect_side(value, RectSide::Top, &mut style.margin),
+        "margin-bottom" => apply_rect_side(value, RectSide::Bottom, &mut style.margin),
 
         "color" => style.color = convert_to_color(value.to_string()),
 
-        "left" => style.left = convert_to_val(value.to_string()),
-        "right" => style.right = convert_to_val(value.to_string()),
-        "top" => style.top = convert_to_val(value.to_string()),
-        "bottom" => style.bottom = convert_to_val(value.to_string()),
+        "left" => apply_length_property(value, &mut style.left, &mut style.left_calc),
+        "right" => apply_length_property(value, &mut style.right, &mut style.right_calc),
+        "top" => apply_length_property(value, &mut style.top, &mut style.top_calc),
+        "bottom" => apply_length_property(value, &mut style.bottom, &mut style.bottom_calc),
 
         "display" => style.display = convert_to_display(value.to_string()),
         "position" => style.position_type = convert_to_position(value.to_string()),
         "box-sizing" => style.box_sizing = convert_to_box_sizing(value.to_string()),
         "scroll-width" => style.scrollbar_width = convert_to_f32(value.to_string()),
-        "gap" => style.gap = convert_to_val(value.to_string()),
+        "gap" => apply_length_property(value, &mut style.gap, &mut style.gap_calc),
+        "row-gap" => apply_length_property(value, &mut style.row_gap, &mut style.row_gap_calc),
+        "column-gap" => {
+            apply_length_property(value, &mut style.column_gap, &mut style.column_gap_calc)
+        }
         "transition" => style.transition = parse_transition(value),
         "transform" => apply_transform_functions(value, &mut style.transform),
         "animation" => style.animation = parse_animation(value),
@@ -250,7 +417,7 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
         }
         "flex-grow" => style.flex_grow = value.trim().parse::<f32>().ok(),
         "flex-shrink" => style.flex_shrink = value.trim().parse::<f32>().ok(),
-        "flex-basis" => style.flex_basis = convert_to_val(value.to_string()),
+        "flex-basis" => apply_length_property(value, &mut style.flex_basis, &mut style.flex_basis_calc),
         "flex-wrap" => {
             style.flex_wrap = convert_to_bevy_flex_wrap(value.to_string());
         }
@@ -284,10 +451,22 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
             });
         }
         "background" => {
+            style.background_position = None;
+            style.background_size = None;
+            style.background_attachment = None;
             style.background = convert_to_background(value.to_string(), true);
         }
         "background-image" => {
             style.background = convert_to_background(value.to_string(), false);
+        }
+        "background-position" => {
+            style.background_position = parse_background_position(value);
+        }
+        "background-size" => {
+            style.background_size = parse_background_size(value);
+        }
+        "background-attachment" => {
+            style.background_attachment = parse_background_attachment(value);
         }
 
         "font-size" => style.font_size = convert_to_font_size(value.to_string()),
@@ -311,30 +490,10 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
                 style.border_color = Some(color);
             }
         }
-        "border-left" => {
-            let val = convert_to_val(value.to_string()).unwrap_or(Val::Px(0.));
-            let mut border = style.border.unwrap_or_default();
-            border.left = val;
-            style.border = Some(border);
-        }
-        "border-right" => {
-            let val = convert_to_val(value.to_string()).unwrap_or(Val::Px(0.));
-            let mut border = style.border.unwrap_or_default();
-            border.right = val;
-            style.border = Some(border);
-        }
-        "border-top" => {
-            let val = convert_to_val(value.to_string()).unwrap_or(Val::Px(0.));
-            let mut border = style.border.unwrap_or_default();
-            border.top = val;
-            style.border = Some(border);
-        }
-        "border-bottom" => {
-            let val = convert_to_val(value.to_string()).unwrap_or(Val::Px(0.));
-            let mut border = style.border.unwrap_or_default();
-            border.bottom = val;
-            style.border = Some(border);
-        }
+        "border-left" => apply_border_side(value, RectSide::Left, &mut style.border),
+        "border-right" => apply_border_side(value, RectSide::Right, &mut style.border),
+        "border-top" => apply_border_side(value, RectSide::Top, &mut style.border),
+        "border-bottom" => apply_border_side(value, RectSide::Bottom, &mut style.border),
         "border-radius" => style.border_radius = convert_to_radius(value.to_string()),
         "border-color" => style.border_color = convert_to_color(value.to_string()),
         "border-width" => style.border = convert_to_ui_rect(value.to_string()),
@@ -342,18 +501,8 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
         "box-shadow" => style.box_shadow = convert_to_bevy_box_shadow(value.to_string()),
 
         "overflow" => style.overflow = convert_overflow(value.to_string(), "all"),
-        "overflow-y" => {
-            let val = convert_overflow(value.to_string(), "y");
-            let mut overflow = style.overflow.unwrap_or_default();
-            overflow.y = val.unwrap_or_default().y;
-            style.overflow = Some(overflow);
-        }
-        "overflow-x" => {
-            let val = convert_overflow(value.to_string(), "x");
-            let mut overflow = style.overflow.unwrap_or_default();
-            overflow.x = val.unwrap_or_default().x;
-            style.overflow = Some(overflow);
-        }
+        "overflow-y" => apply_overflow_axis(style, value, OverflowAxisSelector::Y),
+        "overflow-x" => apply_overflow_axis(style, value, OverflowAxisSelector::X),
 
         "text-wrap" => style.text_wrap = convert_to_bevy_line_break(value.to_string()),
         "z-index" => style.z_index = convert_to_i32(value.to_string()),
@@ -361,6 +510,75 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
         "cursor" => style.cursor = convert_to_cursor_style(value.to_string()),
 
         _ => {}
+    }
+}
+
+#[derive(Clone, Copy)]
+enum RectSide {
+    Left,
+    Right,
+    Top,
+    Bottom,
+}
+
+#[derive(Clone, Copy)]
+enum OverflowAxisSelector {
+    X,
+    Y,
+}
+
+fn apply_rect_side(value: &str, side: RectSide, target: &mut Option<UiRect>) {
+    *target = rect_from_side(value, side);
+}
+
+fn apply_border_side(value: &str, side: RectSide, target: &mut Option<UiRect>) {
+    let val = convert_to_val(value.to_string()).unwrap_or(Val::Px(0.0));
+    let mut rect = target.unwrap_or_default();
+    set_rect_side(&mut rect, side, val);
+    *target = Some(rect);
+}
+
+fn apply_overflow_axis(style: &mut Style, value: &str, axis: OverflowAxisSelector) {
+    let val = match axis {
+        OverflowAxisSelector::X => convert_overflow(value.to_string(), "x"),
+        OverflowAxisSelector::Y => convert_overflow(value.to_string(), "y"),
+    };
+    let mut overflow = style.overflow.unwrap_or_default();
+    match axis {
+        OverflowAxisSelector::X => overflow.x = val.unwrap_or_default().x,
+        OverflowAxisSelector::Y => overflow.y = val.unwrap_or_default().y,
+    }
+    style.overflow = Some(overflow);
+}
+
+fn rect_from_side(value: &str, side: RectSide) -> Option<UiRect> {
+    let val = parse_single_rect_value(value)?;
+    let zero = Val::Px(0.0);
+    let mut rect = UiRect {
+        left: zero,
+        right: zero,
+        top: zero,
+        bottom: zero,
+    };
+    set_rect_side(&mut rect, side, val);
+    Some(rect)
+}
+
+fn parse_single_rect_value(value: &str) -> Option<Val> {
+    let vals = parse_radius_values(value)?;
+    if vals.len() == 1 {
+        vals.into_iter().next()
+    } else {
+        None
+    }
+}
+
+fn set_rect_side(rect: &mut UiRect, side: RectSide, value: Val) {
+    match side {
+        RectSide::Left => rect.left = value,
+        RectSide::Right => rect.right = value,
+        RectSide::Top => rect.top = value,
+        RectSide::Bottom => rect.bottom = value,
     }
 }
 
@@ -503,6 +721,22 @@ fn ensure_animation_spec(style: &mut Style) -> &mut AnimationSpec {
     style.animation.get_or_insert_with(AnimationSpec::default)
 }
 
+#[derive(Clone, Copy)]
+enum AnimationTimeField {
+    Duration,
+    Delay,
+}
+
+fn apply_animation_time(style: &mut Style, value: &str, field: AnimationTimeField) {
+    if let Some(time) = parse_time_seconds(value) {
+        let spec = ensure_animation_spec(style);
+        match field {
+            AnimationTimeField::Duration => spec.duration = time,
+            AnimationTimeField::Delay => spec.delay = time,
+        }
+    }
+}
+
 /// Applies an animation name, clearing animation when set to none.
 fn apply_animation_name(style: &mut Style, value: &str) {
     let name = value.trim();
@@ -517,18 +751,12 @@ fn apply_animation_name(style: &mut Style, value: &str) {
 
 /// Applies an animation duration value.
 fn apply_animation_duration(style: &mut Style, value: &str) {
-    if let Some(duration) = parse_time_seconds(value) {
-        let spec = ensure_animation_spec(style);
-        spec.duration = duration;
-    }
+    apply_animation_time(style, value, AnimationTimeField::Duration);
 }
 
 /// Applies an animation delay value.
 fn apply_animation_delay(style: &mut Style, value: &str) {
-    if let Some(delay) = parse_time_seconds(value) {
-        let spec = ensure_animation_spec(style);
-        spec.delay = delay;
-    }
+    apply_animation_time(style, value, AnimationTimeField::Delay);
 }
 
 /// Applies an animation timing function value.
@@ -578,11 +806,575 @@ fn convert_to_font_weight(value: String) -> Option<FontWeight> {
     FontWeight::from_name(in_value)
 }
 
+struct MathParser<'a> {
+    input: &'a str,
+    pos: usize,
+}
+
+impl<'a> MathParser<'a> {
+    fn new(input: &'a str) -> Self {
+        Self { input, pos: 0 }
+    }
+
+    fn parse_expression(&mut self) -> Option<CalcValue> {
+        let mut left = self.parse_term()?;
+        loop {
+            self.skip_ws();
+            if self.consume('+') {
+                let right = self.parse_term()?;
+                left = add_values(left, right)?;
+            } else if self.consume('-') {
+                let right = self.parse_term()?;
+                left = sub_values(left, right)?;
+            } else {
+                break;
+            }
+        }
+        Some(left)
+    }
+
+    fn parse_term(&mut self) -> Option<CalcValue> {
+        let mut left = self.parse_factor()?;
+        loop {
+            self.skip_ws();
+            if self.consume('*') {
+                let right = self.parse_factor()?;
+                left = mul_values(left, right)?;
+            } else if self.consume('/') {
+                let right = self.parse_factor()?;
+                left = div_values(left, right)?;
+            } else {
+                break;
+            }
+        }
+        Some(left)
+    }
+
+    fn parse_factor(&mut self) -> Option<CalcValue> {
+        self.skip_ws();
+        if self.consume('+') {
+            return self.parse_factor();
+        }
+        if self.consume('-') {
+            let inner = self.parse_factor()?;
+            return Some(CalcValue::new(-inner.value, inner.unit));
+        }
+        if self.consume('(') {
+            let value = self.parse_expression()?;
+            self.expect(')')?;
+            return Some(value);
+        }
+
+        if let Some(name) = self.parse_identifier() {
+            self.skip_ws();
+            if self.consume('(') {
+                return self.parse_function(&name);
+            }
+            return None;
+        }
+
+        self.parse_number()
+    }
+
+    fn parse_function(&mut self, name: &str) -> Option<CalcValue> {
+        match name {
+            "calc" => {
+                let value = self.parse_expression()?;
+                self.expect(')')?;
+                Some(value)
+            }
+            "min" | "max" => {
+                let mut values = Vec::new();
+                loop {
+                    let value = self.parse_expression()?;
+                    values.push(value);
+                    self.skip_ws();
+                    if self.consume(',') {
+                        continue;
+                    }
+                    break;
+                }
+                self.expect(')')?;
+                reduce_min_max(name == "min", &values)
+            }
+            "sin" => {
+                let value = self.parse_expression()?;
+                self.expect(')')?;
+                let radians = to_radians(value)?;
+                Some(CalcValue::new(radians.sin(), CalcUnit::None))
+            }
+            "minmax" => {
+                let _ = self.parse_expression()?;
+                self.skip_ws();
+                if self.consume(',') {
+                    let _ = self.parse_expression()?;
+                }
+                self.expect(')')?;
+                None
+            }
+            _ => None,
+        }
+    }
+
+    fn parse_number(&mut self) -> Option<CalcValue> {
+        self.skip_ws();
+        let start = self.pos;
+        let mut has_digit = false;
+        let mut seen_dot = false;
+
+        while let Some(ch) = self.peek_char() {
+            if ch.is_ascii_digit() {
+                has_digit = true;
+                self.pos += ch.len_utf8();
+            } else if ch == '.' && !seen_dot {
+                seen_dot = true;
+                self.pos += 1;
+            } else {
+                break;
+            }
+        }
+
+        if !has_digit {
+            return None;
+        }
+
+        let number_str = &self.input[start..self.pos];
+        let value = number_str.parse::<f32>().ok()?;
+
+        let unit = if self.consume('%') {
+            CalcUnit::Percent
+        } else if let Some(unit_str) = self.parse_unit() {
+            match unit_str.as_str() {
+                "px" => CalcUnit::Px,
+                "rem" => CalcUnit::Rem,
+                "vw" => CalcUnit::Vw,
+                "vh" => CalcUnit::Vh,
+                "vmin" => CalcUnit::VMin,
+                "vmax" => CalcUnit::VMax,
+                "deg" => CalcUnit::Deg,
+                "rad" => CalcUnit::Rad,
+                "turn" => CalcUnit::Turn,
+                "fr" => CalcUnit::Fr,
+                _ => return None,
+            }
+        } else {
+            CalcUnit::None
+        };
+
+        Some(CalcValue::new(value, unit))
+    }
+
+    fn parse_identifier(&mut self) -> Option<String> {
+        self.skip_ws();
+        let start = self.pos;
+        let mut found = false;
+        while let Some(ch) = self.peek_char() {
+            if ch.is_ascii_alphabetic() || ch == '-' {
+                found = true;
+                self.pos += ch.len_utf8();
+            } else {
+                break;
+            }
+        }
+        if !found {
+            return None;
+        }
+        Some(self.input[start..self.pos].to_ascii_lowercase())
+    }
+
+    fn parse_unit(&mut self) -> Option<String> {
+        let start = self.pos;
+        let mut found = false;
+        while let Some(ch) = self.peek_char() {
+            if ch.is_ascii_alphabetic() {
+                found = true;
+                self.pos += ch.len_utf8();
+            } else {
+                break;
+            }
+        }
+        if !found {
+            return None;
+        }
+        Some(self.input[start..self.pos].to_ascii_lowercase())
+    }
+
+    fn skip_ws(&mut self) {
+        while let Some(ch) = self.peek_char() {
+            if ch.is_whitespace() {
+                self.pos += ch.len_utf8();
+            } else {
+                break;
+            }
+        }
+    }
+
+    fn consume(&mut self, expected: char) -> bool {
+        if self.peek_char() == Some(expected) {
+            self.pos += expected.len_utf8();
+            true
+        } else {
+            false
+        }
+    }
+
+    fn expect(&mut self, expected: char) -> Option<()> {
+        self.skip_ws();
+        if self.consume(expected) {
+            Some(())
+        } else {
+            None
+        }
+    }
+
+    fn peek_char(&self) -> Option<char> {
+        self.input[self.pos..].chars().next()
+    }
+
+    fn is_eof(&self) -> bool {
+        self.pos >= self.input.len()
+    }
+}
+
+fn parse_math_value(input: &str) -> Option<CalcValue> {
+    let mut parser = MathParser::new(input);
+    let value = parser.parse_expression()?;
+    parser.skip_ws();
+    if parser.is_eof() {
+        Some(value)
+    } else {
+        None
+    }
+}
+
+fn add_values(a: CalcValue, b: CalcValue) -> Option<CalcValue> {
+    if a.unit == b.unit {
+        Some(CalcValue::new(a.value + b.value, a.unit))
+    } else {
+        None
+    }
+}
+
+fn sub_values(a: CalcValue, b: CalcValue) -> Option<CalcValue> {
+    if a.unit == b.unit {
+        Some(CalcValue::new(a.value - b.value, a.unit))
+    } else {
+        None
+    }
+}
+
+fn mul_values(a: CalcValue, b: CalcValue) -> Option<CalcValue> {
+    match (a.unit, b.unit) {
+        (CalcUnit::None, unit) => Some(CalcValue::new(a.value * b.value, unit)),
+        (unit, CalcUnit::None) => Some(CalcValue::new(a.value * b.value, unit)),
+        _ => None,
+    }
+}
+
+fn div_values(a: CalcValue, b: CalcValue) -> Option<CalcValue> {
+    if b.value == 0.0 {
+        return None;
+    }
+    match (a.unit, b.unit) {
+        (unit, CalcUnit::None) => Some(CalcValue::new(a.value / b.value, unit)),
+        _ => None,
+    }
+}
+
+fn reduce_min_max(is_min: bool, values: &[CalcValue]) -> Option<CalcValue> {
+    let first = values.first().copied()?;
+    let mut best = first;
+    for value in values.iter().copied().skip(1) {
+        if value.unit != best.unit {
+            return None;
+        }
+        if is_min {
+            if value.value < best.value {
+                best = value;
+            }
+        } else if value.value > best.value {
+            best = value;
+        }
+    }
+    Some(best)
+}
+
+fn to_radians(value: CalcValue) -> Option<f32> {
+    match value.unit {
+        CalcUnit::None => Some(value.value),
+        CalcUnit::Deg => Some(value.value.to_radians()),
+        CalcUnit::Rad => Some(value.value),
+        CalcUnit::Turn => Some(value.value * std::f32::consts::TAU),
+        _ => None,
+    }
+}
+
+struct CalcParser<'a> {
+    input: &'a str,
+    pos: usize,
+}
+
+impl<'a> CalcParser<'a> {
+    fn new(input: &'a str) -> Self {
+        Self { input, pos: 0 }
+    }
+
+    fn parse_expression(&mut self) -> Option<CalcExpr> {
+        let mut left = self.parse_term()?;
+        loop {
+            self.skip_ws();
+            if self.consume('+') {
+                let right = self.parse_term()?;
+                left = CalcExpr::Add(Box::new(left), Box::new(right));
+            } else if self.consume('-') {
+                let right = self.parse_term()?;
+                left = CalcExpr::Sub(Box::new(left), Box::new(right));
+            } else {
+                break;
+            }
+        }
+        Some(left)
+    }
+
+    fn parse_term(&mut self) -> Option<CalcExpr> {
+        let mut left = self.parse_factor()?;
+        loop {
+            self.skip_ws();
+            if self.consume('*') {
+                let right = self.parse_factor()?;
+                left = CalcExpr::Mul(Box::new(left), Box::new(right));
+            } else if self.consume('/') {
+                let right = self.parse_factor()?;
+                left = CalcExpr::Div(Box::new(left), Box::new(right));
+            } else {
+                break;
+            }
+        }
+        Some(left)
+    }
+
+    fn parse_factor(&mut self) -> Option<CalcExpr> {
+        self.skip_ws();
+        if self.consume('+') {
+            return self.parse_factor();
+        }
+        if self.consume('-') {
+            let inner = self.parse_factor()?;
+            return Some(CalcExpr::Mul(
+                Box::new(CalcExpr::Value(CalcValue::new(-1.0, CalcUnit::None))),
+                Box::new(inner),
+            ));
+        }
+        if self.consume('(') {
+            let expr = self.parse_expression()?;
+            self.expect(')')?;
+            return Some(expr);
+        }
+
+        if let Some(name) = self.parse_identifier() {
+            self.skip_ws();
+            if self.consume('(') {
+                return self.parse_function(&name);
+            }
+            return None;
+        }
+
+        self.parse_number()
+    }
+
+    fn parse_function(&mut self, name: &str) -> Option<CalcExpr> {
+        match name {
+            "calc" => {
+                let expr = self.parse_expression()?;
+                self.expect(')')?;
+                Some(expr)
+            }
+            "min" | "max" => {
+                let mut values = Vec::new();
+                loop {
+                    let expr = self.parse_expression()?;
+                    values.push(expr);
+                    self.skip_ws();
+                    if self.consume(',') {
+                        continue;
+                    }
+                    break;
+                }
+                self.expect(')')?;
+                if name == "min" {
+                    Some(CalcExpr::Min(values))
+                } else {
+                    Some(CalcExpr::Max(values))
+                }
+            }
+            "sin" => {
+                let expr = self.parse_expression()?;
+                self.expect(')')?;
+                Some(CalcExpr::Sin(Box::new(expr)))
+            }
+            "minmax" => {
+                let _ = self.parse_expression()?;
+                self.skip_ws();
+                if self.consume(',') {
+                    let _ = self.parse_expression()?;
+                }
+                self.expect(')')?;
+                None
+            }
+            _ => None,
+        }
+    }
+
+    fn parse_number(&mut self) -> Option<CalcExpr> {
+        self.skip_ws();
+        let start = self.pos;
+        let mut has_digit = false;
+        let mut seen_dot = false;
+
+        while let Some(ch) = self.peek_char() {
+            if ch.is_ascii_digit() {
+                has_digit = true;
+                self.pos += ch.len_utf8();
+            } else if ch == '.' && !seen_dot {
+                seen_dot = true;
+                self.pos += 1;
+            } else {
+                break;
+            }
+        }
+
+        if !has_digit {
+            return None;
+        }
+
+        let number_str = &self.input[start..self.pos];
+        let value = number_str.parse::<f32>().ok()?;
+
+        let unit = if self.consume('%') {
+            CalcUnit::Percent
+        } else if let Some(unit_str) = self.parse_unit() {
+            match unit_str.as_str() {
+                "px" => CalcUnit::Px,
+                "rem" => CalcUnit::Rem,
+                "vw" => CalcUnit::Vw,
+                "vh" => CalcUnit::Vh,
+                "vmin" => CalcUnit::VMin,
+                "vmax" => CalcUnit::VMax,
+                "deg" => CalcUnit::Deg,
+                "rad" => CalcUnit::Rad,
+                "turn" => CalcUnit::Turn,
+                "fr" => CalcUnit::Fr,
+                _ => return None,
+            }
+        } else {
+            CalcUnit::None
+        };
+
+        Some(CalcExpr::Value(CalcValue::new(value, unit)))
+    }
+
+    fn parse_identifier(&mut self) -> Option<String> {
+        self.skip_ws();
+        let start = self.pos;
+        let mut found = false;
+        while let Some(ch) = self.peek_char() {
+            if ch.is_ascii_alphabetic() || ch == '-' {
+                found = true;
+                self.pos += ch.len_utf8();
+            } else {
+                break;
+            }
+        }
+        if !found {
+            return None;
+        }
+        Some(self.input[start..self.pos].to_ascii_lowercase())
+    }
+
+    fn parse_unit(&mut self) -> Option<String> {
+        let start = self.pos;
+        let mut found = false;
+        while let Some(ch) = self.peek_char() {
+            if ch.is_ascii_alphabetic() {
+                found = true;
+                self.pos += ch.len_utf8();
+            } else {
+                break;
+            }
+        }
+        if !found {
+            return None;
+        }
+        Some(self.input[start..self.pos].to_ascii_lowercase())
+    }
+
+    fn skip_ws(&mut self) {
+        while let Some(ch) = self.peek_char() {
+            if ch.is_whitespace() {
+                self.pos += ch.len_utf8();
+            } else {
+                break;
+            }
+        }
+    }
+
+    fn consume(&mut self, expected: char) -> bool {
+        if self.peek_char() == Some(expected) {
+            self.pos += expected.len_utf8();
+            true
+        } else {
+            false
+        }
+    }
+
+    fn expect(&mut self, expected: char) -> Option<()> {
+        self.skip_ws();
+        if self.consume(expected) {
+            Some(())
+        } else {
+            None
+        }
+    }
+
+    fn peek_char(&self) -> Option<char> {
+        self.input[self.pos..].chars().next()
+    }
+
+    fn is_eof(&self) -> bool {
+        self.pos >= self.input.len()
+    }
+}
+
+fn parse_calc_expr(input: &str) -> Option<CalcExpr> {
+    let mut parser = CalcParser::new(input);
+    let expr = parser.parse_expression()?;
+    parser.skip_ws();
+    if parser.is_eof() {
+        Some(expr)
+    } else {
+        None
+    }
+}
+
+fn apply_length_property(value: &str, dest: &mut Option<Val>, dest_calc: &mut Option<CalcExpr>) {
+    if let Some(val) = convert_to_val(value.to_string()) {
+        *dest = Some(val);
+        *dest_calc = None;
+        return;
+    }
+
+    if let Some(expr) = parse_calc_expr(value) {
+        *dest = None;
+        *dest_calc = Some(expr);
+    }
+}
+
 /// Converts a string representation of a CSS value into a Bevy [`Val`].
 ///
 /// # Supported Formats
 /// - `"100px"` → `Val::Px(100.0)`
 /// - `"75%"` → `Val::Percent(75.0)`
+/// - `"10vw"` → `Val::Vw(10.0)` (and `vh`/`vmin`/`vmax`)
 ///
 /// # Parameters
 /// - `value`: A [`String`] representing a dimension value (e.g. `"20px"`, `"50%"`).
@@ -592,18 +1384,17 @@ fn convert_to_font_weight(value: String) -> Option<FontWeight> {
 /// - `None` if the format is invalid or cannot be parsed.
 ///
 pub fn convert_to_val(value: String) -> Option<Val> {
-    let mut val = None;
-    let trimmed = value.trim();
-    if trimmed.ends_with("px") {
-        let count = trimmed.replace("px", "").parse::<f32>().ok()?;
-        val = Some(Val::Px(count));
-    } else if trimmed.ends_with("%") {
-        let count = trimmed.replace("%", "").parse::<f32>().ok()?;
-        val = Some(Val::Percent(count));
-    } else if trimmed == "0" || trimmed == "0.0" || trimmed == "-0" || trimmed == "-0.0" {
-        val = Some(Val::Px(0.0));
+    let parsed = parse_math_value(value.trim())?;
+    match parsed.unit {
+        CalcUnit::Px => Some(Val::Px(parsed.value)),
+        CalcUnit::Percent => Some(Val::Percent(parsed.value)),
+        CalcUnit::Vw => Some(Val::Vw(parsed.value)),
+        CalcUnit::Vh => Some(Val::Vh(parsed.value)),
+        CalcUnit::VMin => Some(Val::VMin(parsed.value)),
+        CalcUnit::VMax => Some(Val::VMax(parsed.value)),
+        CalcUnit::None if parsed.value == 0.0 => Some(Val::Px(0.0)),
+        _ => None,
     }
-    val
 }
 
 /// Parses a two-value length into a `Val2`, defaulting the second to zero.
@@ -677,7 +1468,9 @@ fn apply_transform_functions(value: &str, transform: &mut TransformStyle) {
 
 /// Parses a scale value into an `f32`.
 fn parse_scale_value(value: &str) -> Option<f32> {
-    value.trim().parse::<f32>().ok()
+    parse_math_value(value)
+        .filter(|val| val.unit == CalcUnit::None)
+        .map(|val| val.value)
 }
 
 /// Parses scale values into a `Vec2`.
@@ -696,27 +1489,14 @@ fn parse_scale_vec2(value: &str) -> Option<Vec2> {
 
 /// Parses a rotation value into radians.
 fn parse_rotation(value: &str) -> Option<f32> {
-    let token = value.trim().to_ascii_lowercase();
-    if let Some(deg) = token.strip_suffix("deg") {
-        return deg
-            .trim()
-            .parse::<f32>()
-            .ok()
-            .map(|v| nudge_problematic_rotation(v.to_radians()));
-    }
-
-    if let Some(rad) = token.strip_suffix("rad") {
-        return rad
-            .trim()
-            .parse::<f32>()
-            .ok()
-            .map(nudge_problematic_rotation);
-    }
-
-    token
-        .parse::<f32>()
-        .ok()
-        .map(|v| nudge_problematic_rotation(v.to_radians()))
+    let parsed = parse_math_value(value.trim())?;
+    let radians = match parsed.unit {
+        CalcUnit::None | CalcUnit::Deg => parsed.value.to_radians(),
+        CalcUnit::Rad => parsed.value,
+        CalcUnit::Turn => parsed.value * std::f32::consts::TAU,
+        _ => return None,
+    };
+    Some(nudge_problematic_rotation(radians))
 }
 
 /// Nudges rotations that are very close to quadrant boundaries to avoid artifacts.
@@ -759,8 +1539,9 @@ pub fn convert_to_i32(value: String) -> Option<i32> {
 
 /// Parses a numeric string into a floating-point value.
 pub fn convert_to_f32(value: String) -> Option<f32> {
-    let trimmed = value.trim();
-    trimmed.parse::<f32>().ok()
+    parse_math_value(value.trim())
+        .filter(|val| val.unit == CalcUnit::None)
+        .map(|val| val.value)
 }
 
 /// Converts a CSS font-size string into a [`FontVal`] (custom type).
@@ -777,16 +1558,13 @@ pub fn convert_to_f32(value: String) -> Option<f32> {
 /// - `None` if the value is malformed or unsupported.
 ///
 pub fn convert_to_font_size(value: String) -> Option<FontVal> {
-    let mut val = None;
-    let trimmed = value.trim();
-    if trimmed.ends_with("px") {
-        let count = trimmed.replace("px", "").parse::<f32>().ok()?;
-        val = Some(FontVal::Px(count));
-    } else if trimmed.ends_with("rem") {
-        let count = trimmed.replace("rem", "").parse::<f32>().ok()?;
-        val = Some(FontVal::Rem(count));
+    let parsed = parse_math_value(value.trim())?;
+    match parsed.unit {
+        CalcUnit::Px => Some(FontVal::Px(parsed.value)),
+        CalcUnit::Rem => Some(FontVal::Rem(parsed.value)),
+        CalcUnit::None if parsed.value == 0.0 => Some(FontVal::Px(0.0)),
+        _ => None,
     }
-    val
 }
 
 /// Converts a CSS color string into a Bevy [`Color`].
@@ -808,7 +1586,7 @@ pub fn convert_to_color(value: String) -> Option<Color> {
     let mut color = None;
     let trimmed = value.trim();
     if trimmed.eq_ignore_ascii_case("transparent") || trimmed.eq_ignore_ascii_case("none") {
-        return Some(Color::NONE);
+        return color;
     }
 
     if trimmed.starts_with("#") {
@@ -817,38 +1595,30 @@ pub fn convert_to_color(value: String) -> Option<Color> {
         } else {
             color = Some(Colored::hex_to_color(trimmed));
         }
-    } else if trimmed.starts_with("rgb(") {
-        let correct = trimmed.trim_start_matches("rgb(").trim_end_matches(")");
-        let parts: Vec<_> = correct.split(',').map(str::trim).collect();
-
-        if parts.len() == 3 {
-            let r = parts[0].parse::<u8>().ok()?;
-            let g = parts[1].parse::<u8>().ok()?;
-            let b = parts[2].parse::<u8>().ok()?;
-
-            color = Some(Color::srgb_u8(r, g, b));
-        }
-    } else if trimmed.starts_with("rgba(") {
-        if trimmed.eq("rgba(0, 0, 0, 0)") {
-            color = Some(Color::NONE);
-        } else {
-            let correct = trimmed.trim_start_matches("rgba(").trim_end_matches(")");
-            let parts: Vec<_> = correct.split(',').map(str::trim).collect();
-
-            if parts.len() == 4 {
-                let r = parts[0].parse::<u8>().ok()?;
-                let g = parts[1].parse::<u8>().ok()?;
-                let b = parts[2].parse::<u8>().ok()?;
-                let a = parts[3].parse::<u8>().ok()?;
-
-                color = Some(Color::srgba_u8(r, g, b, a));
-            }
-        }
+    } else if let Some(parts) = parse_color_components(trimmed, "rgb", 3) {
+        color = Some(Color::srgb_u8(parts[0], parts[1], parts[2]));
+    } else if let Some(parts) = parse_color_components(trimmed, "rgba", 4) {
+        color = Some(Color::srgba_u8(parts[0], parts[1], parts[2], parts[3]));
     } else {
         color = Colored::named(trimmed);
     }
 
     color
+}
+
+fn parse_color_components(value: &str, name: &str, expected: usize) -> Option<Vec<u8>> {
+    let prefix = format!("{name}(");
+    let inner = value.strip_prefix(&prefix)?.strip_suffix(')')?;
+    let parts: Vec<_> = inner.split(',').map(str::trim).collect();
+    if parts.len() != expected {
+        return None;
+    }
+
+    let mut values = Vec::with_capacity(expected);
+    for part in parts {
+        values.push(part.parse::<u8>().ok()?);
+    }
+    Some(values)
 }
 
 /// Converts a CSS `background` value into a [`Background`] struct.
@@ -867,6 +1637,13 @@ pub fn convert_to_color(value: String) -> Option<Color> {
 pub fn convert_to_background(value: String, all_types: bool) -> Option<Background> {
     let trimmed = value.trim();
 
+    if let Some(gradient) = parse_linear_gradient(trimmed) {
+        return Some(Background {
+            gradient: Some(gradient),
+            ..default()
+        });
+    }
+
     if trimmed.starts_with("url(") {
         let url = trimmed.trim_start_matches("url(").trim_end_matches(")");
         Some(Background {
@@ -881,6 +1658,313 @@ pub fn convert_to_background(value: String, all_types: bool) -> Option<Backgroun
 
         None
     }
+}
+
+fn parse_background_position(value: &str) -> Option<BackgroundPosition> {
+    let segment = value.split(',').next().unwrap_or(value);
+    let tokens: Vec<&str> = segment.split_whitespace().collect();
+    if tokens.is_empty() {
+        return None;
+    }
+
+    let mut x: Option<BackgroundPositionValue> = None;
+    let mut y: Option<BackgroundPositionValue> = None;
+
+    for token in tokens {
+        let lower = token.to_ascii_lowercase();
+        match lower.as_str() {
+            "left" => x = Some(BackgroundPositionValue::Percent(0.0)),
+            "right" => x = Some(BackgroundPositionValue::Percent(100.0)),
+            "top" => y = Some(BackgroundPositionValue::Percent(0.0)),
+            "bottom" => y = Some(BackgroundPositionValue::Percent(100.0)),
+            "center" => {
+                if x.is_none() {
+                    x = Some(BackgroundPositionValue::Percent(50.0));
+                } else if y.is_none() {
+                    y = Some(BackgroundPositionValue::Percent(50.0));
+                }
+            }
+            _ => {
+                if let Some(val) = parse_position_value(token) {
+                    if x.is_none() {
+                        x = Some(val);
+                    } else if y.is_none() {
+                        y = Some(val);
+                    }
+                }
+            }
+        }
+    }
+
+    let x = x.unwrap_or(BackgroundPositionValue::Percent(50.0));
+    let y = y.unwrap_or(BackgroundPositionValue::Percent(50.0));
+
+    Some(BackgroundPosition { x, y })
+}
+
+fn parse_position_value(value: &str) -> Option<BackgroundPositionValue> {
+    let val = convert_to_val(value.to_string())?;
+    match val {
+        Val::Px(px) => Some(BackgroundPositionValue::Px(px)),
+        Val::Percent(percent) => Some(BackgroundPositionValue::Percent(percent)),
+        _ => None,
+    }
+}
+
+fn parse_background_size(value: &str) -> Option<BackgroundSize> {
+    let segment = value.split(',').next().unwrap_or(value);
+    let tokens: Vec<&str> = segment.split_whitespace().collect();
+    if tokens.is_empty() {
+        return None;
+    }
+
+    if tokens.len() == 1 {
+        let lower = tokens[0].to_ascii_lowercase();
+        match lower.as_str() {
+            "cover" => return Some(BackgroundSize::Cover),
+            "contain" => return Some(BackgroundSize::Contain),
+            "auto" => return Some(BackgroundSize::Auto),
+            _ => {}
+        }
+
+        let width = parse_size_value(tokens[0])?;
+        return Some(BackgroundSize::Explicit(width, BackgroundSizeValue::Auto));
+    }
+
+    if tokens.len() >= 2 {
+        let width = parse_size_value(tokens[0])?;
+        let height = parse_size_value(tokens[1])?;
+        return Some(BackgroundSize::Explicit(width, height));
+    }
+
+    None
+}
+
+fn parse_size_value(value: &str) -> Option<BackgroundSizeValue> {
+    let lower = value.trim().to_ascii_lowercase();
+    if lower == "auto" {
+        return Some(BackgroundSizeValue::Auto);
+    }
+
+    let val = convert_to_val(value.to_string())?;
+    match val {
+        Val::Px(px) => Some(BackgroundSizeValue::Px(px)),
+        Val::Percent(percent) => Some(BackgroundSizeValue::Percent(percent)),
+        _ => None,
+    }
+}
+
+fn parse_background_attachment(value: &str) -> Option<BackgroundAttachment> {
+    let trimmed = value.trim().to_ascii_lowercase();
+    match trimmed.as_str() {
+        "scroll" => Some(BackgroundAttachment::Scroll),
+        "fixed" => Some(BackgroundAttachment::Fixed),
+        "local" => Some(BackgroundAttachment::Local),
+        _ => None,
+    }
+}
+
+fn parse_linear_gradient(value: &str) -> Option<LinearGradient> {
+    let trimmed = value.trim();
+    let lower = trimmed.to_ascii_lowercase();
+    let open = lower.find('(')?;
+    let name = lower[..open].trim();
+    if name != "linear-gradient" || !trimmed.ends_with(')') {
+        return None;
+    }
+
+    let inner = &trimmed[open + 1..trimmed.len() - 1];
+    let mut parts = split_top_level_commas(inner);
+    if parts.len() < 2 {
+        return None;
+    }
+
+    let mut angle = None;
+    if let Some(candidate) = parts.first() {
+        if let Some(parsed) = parse_gradient_direction(candidate) {
+            angle = Some(parsed);
+            parts.remove(0);
+        }
+    }
+
+    let angle = angle.unwrap_or(180.0);
+    let mut stops = Vec::new();
+    for part in parts {
+        let mut parsed = parse_gradient_stop(&part)?;
+        stops.append(&mut parsed);
+    }
+
+    if stops.is_empty() {
+        return None;
+    }
+
+    Some(LinearGradient { angle, stops })
+}
+
+fn split_top_level_commas(input: &str) -> Vec<String> {
+    let mut parts = Vec::new();
+    let mut depth = 0i32;
+    let mut start = 0usize;
+
+    for (idx, ch) in input.char_indices() {
+        match ch {
+            '(' => depth += 1,
+            ')' => depth = (depth - 1).max(0),
+            ',' if depth == 0 => {
+                let segment = input[start..idx].trim();
+                if !segment.is_empty() {
+                    parts.push(segment.to_string());
+                }
+                start = idx + 1;
+            }
+            _ => {}
+        }
+    }
+
+    let tail = input[start..].trim();
+    if !tail.is_empty() {
+        parts.push(tail.to_string());
+    }
+
+    parts
+}
+
+fn parse_gradient_direction(value: &str) -> Option<f32> {
+    let trimmed = value.trim();
+    let lower = trimmed.to_ascii_lowercase();
+
+    if let Some(angle) = parse_angle_degrees(&lower) {
+        return Some(normalize_angle(angle));
+    }
+
+    let lower = lower.strip_prefix("to ")?;
+    let mut dx: f32 = 0.0;
+    let mut dy = 0.0;
+
+    for token in lower.split_whitespace() {
+        match token {
+            "left" => dx = -1.0,
+            "right" => dx = 1.0,
+            "top" => dy = -1.0,
+            "bottom" => dy = 1.0,
+            _ => return None,
+        }
+    }
+
+    if dx == 0.0 && dy == 0.0 {
+        return None;
+    }
+
+    let angle = dx.atan2(-dy).to_degrees();
+    Some(normalize_angle(angle))
+}
+
+fn parse_angle_degrees(value: &str) -> Option<f32> {
+    let trimmed = value.trim();
+    if let Some(num) = trimmed.strip_suffix("deg") {
+        return num.trim().parse::<f32>().ok();
+    }
+    if let Some(num) = trimmed.strip_suffix("rad") {
+        let radians = num.trim().parse::<f32>().ok()?;
+        return Some(radians.to_degrees());
+    }
+    if let Some(num) = trimmed.strip_suffix("turn") {
+        let turns = num.trim().parse::<f32>().ok()?;
+        return Some(turns * 360.0);
+    }
+    None
+}
+
+fn normalize_angle(angle: f32) -> f32 {
+    angle.rem_euclid(360.0)
+}
+
+fn parse_gradient_stop(value: &str) -> Option<Vec<GradientStop>> {
+    let (color_text, rest) = split_color_and_positions(value)?;
+    let color = convert_to_color(color_text)?;
+    let positions = parse_stop_positions(rest);
+
+    let mut stops = Vec::new();
+    match positions.len() {
+        0 => stops.push(GradientStop {
+            color,
+            position: None,
+        }),
+        1 => stops.push(GradientStop {
+            color,
+            position: Some(positions[0].clone()),
+        }),
+        _ => {
+            stops.push(GradientStop {
+                color,
+                position: Some(positions[0].clone()),
+            });
+            stops.push(GradientStop {
+                color,
+                position: Some(positions[1].clone()),
+            });
+        }
+    }
+
+    Some(stops)
+}
+
+fn split_color_and_positions(value: &str) -> Option<(String, &str)> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    let lower = trimmed.to_ascii_lowercase();
+    let (color, rest) = if lower.starts_with("rgb(") || lower.starts_with("rgba(") {
+        let end = trimmed.find(')')?;
+        let color = trimmed[..=end].to_string();
+        (color, &trimmed[end + 1..])
+    } else if trimmed.starts_with('#') {
+        let end = trimmed
+            .find(char::is_whitespace)
+            .unwrap_or(trimmed.len());
+        (trimmed[..end].to_string(), &trimmed[end..])
+    } else {
+        let end = trimmed
+            .find(char::is_whitespace)
+            .unwrap_or(trimmed.len());
+        (trimmed[..end].to_string(), &trimmed[end..])
+    };
+
+    Some((color, rest))
+}
+
+fn parse_stop_positions(value: &str) -> Vec<GradientStopPosition> {
+    value
+        .split_whitespace()
+        .filter_map(parse_stop_position)
+        .collect()
+}
+
+fn parse_stop_position(value: &str) -> Option<GradientStopPosition> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    if let Some(num) = trimmed.strip_suffix('%') {
+        return num
+            .trim()
+            .parse::<f32>()
+            .ok()
+            .map(GradientStopPosition::Percent);
+    }
+    if let Some(num) = trimmed.strip_suffix("px") {
+        return num
+            .trim()
+            .parse::<f32>()
+            .ok()
+            .map(GradientStopPosition::Px);
+    }
+    if trimmed == "0" {
+        return Some(GradientStopPosition::Px(0.0));
+    }
+    None
 }
 
 /// Converts a CSS `display` value into a Bevy [`Display`] enum.
@@ -1054,7 +2138,8 @@ pub fn convert_to_ui_rect(value: String) -> Option<UiRect> {
 /// Converts a CSS-like box-shadow string into a Bevy [`BoxShadow`] struct.
 ///
 /// Parses shadow offset (x, y), blur radius, spread radius, and color from the input string.
-/// Supports values in pixels (e.g., `"10px"`), percentages (e.g., `"50%"`), or CSS color formats
+/// Supports values in pixels (e.g., `"10px"`), percentages (e.g., `"50%"`), viewport units (e.g., `"10vw"`),
+/// or CSS color formats
 /// (`"#rrggbb"`, `"rgb(...)"`, `"rgba(...)"`).
 ///
 /// The number of numeric values determines which parts are set:
@@ -1079,12 +2164,8 @@ pub fn convert_to_bevy_box_shadow(value: String) -> Option<BoxShadow> {
 
     for part in parts {
         let trimmed = part.trim();
-        if trimmed.ends_with("px") || trimmed.eq_ignore_ascii_case("0") {
-            let number = trimmed.trim_end_matches("px").parse::<f32>().ok()?;
-            vals.push(Val::Px(number));
-        } else if trimmed.ends_with('%') {
-            let number = trimmed.trim_end_matches('%').parse::<f32>().ok()?;
-            vals.push(Val::Percent(number));
+        if let Some(val) = convert_to_val(trimmed.to_string()) {
+            vals.push(val);
         } else if trimmed.starts_with("#")
             || trimmed.starts_with("rgb(")
             || trimmed.starts_with("rgba(")
@@ -1127,7 +2208,7 @@ pub fn convert_to_bevy_box_shadow(value: String) -> Option<BoxShadow> {
 /// Parses a CSS border shorthand string into a [`UiRect`] for border widths and a [`Color`].
 ///
 /// The input string is expected to be in the form `"WIDTH COLOR"` where:
-/// - WIDTH is a length value (e.g. `"5px"`, `"10%"`, or `"0"`).
+/// - WIDTH is a length value (e.g. `"5px"`, `"10%"`, `"10vw"`, or `"0"`).
 /// - COLOR is an optional CSS color string (e.g. `"#ff0000"`, `"rgba(255,0,0,1)"`).
 ///
 /// If the color is missing, defaults to transparent.
@@ -1142,23 +2223,7 @@ pub fn convert_to_bevy_box_shadow(value: String) -> Option<BoxShadow> {
 pub fn convert_css_border(value: String) -> Option<(UiRect, Color)> {
     /// Parses a single border width token into a `Val`.
     fn parse_val(input: &str) -> Option<Val> {
-        if input.ends_with("px") {
-            input
-                .trim_end_matches("px")
-                .parse::<f32>()
-                .ok()
-                .map(Val::Px)
-        } else if input.ends_with('%') {
-            input
-                .trim_end_matches('%')
-                .parse::<f32>()
-                .ok()
-                .map(Val::Percent)
-        } else if input == "0" {
-            Some(Val::Px(0.0))
-        } else {
-            None
-        }
+        convert_to_val(input.to_string())
     }
 
     let parts: Vec<&str> = value.split_whitespace().collect();
@@ -1551,7 +2616,7 @@ pub fn convert_to_bevy_grid_template(value: String) -> Option<Vec<RepeatedGridTr
  * - "min-content"
  * - "max-content"
  * - "minmax(min, max)"
- * - fixed sizes with units: "100px", "50%"
+ * - fixed sizes with units: "100px", "50%", "10vw"
  *
  * @param input is The CSS grid track string.
  * @return Some(GridTrack) if parsing succeeds, None otherwise.
@@ -1570,22 +2635,19 @@ fn parse_single_grid_track(input: &str) -> Option<GridTrack> {
             let max = parse_max_sizing(parts.next()?)?;
             Some(GridTrack::minmax(min, max))
         }
-        _ if input.ends_with("px") => input
-            .strip_suffix("px")?
-            .parse::<f32>()
-            .ok()
-            .map(GridTrack::px),
-        _ if input.ends_with('%') => input
-            .strip_suffix('%')?
-            .parse::<f32>()
-            .ok()
-            .map(GridTrack::percent),
-        _ if input.ends_with("fr") => input
-            .strip_suffix("fr")?
-            .parse::<f32>()
-            .ok()
-            .map(GridTrack::fr),
-        _ => None,
+        _ => match parse_math_value(input) {
+            Some(value) => match value.unit {
+                CalcUnit::Px => Some(GridTrack::px(value.value)),
+                CalcUnit::Percent => Some(GridTrack::percent(value.value)),
+                CalcUnit::Fr => Some(GridTrack::fr(value.value)),
+                CalcUnit::Vw => Some(GridTrack::vw(value.value)),
+                CalcUnit::Vh => Some(GridTrack::vh(value.value)),
+                CalcUnit::VMin => Some(GridTrack::vmin(value.value)),
+                CalcUnit::VMax => Some(GridTrack::vmax(value.value)),
+                _ => None,
+            },
+            None => None,
+        },
     }
 }
 
@@ -1596,7 +2658,7 @@ fn parse_single_grid_track(input: &str) -> Option<GridTrack> {
  * - "auto"
  * - "min-content"
  * - "max-content"
- * - fixed size in px, e.g. "100px"
+ * - fixed size in px or viewport units, e.g. "100px", "10vw"
  *
  * @param input is The CSS min track sizing string.
  * @return Some(MinTrackSizingFunction) if parsing succeeds, None otherwise.
@@ -1607,12 +2669,18 @@ fn parse_min_sizing(input: &str) -> Option<MinTrackSizingFunction> {
         "auto" => Some(MinTrackSizingFunction::Auto),
         "min-content" => Some(MinTrackSizingFunction::MinContent),
         "max-content" => Some(MinTrackSizingFunction::MaxContent),
-        _ if input.ends_with("px") => input
-            .strip_suffix("px")?
-            .parse::<f32>()
-            .ok()
-            .map(MinTrackSizingFunction::Px),
-        _ => None,
+        _ => match parse_math_value(input) {
+            Some(value) => match value.unit {
+                CalcUnit::Px => Some(MinTrackSizingFunction::Px(value.value)),
+                CalcUnit::Percent => Some(MinTrackSizingFunction::Percent(value.value)),
+                CalcUnit::Vw => Some(MinTrackSizingFunction::Vw(value.value)),
+                CalcUnit::Vh => Some(MinTrackSizingFunction::Vh(value.value)),
+                CalcUnit::VMin => Some(MinTrackSizingFunction::VMin(value.value)),
+                CalcUnit::VMax => Some(MinTrackSizingFunction::VMax(value.value)),
+                _ => None,
+            },
+            None => None,
+        },
     }
 }
 
@@ -1623,7 +2691,7 @@ fn parse_min_sizing(input: &str) -> Option<MinTrackSizingFunction> {
  * - "auto"
  * - "min-content"
  * - "max-content"
- * - fixed size in px, e.g. "100px"
+ * - fixed size in px or viewport units, e.g. "100px", "10vw"
  * - fractional units, e.g. "1 fr"
  *
  *  @param input is The CSS max track sizing string.
@@ -1635,17 +2703,19 @@ fn parse_max_sizing(input: &str) -> Option<MaxTrackSizingFunction> {
         "auto" => Some(MaxTrackSizingFunction::Auto),
         "min-content" => Some(MaxTrackSizingFunction::MinContent),
         "max-content" => Some(MaxTrackSizingFunction::MaxContent),
-        _ if input.ends_with("px") => input
-            .strip_suffix("px")?
-            .parse::<f32>()
-            .ok()
-            .map(MaxTrackSizingFunction::Px),
-        _ if input.ends_with("fr") => input
-            .strip_suffix("fr")?
-            .parse::<f32>()
-            .ok()
-            .map(MaxTrackSizingFunction::Fraction),
-        _ => None,
+        _ => match parse_math_value(input) {
+            Some(value) => match value.unit {
+                CalcUnit::Px => Some(MaxTrackSizingFunction::Px(value.value)),
+                CalcUnit::Percent => Some(MaxTrackSizingFunction::Percent(value.value)),
+                CalcUnit::Fr => Some(MaxTrackSizingFunction::Fraction(value.value)),
+                CalcUnit::Vw => Some(MaxTrackSizingFunction::Vw(value.value)),
+                CalcUnit::Vh => Some(MaxTrackSizingFunction::Vh(value.value)),
+                CalcUnit::VMin => Some(MaxTrackSizingFunction::VMin(value.value)),
+                CalcUnit::VMax => Some(MaxTrackSizingFunction::VMax(value.value)),
+                _ => None,
+            },
+            None => None,
+        },
     }
 }
 
@@ -1704,6 +2774,7 @@ pub fn convert_overflow(value: String, which: &str) -> Option<Overflow> {
  * Supported units:
  * - px (pixels), e.g. "10px"
  * - percent (%), e.g. "50%"
+ * - viewport units (vw/vh/vmin/vmax), e.g. "10vw"
  * - zero ("0") without a unit
  *
  * @param value is The CSS radius string.
@@ -1713,16 +2784,8 @@ pub fn convert_overflow(value: String, which: &str) -> Option<Overflow> {
 fn parse_radius_values(value: &str) -> Option<Vec<Val>> {
     let mut vals = Vec::new();
     for part in value.split_whitespace() {
-        let trimmed = part.trim();
-        if trimmed.ends_with("px") || trimmed.eq_ignore_ascii_case("0") {
-            let number = trimmed.trim_end_matches("px").parse::<f32>().ok()?;
-            vals.push(Val::Px(number));
-        } else if trimmed.ends_with('%') {
-            let number = trimmed.trim_end_matches('%').parse::<f32>().ok()?;
-            vals.push(Val::Percent(number));
-        } else {
-            return None;
-        }
+        let val = convert_to_val(part.trim().to_string())?;
+        vals.push(val);
     }
     Some(vals)
 }
