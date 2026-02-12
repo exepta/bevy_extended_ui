@@ -586,20 +586,43 @@ fn apply_calc_styles_system(
             }
         }
 
-        if let Some(expr) = style.gap_calc.as_ref() {
+        let mut row_gap_val = None;
+        let mut column_gap_val = None;
+
+        if let Some(expr) = style.row_gap_calc.as_ref() {
             if let Some(px) = expr.eval_length(ctx_content_w) {
-                let gap_val = Val::Px(px);
-                match node.flex_direction {
-                    FlexDirection::Row | FlexDirection::RowReverse => {
-                        node.column_gap = gap_val;
-                        node.row_gap = Val::Auto;
+                row_gap_val = Some(Val::Px(px));
+            }
+        }
+
+        if let Some(expr) = style.column_gap_calc.as_ref() {
+            if let Some(px) = expr.eval_length(ctx_content_w) {
+                column_gap_val = Some(Val::Px(px));
+            }
+        }
+
+        let needs_row_gap = style.row_gap.is_none() && row_gap_val.is_none();
+        let needs_column_gap = style.column_gap.is_none() && column_gap_val.is_none();
+
+        if (needs_row_gap || needs_column_gap) && style.gap_calc.is_some() {
+            if let Some(expr) = style.gap_calc.as_ref() {
+                if let Some(px) = expr.eval_length(ctx_content_w) {
+                    let gap_val = Val::Px(px);
+                    if needs_row_gap {
+                        row_gap_val = Some(gap_val);
                     }
-                    _ => {
-                        node.row_gap = gap_val;
-                        node.column_gap = Val::Auto;
+                    if needs_column_gap {
+                        column_gap_val = Some(gap_val);
                     }
                 }
             }
+        }
+
+        if let Some(val) = row_gap_val {
+            node.row_gap = val;
+        }
+        if let Some(val) = column_gap_val {
+            node.column_gap = val;
         }
     }
 }
@@ -1892,16 +1915,10 @@ fn apply_style_to_node(style: &Style, node: Option<&mut Node>) {
         node.overflow = style.overflow.unwrap_or_default();
 
         node.flex_direction = style.flex_direction.unwrap_or(FlexDirection::Row);
-        match node.flex_direction {
-            FlexDirection::Row | FlexDirection::RowReverse => {
-                node.column_gap = style.gap.unwrap_or_default();
-                node.row_gap = Val::Auto;
-            }
-            _ => {
-                node.row_gap = style.gap.unwrap_or_default();
-                node.column_gap = Val::Auto;
-            }
-        }
+        let row_gap = style.row_gap.or(style.gap).unwrap_or_default();
+        let column_gap = style.column_gap.or(style.gap).unwrap_or_default();
+        node.row_gap = row_gap;
+        node.column_gap = column_gap;
 
         node.flex_grow = style.flex_grow.unwrap_or_default();
         node.flex_basis = style.flex_basis.unwrap_or_default();

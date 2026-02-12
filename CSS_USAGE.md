@@ -35,6 +35,7 @@ properties or values are ignored silently.
 - `position` (`relative`, `absolute`; defaults to `relative`)
 - `left`, `right`, `top`, `bottom`
 - `gap`
+- `row-gap`, `column-gap`
 - `overflow`, `overflow-x`, `overflow-y`
 
 ### Flex
@@ -54,6 +55,7 @@ properties or values are ignored silently.
 - `grid-template-rows`, `grid-template-columns`
 - `grid-auto-rows`, `grid-auto-columns`
 - `minmax()` is supported for grid tracks; its min/max arguments can use `calc`, `min`, `max`, and `sin`
+- Grid track sizes accept `px`, `%`, `fr`, and viewport units (`vw`, `vh`, `vmin`, `vmax`)
 
 ### Typography
 
@@ -99,11 +101,13 @@ properties or values are ignored silently.
 
 Used by width/height, padding/margin, border widths, translation, etc.
 
-- Supported units: `px`, `%`
+- Supported units: `px`, `%`, `vw`, `vh`, `vmin`, `vmax`
 - Also supports `0` / `0.0` (treated as `0px`)
 - Anything else is ignored
 - Math functions: `calc`, `min`, `max`, `sin` (unitless radians), and nested usage
 - Mixed units in `calc` (e.g. `calc(100% - 10px)`) are resolved at runtime using the parent size (or window if no parent)
+
+Note: `gap` sets both row and column gaps. `row-gap` and `column-gap` override their respective axis.
 
 ### Font Size (`font-size`)
 
@@ -293,7 +297,7 @@ Tracks support:
 
 - `auto`, `min-content`, `max-content`
 - `minmax(min, max)`
-- `px`, `%`, `fr`
+- `px`, `%`, `fr`, `vw`, `vh`, `vmin`, `vmax`
 
 `grid-auto-rows` / `grid-auto-columns` accept a list of tracks (space-separated).
 
