@@ -29,15 +29,15 @@ button {
     padding: 0 15px;
     color: var(--text-color);
     font-size: 15px;
-}
 
-button:hover {
-    background: var(--primary-hover);
-}
+    &:hover {
+        background: var(--primary-hover);
+    }
 
-button:disabled {
-    background: var(--primary-disabled);
-    color: var(--text-color-dark);
+    &:disabled {
+        background: var(--primary-disabled);
+        color: var(--text-color-dark);
+    }
 }
 
 /* CheckBox */
@@ -50,57 +50,58 @@ checkbox {
     align-items: center;
     flex-direction: row;
     gap: 10px;
-    transition: all 0.3s;
     color: var(--text-color);
     font-size: 13px;
-}
 
-checkbox .mark-box {
-    width: 25px;
-    height: 25px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    border-radius: 4px;
-    border: 2px;
-    border-color: var(--text-color);
-}
+    > .mark-box {
+        width: 25px;
+        height: 25px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        border-radius: 4px;
+        border: 2px;
+        border-color: var(--text-color);
 
-checkbox .mark-box .mark {
-    width: 16px;
-    height: 16px;
-    transition: all 0.3s;
-}
+        > .mark {
+            width: 16px;
+            height: 16px;
+            transition: all 0.3s;
+        }
+    }
 
-checkbox:checked .mark-box {
-    border-color: var(--primary);
-    background: var(--primary);
-}
+    &:checked > .mark-box {
+        border-color: var(--primary);
+        background: var(--primary);
+    }
 
-checkbox .check-text {
-    transition: all 0.3s;
-}
+    > .check-text {
+        transition: all 0.3s;
+    }
 
-checkbox:disabled {
-    color: var(--disabled-text);
-}
+    &:disabled {
+        color: var(--disabled-text);
+    }
 
-checkbox:disabled .mark-box {
-    color: var(--disabled-text);
-    border-color: var(--primary-disabled);
-    background: var(--primary-disabled);
+    &:disabled > .mark-box {
+        color: var(--disabled-text);
+        border-color: var(--primary-disabled);
+        background: var(--primary-disabled);
+    }
 }
 
 /* Div */
 
-div scroll {
-    position: absolute;
-    right: 0;
-}
+div {
+    > scroll {
+        position: absolute;
+        right: 0;
+    }
 
-div .scroll-horizontal {
-    bottom: 0;
-    left: 0;
+    > .scroll-horizontal {
+        bottom: 0;
+        left: 0;
+    }
 }
 
 /* Divider */
@@ -197,78 +198,79 @@ input {
     color: var(--text-color);
     font-size: 15px;
     cursor: text;
-}
 
-input:disabled {
-    border-color: var(--disabled-text);
-    color: var(--disabled-text);
-}
+    &:disabled {
+        border-color: var(--disabled-text);
+        color: var(--disabled-text);
+    }
 
-input:hover {
-    border-color: var(--primary-hover);
-    color: var(--primary-hover);
-}
+    &:hover {
+        border-color: var(--primary-hover);
+        color: var(--primary-hover);
+    }
 
-input:focus {
-    border-color: var(--primary);
-    color: var(--text-color);
-}
+    &:focus {
+        border-color: var(--primary);
+        color: var(--text-color);
+    }
 
-input:focus .input-label {
-    color: var(--primary);
-}
+    &:focus > .input-label {
+        color: var(--primary);
+    }
 
-input .input-label {
-    position: absolute;
-    left: 10px;
-    top: 19px;
-    transition: all 0.3s;
-}
+    > .input-label {
+        position: absolute;
+        left: 10px;
+        top: 19px;
+        transition: all 0.3s;
+    }
 
-input .in-icon-container {
-    width: 50px;
-    height: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    transition: all 0.3s;
-}
+    > .in-icon-container {
+        width: 50px;
+        height: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        transition: all 0.3s;
 
-.in-icon-container .in-icon {
-    font-size: 16px;
-    transition: all 0.3s;
-}
+        > .in-icon {
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+    }
 
-input .in-text-container {
-    height: 100%;
-    width: 95%;
-    display: flex;
-    justify-content: flex-start;
-    align-items: center;
-    overflow-y: hidden;
-    overflow-x: scroll;
-    padding-left: 10px;
-    transition: all 0.3s;
-}
+    > .in-text-container {
+        height: 100%;
+        width: 95%;
+        display: flex;
+        justify-content: flex-start;
+        align-items: center;
+        overflow-y: hidden;
+        overflow-x: scroll;
+        padding-left: 10px;
+        transition: all 0.3s;
 
-input .in-text-container .input-text {
-    width: 100%;
-    text-wrap: nowrap;
-    transition: all 0.3s;
-}
+        > .input-text {
+            width: 100%;
+            text-wrap: nowrap;
+            transition: all 0.3s;
+        }
 
-input .in-text-container .input-cursor {
-    width: 2px;
-    height: 20px;
-    background: var(--text-color);
-    transition: all 0.3s;
-}
+        > .input-cursor {
+            width: 2px;
+            height: 20px;
+            background: var(--text-color);
+            transition: all 0.3s;
+        }
+    }
 
-input:disabled .in-text-container .input-cursor {
-    background: var(--disabled-text);
+    &:disabled > .in-text-container > .input-cursor {
+        background: var(--disabled-text);
+    }
 }
 
 /* Paragraph */
+
 p {
     margin: 8px;
     font-size: 12px;
@@ -276,20 +278,21 @@ p {
 }
 
 /* Progress Bar */
+
 progressbar {
     min-width: 220px;
     min-height: 10px;
     border-radius: 5px;
     background: var(--primary-transparent-layer);
     transition: all 0.3s;
-}
 
-progressbar .progress {
-    width: 0;
-    height: 100%;
-    background: var(--primary-hover);
-    border-radius: 5px;
-    transition: all 0.3s;
+    > .progress {
+        width: 0;
+        height: 100%;
+        background: var(--primary-hover);
+        border-radius: 5px;
+        transition: all 0.3s;
+    }
 }
 
 /* Radio Button */
@@ -306,50 +309,51 @@ radio {
     transition: all 0.3s;
     font-size: 13px;
     color: var(--text-color);
-}
 
-radio .radio-dot {
-    width: 25px;
-    height: 25px;
-    border-radius: 50%;
-    border: 2px;
-    border-color: var(--text-color);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    background: transparent;
-    transition: all 0.3s;
-}
+    > .radio-dot {
+        width: 25px;
+        height: 25px;
+        border-radius: 50%;
+        border: 2px;
+        border-color: var(--text-color);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background: transparent;
+        transition: all 0.3s;
 
-radio:hover .radio-dot {
-    border-color: var(--primary-hover);
-}
+        > .checked-dot {
+            width: 17px;
+            height: 17px;
+            background: var(--primary);
+            border-radius: 50%;
+            transition: all 0.3s;
+        }
+    }
 
-radio:disabled .radio-dot {
-    border-color: var(--primary-disabled);
-}
+    &:hover > .radio-dot {
+        border-color: var(--primary-hover);
+    }
 
-radio:checked .radio-dot {
-    border-color: var(--primary);
-}
+    &:disabled > .radio-dot {
+        border-color: var(--primary-disabled);
+    }
 
-radio .radio-dot .checked-dot {
-    width: 17px;
-    height: 17px;
-    background: var(--primary);
-    border-radius: 50%;
-    transition: all 0.3s;
-}
+    &:checked > .radio-dot {
+        border-color: var(--primary);
+    }
 
-radio:disabled .radio-dot .checked-dot {
-    background: var(--primary-disabled);
-}
+    &:disabled > .radio-dot > .checked-dot {
+        background: var(--primary-disabled);
+    }
 
-radio:disabled .radio-text {
-    color: var(--disabled-text);
+    &:disabled > .radio-text {
+        color: var(--disabled-text);
+    }
 }
 
 /* Scrollbar */
+
 scroll {
     width: 10px;
     height: 95%;
@@ -357,6 +361,20 @@ scroll {
     border-radius: 5px;
     position: relative;
     transition: all 0.3s;
+
+    > .scroll-track {
+        width: 100%;
+        height: 100%;
+        transition: all 0.3s;
+
+        > .scroll-thumb {
+            position: absolute;
+            width: 100%;
+            background: var(--primary);
+            border-radius: 5px;
+            transition: all 0.3s;
+        }
+    }
 }
 
 .scroll-horizontal {
@@ -364,21 +382,7 @@ scroll {
     height: 10px;
 }
 
-scroll .scroll-track {
-    width: 100%;
-    height: 100%;
-    transition: all 0.3s;
-}
-
-scroll .scroll-track .scroll-thumb {
-    position: absolute;
-    width: 100%;
-    background: var(--primary);
-    border-radius: 5px;
-    transition: all 0.3s;
-}
-
-.scroll-horizontal .scroll-track .scroll-thumb {
+.scroll-horizontal > .scroll-track > .scroll-thumb {
     height: 100%;
 }
 
@@ -394,142 +398,140 @@ select {
     font-size: 14px;
     z-index: 1;
     transition: all 0.3s;
-}
 
-select:disabled {
-    border-color: var(--disabled-text);
-    color: var(--disabled-text);
-}
+    &:disabled {
+        border-color: var(--disabled-text);
+        color: var(--disabled-text);
+    }
 
-select:hover {
-    border-color: var(--primary-hover);
-}
+    &:hover {
+        border-color: var(--primary-hover);
+    }
 
-select:focus {
-    border-color: var(--primary);
-}
+    &:focus {
+        border-color: var(--primary);
+    }
 
-select .select-label {
-    position: absolute;
-    left: 10px;
-    top: 19px;
-    font-size: 14px;
-    transition: all 0.3s;
-}
+    > .select-label {
+        position: absolute;
+        left: 10px;
+        top: 19px;
+        font-size: 14px;
+        transition: all 0.3s;
+    }
 
-select:disabled .select-label {
-    color: var(--disabled-text);
-}
+    &:disabled > .select-label {
+        color: var(--disabled-text);
+    }
 
-select:hover .select-label {
-    color: var(--primary-hover);
-}
+    &:hover > .select-label {
+        color: var(--primary-hover);
+    }
 
-select:focus .select-label {
-    color: var(--primary);
-}
+    &:focus > .select-label {
+        color: var(--primary);
+    }
 
+    > .option-drop-box {
+        width: 50px;
+        min-width: 25px;
+        height: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        transition: all 0.3s;
 
-select .option-drop-box {
-    width: 50px;
-    min-width: 25px;
-    height: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    transition: all 0.3s;
-}
+        > .option-drop-icon {
+            transition: all 0.3s;
 
-select .option-drop-box .option-drop-icon {
-    transition: all 0.3s;
-}
+            &:hover {
+                color: var(--primary-hover);
+            }
 
-.option-drop-box .option-drop-icon:hover {
-    color: var(--primary-hover);
-}
+            &:focus {
+                color: var(--primary);
+            }
+        }
+    }
 
-.option-drop-box .option-drop-icon:focus {
-    color: var(--primary);
-}
+    > .option-selected {
+        width: 80%;
+        display: flex;
+        justify-content: flex-start;
+        align-items: center;
+        flex-direction: row;
+        gap: 10px;
+        padding-left: 15px;
+        flex-grow: 1;
+        border-radius: 5px 0;
+        transition: all 0.3s;
 
-select .option-selected {
-    width: 80%;
-    display: flex;
-    justify-content: flex-start;
-    align-items: center;
-    flex-direction: row;
-    gap: 10px;
-    padding-left: 15px;
-    flex-grow: 1;
-    border-radius: 5px 0;
-    transition: all 0.3s;
-}
+        > .option-sel-text {
+            transition: all 0.3s;
+        }
 
-select .option-selected .option-sel-text {
-    transition: all 0.3s;
-}
+        &:disabled > .option-sel-text {
+            color: var(--disabled-text);
+        }
+    }
 
-.option-selected:disabled .option-sel-text {
-    color: var(--disabled-text);
-}
+    > .choice-content-box {
+        position: absolute;
+        width: 100%;
+        min-height: 50px;
+        max-height: 150px;
+        top: 55px;
+        box-shadow: 0 0 3px 3px #303033;
+        border-radius: 0 5px;
+        display: flex;
+        justify-content: flex-start;
+        align-items: flex-start;
+        flex-direction: column;
+        background: var(--gray-background);
+        overflow-x: hidden;
+        overflow-y: scroll;
+        transition: all 0.3s;
 
-select .choice-content-box {
-    position: absolute;
-    width: 100%;
-    min-height: 50px;
-    max-height: 150px;
-    top: 55px;
-    box-shadow: 0 0 3px 3px #303033;
-    border-radius: 0 5px;
-    display: flex;
-    justify-content: flex-start;
-    align-items: flex-start;
-    flex-direction: column;
-    background: var(--gray-background);
-    overflow-x: hidden;
-    overflow-y: scroll;
-    transition: all 0.3s;
-}
+        > .choice-option {
+            width: 100%;
+            height: 50px;
+            min-height: 50px;
+            max-height: 50px;
+            padding-left: 15px;
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+            flex-direction: row;
+            gap: 10px;
+            flex-grow: 1;
+            background: var(--gray-background);
+            transition: all 0.3s;
 
-select .choice-content-box .choice-option {
-    width: 100%;
-    height: 50px;
-    min-height: 50px;
-    max-height: 50px;
-    padding-left: 15px;
-    display: flex;
-    justify-content: flex-start;
-    align-items: center;
-    flex-direction: row;
-    gap: 10px;
-    flex-grow: 1;
-    background: var(--gray-background);
-    transition: all 0.3s;
-}
+            > .option-text {
+                transition: all 0.3s;
 
-select .choice-content-box .choice-option .option-text {
-    transition: all 0.3s;
-}
+                &:hover {
+                    color: var(--text-color);
+                }
 
+                &:checked {
+                    color: var(--text-color);
+                }
+            }
 
-select .choice-content-box .choice-option:hover {
-    background: var(--primary-hover);
-}
+            &:hover {
+                background: var(--primary-hover);
+            }
 
-
-select .choice-content-box .choice-option .option-text:hover {
-    color: var(--text-color);
-}
-
-select .choice-content-box .choice-option:checked {
-    background: var(--primary);
-}
-
-select .choice-content-box .choice-option .option-text:checked {
-    color: var(--text-color);
+            &:checked {
+                background: var(--primary);
+            }
+        }
+    }
 }
 
 /* Slider */
+
 slider {
     width: 250px;
     height: 26px;
@@ -537,52 +539,52 @@ slider {
     justify-content: center;
     align-items: center;
     transition: all 0.3s;
-}
 
-slider .slider-track {
-    width: 100%;
-    height: 10px;
-    background: var(--primary-transparent-layer);
-    border-radius: 5px;
-    position: relative;
-    overflow: visible;
-    display: flex;
-    justify-content: start;
-    align-items: center;
-    transition: all 0.3s;
-}
+    > .slider-track {
+        width: 100%;
+        height: 10px;
+        background: var(--primary-transparent-layer);
+        border-radius: 5px;
+        position: relative;
+        overflow: visible;
+        display: flex;
+        justify-content: start;
+        align-items: center;
+        transition: all 0.3s;
 
-slider:disabled .slider-track {
-    background: var(--disabled-text-darker);
-}
+        > .track-fill {
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: 0;
+            background: var(--primary);
+            border-radius: 5px;
+            transition: all 0.3s;
+        }
 
-slider .slider-track .track-fill {
-    position: absolute;
-    left: 0;
-    top: 0;
-    height: 100%;
-    width: 0;
-    background: var(--primary);
-    border-radius: 5px;
-    transition: all 0.3s;
-}
+        > .thumb {
+            width: 16px;
+            height: 16px;
+            background: var(--primary);
+            border-radius: 50%;
+            position: absolute;
+            box-shadow: 0 0 1px 1px #303033;
+            transition: all 0.3s;
+        }
+    }
 
-slider:disabled .slider-track .track-fill {
-    background: var(--disabled-text);
-}
+    &:disabled > .slider-track {
+        background: var(--disabled-text-darker);
+    }
 
-slider .slider-track .thumb {
-    width: 16px;
-    height: 16px;
-    background: var(--primary);
-    border-radius: 50%;
-    position: absolute;
-    box-shadow: 0 0 1px 1px #303033;
-    transition: all 0.3s;
-}
+    &:disabled > .slider-track > .track-fill {
+        background: var(--disabled-text);
+    }
 
-slider:disabled .slider-track .thumb {
-    background: var(--disabled-text);
+    &:disabled > .slider-track > .thumb {
+        background: var(--disabled-text);
+    }
 }
 
 /* Switch Button */
@@ -599,57 +601,58 @@ switch {
     font-size: 11px;
     font-weight: 200;
     color: var(--text-color);
-}
 
-switch:disabled .switch-text {
-    color: var(--disabled-text);
-}
+    &:disabled > .switch-text {
+        color: var(--disabled-text);
+    }
 
-switch .switch-track {
-    width: 50px;
-    height: 24px;
-    border-radius: 13px;
-    background: var(--gray-background);
-    position: relative;
-    display: flex;
-    justify-content: start;
-    align-items: center;
-    transition: all 0.3s;
-}
+    > .switch-track {
+        width: 50px;
+        height: 24px;
+        border-radius: 13px;
+        background: var(--gray-background);
+        position: relative;
+        display: flex;
+        justify-content: start;
+        align-items: center;
+        transition: all 0.3s;
 
-switch:checked .switch-track {
-    background: var(--primary-hover);
-    justify-content: end;
-}
+        > .switch-dot {
+            position: absolute;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 5px;
+            background: var(--primary);
+            transition: all 0.3s;
 
-switch:disabled .switch-track {
-    background: var(--disabled-text-darker);
-}
+            > .icon-dot {
+                width: 80%;
+                height: 80%;
+                transition: all 0.3s;
+            }
+        }
+    }
 
-switch .switch-track .switch-dot {
-    position: absolute;
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 5px;
-    background: var(--primary);
-    transition: all 0.3s;
-}
+    &:checked > .switch-track {
+        background: var(--primary-hover);
+        justify-content: end;
+    }
 
-switch .switch-track .switch-dot .icon-dot {
-    width: 80%;
-    height: 80%;
-    transition: all 0.3s;
-}
+    &:disabled > .switch-track {
+        background: var(--disabled-text-darker);
+    }
 
-switch:disabled .switch-track .switch-dot {
-    background: var(--disabled-text);
+    &:disabled > .switch-track > .switch-dot {
+        background: var(--disabled-text);
+    }
 }
 
 /* Toggle Button */
+
 toggle {
     background: var(--gray-background);
     min-width: 45px;
@@ -662,22 +665,22 @@ toggle {
     transition: all 0.3s;
     color: var(--text-color);
     font-size: 15px;
-}
 
-toggle:disabled {
-    background: var(--gray-background-disabled);
-}
+    &:disabled {
+        background: var(--gray-background-disabled);
+    }
 
-toggle:hover {
-    background: var(--primary-hover);
-}
+    &:hover {
+        background: var(--primary-hover);
+    }
 
-toggle:checked {
-    background: var(--primary-hover);
-}
+    &:checked {
+        background: var(--primary-hover);
+    }
 
-toggle:disabled .button-text {
-    color: var(--disabled-text);
+    &:disabled > .button-text {
+        color: var(--disabled-text);
+    }
 }
 
 /**********************************
@@ -693,7 +696,6 @@ toggle:disabled .button-text {
         transform: scale(1.05);
     }
 }
-
 
 @keyframes default-shake {
     0% {

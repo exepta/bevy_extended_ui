@@ -223,7 +223,7 @@ fn load_and_merge_styles_from_assets(
         };
 
         for (selector, new_style) in parsed_map.styles.iter() {
-            let selector_parts: Vec<&str> = selector.split_whitespace().collect();
+            let selector_parts = parse_selector_steps(selector);
 
             if matches_selector_chain(&selector_parts, id, class, tag, parent, parent_query) {
                 merged_styles
@@ -254,7 +254,7 @@ fn load_and_merge_styles_from_assets(
 
 /// Recursively matches a selector chain against an element and its parents.
 fn matches_selector_chain(
-    selectors: &[&str],
+    selectors: &[SelectorStep],
     id_opt: Option<&CssID>,
     class_opt: Option<&CssClass>,
     tag_opt: Option<&TagName>,
@@ -270,11 +270,9 @@ fn matches_selector_chain(
         return true;
     }
 
-    if selectors.len() > 1 && parent_opt.is_none() {
-        return false;
-    }
+    let mut current_parent = parent_opt;
 
-    let current_sel = selectors[selectors.len() - 1];
+    let current_sel = &selectors[selectors.len() - 1].selector;
     if !matches_selector(current_sel, id_opt, class_opt, tag_opt) {
         return false;
     }
@@ -283,20 +281,53 @@ fn matches_selector_chain(
         return true;
     }
 
-    if let Some(parent) = parent_opt {
-        if let Ok((pid, p_class, p_tag, p_parent)) = parent_query.get(parent.parent()) {
-            return matches_selector_chain(
-                &selectors[..selectors.len() - 1],
-                pid,
-                p_class,
-                p_tag,
-                p_parent,
-                parent_query,
-            );
+    let mut index = selectors.len() - 1;
+    while index > 0 {
+        let relation = selectors[index].combinator;
+        let target = &selectors[index - 1].selector;
+
+        match relation {
+            SelectorCombinator::Child => {
+                let Some(parent) = current_parent else {
+                    return false;
+                };
+                let Ok((pid, p_class, p_tag, p_parent)) = parent_query.get(parent.parent()) else {
+                    return false;
+                };
+                if !matches_selector(target, pid, p_class, p_tag) {
+                    return false;
+                }
+                current_parent = p_parent;
+            }
+            SelectorCombinator::Descendant => {
+                let mut parent = current_parent;
+                let mut found = false;
+                while let Some(parent_entity) = parent {
+                    let Ok((pid, p_class, p_tag, p_parent)) =
+                        parent_query.get(parent_entity.parent())
+                    else {
+                        return false;
+                    };
+                    if matches_selector(target, pid, p_class, p_tag) {
+                        current_parent = p_parent;
+                        found = true;
+                        break;
+                    }
+                    parent = p_parent;
+                }
+                if !found {
+                    return false;
+                }
+            }
+            SelectorCombinator::Root => {
+                return false;
+            }
         }
+
+        index -= 1;
     }
 
-    false
+    true
 }
 
 /// Matches a single selector against an element's id, class, and tag.
@@ -335,4 +366,44 @@ fn matches_selector(
     }
 
     false
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum SelectorCombinator {
+    Root,
+    Descendant,
+    Child,
+}
+
+#[derive(Clone, Debug)]
+struct SelectorStep {
+    selector: String,
+    combinator: SelectorCombinator,
+}
+
+fn parse_selector_steps(selector: &str) -> Vec<SelectorStep> {
+    let mut steps = Vec::new();
+    let mut next_relation = SelectorCombinator::Descendant;
+
+    for part in selector.replace('>', " > ").split_whitespace() {
+        if part == ">" {
+            next_relation = SelectorCombinator::Child;
+            continue;
+        }
+
+        let relation = if steps.is_empty() {
+            SelectorCombinator::Root
+        } else {
+            next_relation
+        };
+
+        steps.push(SelectorStep {
+            selector: part.to_string(),
+            combinator: relation,
+        });
+
+        next_relation = SelectorCombinator::Descendant;
+    }
+
+    steps
 }

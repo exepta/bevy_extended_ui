@@ -6,8 +6,15 @@ properties or values are ignored silently.
 ## Variables
 
 - Define CSS variables only in `:root` using `--name: value`.
-- Use them as `var(--name)` with no fallback support.
-- The parser only resolves the exact `var(...)` form; nested or chained vars are not resolved.
+- Use them as `var(--name)` or with fallback `var(--name, #000)`.
+- Fallbacks may be another variable, e.g. `var(--primary, var(--default))`.
+- The parser only resolves the exact `var(...)` form; var() inside other functions is not resolved.
+
+## Selectors
+
+- Descendant selectors use whitespace (`parent child`).
+- Direct child selectors use `>` (`parent > child`).
+- Nested rules are supported with `&` for the parent selector (e.g. `button { &:hover { ... } }`).
 
 ## Supported Properties
 
@@ -46,6 +53,7 @@ properties or values are ignored silently.
 - `grid-auto-flow`
 - `grid-template-rows`, `grid-template-columns`
 - `grid-auto-rows`, `grid-auto-columns`
+- `minmax()` is supported for grid tracks; its min/max arguments can use `calc`, `min`, `max`, and `sin`
 
 ### Typography
 
@@ -94,11 +102,14 @@ Used by width/height, padding/margin, border widths, translation, etc.
 - Supported units: `px`, `%`
 - Also supports `0` / `0.0` (treated as `0px`)
 - Anything else is ignored
+- Math functions: `calc`, `min`, `max`, `sin` (unitless radians), and nested usage
+- Mixed units in `calc` (e.g. `calc(100% - 10px)`) are resolved at runtime using the parent size (or window if no parent)
 
 ### Font Size (`font-size`)
 
 - `px` -> `FontVal::Px`
 - `rem` -> `FontVal::Rem`
+- Math functions: `calc`, `min`, `max`, `sin` (unitless radians)
 
 ### Colors
 
@@ -110,9 +121,12 @@ Used by width/height, padding/margin, border widths, translation, etc.
 
 ### Background
 
-- `background`: supports `url("...")` or a color
-- `background-image`: supports only `url("...")`
+- `background`: supports `url("...")`, a color, or `linear-gradient(...)`
+- `background-image`: supports `url("...")` or `linear-gradient(...)`
 - `background-color`: color only
+- `background-position`: supports keywords (`left`, `right`, `top`, `bottom`, `center`) and `%`/`px`
+- `background-size`: supports `auto`, `cover`, `contain`, or `%`/`px` values
+- `background-attachment`: supports `scroll`, `fixed`, `local`
 
 ### Border
 
