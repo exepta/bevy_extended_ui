@@ -30,8 +30,8 @@ Available features:
 - [x] Animation support (`@keyframes`).
 - [x] Validation for widgets like required fields.
 - [x] CSS `*` support.
+- [x] Custom Cursor or system cursor support.
 - [ ] Form Widget for validation and submission.
-- [ ] Custom Cursor or system cursor support.
 - [ ] Customizable theme.
 
 There are many other things, but currently you can use the core (HTML / CSS) features.
@@ -50,9 +50,17 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-bevy_extended_ui = "1.2.0"
-bevy_extended_ui_macros = "1.2.0"
+bevy_extended_ui = "1.4.0"
+bevy_extended_ui_macros = "1.4.0"
 ```
+
+#### Features
+| Feature           | Description                               |
+|-------------------|-------------------------------------------|
+| `default`         | Enables all default features.             |
+| `fluent`          | Enables Fluent Language support.          |
+| `properties-lang` | Enables Java Properties Language support. |
+| `clipboard-wasm`  | Enables WASM clipboard support web.       |
 
 Then, you add the plugin to your `main.rs` or on any point at a build function:
 
