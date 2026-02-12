@@ -9,9 +9,7 @@ use bevy::window::PrimaryWindow;
 #[cfg(not(target_arch = "wasm32"))]
 use arboard::Clipboard;
 #[cfg(all(target_arch = "wasm32", feature = "clipboard-wasm"))]
-use std::cell::RefCell;
-#[cfg(all(target_arch = "wasm32", feature = "clipboard-wasm"))]
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 #[cfg(all(target_arch = "wasm32", feature = "clipboard-wasm"))]
 use wasm_bindgen_futures::{spawn_local, JsFuture};
 use crate::styles::components::UiStyle;
@@ -78,9 +76,13 @@ struct InputClipboard {
     clipboard: Option<Clipboard>,
     fallback: String,
     #[cfg(all(target_arch = "wasm32", feature = "clipboard-wasm"))]
-    pending_text: Rc<RefCell<Option<String>>>,
-    #[cfg(all(target_arch = "wasm32", feature = "clipboard-wasm"))]
-    pending_target: Option<usize>,
+    pending: Arc<Mutex<PendingPaste>>,
+}
+
+#[cfg(all(target_arch = "wasm32", feature = "clipboard-wasm"))]
+struct PendingPaste {
+    target: Option<usize>,
+    text: Option<String>,
 }
 
 impl Default for InputClipboard {
@@ -97,8 +99,10 @@ impl Default for InputClipboard {
         {
             return Self {
                 fallback: String::new(),
-                pending_text: Rc::new(RefCell::new(None)),
-                pending_target: None,
+                pending: Arc::new(Mutex::new(PendingPaste {
+                    target: None,
+                    text: None,
+                })),
             };
         }
 
@@ -123,13 +127,12 @@ impl InputClipboard {
         #[cfg(all(target_arch = "wasm32", feature = "clipboard-wasm"))]
         {
             if let Some(window) = web_sys::window() {
-                if let Some(clipboard) = window.navigator().clipboard() {
-                    let text_owned = text.to_string();
-                    spawn_local(async move {
-                        let _ = JsFuture::from(clipboard.write_text(&text_owned)).await;
-                    });
-                    return;
-                }
+                let clipboard = window.navigator().clipboard();
+                let text_owned = text.to_string();
+                spawn_local(async move {
+                    let _ = JsFuture::from(clipboard.write_text(&text_owned)).await;
+                });
+                return;
             }
         }
 
@@ -158,30 +161,36 @@ impl InputClipboard {
 
     #[cfg(all(target_arch = "wasm32", feature = "clipboard-wasm"))]
     fn request_paste(&mut self, target: usize) {
-        self.pending_target = Some(target);
-        let pending = self.pending_text.clone();
+        if let Ok(mut pending) = self.pending.lock() {
+            pending.target = Some(target);
+            pending.text = None;
+        }
+
+        let pending = self.pending.clone();
 
         if let Some(window) = web_sys::window() {
-            if let Some(clipboard) = window.navigator().clipboard() {
-                spawn_local(async move {
-                    let text = JsFuture::from(clipboard.read_text())
-                        .await
-                        .ok()
-                        .and_then(|v| v.as_string());
-                    if let Some(text) = text {
-                        *pending.borrow_mut() = Some(text);
+            let clipboard = window.navigator().clipboard();
+            spawn_local(async move {
+                let text = JsFuture::from(clipboard.read_text())
+                    .await
+                    .ok()
+                    .and_then(|v| v.as_string());
+                if let Some(text) = text {
+                    if let Ok(mut pending) = pending.lock() {
+                        pending.text = Some(text);
                     }
-                });
-                return;
-            }
+                }
+            });
+            return;
         }
     }
 
     #[cfg(all(target_arch = "wasm32", feature = "clipboard-wasm"))]
     fn take_pending(&mut self) -> Option<(usize, String)> {
-        let target = self.pending_target?;
-        let text = self.pending_text.borrow_mut().take()?;
-        self.pending_target = None;
+        let mut pending = self.pending.lock().ok()?;
+        let target = pending.target?;
+        let text = pending.text.take()?;
+        pending.target = None;
         Some((target, text))
     }
 }
@@ -214,6 +223,12 @@ impl Plugin for InputWidget {
         app.insert_resource(KeyRepeatTimers::default());
         app.insert_resource(CursorBlinkTimer::default());
         app.insert_resource(InputClipboard::default());
+        #[cfg(all(target_arch = "wasm32", feature = "clipboard-wasm"))]
+        let typing_chain = (handle_typing, sync_input_text_spans, apply_pending_paste).chain();
+
+        #[cfg(not(all(target_arch = "wasm32", feature = "clipboard-wasm")))]
+        let typing_chain = (handle_typing, sync_input_text_spans).chain();
+
         app.add_systems(
             Update,
             (
@@ -221,16 +236,12 @@ impl Plugin for InputWidget {
                 sync_input_field_updates,
                 update_cursor_visibility,
                 update_cursor_position,
-                handle_typing,
+                typing_chain,
                 handle_input_horizontal_scroll,
                 calculate_correct_text_container_width,
                 handle_overlay_label,
-                sync_input_text_spans.after(handle_typing),
             ),
         );
-
-        #[cfg(all(target_arch = "wasm32", feature = "clipboard-wasm"))]
-        app.add_systems(Update, apply_pending_paste.after(sync_input_text_spans));
     }
 }
 
