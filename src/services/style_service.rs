@@ -209,6 +209,9 @@ pub fn update_widget_styles_system(
         let mut pseudo_styles: Vec<(&String, u32, usize)> = vec![];
 
         for (sel, style_pair) in &ui_style.styles {
+            if sel.contains("::") {
+                continue;
+            }
             if selector_matches_state(sel, &state) {
                 let specificity = selector_specificity(sel);
                 if sel.contains(':') {

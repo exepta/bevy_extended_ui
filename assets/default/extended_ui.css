@@ -204,6 +204,11 @@ input {
         color: var(--disabled-text);
     }
 
+    &::selection {
+        background: var(--primary-transparent-layer);
+        color: var(--text-color);
+    }
+
     &:hover {
         border-color: var(--primary-hover);
         color: var(--primary-hover);
