@@ -8,6 +8,12 @@ use bevy::ui::{RelativeCursorPosition, ScrollPosition, UiScale};
 use bevy::window::PrimaryWindow;
 #[cfg(not(target_arch = "wasm32"))]
 use arboard::Clipboard;
+#[cfg(all(target_arch = "wasm32", feature = "clipboard-wasm"))]
+use std::cell::RefCell;
+#[cfg(all(target_arch = "wasm32", feature = "clipboard-wasm"))]
+use std::rc::Rc;
+#[cfg(all(target_arch = "wasm32", feature = "clipboard-wasm"))]
+use wasm_bindgen_futures::{spawn_local, JsFuture};
 use crate::styles::components::UiStyle;
 use crate::styles::paint::Colored;
 use crate::styles::{Background, CssClass, CssSource, FontVal, Style, TagName};
@@ -71,6 +77,10 @@ struct InputClipboard {
     #[cfg(not(target_arch = "wasm32"))]
     clipboard: Option<Clipboard>,
     fallback: String,
+    #[cfg(all(target_arch = "wasm32", feature = "clipboard-wasm"))]
+    pending_text: Rc<RefCell<Option<String>>>,
+    #[cfg(all(target_arch = "wasm32", feature = "clipboard-wasm"))]
+    pending_target: Option<usize>,
 }
 
 impl Default for InputClipboard {
@@ -83,7 +93,16 @@ impl Default for InputClipboard {
             };
         }
 
-        #[cfg(target_arch = "wasm32")]
+        #[cfg(all(target_arch = "wasm32", feature = "clipboard-wasm"))]
+        {
+            return Self {
+                fallback: String::new(),
+                pending_text: Rc::new(RefCell::new(None)),
+                pending_target: None,
+            };
+        }
+
+        #[cfg(all(target_arch = "wasm32", not(feature = "clipboard-wasm")))]
         {
             return Self {
                 fallback: String::new(),
@@ -101,10 +120,28 @@ impl InputClipboard {
             }
         }
 
+        #[cfg(all(target_arch = "wasm32", feature = "clipboard-wasm"))]
+        {
+            if let Some(window) = web_sys::window() {
+                if let Some(clipboard) = window.navigator().clipboard() {
+                    let text_owned = text.to_string();
+                    spawn_local(async move {
+                        let _ = JsFuture::from(clipboard.write_text(&text_owned)).await;
+                    });
+                    return;
+                }
+            }
+        }
+
         self.fallback = text.to_string();
     }
 
     fn get_text(&mut self) -> Option<String> {
+        #[cfg(all(target_arch = "wasm32", feature = "clipboard-wasm"))]
+        {
+            return None;
+        }
+
         #[cfg(not(target_arch = "wasm32"))]
         if let Some(clipboard) = self.clipboard.as_mut() {
             if let Ok(text) = clipboard.get_text() {
@@ -117,6 +154,35 @@ impl InputClipboard {
         } else {
             Some(self.fallback.clone())
         }
+    }
+
+    #[cfg(all(target_arch = "wasm32", feature = "clipboard-wasm"))]
+    fn request_paste(&mut self, target: usize) {
+        self.pending_target = Some(target);
+        let pending = self.pending_text.clone();
+
+        if let Some(window) = web_sys::window() {
+            if let Some(clipboard) = window.navigator().clipboard() {
+                spawn_local(async move {
+                    let text = JsFuture::from(clipboard.read_text())
+                        .await
+                        .ok()
+                        .and_then(|v| v.as_string());
+                    if let Some(text) = text {
+                        *pending.borrow_mut() = Some(text);
+                    }
+                });
+                return;
+            }
+        }
+    }
+
+    #[cfg(all(target_arch = "wasm32", feature = "clipboard-wasm"))]
+    fn take_pending(&mut self) -> Option<(usize, String)> {
+        let target = self.pending_target?;
+        let text = self.pending_text.borrow_mut().take()?;
+        self.pending_target = None;
+        Some((target, text))
     }
 }
 
@@ -162,6 +228,9 @@ impl Plugin for InputWidget {
                 sync_input_text_spans.after(handle_typing),
             ),
         );
+
+        #[cfg(all(target_arch = "wasm32", feature = "clipboard-wasm"))]
+        app.add_systems(Update, apply_pending_paste.after(sync_input_text_spans));
     }
 }
 
@@ -867,12 +936,20 @@ fn handle_typing(
                 }
 
                 if keyboard.just_pressed(KeyCode::KeyV) {
-                    if let Some(paste) = clipboard.get_text() {
-                        let deleted = delete_selection(&mut in_field, &mut selection);
-                        let inserted =
-                            insert_text_filtered(&mut in_field, style, computed_node, &paste);
-                        if deleted || inserted {
-                            input_value.0 = in_field.text.clone();
+                    #[cfg(all(target_arch = "wasm32", feature = "clipboard-wasm"))]
+                    {
+                        clipboard.request_paste(ui_id.0);
+                    }
+
+                    #[cfg(not(all(target_arch = "wasm32", feature = "clipboard-wasm")))]
+                    {
+                        if let Some(paste) = clipboard.get_text() {
+                            let deleted = delete_selection(&mut in_field, &mut selection);
+                            let inserted =
+                                insert_text_filtered(&mut in_field, style, computed_node, &paste);
+                            if deleted || inserted {
+                                input_value.0 = in_field.text.clone();
+                            }
                         }
                     }
                     continue;
@@ -1229,6 +1306,49 @@ fn sync_input_text_spans(
                 *span_font = text_font.clone();
             }
         }
+    }
+}
+
+#[cfg(all(target_arch = "wasm32", feature = "clipboard-wasm"))]
+fn apply_pending_paste(
+    mut clipboard: ResMut<InputClipboard>,
+    mut input_query: Query<(
+        &mut InputField,
+        &mut InputSelection,
+        &mut InputValue,
+        &UiStyle,
+        &UIGenID,
+        &UIWidgetState,
+    )>,
+    text_query: Query<(&ComputedNode, &BindToID), With<InputFieldText>>,
+) {
+    let Some((target, text)) = clipboard.take_pending() else {
+        return;
+    };
+
+    let mut computed = None;
+    for (node, bind) in text_query.iter() {
+        if bind.0 == target {
+            computed = Some(node.clone());
+            break;
+        }
+    }
+
+    let Some(computed_node) = computed else {
+        return;
+    };
+
+    for (mut field, mut selection, mut input_value, style, ui_id, state) in input_query.iter_mut()
+    {
+        if ui_id.0 != target || state.disabled || !state.focused {
+            continue;
+        }
+
+        delete_selection(&mut field, &mut selection);
+        if insert_text_filtered(&mut field, style, &computed_node, &text) {
+            input_value.0 = field.text.clone();
+        }
+        break;
     }
 }
 
