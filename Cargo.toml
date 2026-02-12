@@ -9,6 +9,12 @@ repository = "https://github.com/exepta/bevy_extended_ui"
 readme = "README.md"
 keywords = ["bevy", "ui", "slider", "css", "html"]
 categories = ["gui", "rendering"]
+exclude = [
+    "examples/**",
+    "assets/examples/**",
+    "assets/images/**",
+    "assets/lang/**",
+]
 
 [lib]
 name = "bevy_extended_ui"
