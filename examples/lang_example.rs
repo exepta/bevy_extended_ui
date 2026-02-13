@@ -1,11 +1,16 @@
+#[cfg(not(any(feature = "fluent", feature = "properties-lang")))]
+compile_error!(
+    "lang_example requires a localization backend. Run with --features fluent or --features properties-lang."
+);
+
 use bevy::prelude::*;
+use bevy_extended_ui::UiLangVariables;
 use bevy_extended_ui::example_utils::make_app;
 use bevy_extended_ui::html::HtmlSource;
 use bevy_extended_ui::io::HtmlAsset;
 use bevy_extended_ui::lang::UILang;
-use bevy_extended_ui::UiLangVariables;
-use std::env;
 use bevy_extended_ui::registry::UiRegistry;
+use std::env;
 
 /// Tracks whether the resolved language was logged.
 #[derive(Resource, Default)]

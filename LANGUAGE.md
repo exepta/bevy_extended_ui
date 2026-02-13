@@ -39,6 +39,14 @@ Inside the braces:
 
 If a translation key or variable is missing, the original token is kept.
 
+Reactive Bindings
+Reactive placeholders can coexist with localization.
+Examples:
+- {{ user.name }}
+- {{ user.full_name() }}
+
+If no translation key matches, these placeholders stay untouched so they can be consumed by the reactive widget attributes (`innerText`, `innerHtml`, `innerBindings`).
+
 Fluent Backend (ftl)
 Use .ftl files in the language folder. This implementation reads simple message values by key. Fluent arguments are not evaluated here, so use multiple keys plus %var% placeholders for runtime values.
 

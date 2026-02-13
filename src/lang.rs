@@ -1,8 +1,8 @@
 use bevy::prelude::*;
 use std::collections::HashMap;
-use std::env;
 #[cfg(any(feature = "fluent", feature = "properties-lang"))]
 use std::collections::HashSet;
+use std::env;
 
 #[cfg(any(feature = "fluent", feature = "properties-lang"))]
 use std::fs;
@@ -185,8 +185,7 @@ fn normalize_lang_tag(raw: Option<&str>) -> Option<String> {
 }
 
 #[cfg(any(feature = "fluent", feature = "properties-lang"))]
-static PLACEHOLDER_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?s)\{\{\s*(.+?)\s*\}\}").unwrap());
+static PLACEHOLDER_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?s)\{\{\s*(.+?)\s*\}\}").unwrap());
 
 /// Returns the input HTML unchanged when no localization backends are enabled.
 #[cfg(not(any(feature = "fluent", feature = "properties-lang")))]
@@ -257,19 +256,26 @@ fn localize_html_fluent(
     let localized = PLACEHOLDER_RE
         .replace_all(html, |caps: &regex::Captures| {
             let inner = caps.get(1).map(|m| m.as_str()).unwrap_or_default();
-            let resolved = resolve_placeholder(inner, |key| {
-                let message = bundle.get_message(key)?;
-                let pattern = message.value()?;
-                errors.clear();
-                let value = bundle.format_pattern(pattern, None, &mut errors);
-                if errors.is_empty() {
-                    Some(value.to_string())
-                } else {
-                    None
-                }
-            }, vars);
+            let resolved = resolve_placeholder(
+                inner,
+                |key| {
+                    let message = bundle.get_message(key)?;
+                    let pattern = message.value()?;
+                    errors.clear();
+                    let value = bundle.format_pattern(pattern, None, &mut errors);
+                    if errors.is_empty() {
+                        Some(value.to_string())
+                    } else {
+                        None
+                    }
+                },
+                vars,
+            );
             resolved.unwrap_or_else(|| {
-                caps.get(0).map(|m| m.as_str()).unwrap_or_default().to_string()
+                caps.get(0)
+                    .map(|m| m.as_str())
+                    .unwrap_or_default()
+                    .to_string()
             })
         })
         .into_owned();
@@ -295,7 +301,10 @@ fn localize_html_properties(
             let inner = caps.get(1).map(|m| m.as_str()).unwrap_or_default();
             let resolved = resolve_placeholder(inner, |key| map.get(key).cloned(), vars);
             resolved.unwrap_or_else(|| {
-                caps.get(0).map(|m| m.as_str()).unwrap_or_default().to_string()
+                caps.get(0)
+                    .map(|m| m.as_str())
+                    .unwrap_or_default()
+                    .to_string()
             })
         })
         .into_owned();
@@ -441,11 +450,7 @@ pub fn vars_fingerprint(vars: &UiLangVariables) -> u64 {
 
 /// Resolves a placeholder token, returning `None` if unchanged.
 #[cfg(any(feature = "fluent", feature = "properties-lang"))]
-fn resolve_placeholder<F>(
-    inner: &str,
-    mut translate: F,
-    vars: &UiLangVariables,
-) -> Option<String>
+fn resolve_placeholder<F>(inner: &str, mut translate: F, vars: &UiLangVariables) -> Option<String>
 where
     F: FnMut(&str) -> Option<String>,
 {
@@ -548,3 +553,48 @@ pub use i18n_fluent;
 
 #[cfg(feature = "properties-lang")]
 pub use i18n_properties;
+
+#[cfg(all(test, any(feature = "fluent", feature = "properties-lang")))]
+mod tests {
+    use super::{UiLangVariables, localize_html, resolve_placeholder};
+
+    #[test]
+    fn unresolved_reactive_placeholder_stays_unchanged() {
+        let vars = UiLangVariables::default();
+        let resolved = resolve_placeholder("user.name", |_| None, &vars);
+        assert_eq!(resolved, None);
+    }
+
+    #[test]
+    fn dotted_language_keys_can_still_be_localized() {
+        let vars = UiLangVariables::default();
+        let resolved = resolve_placeholder("app.title", |key| Some(format!("tr:{key}")), &vars);
+        assert_eq!(resolved, Some("tr:app.title".to_string()));
+    }
+
+    #[cfg(feature = "fluent")]
+    #[test]
+    fn fluent_localization_replaces_placeholders_from_assets() {
+        let html = "<h2>{{ LANGUAGE_TITLE }}</h2><p>{{ WELCOME_START_TEXT %player_name% WELCOME_END_TEXT }}</p>";
+        let mut vars = UiLangVariables::default();
+        vars.set("player_name", "Tester");
+
+        let out = localize_html(html, Some("de"), "assets/lang", &vars);
+
+        assert!(out.contains("Sprachbeispiel"), "output: {out}");
+        assert!(out.contains("Willkommen Tester !"), "output: {out}");
+    }
+
+    #[cfg(feature = "properties-lang")]
+    #[test]
+    fn properties_localization_replaces_placeholders_from_assets() {
+        let html = "<h2>{{ LANGUAGE_TITLE }}</h2><p>{{ WELCOME_START_TEXT %player_name% WELCOME_END_TEXT }}</p>";
+        let mut vars = UiLangVariables::default();
+        vars.set("player_name", "Tester");
+
+        let out = localize_html(html, Some("de"), "assets/lang", &vars);
+
+        assert!(out.contains("Sprachbeispiel"), "output: {out}");
+        assert!(out.contains("Willkommen Tester !"), "output: {out}");
+    }
+}

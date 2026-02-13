@@ -11,10 +11,16 @@ use bevy_extended_ui_macros::html_fn;
 fn main() {
     let mut app = make_app("Debug Html UI - test");
 
-    app.add_systems(Startup, |mut reg: ResMut<UiRegistry>, asset_server: Res<AssetServer>| {
-        let handle: Handle<HtmlAsset> = asset_server.load("examples/choice_box.html");
-        reg.add_and_use("choice_box_test".to_string(), HtmlSource::from_handle(handle));
-    });
+    app.add_systems(
+        Startup,
+        |mut reg: ResMut<UiRegistry>, asset_server: Res<AssetServer>| {
+            let handle: Handle<HtmlAsset> = asset_server.load("examples/choice_box.html");
+            reg.add_and_use(
+                "choice_box_test".to_string(),
+                HtmlSource::from_handle(handle),
+            );
+        },
+    );
 
     app.run();
 }
@@ -26,9 +32,7 @@ fn on_select_change(
     query: Query<&ChoiceBox>,
     mut text_query: Query<(&CssID, &mut Headline), With<Headline>>,
 ) {
-    let Some((_text_id, mut headline)) = text_query
-        .iter_mut()
-        .find(|(id, _)| id.0 == "sel-text")
+    let Some((_text_id, mut headline)) = text_query.iter_mut().find(|(id, _)| id.0 == "sel-text")
     else {
         return;
     };

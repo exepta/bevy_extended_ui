@@ -1,22 +1,27 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use bevy::asset::AssetEvent;
 use bevy::prelude::*;
-use kuchiki::{traits::TendrilSink, Attributes, NodeRef};
+use kuchiki::{Attributes, NodeRef, traits::TendrilSink};
+use once_cell::sync::Lazy;
+use regex::Regex;
 
+use crate::ExtendedUiConfiguration;
 use crate::html::{
-    HtmlDirty, HtmlEventBindings, HtmlID, HtmlMeta, HtmlSource, HtmlStates, HtmlStructureMap,
-    HtmlStyle, HtmlSystemSet, HtmlWidgetNode,
+    HtmlDirty, HtmlEventBindings, HtmlID, HtmlInnerContent, HtmlMeta, HtmlSource, HtmlStates,
+    HtmlStructureMap, HtmlStyle, HtmlSystemSet, HtmlWidgetNode,
 };
 use crate::io::{CssAsset, DefaultCssHandle, HtmlAsset};
-use crate::lang::{localize_html, vars_fingerprint, UiLangState, UiLangVariables, UILang};
+use crate::lang::{UILang, UiLangState, UiLangVariables, localize_html, vars_fingerprint};
 use crate::styles::IconPlace;
 use crate::widgets::Button;
 use crate::widgets::*;
-use crate::ExtendedUiConfiguration;
 
 /// Default CSS asset path applied to every HTML UI.
 pub const DEFAULT_UI_CSS: &str = "default/extended_ui.css";
+
+static INNER_BINDING_RE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?s)\{\{\s*([^{}]+?)\s*\}\}").unwrap());
 
 /// Plugin that parses HTML assets into widget trees.
 pub struct HtmlConverterSystem;
@@ -83,9 +88,9 @@ fn update_html_ui(
     // If an HtmlAsset changed OR was added later (async), find all entities referencing it.
     for ev in html_asset_events.read() {
         let id = match ev {
-            AssetEvent::Added { id }
-            | AssetEvent::Modified { id }
-            | AssetEvent::Removed { id } => *id,
+            AssetEvent::Added { id } | AssetEvent::Modified { id } | AssetEvent::Removed { id } => {
+                *id
+            }
             _ => continue,
         };
 
@@ -219,13 +224,9 @@ fn update_html_ui(
 
         let label_map = collect_labels_by_for(body_node.as_node());
 
-        if let Some(body_widget) = parse_html_node(
-            body_node.as_node(),
-            &css_handles,
-            &label_map,
-            &ui_key,
-            html,
-        ) {
+        if let Some(body_widget) =
+            parse_html_node(body_node.as_node(), &css_handles, &label_map, &ui_key, html)
+        {
             structure_map.html_map.insert(ui_key, vec![body_widget]);
 
             // IMPORTANT: Explicitly mark UI as dirty so the builder rebuilds.
@@ -256,6 +257,7 @@ fn parse_html_node(
             .map(|s| s.split_whitespace().map(str::to_string).collect()),
         style: attributes.get("style").map(HtmlStyle::from_str),
         validation: parse_validation_attributes(&attributes),
+        inner_content: parse_inner_content(node),
     };
 
     let states = HtmlStates {
@@ -414,6 +416,7 @@ fn parse_html_node(
                         .map(|s| s.split_whitespace().map(str::to_string).collect()),
                     style: attrs.get("style").map(HtmlStyle::from_str),
                     validation: parse_validation_attributes(&attrs),
+                    inner_content: parse_inner_content(&radio_node),
                 };
 
                 let child_states = HtmlStates {
@@ -488,7 +491,10 @@ fn parse_html_node(
             let src_resolved = if src_raw.trim().is_empty() {
                 None
             } else {
-                Some(resolve_relative_asset_path(&html.get_source_path(), &src_raw))
+                Some(resolve_relative_asset_path(
+                    &html.get_source_path(),
+                    &src_raw,
+                ))
             };
 
             Some(HtmlWidgetNode::Img(
@@ -621,7 +627,10 @@ fn parse_html_node(
                 vertical = false;
             }
             Some(HtmlWidgetNode::Scrollbar(
-                Scrollbar { vertical, ..default() },
+                Scrollbar {
+                    vertical,
+                    ..default()
+                },
                 meta,
                 states,
                 functions,
@@ -663,7 +672,8 @@ fn parse_html_node(
                 }
             }
 
-            let value = selected_value.unwrap_or_else(|| options.first().cloned().unwrap_or_default());
+            let value =
+                selected_value.unwrap_or_else(|| options.first().cloned().unwrap_or_default());
 
             Some(HtmlWidgetNode::ChoiceBox(
                 ChoiceBox {
@@ -880,4 +890,66 @@ fn parse_icon_and_text(node: &NodeRef) -> (Option<String>, IconPlace) {
     }
 
     (icon_path, icon_place)
+}
+
+/// Builds the per-widget inner content payload.
+fn parse_inner_content(node: &NodeRef) -> HtmlInnerContent {
+    let inner_text = node.text_contents();
+    let inner_html = node
+        .children()
+        .map(|child| child.to_string())
+        .collect::<String>();
+    let inner_bindings = extract_inner_bindings(&inner_html);
+
+    HtmlInnerContent::new(inner_text, inner_html, inner_bindings)
+}
+
+/// Extracts unique `{{...}}` placeholders from serialized content.
+fn extract_inner_bindings(content: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut seen = HashSet::new();
+
+    for caps in INNER_BINDING_RE.captures_iter(content) {
+        let Some(raw) = caps.get(0).map(|m| m.as_str()) else {
+            continue;
+        };
+
+        let key = raw.trim().to_string();
+        if seen.insert(key.clone()) {
+            out.push(key);
+        }
+    }
+
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn extract_inner_bindings_returns_unique_placeholders() {
+        let src = "<p>{{user.name}} {{ user.name }} {{ user.name }} {{user.id}}</p>";
+        let bindings = extract_inner_bindings(src);
+
+        assert_eq!(
+            bindings,
+            vec![
+                "{{user.name}}".to_string(),
+                "{{ user.name }}".to_string(),
+                "{{user.id}}".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn parse_inner_content_collects_text_html_and_bindings() {
+        let doc = kuchiki::parse_html().one("<p>Hello <b>{{ user.name }}</b>!</p>");
+        let node = doc.select_first("p").unwrap();
+        let content = parse_inner_content(node.as_node());
+
+        assert!(content.inner_text().contains("Hello"));
+        assert!(content.inner_html().contains("<b>{{ user.name }}</b>"));
+        assert_eq!(content.inner_bindings(), &["{{ user.name }}".to_string()]);
+    }
 }

@@ -878,7 +878,10 @@ impl Style {
         merge_opt(&mut self.background, &other.background);
         merge_opt(&mut self.background_position, &other.background_position);
         merge_opt(&mut self.background_size, &other.background_size);
-        merge_opt(&mut self.background_attachment, &other.background_attachment);
+        merge_opt(
+            &mut self.background_attachment,
+            &other.background_attachment,
+        );
 
         merge_opt(&mut self.border_color, &other.border_color);
         merge_opt(&mut self.border_width, &other.border_width);

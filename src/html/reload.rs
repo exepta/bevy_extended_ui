@@ -42,10 +42,7 @@ fn mark_css_users_dirty_on_css_change(
 
     // Mark all entities that reference any changed CssAsset.
     for (entity, css_source) in query.iter() {
-        let uses_changed = css_source
-            .0
-            .iter()
-            .any(|h| changed.contains(&h.id()));
+        let uses_changed = css_source.0.iter().any(|h| changed.contains(&h.id()));
 
         if uses_changed {
             // IMPORTANT: entity might have been despawned by HTML hot reload

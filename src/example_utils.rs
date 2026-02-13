@@ -15,7 +15,7 @@ pub fn make_app(title: impl Into<String>) -> App {
         }),
         ..default()
     }))
-        .add_plugins(ExtendedUiPlugin);
+    .add_plugins(ExtendedUiPlugin);
 
     app
 }
