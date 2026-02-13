@@ -4,10 +4,10 @@ use crate::services::image_service::get_or_load_image;
 use crate::services::state_service::update_widget_states;
 use crate::styles::components::UiStyle;
 use crate::styles::{
-    AnimationDirection, AnimationKeyframe, AnimationSpec, BackgroundAttachment, BackgroundPosition,
-    BackgroundPositionValue, BackgroundSize, BackgroundSizeValue, CalcContext, CalcExpr,
-    CursorStyle, FontVal, FontWeight, GradientStopPosition, LinearGradient, Radius, Style,
-    TransformStyle, TransitionProperty, TransitionSpec,
+    AnimationDirection, AnimationKeyframe, AnimationSpec, BackdropFilter, BackgroundAttachment,
+    BackgroundPosition, BackgroundPositionValue, BackgroundSize, BackgroundSizeValue, CalcContext,
+    CalcExpr, CursorStyle, FontVal, FontWeight, GradientStopPosition, LinearGradient, Radius,
+    Style, TransformStyle, TransitionProperty, TransitionSpec,
 };
 use crate::widgets::UIWidgetState;
 
@@ -16,7 +16,12 @@ use bevy::color::Srgba;
 use bevy::image::ImageSampler;
 use bevy::math::Rot2;
 use bevy::prelude::*;
-use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
+use bevy::reflect::TypePath;
+use bevy::render::render_resource::{
+    AsBindGroup, Extent3d, ShaderType, TextureDimension, TextureFormat,
+};
+use bevy::render::view::screenshot::{Screenshot, ScreenshotCaptured};
+use bevy::shader::ShaderRef;
 use bevy::ui::{
     ComputedNode, ComputedUiRenderTargetInfo, UiGlobalTransform, UiSystems, UiTransform, Val2,
 };
@@ -29,6 +34,9 @@ impl Plugin for StyleService {
     /// Registers style update systems and resources.
     fn build(&self, app: &mut App) {
         app.init_resource::<CssCursorState>();
+        app.init_resource::<BackdropCaptureState>();
+        app.add_plugins(UiMaterialPlugin::<BackdropBlurMaterial>::default());
+        app.add_observer(on_backdrop_screenshot_captured);
         app.add_systems(
             PostUpdate,
             (
@@ -41,6 +49,10 @@ impl Plugin for StyleService {
                     .after(UiSystems::Layout),
                 apply_background_images_system
                     .after(apply_background_gradients_system)
+                    .after(UiSystems::Layout),
+                request_backdrop_capture_system.after(apply_background_images_system),
+                sync_backdrop_blur_materials_system
+                    .after(apply_background_images_system)
                     .after(UiSystems::Layout),
                 propagate_style_inheritance.after(apply_calc_styles_system),
                 sync_last_ui_transform.after(propagate_style_inheritance),
@@ -81,6 +93,39 @@ pub struct StyleAnimation {
 struct CssCursorState {
     active: bool,
     previous: Option<CursorIcon>,
+}
+
+#[derive(ShaderType, Clone, Copy, Debug)]
+struct BackdropBlurUniform {
+    blur_radius_px: f32,
+    _pad: Vec3,
+    tint: Vec4,
+}
+
+#[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
+struct BackdropBlurMaterial {
+    #[uniform(0)]
+    uniform: BackdropBlurUniform,
+    #[texture(1)]
+    #[sampler(2)]
+    screen_texture: Handle<Image>,
+}
+
+impl UiMaterial for BackdropBlurMaterial {
+    fn fragment_shader() -> ShaderRef {
+        "shaders/blur_shader.wgsl".into()
+    }
+}
+
+#[derive(Resource, Default)]
+struct BackdropCaptureState {
+    screen_texture: Option<Handle<Image>>,
+    pending: bool,
+}
+
+#[derive(Component, Clone)]
+struct BackdropCaptureHidden {
+    previous_visibility: Visibility,
 }
 
 /// Convenience alias for mutable style-related UI component access.
@@ -854,6 +899,234 @@ fn apply_background_images_system(
     }
 }
 
+fn resolved_active_style<'a>(
+    ui_style: &'a UiStyle,
+    transition_opt: Option<&'a StyleTransition>,
+    animation_opt: Option<&'a StyleAnimation>,
+) -> Option<&'a Style> {
+    if let Some(transition) = transition_opt {
+        return Some(transition.current_style.as_ref().unwrap_or(&transition.to));
+    }
+    if let Some(animation) = animation_opt {
+        return Some(animation.current_style.as_ref().unwrap_or(&animation.base));
+    }
+    ui_style.active_style.as_ref()
+}
+
+fn sync_backdrop_blur_materials_system(
+    mut commands: Commands,
+    query: Query<(
+        Entity,
+        &UiStyle,
+        Option<&StyleTransition>,
+        Option<&StyleAnimation>,
+        Option<&MaterialNode<BackdropBlurMaterial>>,
+    )>,
+    capture_state: Res<BackdropCaptureState>,
+    mut materials: ResMut<Assets<BackdropBlurMaterial>>,
+) {
+    for (entity, ui_style, transition_opt, animation_opt, material_node_opt) in query.iter() {
+        let Some(style) = resolved_active_style(ui_style, transition_opt, animation_opt) else {
+            if material_node_opt.is_some() {
+                commands
+                    .entity(entity)
+                    .remove::<MaterialNode<BackdropBlurMaterial>>();
+            }
+            continue;
+        };
+
+        let blur_radius = match style.backdrop_filter.as_ref() {
+            Some(BackdropFilter::Blur(radius)) if *radius > 0.0 => *radius,
+            _ => {
+                if material_node_opt.is_some() {
+                    commands
+                        .entity(entity)
+                        .remove::<MaterialNode<BackdropBlurMaterial>>();
+                }
+                continue;
+            }
+        };
+
+        let tint = style
+            .background
+            .as_ref()
+            .map(|background| background.color.to_linear().to_vec4())
+            .unwrap_or(Vec4::new(1.0, 1.0, 1.0, 0.0));
+        let Some(screen_texture) = capture_state.screen_texture.clone() else {
+            if material_node_opt.is_some() {
+                commands
+                    .entity(entity)
+                    .remove::<MaterialNode<BackdropBlurMaterial>>();
+            }
+            continue;
+        };
+        let uniform = BackdropBlurUniform {
+            blur_radius_px: blur_radius,
+            _pad: Vec3::ZERO,
+            tint,
+        };
+
+        if let Some(material_node) = material_node_opt {
+            if let Some(material) = materials.get_mut(material_node.id()) {
+                material.uniform = uniform;
+                material.screen_texture = screen_texture.clone();
+            } else {
+                let handle = materials.add(BackdropBlurMaterial {
+                    uniform,
+                    screen_texture: screen_texture.clone(),
+                });
+                commands.entity(entity).insert(MaterialNode(handle));
+            }
+            continue;
+        }
+
+        let handle = materials.add(BackdropBlurMaterial {
+            uniform,
+            screen_texture,
+        });
+        commands.entity(entity).insert(MaterialNode(handle));
+    }
+}
+
+fn request_backdrop_capture_system(
+    mut commands: Commands,
+    mut capture_state: ResMut<BackdropCaptureState>,
+    window_q: Query<(), With<PrimaryWindow>>,
+    mut query: Query<(
+        Entity,
+        &UiStyle,
+        Option<&StyleTransition>,
+        Option<&StyleAnimation>,
+        &mut Visibility,
+    )>,
+) {
+    if capture_state.pending || capture_state.screen_texture.is_some() || window_q.is_empty() {
+        return;
+    }
+
+    let mut has_backdrop_blur = false;
+    for (entity, ui_style, transition_opt, animation_opt, mut visibility) in query.iter_mut() {
+        let Some(style) = resolved_active_style(ui_style, transition_opt, animation_opt) else {
+            continue;
+        };
+        let should_blur = matches!(
+            style.backdrop_filter.as_ref(),
+            Some(BackdropFilter::Blur(radius)) if *radius > 0.0
+        );
+        if !should_blur {
+            continue;
+        }
+        has_backdrop_blur = true;
+        let previous_visibility = visibility.clone();
+        *visibility = Visibility::Hidden;
+        commands.entity(entity).insert(BackdropCaptureHidden {
+            previous_visibility,
+        });
+    }
+
+    if !has_backdrop_blur {
+        return;
+    }
+
+    capture_state.pending = true;
+    commands.spawn(Screenshot::primary_window());
+}
+
+fn screenshot_has_content(image: &Image) -> bool {
+    let Some(data) = image.data.as_ref() else {
+        return false;
+    };
+    if data.is_empty() || data.len() < 4 {
+        return false;
+    }
+
+    let size = image.size();
+    let width = size.x as usize;
+    let height = size.y as usize;
+    if width == 0 || height == 0 {
+        return false;
+    }
+
+    // Probe a 6x6 grid across the whole screenshot. This avoids false-positives
+    // from tiny bright UI fragments on an otherwise black/empty capture.
+    let grid = 6usize;
+    let mut bright_samples = 0usize;
+    let mut total_samples = 0usize;
+
+    for gy in 0..grid {
+        for gx in 0..grid {
+            let x = ((gx + 1) * width) / (grid + 1);
+            let y = ((gy + 1) * height) / (grid + 1);
+            let idx = (y * width + x) * 4;
+            if idx + 3 >= data.len() {
+                continue;
+            }
+
+            total_samples += 1;
+            let r = data[idx] as u32;
+            let g = data[idx + 1] as u32;
+            let b = data[idx + 2] as u32;
+            let a = data[idx + 3] as u32;
+            let luma = r + g + b;
+
+            if a > 10 && luma > 45 {
+                bright_samples += 1;
+            }
+        }
+    }
+
+    if total_samples == 0 {
+        return false;
+    }
+
+    bright_samples >= 8
+}
+
+fn on_backdrop_screenshot_captured(
+    trigger: On<ScreenshotCaptured>,
+    mut commands: Commands,
+    mut capture_state: ResMut<BackdropCaptureState>,
+    mut images: ResMut<Assets<Image>>,
+    mut materials: ResMut<Assets<BackdropBlurMaterial>>,
+    mut hidden_query: Query<(Entity, &BackdropCaptureHidden, &mut Visibility)>,
+) {
+    for (entity, marker, mut visibility) in hidden_query.iter_mut() {
+        *visibility = marker.previous_visibility.clone();
+        commands.entity(entity).remove::<BackdropCaptureHidden>();
+    }
+
+    if !capture_state.pending {
+        return;
+    }
+
+    let mut captured_image = trigger.image.clone();
+    captured_image.sampler = ImageSampler::linear();
+    if !screenshot_has_content(&captured_image) {
+        capture_state.pending = false;
+        return;
+    }
+
+    let active_texture = if let Some(existing_handle) = capture_state.screen_texture.clone() {
+        if let Some(existing) = images.get_mut(existing_handle.id()) {
+            *existing = captured_image;
+            existing_handle
+        } else {
+            let handle = images.add(captured_image);
+            capture_state.screen_texture = Some(handle.clone());
+            handle
+        }
+    } else {
+        let handle = images.add(captured_image);
+        capture_state.screen_texture = Some(handle.clone());
+        handle
+    };
+
+    for (_, material) in materials.iter_mut() {
+        material.screen_texture = active_texture.clone();
+    }
+    capture_state.pending = false;
+}
+
 type StyleCandidate<'a> = (&'a String, u32, usize);
 
 fn sort_style_candidates(candidates: &mut [StyleCandidate<'_>]) {
@@ -1317,11 +1590,15 @@ fn apply_style_components(
 
     // BackgroundColor
     if let Some(bg) = components.1.as_mut() {
-        bg.0 = style
-            .background
-            .as_ref()
-            .map(|b| b.color)
-            .unwrap_or(Color::NONE);
+        bg.0 = if style.backdrop_filter.is_some() {
+            Color::NONE
+        } else {
+            style
+                .background
+                .as_ref()
+                .map(|b| b.color)
+                .unwrap_or(Color::NONE)
+        };
     }
 
     // BorderColor
