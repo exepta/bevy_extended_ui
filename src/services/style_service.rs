@@ -52,6 +52,7 @@ impl Plugin for StyleService {
                     .after(UiSystems::Layout),
                 request_backdrop_capture_system.after(apply_background_images_system),
                 sync_backdrop_blur_materials_system
+                    .after(request_backdrop_capture_system)
                     .after(apply_background_images_system)
                     .after(UiSystems::Layout),
                 propagate_style_inheritance.after(apply_calc_styles_system),
@@ -98,7 +99,8 @@ struct CssCursorState {
 #[derive(ShaderType, Clone, Copy, Debug)]
 struct BackdropBlurUniform {
     blur_radius_px: f32,
-    _pad: Vec3,
+    overlay_alpha: f32,
+    viewport_size: Vec2,
     tint: Vec4,
 }
 
@@ -109,6 +111,9 @@ struct BackdropBlurMaterial {
     #[texture(1)]
     #[sampler(2)]
     screen_texture: Handle<Image>,
+    #[texture(3)]
+    #[sampler(4)]
+    overlay_texture: Handle<Image>,
 }
 
 impl UiMaterial for BackdropBlurMaterial {
@@ -121,6 +126,12 @@ impl UiMaterial for BackdropBlurMaterial {
 struct BackdropCaptureState {
     screen_texture: Option<Handle<Image>>,
     pending: bool,
+    hide_prepared: bool,
+    captured_size: UVec2,
+    needs_recapture: bool,
+    failed_attempts: u8,
+    recapture_after_secs: f32,
+    settle_frames: u8,
 }
 
 #[derive(Component, Clone)]
@@ -915,17 +926,27 @@ fn resolved_active_style<'a>(
 
 fn sync_backdrop_blur_materials_system(
     mut commands: Commands,
+    window_q: Query<&Window, With<PrimaryWindow>>,
     query: Query<(
         Entity,
         &UiStyle,
         Option<&StyleTransition>,
         Option<&StyleAnimation>,
+        Option<&ImageNode>,
         Option<&MaterialNode<BackdropBlurMaterial>>,
     )>,
     capture_state: Res<BackdropCaptureState>,
     mut materials: ResMut<Assets<BackdropBlurMaterial>>,
 ) {
-    for (entity, ui_style, transition_opt, animation_opt, material_node_opt) in query.iter() {
+    let viewport_size = window_q
+        .single()
+        .map(|w| w.physical_size().as_vec2())
+        .unwrap_or(Vec2::ONE)
+        .max(Vec2::ONE);
+
+    for (entity, ui_style, transition_opt, animation_opt, image_node_opt, material_node_opt) in
+        query.iter()
+    {
         let Some(style) = resolved_active_style(ui_style, transition_opt, animation_opt) else {
             if material_node_opt.is_some() {
                 commands
@@ -952,37 +973,64 @@ fn sync_backdrop_blur_materials_system(
             .as_ref()
             .map(|background| background.color.to_linear().to_vec4())
             .unwrap_or(Vec4::new(1.0, 1.0, 1.0, 0.0));
-        let Some(screen_texture) = capture_state.screen_texture.clone() else {
-            if material_node_opt.is_some() {
-                commands
-                    .entity(entity)
-                    .remove::<MaterialNode<BackdropBlurMaterial>>();
-            }
-            continue;
-        };
+        let has_overlay = style
+            .background
+            .as_ref()
+            .map(|background| background.gradient.is_some() || background.image.is_some())
+            .unwrap_or(false);
         let uniform = BackdropBlurUniform {
             blur_radius_px: blur_radius,
-            _pad: Vec3::ZERO,
+            overlay_alpha: if has_overlay { 1.0 } else { 0.0 },
+            viewport_size,
             tint,
         };
 
         if let Some(material_node) = material_node_opt {
             if let Some(material) = materials.get_mut(material_node.id()) {
                 material.uniform = uniform;
-                material.screen_texture = screen_texture.clone();
-            } else {
+                if let Some(screen_texture) = capture_state.screen_texture.clone() {
+                    let overlay_texture = if has_overlay {
+                        image_node_opt
+                            .map(|img| img.image.clone())
+                            .unwrap_or_else(|| screen_texture.clone())
+                    } else {
+                        screen_texture.clone()
+                    };
+                    material.screen_texture = screen_texture;
+                    material.overlay_texture = overlay_texture;
+                }
+            } else if let Some(screen_texture) = capture_state.screen_texture.clone() {
+                let overlay_texture = if has_overlay {
+                    image_node_opt
+                        .map(|img| img.image.clone())
+                        .unwrap_or_else(|| screen_texture.clone())
+                } else {
+                    screen_texture.clone()
+                };
                 let handle = materials.add(BackdropBlurMaterial {
                     uniform,
-                    screen_texture: screen_texture.clone(),
+                    screen_texture,
+                    overlay_texture,
                 });
                 commands.entity(entity).insert(MaterialNode(handle));
             }
             continue;
         }
 
+        let Some(screen_texture) = capture_state.screen_texture.clone() else {
+            continue;
+        };
+        let overlay_texture = if has_overlay {
+            image_node_opt
+                .map(|img| img.image.clone())
+                .unwrap_or_else(|| screen_texture.clone())
+        } else {
+            screen_texture.clone()
+        };
         let handle = materials.add(BackdropBlurMaterial {
             uniform,
             screen_texture,
+            overlay_texture,
         });
         commands.entity(entity).insert(MaterialNode(handle));
     }
@@ -991,21 +1039,54 @@ fn sync_backdrop_blur_materials_system(
 fn request_backdrop_capture_system(
     mut commands: Commands,
     mut capture_state: ResMut<BackdropCaptureState>,
-    window_q: Query<(), With<PrimaryWindow>>,
-    mut query: Query<(
+    time: Res<Time>,
+    window_q: Query<&Window, With<PrimaryWindow>>,
+    blur_query: Query<(
         Entity,
         &UiStyle,
         Option<&StyleTransition>,
         Option<&StyleAnimation>,
-        &mut Visibility,
+        Ref<ComputedNode>,
+        Ref<UiGlobalTransform>,
+        Option<&BackdropCaptureHidden>,
     )>,
+    mut visibility_query: Query<&mut Visibility>,
 ) {
-    if capture_state.pending || capture_state.screen_texture.is_some() || window_q.is_empty() {
+    let Ok(window) = window_q.single() else {
+        return;
+    };
+    let now = time.elapsed_secs();
+    let window_size = window.physical_size();
+    if window_size == UVec2::ZERO {
+        return;
+    }
+
+    if capture_state.captured_size != UVec2::ZERO && capture_state.captured_size != window_size {
+        if !capture_state.needs_recapture {
+            capture_state.needs_recapture = true;
+            // Wait a short moment + a couple of frames so layout/background scaling
+            // catches up before taking the backdrop screenshot.
+            capture_state.recapture_after_secs = now + 0.06;
+            capture_state.settle_frames = 2;
+        }
+    }
+
+    if capture_state.pending {
         return;
     }
 
     let mut has_backdrop_blur = false;
-    for (entity, ui_style, transition_opt, animation_opt, mut visibility) in query.iter_mut() {
+    let mut blur_entities: Vec<(Entity, Option<Visibility>)> = Vec::new();
+    for (
+        entity,
+        ui_style,
+        transition_opt,
+        animation_opt,
+        computed_node,
+        global_transform,
+        hidden_opt,
+    ) in blur_query.iter()
+    {
         let Some(style) = resolved_active_style(ui_style, transition_opt, animation_opt) else {
             continue;
         };
@@ -1017,17 +1098,65 @@ fn request_backdrop_capture_system(
             continue;
         }
         has_backdrop_blur = true;
-        let previous_visibility = visibility.clone();
-        *visibility = Visibility::Hidden;
-        commands.entity(entity).insert(BackdropCaptureHidden {
-            previous_visibility,
-        });
+        if computed_node.is_changed() || global_transform.is_changed() {
+            if !capture_state.needs_recapture {
+                capture_state.needs_recapture = true;
+                capture_state.recapture_after_secs = now + 0.05;
+                capture_state.settle_frames = capture_state.settle_frames.max(1);
+            }
+        }
+        let prev_visibility = hidden_opt.map(|marker| marker.previous_visibility.clone());
+        blur_entities.push((entity, prev_visibility));
     }
 
     if !has_backdrop_blur {
+        for (entity, prev_visibility) in blur_entities {
+            if let Some(previous_visibility) = prev_visibility {
+                if let Ok(mut visibility) = visibility_query.get_mut(entity) {
+                    *visibility = previous_visibility;
+                }
+                commands.entity(entity).remove::<BackdropCaptureHidden>();
+            }
+        }
+        capture_state.pending = false;
+        capture_state.hide_prepared = false;
+        capture_state.needs_recapture = false;
+        capture_state.failed_attempts = 0;
+        capture_state.recapture_after_secs = 0.0;
+        capture_state.settle_frames = 0;
         return;
     }
 
+    let needs_capture = capture_state.screen_texture.is_none() || capture_state.needs_recapture;
+    if !needs_capture {
+        return;
+    }
+
+    if capture_state.needs_recapture && now < capture_state.recapture_after_secs {
+        return;
+    }
+
+    if capture_state.needs_recapture && capture_state.settle_frames > 0 {
+        capture_state.settle_frames -= 1;
+        return;
+    }
+
+    // Phase 1: hide backdrop roots and wait one frame for visibility propagation.
+    if !capture_state.hide_prepared {
+        for (entity, prev_visibility) in blur_entities {
+            if let Ok(mut visibility) = visibility_query.get_mut(entity) {
+                let previous_visibility = prev_visibility.unwrap_or_else(|| visibility.clone());
+                *visibility = Visibility::Hidden;
+                commands
+                    .entity(entity)
+                    .insert(BackdropCaptureHidden { previous_visibility });
+            }
+        }
+        capture_state.hide_prepared = true;
+        return;
+    }
+
+    // Phase 2: capture while hidden. Restore happens in screenshot callback.
     capture_state.pending = true;
     commands.spawn(Screenshot::primary_window());
 }
@@ -1047,11 +1176,10 @@ fn screenshot_has_content(image: &Image) -> bool {
         return false;
     }
 
-    // Probe a 6x6 grid across the whole screenshot. This avoids false-positives
-    // from tiny bright UI fragments on an otherwise black/empty capture.
-    let grid = 6usize;
-    let mut bright_samples = 0usize;
-    let mut total_samples = 0usize;
+    // Reject obviously invalid/empty captures (commonly all-black on early frames).
+    let grid = 8usize;
+    let mut sampled = 0usize;
+    let mut non_black = 0usize;
 
     for gy in 0..grid {
         for gx in 0..grid {
@@ -1061,30 +1189,25 @@ fn screenshot_has_content(image: &Image) -> bool {
             if idx + 3 >= data.len() {
                 continue;
             }
+            sampled += 1;
 
-            total_samples += 1;
             let r = data[idx] as u32;
             let g = data[idx + 1] as u32;
             let b = data[idx + 2] as u32;
-            let a = data[idx + 3] as u32;
-            let luma = r + g + b;
-
-            if a > 10 && luma > 45 {
-                bright_samples += 1;
+            if r + g + b > 12 {
+                non_black += 1;
             }
         }
     }
 
-    if total_samples == 0 {
-        return false;
-    }
-
-    bright_samples >= 8
+    sampled > 0 && non_black >= 3
 }
 
 fn on_backdrop_screenshot_captured(
     trigger: On<ScreenshotCaptured>,
     mut commands: Commands,
+    time: Res<Time>,
+    window_q: Query<&Window, With<PrimaryWindow>>,
     mut capture_state: ResMut<BackdropCaptureState>,
     mut images: ResMut<Assets<Image>>,
     mut materials: ResMut<Assets<BackdropBlurMaterial>>,
@@ -1096,13 +1219,45 @@ fn on_backdrop_screenshot_captured(
     }
 
     if !capture_state.pending {
+        capture_state.hide_prepared = false;
         return;
     }
+
+    let current_window_size = window_q
+        .single()
+        .map(|w| w.physical_size())
+        .unwrap_or(UVec2::ZERO);
 
     let mut captured_image = trigger.image.clone();
     captured_image.sampler = ImageSampler::linear();
     if !screenshot_has_content(&captured_image) {
+        capture_state.failed_attempts = capture_state.failed_attempts.saturating_add(1);
+        capture_state.needs_recapture = true;
+        capture_state.recapture_after_secs = time.elapsed_secs() + 0.15;
         capture_state.pending = false;
+        capture_state.hide_prepared = false;
+        return;
+    }
+
+    capture_state.failed_attempts = 0;
+    capture_state.captured_size = captured_image.size();
+    let size_matches = current_window_size != UVec2::ZERO
+        && capture_state.captured_size == current_window_size;
+    capture_state.needs_recapture = !size_matches;
+    capture_state.recapture_after_secs = if capture_state.needs_recapture {
+        time.elapsed_secs() + 0.01
+    } else {
+        0.0
+    };
+    if capture_state.needs_recapture {
+        capture_state.settle_frames = capture_state.settle_frames.max(1);
+    } else {
+        capture_state.settle_frames = 0;
+    }
+
+    if captured_image.size() == UVec2::ZERO {
+        capture_state.pending = false;
+        capture_state.hide_prepared = false;
         return;
     }
 
@@ -1125,6 +1280,7 @@ fn on_backdrop_screenshot_captured(
         material.screen_texture = active_texture.clone();
     }
     capture_state.pending = false;
+    capture_state.hide_prepared = false;
 }
 
 type StyleCandidate<'a> = (&'a String, u32, usize);
@@ -1590,15 +1746,11 @@ fn apply_style_components(
 
     // BackgroundColor
     if let Some(bg) = components.1.as_mut() {
-        bg.0 = if style.backdrop_filter.is_some() {
-            Color::NONE
-        } else {
-            style
-                .background
-                .as_ref()
-                .map(|b| b.color)
-                .unwrap_or(Color::NONE)
-        };
+        bg.0 = style
+            .background
+            .as_ref()
+            .map(|b| b.color)
+            .unwrap_or(Color::NONE);
     }
 
     // BorderColor

@@ -3,7 +3,8 @@
 
 struct BackdropBlurUniform {
     blur_radius_px: f32,
-    _pad: vec3<f32>,
+    overlay_alpha: f32,
+    viewport_size: vec2<f32>,
     tint: vec4<f32>,
 };
 
@@ -13,6 +14,10 @@ var<uniform> material: BackdropBlurUniform;
 var screen_texture: texture_2d<f32>;
 @group(1) @binding(2)
 var screen_sampler: sampler;
+@group(1) @binding(3)
+var overlay_texture: texture_2d<f32>;
+@group(1) @binding(4)
+var overlay_sampler: sampler;
 
 const MAX_RADIUS: i32 = 24;
 
@@ -23,7 +28,8 @@ fn gaussian_weight(distance_sq: f32, sigma: f32) -> f32 {
 @fragment
 fn fragment(in: UiVertexOutput) -> @location(0) vec4<f32> {
     let texture_size = max(vec2<f32>(textureDimensions(screen_texture)), vec2<f32>(1.0));
-    let screen_uv = clamp(in.position.xy / texture_size, vec2<f32>(0.0), vec2<f32>(1.0));
+    let viewport_size = max(material.viewport_size, vec2<f32>(1.0));
+    let screen_uv = clamp(in.position.xy / viewport_size, vec2<f32>(0.0), vec2<f32>(1.0));
     let texel = vec2<f32>(1.0) / texture_size;
 
     let requested_radius = max(material.blur_radius_px, 0.0);
@@ -57,7 +63,10 @@ fn fragment(in: UiVertexOutput) -> @location(0) vec4<f32> {
     let blurred = select(base_color, sum / max(weight_sum, 0.0001), radius > 0);
 
     let background_alpha = clamp(material.tint.a, 0.0, 1.0);
-    let glass_color = mix(blurred.rgb, material.tint.rgb, background_alpha);
+    let tinted_glass = mix(blurred.rgb, material.tint.rgb, background_alpha);
+    let overlay_sample = textureSample(overlay_texture, overlay_sampler, clamp(in.uv, vec2<f32>(0.0), vec2<f32>(1.0)));
+    let overlay_alpha = clamp(overlay_sample.a * material.overlay_alpha, 0.0, 1.0);
+    let glass_color = mix(tinted_glass, overlay_sample.rgb, overlay_alpha);
 
     let point = in.uv * in.size - 0.5 * in.size;
     return draw_uinode_background(

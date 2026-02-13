@@ -38,7 +38,8 @@ h2 {
     height: 250px;
     padding: 20px;
     border-radius: 22px;
-    border: 2px rgba(255, 255, 255, 0.35);
+    border-width: 2px;
+    border-color: rgba(255, 255, 255, 0.35);
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
