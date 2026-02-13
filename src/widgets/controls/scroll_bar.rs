@@ -118,9 +118,7 @@ fn internal_node_creation_system(
                         UIWidgetState::default(),
                         RelativeCursorPosition::default(),
                         css_source.clone(),
-                        CssClass(vec![
-                            "scroll-track".to_string(),
-                        ]),
+                        CssClass(vec!["scroll-track".to_string()]),
                         RenderLayers::layer(layer),
                         Pickable::default(),
                         ScrollTrack,
@@ -148,7 +146,9 @@ fn internal_node_creation_system(
                                 ]),
                                 RenderLayers::layer(layer),
                                 Pickable::default(),
-                                ScrollThumb { current_center: 0.0 },
+                                ScrollThumb {
+                                    current_center: 0.0,
+                                },
                                 BindToID(scroll.entry),
                             ))
                             .insert((
@@ -212,13 +212,20 @@ fn on_track_click(
     track_q: Query<(&ComputedNode, &BindToID, &RelativeCursorPosition), With<ScrollTrack>>,
     thumb_q: Query<(&ComputedNode, &BindToID), With<ScrollThumb>>,
 
-    mut thumb_node_q: Query<(&mut Node, &mut ScrollThumb, &BindToID, &mut UiStyle), With<ScrollThumb>>,
+    mut thumb_node_q: Query<
+        (&mut Node, &mut ScrollThumb, &BindToID, &mut UiStyle),
+        With<ScrollThumb>,
+    >,
     mut target_scroll_q: Query<&mut ScrollPosition>,
 ) {
-    let Ok(window) = window_q.single() else { return; };
+    let Ok(window) = window_q.single() else {
+        return;
+    };
     let sf = window.scale_factor() * ui_scale.0;
 
-    let Ok((track_node, bind, rel)) = track_q.get(trigger.entity) else { return; };
+    let Ok((track_node, bind, rel)) = track_q.get(trigger.entity) else {
+        return;
+    };
 
     let Some((vertical, viewport_extent, content_extent, min, max)) =
         scroll_metrics(bind.0, &mut scroll_q)
@@ -228,16 +235,27 @@ fn on_track_click(
     };
 
     let track_extent = track_extent(vertical, track_node.size(), sf);
-    let Some(fallback_extent) = find_bound_extent(bind.0, &thumb_q, sf, vertical) else { return; };
-    let thumb_extent =
-        compute_thumb_extent_from_metrics(viewport_extent, content_extent, max - min, track_extent, fallback_extent);
+    let Some(fallback_extent) = find_bound_extent(bind.0, &thumb_q, sf, vertical) else {
+        return;
+    };
+    let thumb_extent = compute_thumb_extent_from_metrics(
+        viewport_extent,
+        content_extent,
+        max - min,
+        track_extent,
+        fallback_extent,
+    );
 
     let Some(n) = rel.normalized else {
         trigger.propagate(false);
         return;
     };
 
-    let t = if vertical { (n.y + 0.5).clamp(0.0, 1.0) } else { (n.x + 0.5).clamp(0.0, 1.0) };
+    let t = if vertical {
+        (n.y + 0.5).clamp(0.0, 1.0)
+    } else {
+        (n.x + 0.5).clamp(0.0, 1.0)
+    };
     let click_pos = t * track_extent;
     let desired_offset = click_pos - thumb_extent * 0.5;
 
@@ -266,27 +284,48 @@ fn on_thumb_drag(
     window_q: Query<&Window, With<PrimaryWindow>>,
     ui_scale: Res<UiScale>,
 ) {
-    let Ok(window) = window_q.single() else { return; };
+    let Ok(window) = window_q.single() else {
+        return;
+    };
     let sf = window.scale_factor() * ui_scale.0;
 
-    let Ok(parent) = parent_q.get(event.entity) else { return; };
-    let Ok((track_node, bind)) = track_q.get(parent.parent()) else { return; };
+    let Ok(parent) = parent_q.get(event.entity) else {
+        return;
+    };
+    let Ok((track_node, bind)) = track_q.get(parent.parent()) else {
+        return;
+    };
 
-    let Some((vertical, viewport_extent, content_extent, min, max)) = scroll_metrics(bind.0, &mut scroll_q) else {
+    let Some((vertical, viewport_extent, content_extent, min, max)) =
+        scroll_metrics(bind.0, &mut scroll_q)
+    else {
         return;
     };
 
     let track_extent = track_extent(vertical, track_node.size(), sf);
 
-    let Ok(thumb_node) = thumb_node_q.get(event.entity) else { return; };
+    let Ok(thumb_node) = thumb_node_q.get(event.entity) else {
+        return;
+    };
     let fallback_extent = axis_size(vertical, thumb_node.size(), sf);
-    let thumb_extent =
-        compute_thumb_extent_from_metrics(viewport_extent, content_extent, max - min, track_extent, fallback_extent);
+    let thumb_extent = compute_thumb_extent_from_metrics(
+        viewport_extent,
+        content_extent,
+        max - min,
+        track_extent,
+        fallback_extent,
+    );
     let half = thumb_extent * 0.5;
 
-    let delta = if vertical { event.event.delta.y / sf } else { event.event.delta.x / sf };
+    let delta = if vertical {
+        event.event.delta.y / sf
+    } else {
+        event.event.delta.x / sf
+    };
 
-    let Ok((_, thumb, _, _)) = thumb_q.get(event.entity) else { return; };
+    let Ok((_, thumb, _, _)) = thumb_q.get(event.entity) else {
+        return;
+    };
     let current_offset = thumb.current_center - half;
 
     apply_from_track_top_uid(
@@ -398,22 +437,34 @@ fn apply_from_track_top_uid(
 
 /// Detects scroll value changes and updates thumb visuals.
 fn detect_change_scroll_values(
-    mut scroll_q: Query<(&mut Scrollbar, &UIWidgetState, &mut PreviousScrollState), With<Scrollbar>>,
+    mut scroll_q: Query<
+        (&mut Scrollbar, &UIWidgetState, &mut PreviousScrollState),
+        With<Scrollbar>,
+    >,
     track_q: Query<(&ComputedNode, &BindToID), With<ScrollTrack>>,
     thumb_q: Query<(&ComputedNode, &BindToID), With<ScrollThumb>>,
-    mut thumb_node_q: Query<(&mut Node, &mut ScrollThumb, &BindToID, &mut UiStyle), With<ScrollThumb>>,
+    mut thumb_node_q: Query<
+        (&mut Node, &mut ScrollThumb, &BindToID, &mut UiStyle),
+        With<ScrollThumb>,
+    >,
     mut target_scroll_q: Query<&mut ScrollPosition>,
     window_q: Query<&Window, With<PrimaryWindow>>,
     ui_scale: Res<UiScale>,
     keyboard: Res<ButtonInput<KeyCode>>,
 ) {
-    let Ok(window) = window_q.single() else { return; };
+    let Ok(window) = window_q.single() else {
+        return;
+    };
     let sf = window.scale_factor() * ui_scale.0;
     let shift = keyboard.pressed(KeyCode::ShiftLeft) || keyboard.pressed(KeyCode::ShiftRight);
 
     for (mut scroll, state, mut prev) in scroll_q.iter_mut() {
         if state.focused {
-            let step = if shift { scroll.step * 10.0 } else { scroll.step };
+            let step = if shift {
+                scroll.step * 10.0
+            } else {
+                scroll.step
+            };
             if scroll.vertical {
                 if keyboard.just_pressed(KeyCode::ArrowUp) {
                     scroll.value = (scroll.value - step).max(scroll.min);
@@ -452,8 +503,12 @@ fn detect_change_scroll_values(
         prev.viewport_extent = scroll.viewport_extent;
         prev.content_extent = scroll.content_extent;
 
-        let track_extent = find_bound_extent(scroll.entry, &track_q, sf, scroll.vertical).unwrap_or(1.0);
-        let Some(thumb_extent) = find_bound_extent(scroll.entry, &thumb_q, sf, scroll.vertical) else { continue; };
+        let track_extent =
+            find_bound_extent(scroll.entry, &track_q, sf, scroll.vertical).unwrap_or(1.0);
+        let Some(thumb_extent) = find_bound_extent(scroll.entry, &thumb_q, sf, scroll.vertical)
+        else {
+            continue;
+        };
         let thumb_extent = compute_thumb_extent(&scroll, track_extent, thumb_extent);
         let thumb_extent = compute_thumb_extent(&scroll, track_extent, thumb_extent);
 
@@ -479,12 +534,17 @@ fn initialize_scroll_visual_state(
     mut scroll_q: Query<(Entity, &mut Scrollbar, Option<&ScrollNeedInit>), With<Scrollbar>>,
     track_q: Query<(&ComputedNode, &BindToID), With<ScrollTrack>>,
     thumb_q: Query<(&ComputedNode, &BindToID), With<ScrollThumb>>,
-    mut thumb_node_q: Query<(&mut Node, &mut ScrollThumb, &BindToID, &mut UiStyle), With<ScrollThumb>>,
+    mut thumb_node_q: Query<
+        (&mut Node, &mut ScrollThumb, &BindToID, &mut UiStyle),
+        With<ScrollThumb>,
+    >,
     mut target_scroll_q: Query<&mut ScrollPosition>,
     window_q: Query<&Window, With<PrimaryWindow>>,
     ui_scale: Res<UiScale>,
 ) {
-    let Ok(window) = window_q.single() else { return; };
+    let Ok(window) = window_q.single() else {
+        return;
+    };
     let sf = window.scale_factor() * ui_scale.0;
 
     for (entity, mut scroll, needs) in scroll_q.iter_mut() {
@@ -492,8 +552,12 @@ fn initialize_scroll_visual_state(
             continue;
         }
 
-        let track_extent = find_bound_extent(scroll.entry, &track_q, sf, scroll.vertical).unwrap_or(1.0);
-        let Some(thumb_extent) = find_bound_extent(scroll.entry, &thumb_q, sf, scroll.vertical) else { continue; };
+        let track_extent =
+            find_bound_extent(scroll.entry, &track_q, sf, scroll.vertical).unwrap_or(1.0);
+        let Some(thumb_extent) = find_bound_extent(scroll.entry, &thumb_q, sf, scroll.vertical)
+        else {
+            continue;
+        };
 
         let max_top = (track_extent - thumb_extent).max(0.0);
         let denom = (scroll.max - scroll.min).max(f32::EPSILON);

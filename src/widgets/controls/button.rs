@@ -1,11 +1,11 @@
 use crate::styles::paint::Colored;
 use crate::styles::{CssClass, CssSource, IconPlace, TagName};
+use crate::widgets::controls::place_icon_if;
 use crate::widgets::{BindToID, Button, UIGenID, UIWidgetState, WidgetId, WidgetKind};
 use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
 use bevy::camera::visibility::RenderLayers;
 use bevy::ecs::relationship::RelatedSpawnerCommands;
 use bevy::prelude::*;
-use crate::widgets::controls::place_icon_if;
 
 /// Marker component for initialized button widgets.
 #[derive(Component)]
@@ -21,7 +21,10 @@ pub struct ButtonWidget;
 impl Plugin for ButtonWidget {
     /// Registers systems for button widget setup and updates.
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (internal_node_creation_system, update_button_system));
+        app.add_systems(
+            Update,
+            (internal_node_creation_system, update_button_system),
+        );
     }
 }
 
@@ -91,7 +94,15 @@ fn internal_node_creation_system(
                 ButtonBase,
             ))
             .with_children(|builder| {
-                spawn_button_children(builder, button, id, *layer, css_source.clone(), &asset_server, &mut image_cache);
+                spawn_button_children(
+                    builder,
+                    button,
+                    id,
+                    *layer,
+                    css_source.clone(),
+                    &asset_server,
+                    &mut image_cache,
+                );
             })
             .observe(on_internal_click)
             .observe(on_internal_cursor_entered)
@@ -103,7 +114,13 @@ fn internal_node_creation_system(
 fn update_button_system(
     mut commands: Commands,
     query: Query<
-        (Entity, &UIGenID, &Button, Option<&CssSource>, Option<&Children>),
+        (
+            Entity,
+            &UIGenID,
+            &Button,
+            Option<&CssSource>,
+            Option<&Children>,
+        ),
         (With<Button>, With<ButtonBase>, Changed<Button>),
     >,
     text_q: Query<(), With<ButtonText>>,

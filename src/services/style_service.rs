@@ -11,8 +11,8 @@ use crate::styles::{
 };
 use crate::widgets::UIWidgetState;
 
-use bevy::color::Srgba;
 use bevy::asset::RenderAssetUsages;
+use bevy::color::Srgba;
 use bevy::image::ImageSampler;
 use bevy::math::Rot2;
 use bevy::prelude::*;
@@ -20,9 +20,7 @@ use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy::ui::{
     ComputedNode, ComputedUiRenderTargetInfo, UiGlobalTransform, UiSystems, UiTransform, Val2,
 };
-use bevy::window::{
-    CursorIcon, CustomCursor, CustomCursorImage, PrimaryWindow, SystemCursorIcon,
-};
+use bevy::window::{CursorIcon, CustomCursor, CustomCursorImage, PrimaryWindow, SystemCursorIcon};
 
 /// Plugin that applies CSS styles, transitions, and animations to UI nodes.
 pub struct StyleService;
@@ -564,11 +562,27 @@ fn apply_calc_styles_system(
         };
 
         apply_calc_length(style.width_calc.as_ref(), ctx_content_w, &mut node.width);
-        apply_calc_length(style.min_width_calc.as_ref(), ctx_content_w, &mut node.min_width);
-        apply_calc_length(style.max_width_calc.as_ref(), ctx_content_w, &mut node.max_width);
+        apply_calc_length(
+            style.min_width_calc.as_ref(),
+            ctx_content_w,
+            &mut node.min_width,
+        );
+        apply_calc_length(
+            style.max_width_calc.as_ref(),
+            ctx_content_w,
+            &mut node.max_width,
+        );
         apply_calc_length(style.height_calc.as_ref(), ctx_content_h, &mut node.height);
-        apply_calc_length(style.min_height_calc.as_ref(), ctx_content_h, &mut node.min_height);
-        apply_calc_length(style.max_height_calc.as_ref(), ctx_content_h, &mut node.max_height);
+        apply_calc_length(
+            style.min_height_calc.as_ref(),
+            ctx_content_h,
+            &mut node.min_height,
+        );
+        apply_calc_length(
+            style.max_height_calc.as_ref(),
+            ctx_content_h,
+            &mut node.max_height,
+        );
 
         apply_calc_length(style.left_calc.as_ref(), ctx_box_w, &mut node.left);
         apply_calc_length(style.right_calc.as_ref(), ctx_box_w, &mut node.right);
@@ -765,18 +779,16 @@ fn apply_background_images_system(
         let inv_sf = computed.inverse_scale_factor.max(f32::EPSILON);
         let scale_factor = inv_sf.recip();
 
-        let attachment = style
-            .background_attachment
-            .clone()
-            .unwrap_or_default();
-        let position = style
-            .background_position
-            .clone()
-            .unwrap_or_default();
+        let attachment = style.background_attachment.clone().unwrap_or_default();
+        let position = style.background_position.clone().unwrap_or_default();
         let bg_size = style.background_size.clone().unwrap_or_default();
 
-        let source_handle =
-            get_or_load_image(image_path.as_str(), &mut image_cache, &mut images, &asset_server);
+        let source_handle = get_or_load_image(
+            image_path.as_str(),
+            &mut image_cache,
+            &mut images,
+            &asset_server,
+        );
         let Some(source_image) = images.get(source_handle.id()) else {
             continue;
         };
@@ -798,12 +810,8 @@ fn apply_background_images_system(
             container_size
         };
 
-        let draw_size = resolve_background_draw_size(
-            &bg_size,
-            source_size,
-            positioning_size,
-            scale_factor,
-        );
+        let draw_size =
+            resolve_background_draw_size(&bg_size, source_size, positioning_size, scale_factor);
         if draw_size.x == 0 || draw_size.y == 0 {
             continue;
         }
@@ -830,12 +838,9 @@ fn apply_background_images_system(
         let handle = if let Some(handle) = image_cache.map.get(&cache_key) {
             handle.clone()
         } else {
-            let Some(image) = render_background_image(
-                source_image,
-                container_size,
-                draw_size,
-                offset,
-            ) else {
+            let Some(image) =
+                render_background_image(source_image, container_size, draw_size, offset)
+            else {
                 continue;
             };
             let handle = images.add(image);
@@ -1002,18 +1007,8 @@ fn resolve_background_position(
     let image_w = image.x as f32;
     let image_h = image.y as f32;
 
-    let x = resolve_background_position_axis(
-        &position.x,
-        area_w,
-        image_w,
-        scale_factor,
-    );
-    let y = resolve_background_position_axis(
-        &position.y,
-        area_h,
-        image_h,
-        scale_factor,
-    );
+    let x = resolve_background_position_axis(&position.x, area_w, image_w, scale_factor);
+    let y = resolve_background_position_axis(&position.y, area_h, image_h, scale_factor);
     Vec2::new(x, y)
 }
 
@@ -1169,9 +1164,7 @@ fn resolve_gradient_stops(
         .map(|stop| {
             let position = match stop.position {
                 Some(GradientStopPosition::Percent(value)) => Some(value / 100.0),
-                Some(GradientStopPosition::Px(value)) => {
-                    Some((value * scale_factor) / line_length)
-                }
+                Some(GradientStopPosition::Px(value)) => Some((value * scale_factor) / line_length),
                 None => None,
             };
             (stop.color.to_srgba(), position)
@@ -1245,7 +1238,10 @@ fn resolve_gradient_stops(
         if pos < prev {
             pos = prev;
         }
-        resolved.push(ResolvedGradientStop { color, position: pos });
+        resolved.push(ResolvedGradientStop {
+            color,
+            position: pos,
+        });
         prev = pos;
     }
 
@@ -2118,9 +2114,7 @@ fn propagate_recursive(
             // We need to form the font path from inherited values
             if let Some(inherited) = inherited_style {
                 if let Some(family) = &inherited.font_family {
-                    let weight = inherited
-                        .font_weight
-                        .unwrap_or(FontWeight::Normal);
+                    let weight = inherited.font_weight.unwrap_or(FontWeight::Normal);
                     let folder = &family.0; // Assuming FontFamily is struct(String)
                     let weight_str = weight_token_exact(weight);
                     // This assumes a standard naming convention "Family-Weight.ttf"

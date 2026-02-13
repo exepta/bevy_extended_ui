@@ -111,16 +111,15 @@ impl ValidationRules {
             }
         }
 
-        if rules.is_empty() {
-            None
-        } else {
-            Some(rules)
-        }
+        if rules.is_empty() { None } else { Some(rules) }
     }
 
     /// Returns true when no rules are configured.
     fn is_empty(&self) -> bool {
-        !self.required && self.min_length.is_none() && self.max_length.is_none() && self.pattern.is_none()
+        !self.required
+            && self.min_length.is_none()
+            && self.max_length.is_none()
+            && self.pattern.is_none()
     }
 }
 
@@ -147,8 +146,8 @@ fn apply_length_rules(args: &str, rules: &mut ValidationRules) {
             if let Some(value) = parse_part(max) {
                 rules.max_length = Some(value);
             }
-        },
-        &[] => todo!()
+        }
+        &[] => todo!(),
     }
 }
 
@@ -158,7 +157,11 @@ fn apply_pattern_rule(args: &str, rules: &mut ValidationRules) {
     let stripped = trimmed
         .strip_prefix('"')
         .and_then(|rest| rest.strip_suffix('"'))
-        .or_else(|| trimmed.strip_prefix('\'').and_then(|rest| rest.strip_suffix('\'')))
+        .or_else(|| {
+            trimmed
+                .strip_prefix('\'')
+                .and_then(|rest| rest.strip_suffix('\''))
+        })
         .unwrap_or(trimmed);
 
     if stripped.is_empty() {

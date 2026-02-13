@@ -1,5 +1,5 @@
-use bevy::prelude::*;
 use bevy::asset::{AssetServer, Handle};
+use bevy::prelude::*;
 use bevy::prelude::{In, Res, ResMut};
 use bevy_extended_ui::example_utils::make_app;
 use bevy_extended_ui::html::{HtmlEvent, HtmlSource};
@@ -31,14 +31,24 @@ fn main() {
 
     app.init_resource::<OverlayState>();
 
-    app.add_systems(Startup, |mut reg: ResMut<UiRegistry>, asset_server: Res<AssetServer>| {
-        let main_test_handle: Handle<HtmlAsset> = asset_server.load("examples/main_ui.html");
-        let overlay_test_handle: Handle<HtmlAsset> = asset_server.load("examples/overlay_ui.html");
+    app.add_systems(
+        Startup,
+        |mut reg: ResMut<UiRegistry>, asset_server: Res<AssetServer>| {
+            let main_test_handle: Handle<HtmlAsset> = asset_server.load("examples/main_ui.html");
+            let overlay_test_handle: Handle<HtmlAsset> =
+                asset_server.load("examples/overlay_ui.html");
 
-        reg.add("main_ui".to_string(), HtmlSource::from_handle(main_test_handle));
-        reg.add("overlay_ui".to_string(), HtmlSource::from_handle(overlay_test_handle));
-        reg.use_uis(vec!["main_ui".to_string(), "overlay_ui".to_string()]);
-    });
+            reg.add(
+                "main_ui".to_string(),
+                HtmlSource::from_handle(main_test_handle),
+            );
+            reg.add(
+                "overlay_ui".to_string(),
+                HtmlSource::from_handle(overlay_test_handle),
+            );
+            reg.use_uis(vec!["main_ui".to_string(), "overlay_ui".to_string()]);
+        },
+    );
 
     app.add_systems(Update, apply_initial_overlay_state);
     app.add_systems(PostUpdate, enforce_overlay_visibility);
@@ -93,10 +103,7 @@ fn apply_initial_overlay_state(
 }
 
 /// Ensures overlay visibility matches the stored state.
-fn enforce_overlay_visibility(
-    state: Res<OverlayState>,
-    mut q: Query<(&Body, &mut Visibility)>,
-) {
+fn enforce_overlay_visibility(state: Res<OverlayState>, mut q: Query<(&Body, &mut Visibility)>) {
     let target_key = "overlay_ui";
 
     for (body, mut vis) in q.iter_mut() {

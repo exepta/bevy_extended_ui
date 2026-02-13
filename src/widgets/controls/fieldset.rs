@@ -1,7 +1,10 @@
 use crate::ExtendedUiConfiguration;
 use crate::styles::paint::Colored;
 use crate::styles::{CssSource, TagName};
-use crate::widgets::{ToggleButton, FieldKind, FieldSelectionMulti, FieldSet, FieldSelectionSingle, RadioButton, WidgetId, WidgetKind};
+use crate::widgets::{
+    FieldKind, FieldSelectionMulti, FieldSelectionSingle, FieldSet, RadioButton, ToggleButton,
+    WidgetId, WidgetKind,
+};
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
 
@@ -75,7 +78,12 @@ fn internal_node_creation_system(
 /// Detects field set child types and updates selection mode.
 fn detect_fieldset_kind_system(
     mut commands: Commands,
-    mut fieldsets: Query<(Entity, &mut FieldSet, Option<&Children>, &mut FieldSetWarned)>,
+    mut fieldsets: Query<(
+        Entity,
+        &mut FieldSet,
+        Option<&Children>,
+        &mut FieldSetWarned,
+    )>,
     radio_q: Query<(), With<RadioButton>>,
     toggle_q: Query<(), With<ToggleButton>>,
 ) {

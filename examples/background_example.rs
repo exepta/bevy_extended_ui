@@ -14,5 +14,8 @@ fn main() {
 /// Loads and registers the background example UI.
 fn setup(mut registry: ResMut<UiRegistry>, asset_server: Res<AssetServer>) {
     let handle: Handle<HtmlAsset> = asset_server.load("examples/background_examples.html");
-    registry.add_and_use("background_examples".to_string(), HtmlSource::from_handle(handle));
+    registry.add_and_use(
+        "background_examples".to_string(),
+        HtmlSource::from_handle(handle),
+    );
 }

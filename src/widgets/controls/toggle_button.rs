@@ -1,10 +1,13 @@
+use crate::styles::paint::Colored;
+use crate::styles::{CssClass, CssSource, IconPlace, TagName};
+use crate::widgets::controls::place_icon_if;
+use crate::widgets::{
+    BindToID, FieldMode, FieldSelectionMulti, FieldSelectionSingle, FieldSet, InFieldSet,
+    ToggleButton, UIGenID, UIWidgetState, WidgetId, WidgetKind,
+};
+use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
-use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
-use crate::styles::{CssClass, CssSource, IconPlace, TagName};
-use crate::styles::paint::Colored;
-use crate::widgets::{BindToID, FieldMode, FieldSelectionMulti, FieldSet, FieldSelectionSingle, InFieldSet, ToggleButton, UIGenID, UIWidgetState, WidgetId, WidgetKind};
-use crate::widgets::controls::place_icon_if;
 
 /// Marker component for initialized toggle button widgets.
 #[derive(Component)]
@@ -200,12 +203,7 @@ fn ensure_fieldset_selection_system(
 fn on_internal_click(
     mut trigger: On<Pointer<Click>>,
     mut toggles_q: Query<
-        (
-            Entity,
-            &mut UIWidgetState,
-            &UIGenID,
-            &mut ToggleButton,
-        ),
+        (Entity, &mut UIWidgetState, &UIGenID, &mut ToggleButton),
         With<ToggleButton>,
     >,
     parents: Query<&ChildOf>,
@@ -311,7 +309,8 @@ fn on_internal_click(
             if e == clicked {
                 continue;
             }
-            let Some(fs_other) = find_fieldset_ancestor_optional(e, &parents, &fieldset_tag_q) else {
+            let Some(fs_other) = find_fieldset_ancestor_optional(e, &parents, &fieldset_tag_q)
+            else {
                 continue;
             };
             if fs_other != fs_entity {
@@ -360,7 +359,9 @@ fn find_fieldset_ancestor_optional(
     fieldsets: &Query<(), With<FieldSet>>,
 ) -> Option<Entity> {
     loop {
-        let Ok(p) = parents.get(entity) else { return None };
+        let Ok(p) = parents.get(entity) else {
+            return None;
+        };
         let parent = p.parent();
         if fieldsets.get(parent).is_ok() {
             return Some(parent);

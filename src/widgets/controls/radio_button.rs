@@ -1,6 +1,9 @@
 use crate::styles::paint::Colored;
 use crate::styles::{CssClass, CssSource, TagName};
-use crate::widgets::{BindToID, FieldMode, FieldSet, FieldSelectionSingle, InFieldSet, RadioButton, UIGenID, UIWidgetState, WidgetId, WidgetKind};
+use crate::widgets::{
+    BindToID, FieldMode, FieldSelectionSingle, FieldSet, InFieldSet, RadioButton, UIGenID,
+    UIWidgetState, WidgetId, WidgetKind,
+};
 use crate::{CurrentWidgetState, ExtendedUiConfiguration};
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
@@ -56,7 +59,8 @@ fn internal_node_creation_system(
     let layer = config.render_layers.first().unwrap_or(&1);
 
     for (entity, id, radio_button, source_opt, mut state) in query.iter_mut() {
-        let Some(fieldset_entity) = find_fieldset_ancestor(entity, &parents, &fieldset_tag_q) else {
+        let Some(fieldset_entity) = find_fieldset_ancestor(entity, &parents, &fieldset_tag_q)
+        else {
             if !warned.0 {
                 warn!(
                     "RadioButton widgets must be placed inside a <fieldset>. \

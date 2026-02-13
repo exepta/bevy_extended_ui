@@ -1,24 +1,28 @@
+mod bindings;
 pub mod builder;
 pub mod converter;
 pub mod reload;
-mod bindings;
 
 pub use inventory;
 
-use std::collections::HashMap;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use bevy::ecs::system::SystemId;
-use bevy::prelude::*;
 use crate::html::bindings::HtmlEventBindingsPlugin;
 use crate::html::builder::HtmlBuilderSystem;
 use crate::html::converter::HtmlConverterSystem;
 use crate::html::reload::HtmlReloadPlugin;
-use crate::lang::{UiLangState, UiLangVariables, UILang};
+use crate::lang::{UILang, UiLangState, UiLangVariables};
+use bevy::ecs::system::SystemId;
+use bevy::prelude::*;
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::io::{CssAsset, HtmlAsset};
 use crate::styles::Style;
 use crate::styles::parser::apply_property_to_style;
-use crate::widgets::{Body, Button, CheckBox, ChoiceBox, Div, Divider, FieldSet, Headline, Img, InputField, Paragraph, ProgressBar, RadioButton, Scrollbar, Slider, SwitchButton, ToggleButton, ValidationRules, Widget};
+use crate::widgets::{
+    Body, Button, CheckBox, ChoiceBox, Div, Divider, FieldSet, Headline, Img, InputField,
+    Paragraph, ProgressBar, RadioButton, Scrollbar, Slider, SwitchButton, ToggleButton,
+    ValidationRules, Widget,
+};
 
 pub static HTML_ID_COUNTER: AtomicUsize = AtomicUsize::new(1);
 
@@ -140,6 +144,66 @@ pub struct HtmlMeta {
     pub class: Option<Vec<String>>,
     pub style: Option<HtmlStyle>,
     pub validation: Option<ValidationRules>,
+    pub inner_content: HtmlInnerContent,
+}
+
+/// Captures textual and reactive inner content for an HTML element.
+///
+/// These fields mirror common DOM concepts:
+/// - `inner_text`: plain text inside the element
+/// - `inner_html`: serialized child HTML
+/// - `inner_bindings`: placeholders such as `{{user.name}}`
+#[derive(Component, Reflect, Debug, Clone, Default)]
+#[reflect(Component)]
+pub struct HtmlInnerContent {
+    inner_text: String,
+    inner_html: String,
+    inner_bindings: Vec<String>,
+}
+
+impl HtmlInnerContent {
+    /// Creates a new inner content payload.
+    pub fn new(
+        inner_text: impl Into<String>,
+        inner_html: impl Into<String>,
+        inner_bindings: Vec<String>,
+    ) -> Self {
+        Self {
+            inner_text: inner_text.into(),
+            inner_html: inner_html.into(),
+            inner_bindings,
+        }
+    }
+
+    /// Returns the raw text content (`innerText`).
+    pub fn inner_text(&self) -> &str {
+        &self.inner_text
+    }
+
+    /// Returns the serialized HTML content (`innerHtml`).
+    pub fn inner_html(&self) -> &str {
+        &self.inner_html
+    }
+
+    /// Returns the discovered reactive bindings (`innerBindings`).
+    pub fn inner_bindings(&self) -> &[String] {
+        &self.inner_bindings
+    }
+
+    /// Overrides the raw text content.
+    pub fn set_inner_text(&mut self, value: impl Into<String>) {
+        self.inner_text = value.into();
+    }
+
+    /// Overrides the serialized HTML content.
+    pub fn set_inner_html(&mut self, value: impl Into<String>) {
+        self.inner_html = value.into();
+    }
+
+    /// Overrides the discovered bindings.
+    pub fn set_inner_bindings(&mut self, value: Vec<String>) {
+        self.inner_bindings = value;
+    }
 }
 
 /// Common HTML state flags for nodes.
@@ -399,8 +463,9 @@ pub struct HtmlEvent {
 
 impl HtmlEvent {
     /// Returns the target entity for the event.
-    pub fn target(&self) -> Entity { self.entity }
-
+    pub fn target(&self) -> Entity {
+        self.entity
+    }
 }
 
 /// Registry of HTML event handlers by name and event type.
@@ -580,6 +645,7 @@ impl Plugin for ExtendedUiHtmlPlugin {
         app.register_type::<HtmlEventBindings>();
         app.register_type::<HtmlSource>();
         app.register_type::<HtmlStyle>();
+        app.register_type::<HtmlInnerContent>();
 
         app.configure_sets(
             Update,
@@ -614,73 +680,85 @@ pub fn register_html_fns(world: &mut World) {
             }
             HtmlFnRegistration::HtmlClick { name, build } => {
                 let id = (*build)(world);
-                world.resource_mut::<HtmlFunctionRegistry>()
+                world
+                    .resource_mut::<HtmlFunctionRegistry>()
                     .click_typed
                     .insert((*name).to_string(), id);
             }
             HtmlFnRegistration::HtmlChange { name, build } => {
                 let id = (*build)(world);
-                world.resource_mut::<HtmlFunctionRegistry>()
+                world
+                    .resource_mut::<HtmlFunctionRegistry>()
                     .change_typed
                     .insert((*name).to_string(), id);
             }
             HtmlFnRegistration::HtmlInit { name, build } => {
                 let id = (*build)(world);
-                world.resource_mut::<HtmlFunctionRegistry>()
+                world
+                    .resource_mut::<HtmlFunctionRegistry>()
                     .init_typed
                     .insert((*name).to_string(), id);
             }
             HtmlFnRegistration::HtmlMouseOut { name, build } => {
                 let id = (*build)(world);
-                world.resource_mut::<HtmlFunctionRegistry>()
+                world
+                    .resource_mut::<HtmlFunctionRegistry>()
                     .out_typed
                     .insert((*name).to_string(), id);
             }
             HtmlFnRegistration::HtmlMouseOver { name, build } => {
                 let id = (*build)(world);
-                world.resource_mut::<HtmlFunctionRegistry>()
+                world
+                    .resource_mut::<HtmlFunctionRegistry>()
                     .over_typed
                     .insert((*name).to_string(), id);
             }
             HtmlFnRegistration::HtmlFocus { name, build } => {
                 let id = (*build)(world);
-                world.resource_mut::<HtmlFunctionRegistry>()
+                world
+                    .resource_mut::<HtmlFunctionRegistry>()
                     .focus_typed
                     .insert((*name).to_string(), id);
             }
             HtmlFnRegistration::HtmlScroll { name, build } => {
                 let id = (*build)(world);
-                world.resource_mut::<HtmlFunctionRegistry>()
+                world
+                    .resource_mut::<HtmlFunctionRegistry>()
                     .scroll_typed
                     .insert((*name).to_string(), id);
             }
             HtmlFnRegistration::HtmlKeyDown { name, build } => {
                 let id = (*build)(world);
-                world.resource_mut::<HtmlFunctionRegistry>()
+                world
+                    .resource_mut::<HtmlFunctionRegistry>()
                     .keydown_typed
                     .insert((*name).to_string(), id);
             }
             HtmlFnRegistration::HtmlKeyUp { name, build } => {
                 let id = (*build)(world);
-                world.resource_mut::<HtmlFunctionRegistry>()
+                world
+                    .resource_mut::<HtmlFunctionRegistry>()
                     .keyup_typed
                     .insert((*name).to_string(), id);
             }
             HtmlFnRegistration::HtmlDragStart { name, build } => {
                 let id = (*build)(world);
-                world.resource_mut::<HtmlFunctionRegistry>()
+                world
+                    .resource_mut::<HtmlFunctionRegistry>()
                     .dragstart_typed
                     .insert((*name).to_string(), id);
             }
             HtmlFnRegistration::HtmlDrag { name, build } => {
                 let id = (*build)(world);
-                world.resource_mut::<HtmlFunctionRegistry>()
+                world
+                    .resource_mut::<HtmlFunctionRegistry>()
                     .drag_typed
                     .insert((*name).to_string(), id);
             }
             HtmlFnRegistration::HtmlDragStop { name, build } => {
                 let id = (*build)(world);
-                world.resource_mut::<HtmlFunctionRegistry>()
+                world
+                    .resource_mut::<HtmlFunctionRegistry>()
                     .dragstop_typed
                     .insert((*name).to_string(), id);
             }

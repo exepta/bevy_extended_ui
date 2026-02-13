@@ -1,23 +1,26 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
+use crate::styles::components::UiStyle;
+use crate::styles::paint::Colored;
+use crate::styles::{Background, CssClass, CssSource, FontVal, Style, TagName};
+use crate::utils::keycode_to_char;
+use crate::widgets::{
+    BindToID, InputCap, InputField, InputType, InputValue, UIGenID, UIWidgetState, WidgetId,
+    WidgetKind,
+};
+use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
+#[cfg(not(target_arch = "wasm32"))]
+use arboard::Clipboard;
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
 use bevy::text::{TextBackgroundColor, TextLayoutInfo, TextSpan};
 use bevy::ui::{RelativeCursorPosition, ScrollPosition, UiScale};
 use bevy::window::PrimaryWindow;
-#[cfg(not(target_arch = "wasm32"))]
-use arboard::Clipboard;
 #[cfg(all(target_arch = "wasm32", feature = "clipboard-wasm"))]
 use std::sync::{Arc, Mutex};
 #[cfg(all(target_arch = "wasm32", feature = "clipboard-wasm"))]
-use wasm_bindgen_futures::{spawn_local, JsFuture};
-use crate::styles::components::UiStyle;
-use crate::styles::paint::Colored;
-use crate::styles::{Background, CssClass, CssSource, FontVal, Style, TagName};
-use crate::utils::keycode_to_char;
-use crate::widgets::{BindToID, InputCap, InputField, InputType, InputValue, UIGenID, UIWidgetState, WidgetId, WidgetKind};
-use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
+use wasm_bindgen_futures::{JsFuture, spawn_local};
 
 /// Marker component for initialized input fields.
 #[derive(Component)]
@@ -375,7 +378,7 @@ fn internal_node_creation_system(
                 ));
 
                 // Text content children
-                    builder
+                builder
                     .spawn((
                         Name::new(format!("Input-Text-Container-{}", field.entry)),
                         Node::default(),
@@ -559,7 +562,8 @@ fn sync_input_field_updates(
                             InputFieldIconImage,
                             BindToID(ui_id.0),
                         )],
-                    )).id();
+                    ))
+                    .id();
 
                 if children_query.get(entity).is_ok() {
                     commands.entity(entity).insert_children(0, &[icon_entity]);
@@ -662,7 +666,12 @@ fn update_cursor_position(
     mut key_repeat: ResMut<KeyRepeatTimers>,
     mut cursor_query: Query<(&mut Node, &mut UiStyle, &BindToID), With<InputCursor>>,
     mut text_field_query: Query<
-        (&mut InputField, &mut InputSelection, &UIGenID, &UIWidgetState),
+        (
+            &mut InputField,
+            &mut InputSelection,
+            &UIGenID,
+            &UIWidgetState,
+        ),
         (With<InputField>, Without<InputCursor>),
     >,
     text_query: Query<(&TextFont, &BindToID), (With<InputFieldText>, Without<InputCursor>)>,
@@ -828,7 +837,7 @@ fn handle_input_horizontal_scroll(
     }
 
     for (input_field, ui_id, state) in query.iter() {
-        if !state.focused || state.disabled  {
+        if !state.focused || state.disabled {
             continue;
         }
 
@@ -902,7 +911,8 @@ fn handle_typing(
     // Cache pressed keys to avoid repeated iterator calls.
     let pressed: Vec<KeyCode> = keyboard.get_pressed().copied().collect();
 
-    for (mut in_field, mut input_value, mut selection, mut state, style, ui_id) in query.iter_mut() {
+    for (mut in_field, mut input_value, mut selection, mut state, style, ui_id) in query.iter_mut()
+    {
         if state.disabled {
             state.focused = false;
             continue;
@@ -1207,7 +1217,13 @@ fn handle_overlay_label(
 /// Synchronizes input text with selection spans.
 fn sync_input_text_spans(
     input_query: Query<
-        (&InputField, &InputSelection, &UIWidgetState, &UIGenID, &UiStyle),
+        (
+            &InputField,
+            &InputSelection,
+            &UIWidgetState,
+            &UIGenID,
+            &UiStyle,
+        ),
         With<InputFieldBase>,
     >,
     mut text_query: Query<
@@ -1256,8 +1272,7 @@ fn sync_input_text_spans(
             field.text.clone()
         };
 
-        let selection_active =
-            state.focused && !state.disabled && !field.text.is_empty();
+        let selection_active = state.focused && !state.disabled && !field.text.is_empty();
         let selection_range = if selection_active {
             selection_range(&selection)
         } else {
@@ -1273,8 +1288,7 @@ fn sync_input_text_spans(
             (visible_text.as_str(), "", "")
         };
 
-        let (selection_text, selection_bg) =
-            resolve_selection_colors(ui_style, state, base_color);
+        let (selection_text, selection_bg) = resolve_selection_colors(ui_style, state, base_color);
 
         for (mut text, mut text_color, text_font, bind_id) in text_query.iter_mut() {
             if bind_id.0 != ui_id.0 {
@@ -1305,8 +1319,7 @@ fn sync_input_text_spans(
                 *span_font = text_font.clone();
             }
 
-            for (mut span, mut span_color, mut span_font, span_bind) in
-                suffix_span_query.iter_mut()
+            for (mut span, mut span_color, mut span_font, span_bind) in suffix_span_query.iter_mut()
             {
                 if span_bind.0 != ui_id.0 {
                     continue;
@@ -1349,8 +1362,7 @@ fn apply_pending_paste(
         return;
     };
 
-    for (mut field, mut selection, mut input_value, style, ui_id, state) in input_query.iter_mut()
-    {
+    for (mut field, mut selection, mut input_value, style, ui_id, state) in input_query.iter_mut() {
         if ui_id.0 != target || state.disabled || !state.focused {
             continue;
         }
@@ -1740,7 +1752,12 @@ fn cursor_position_from_pointer(
 fn on_internal_press(
     mut trigger: On<Pointer<Press>>,
     mut query: Query<
-        (&mut UIWidgetState, &UIGenID, &mut InputField, &mut InputSelection),
+        (
+            &mut UIWidgetState,
+            &UIGenID,
+            &mut InputField,
+            &mut InputSelection,
+        ),
         With<InputField>,
     >,
     bind_query: Query<&BindToID>,
@@ -1766,34 +1783,33 @@ fn on_internal_press(
 
     let target = trigger.event_target();
 
-    let mut apply_press =
-        |mut state: Mut<UIWidgetState>,
-         gen_id: &UIGenID,
-         mut field: Mut<InputField>,
-         mut selection: Mut<InputSelection>| {
-            if state.disabled {
-                return;
-            }
+    let mut apply_press = |mut state: Mut<UIWidgetState>,
+                           gen_id: &UIGenID,
+                           mut field: Mut<InputField>,
+                           mut selection: Mut<InputSelection>| {
+        if state.disabled {
+            return;
+        }
 
-            state.focused = true;
-            current_widget_state.widget_id = gen_id.0;
+        state.focused = true;
+        current_widget_state.widget_id = gen_id.0;
 
-    if let Some(pos) = cursor_position_from_pointer(
-        gen_id.0,
-        field.text.len(),
-        &selection,
-        &container_query,
-        &text_query,
-        &layout_query,
-        &window_q,
-        &ui_scale,
-    ) {
-                field.cursor_position = pos;
-                selection.anchor = pos;
-                selection.focus = pos;
-                selection.dragging = true;
-            }
-        };
+        if let Some(pos) = cursor_position_from_pointer(
+            gen_id.0,
+            field.text.len(),
+            &selection,
+            &container_query,
+            &text_query,
+            &layout_query,
+            &window_q,
+            &ui_scale,
+        ) {
+            field.cursor_position = pos;
+            selection.anchor = pos;
+            selection.focus = pos;
+            selection.dragging = true;
+        }
+    };
 
     if let Ok((state, gen_id, field, selection)) = query.get_mut(target) {
         apply_press(state, gen_id, field, selection);
@@ -1811,7 +1827,15 @@ fn on_internal_press(
 /// Handles drag events to update text selection.
 fn on_internal_drag(
     event: On<Pointer<Drag>>,
-    mut query: Query<(&mut InputField, &mut InputSelection, &UIWidgetState, &UIGenID), With<InputField>>,
+    mut query: Query<
+        (
+            &mut InputField,
+            &mut InputSelection,
+            &UIWidgetState,
+            &UIGenID,
+        ),
+        With<InputField>,
+    >,
     bind_query: Query<&BindToID>,
     container_query: Query<
         (
@@ -1834,30 +1858,29 @@ fn on_internal_drag(
 
     let target = event.event_target();
 
-    let apply_drag =
-        |mut field: Mut<InputField>,
-         mut selection: Mut<InputSelection>,
-         state: &UIWidgetState,
-         gen_id: &UIGenID| {
-            if state.disabled || !state.focused {
-                return;
-            }
+    let apply_drag = |mut field: Mut<InputField>,
+                      mut selection: Mut<InputSelection>,
+                      state: &UIWidgetState,
+                      gen_id: &UIGenID| {
+        if state.disabled || !state.focused {
+            return;
+        }
 
-    if let Some(pos) = cursor_position_from_pointer(
-        gen_id.0,
-        field.text.len(),
-        &selection,
-        &container_query,
-        &text_query,
-        &layout_query,
-        &window_q,
-        &ui_scale,
-    ) {
-                field.cursor_position = pos;
-                selection.focus = pos;
-                selection.dragging = true;
-            }
-        };
+        if let Some(pos) = cursor_position_from_pointer(
+            gen_id.0,
+            field.text.len(),
+            &selection,
+            &container_query,
+            &text_query,
+            &layout_query,
+            &window_q,
+            &ui_scale,
+        ) {
+            field.cursor_position = pos;
+            selection.focus = pos;
+            selection.dragging = true;
+        }
+    };
 
     if let Ok((field, selection, state, gen_id)) = query.get_mut(target) {
         apply_drag(field, selection, state, gen_id);
