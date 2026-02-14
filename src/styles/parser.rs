@@ -1,10 +1,10 @@
 use crate::styles::paint::Colored;
 use crate::styles::{
-    AnimationDirection, AnimationKeyframe, AnimationSpec, Background, BackgroundAttachment,
-    BackgroundPosition, BackgroundPositionValue, BackgroundSize, BackgroundSizeValue, CalcExpr,
-    CalcUnit, CalcValue, CursorStyle, FontFamily, FontVal, FontWeight, GradientStop,
-    GradientStopPosition, LinearGradient, ParsedCss, Radius, Style, StylePair, TransformStyle,
-    TransitionProperty, TransitionSpec, TransitionTiming,
+    AnimationDirection, AnimationKeyframe, AnimationSpec, BackdropFilter, Background,
+    BackgroundAttachment, BackgroundPosition, BackgroundPositionValue, BackgroundSize,
+    BackgroundSizeValue, CalcExpr, CalcUnit, CalcValue, CursorStyle, FontFamily, FontVal,
+    FontWeight, GradientStop, GradientStopPosition, LinearGradient, ParsedCss, Radius, Style,
+    StylePair, TransformStyle, TransitionProperty, TransitionSpec, TransitionTiming,
 };
 use bevy::prelude::*;
 use bevy::ui::Val2;
@@ -460,6 +460,9 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
             style.background_size = None;
             style.background_attachment = None;
             style.background = convert_to_background(value.to_string(), true);
+        }
+        "backdrop-filter" | "-webkit-backdrop-filter" => {
+            style.backdrop_filter = parse_backdrop_filter(value);
         }
         "background-image" => {
             style.background = convert_to_background(value.to_string(), false);
@@ -1759,6 +1762,34 @@ fn parse_background_attachment(value: &str) -> Option<BackgroundAttachment> {
         "local" => Some(BackgroundAttachment::Local),
         _ => None,
     }
+}
+
+fn parse_backdrop_filter(value: &str) -> Option<BackdropFilter> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("none") {
+        return None;
+    }
+
+    let lower = trimmed.to_ascii_lowercase();
+    if !lower.starts_with("blur(") || !trimmed.ends_with(')') {
+        return None;
+    }
+
+    let start = trimmed.find('(')?;
+    let end = trimmed.rfind(')')?;
+    if end <= start + 1 {
+        return None;
+    }
+
+    let inner = &trimmed[start + 1..end];
+    let parsed = parse_math_value(inner.trim())?;
+    let radius = match parsed.unit {
+        CalcUnit::Px => parsed.value,
+        CalcUnit::None if parsed.value == 0.0 => 0.0,
+        _ => return None,
+    };
+
+    Some(BackdropFilter::Blur(radius.max(0.0)))
 }
 
 fn parse_linear_gradient(value: &str) -> Option<LinearGradient> {

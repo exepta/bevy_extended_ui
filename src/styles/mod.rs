@@ -162,6 +162,12 @@ impl Default for BackgroundAttachment {
     }
 }
 
+/// Defines supported backdrop-filter effects.
+#[derive(Reflect, Debug, Clone, PartialEq)]
+pub enum BackdropFilter {
+    Blur(f32),
+}
+
 /// Represents a parsed CSS `linear-gradient(...)` definition.
 #[derive(Reflect, Debug, Clone, PartialEq)]
 pub struct LinearGradient {
@@ -749,6 +755,7 @@ pub struct Style {
     pub overflow: Option<Overflow>,
     pub color: Option<Color>,
     pub background: Option<Background>,
+    pub backdrop_filter: Option<BackdropFilter>,
     pub background_position: Option<BackgroundPosition>,
     pub background_size: Option<BackgroundSize>,
     pub background_attachment: Option<BackgroundAttachment>,
@@ -876,6 +883,7 @@ impl Style {
 
         merge_opt(&mut self.color, &other.color);
         merge_opt(&mut self.background, &other.background);
+        merge_opt(&mut self.backdrop_filter, &other.backdrop_filter);
         merge_opt(&mut self.background_position, &other.background_position);
         merge_opt(&mut self.background_size, &other.background_size);
         merge_opt(

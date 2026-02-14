@@ -70,6 +70,7 @@ properties or values are ignored silently.
 - `background-color`
 - `background`
 - `background-image`
+- `backdrop-filter` (`blur(<px>)`, `none`)
 - `border-color`
 - `box-shadow`
 
@@ -131,6 +132,7 @@ Note: `gap` sets both row and column gaps. `row-gap` and `column-gap` override t
 - `background-position`: supports keywords (`left`, `right`, `top`, `bottom`, `center`) and `%`/`px`
 - `background-size`: supports `auto`, `cover`, `contain`, or `%`/`px` values
 - `background-attachment`: supports `scroll`, `fixed`, `local`
+- `backdrop-filter`: supports `blur(<px>)` and `none` (also `-webkit-backdrop-filter`)
 
 ### Border
 
