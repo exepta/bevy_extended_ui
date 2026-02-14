@@ -13,6 +13,7 @@ use crate::styles::{
 use crate::widgets::UIWidgetState;
 use std::collections::HashMap;
 
+use bevy::asset::{load_internal_asset, uuid_handle};
 use bevy::asset::RenderAssetUsages;
 use bevy::color::Srgba;
 use bevy::core_pipeline::core_2d::graph::{Core2d, Node2d};
@@ -36,7 +37,7 @@ use bevy::render::render_resource::{
 };
 use bevy::render::texture::GpuImage;
 use bevy::render::view::{ExtractedView, RetainedViewEntity, ViewTarget};
-use bevy::shader::ShaderRef;
+use bevy::shader::{Shader, ShaderRef};
 use bevy::ui::{
     ComputedNode, ComputedUiRenderTargetInfo, UiGlobalTransform, UiSystems, UiTransform, Val2,
 };
@@ -44,12 +45,21 @@ use bevy::ui_render::graph::NodeUi;
 use bevy::ui_render::{DrawUiMaterial, TransparentUi, UiCameraView};
 use bevy::window::{CursorIcon, CustomCursor, CustomCursorImage, PrimaryWindow, SystemCursorIcon};
 
+const BACKDROP_BLUR_SHADER_HANDLE: Handle<Shader> =
+    uuid_handle!("9d04a8bb-b6cf-4758-bca8-30706480973f");
+
 /// Plugin that applies CSS styles, transitions, and animations to UI nodes.
 pub struct StyleService;
 
 impl Plugin for StyleService {
     /// Registers style update systems and resources.
     fn build(&self, app: &mut App) {
+        load_internal_asset!(
+            app,
+            BACKDROP_BLUR_SHADER_HANDLE,
+            "../../assets/shaders/blur_shader.wgsl",
+            Shader::from_wgsl
+        );
         app.init_resource::<CssCursorState>();
         app.init_resource::<BackdropCaptureState>();
         app.add_plugins(ExtractResourcePlugin::<BackdropCaptureState>::default());
@@ -165,7 +175,7 @@ struct BackdropBlurMaterial {
 
 impl UiMaterial for BackdropBlurMaterial {
     fn fragment_shader() -> ShaderRef {
-        "shaders/blur_shader.wgsl".into()
+        BACKDROP_BLUR_SHADER_HANDLE.into()
     }
 }
 
