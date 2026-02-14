@@ -53,7 +53,13 @@ impl Plugin for CheckBoxWidget {
 fn internal_node_creation_system(
     mut commands: Commands,
     query: Query<
-        (Entity, &UIGenID, &CheckBox, &UIWidgetState, Option<&CssSource>),
+        (
+            Entity,
+            &UIGenID,
+            &CheckBox,
+            &UIWidgetState,
+            Option<&CssSource>,
+        ),
         (With<CheckBox>, Without<CheckBoxBase>),
     >,
     config: Res<ExtendedUiConfiguration>,

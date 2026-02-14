@@ -1,9 +1,9 @@
+use crate::html::HtmlSource;
+use crate::widgets::{Body, UIGenID, WidgetId, WidgetKind};
 use bevy::prelude::*;
 use once_cell::sync::Lazy;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Mutex;
-use crate::html::HtmlSource;
-use crate::widgets::{Body, UIGenID, WidgetId, WidgetKind};
 
 pub static UI_ID_GENERATE: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
 pub static BODY_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
@@ -91,7 +91,13 @@ impl UiRegistry {
     /// * `name` - The name under which the UI source will be registered.
     /// * `source` - The HTML source data.
     pub fn add(&mut self, name: String, source: HtmlSource) {
-        self.collection.insert(name.clone(), HtmlSource { source_id: name.clone(), ..source });
+        self.collection.insert(
+            name.clone(),
+            HtmlSource {
+                source_id: name.clone(),
+                ..source
+            },
+        );
     }
 
     /// Adds a UI source and marks it as currently in use.
@@ -101,7 +107,13 @@ impl UiRegistry {
     /// * `name` - The name to register and use.
     /// * `source` - The HTML source data.
     pub fn add_and_use(&mut self, name: String, source: HtmlSource) {
-        self.add(name.clone(), HtmlSource { source_id: name.clone(), ..source});
+        self.add(
+            name.clone(),
+            HtmlSource {
+                source_id: name.clone(),
+                ..source
+            },
+        );
         self.use_ui(&name);
     }
 
@@ -113,7 +125,13 @@ impl UiRegistry {
     pub fn add_and_use_multiple(&mut self, entries: Vec<(String, HtmlSource)>) {
         let mut names = Vec::with_capacity(entries.len());
         for (name, source) in entries {
-            self.add(name.clone(), HtmlSource { source_id: name.clone(), ..source });
+            self.add(
+                name.clone(),
+                HtmlSource {
+                    source_id: name.clone(),
+                    ..source
+                },
+            );
             names.push(name);
         }
         self.use_uis(names);
@@ -249,12 +267,9 @@ impl Plugin for ExtendedRegistryPlugin {
         app.init_resource::<UiRegistry>();
         app.add_systems(
             Update,
-            (
-                despawn_widget_ids,
-                update_que,
-            )
+            (despawn_widget_ids, update_que)
                 .chain()
-                .run_if(resource_changed::<UiRegistry>)
+                .run_if(resource_changed::<UiRegistry>),
         );
     }
 }
@@ -351,13 +366,15 @@ fn update_que(
 /// * `commands` - Commands to spawn the UI entity.
 /// * `name` - The name of the UI to spawn.
 /// * `ui_registry` - The UI registry resource.
-fn spawn_ui_source(commands: &mut Commands, name: &str, ui_registry: &UiRegistry, ui_init: &mut UiInitResource) {
+fn spawn_ui_source(
+    commands: &mut Commands,
+    name: &str,
+    ui_registry: &UiRegistry,
+    ui_init: &mut UiInitResource,
+) {
     if let Some(source) = ui_registry.get(name) {
         ui_init.0 = true;
-        commands.spawn((
-            Name::new(name.to_string()),
-            source.clone(),
-        ));
+        commands.spawn((Name::new(name.to_string()), source.clone()));
         debug!("Loaded Registered UI {:?}", source);
     } else {
         warn!("UI source {} not found in registry", name);
@@ -381,7 +398,7 @@ fn despawn_widget_ids(
     last_ui_usage: Option<Res<LastUiUsage>>,
     query: Query<Entity, With<WidgetId>>,
     widget_ids: Query<&WidgetId>,
-    ui_id: Query<&UIGenID>
+    ui_id: Query<&UIGenID>,
 ) {
     if let Some(current) = ui_registry.current.as_ref() {
         if let Some(last_ui) = last_ui_usage {
@@ -408,10 +425,18 @@ fn despawn_widget_ids(
                 WidgetKind::InputField => INPUT_ID_POOL.lock().unwrap().release(widget_id.id),
                 WidgetKind::ChoiceBox => CHOICE_BOX_ID_POOL.lock().unwrap().release(widget_id.id),
                 WidgetKind::Img => IMAGE_ID_POOL.lock().unwrap().release(widget_id.id),
-                WidgetKind::ProgressBar => PROGRESS_BAR_ID_POOL.lock().unwrap().release(widget_id.id),
-                WidgetKind::RadioButton => RADIO_BUTTON_ID_POOL.lock().unwrap().release(widget_id.id),
-                WidgetKind::SwitchButton => SWITCH_BUTTON_ID_POOL.lock().unwrap().release(widget_id.id),
-                WidgetKind::ToggleButton => TOGGLE_BUTTON_ID_POOL.lock().unwrap().release(widget_id.id),
+                WidgetKind::ProgressBar => {
+                    PROGRESS_BAR_ID_POOL.lock().unwrap().release(widget_id.id)
+                }
+                WidgetKind::RadioButton => {
+                    RADIO_BUTTON_ID_POOL.lock().unwrap().release(widget_id.id)
+                }
+                WidgetKind::SwitchButton => {
+                    SWITCH_BUTTON_ID_POOL.lock().unwrap().release(widget_id.id)
+                }
+                WidgetKind::ToggleButton => {
+                    TOGGLE_BUTTON_ID_POOL.lock().unwrap().release(widget_id.id)
+                }
                 WidgetKind::Scrollbar => SCROLL_ID_POOL.lock().unwrap().release(widget_id.id),
                 WidgetKind::Divider => DIVIDER_ID_POOL.lock().unwrap().release(widget_id.id),
                 WidgetKind::FieldSet => FIELDSET_ID_POOL.lock().unwrap().release(widget_id.id),

@@ -1,8 +1,6 @@
 use crate::styles::paint::Colored;
 use crate::styles::{CssClass, CssSource, TagName};
-use crate::widgets::{
-    BindToID, SwitchButton, UIGenID, UIWidgetState, WidgetId, WidgetKind,
-};
+use crate::widgets::{BindToID, SwitchButton, UIGenID, UIWidgetState, WidgetId, WidgetKind};
 use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
@@ -56,16 +54,15 @@ fn internal_node_creation_system(
             image_cache
                 .map
                 .entry(icon_path.clone())
-                .or_insert_with(|| asset_server.load(icon_path.clone())).clone()
+                .or_insert_with(|| asset_server.load(icon_path.clone()))
+                .clone()
         });
 
         commands
             .entity(entity)
             .insert((
                 Name::new(format!("SwitchButton-{}", switch_button.entry)),
-                Node {
-                    ..default()
-                },
+                Node { ..default() },
                 WidgetId {
                     id: switch_button.entry,
                     kind: WidgetKind::SwitchButton,
@@ -91,9 +88,7 @@ fn internal_node_creation_system(
                 builder
                     .spawn((
                         Name::new(format!("Switch-Track-{}", switch_button.entry)),
-                        Node {
-                            ..default()
-                        },
+                        Node { ..default() },
                         BackgroundColor::default(),
                         BorderColor::default(),
                         css_source.clone(),

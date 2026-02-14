@@ -4,18 +4,18 @@ use bevy_extended_ui::html::HtmlSource;
 use bevy_extended_ui::io::HtmlAsset;
 use bevy_extended_ui::registry::UiRegistry;
 
-/// Runs the background image example app.
+/// Runs the backdrop-filter showcase example.
 fn main() {
-    let mut app = make_app("Background Image Example");
+    let mut app = make_app("Backdrop Filter Example");
     app.add_systems(Startup, setup);
     app.run();
 }
 
-/// Loads and registers the background example UI.
+/// Loads and registers the backdrop-filter example UI.
 fn setup(mut registry: ResMut<UiRegistry>, asset_server: Res<AssetServer>) {
-    let handle: Handle<HtmlAsset> = asset_server.load("examples/background_examples.html");
+    let handle: Handle<HtmlAsset> = asset_server.load("examples/backdrop_filter_example.html");
     registry.add_and_use(
-        "background_examples".to_string(),
+        "backdrop_filter_example".to_string(),
         HtmlSource::from_handle(handle),
     );
 }

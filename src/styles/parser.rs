@@ -1,13 +1,13 @@
 use crate::styles::paint::Colored;
 use crate::styles::{
-    AnimationDirection, AnimationKeyframe, AnimationSpec, Background, BackgroundAttachment,
-    BackgroundPosition, BackgroundPositionValue, BackgroundSize, BackgroundSizeValue, CalcExpr,
-    CalcUnit, CalcValue, CursorStyle, FontFamily, FontVal, FontWeight, GradientStop,
-    GradientStopPosition, LinearGradient, ParsedCss, Radius, Style, StylePair, TransformStyle,
-    TransitionProperty, TransitionSpec, TransitionTiming,
+    AnimationDirection, AnimationKeyframe, AnimationSpec, BackdropFilter, Background,
+    BackgroundAttachment, BackgroundPosition, BackgroundPositionValue, BackgroundSize,
+    BackgroundSizeValue, CalcExpr, CalcUnit, CalcValue, CursorStyle, FontFamily, FontVal,
+    FontWeight, GradientStop, GradientStopPosition, LinearGradient, ParsedCss, Radius, Style,
+    StylePair, TransformStyle, TransitionProperty, TransitionSpec, TransitionTiming,
 };
-use bevy::ui::Val2;
 use bevy::prelude::*;
+use bevy::ui::Val2;
 use bevy::window::SystemCursorIcon;
 use lightningcss::rules::CssRule;
 use lightningcss::rules::keyframes::KeyframeSelector;
@@ -132,10 +132,7 @@ fn collect_style_rule(
     keyframes_map: &mut HashMap<String, Vec<AnimationKeyframe>>,
 ) {
     let selectors = selector_list_to_strings(&style_rule.selectors);
-    if parent_selectors.is_none()
-        && selectors.len() == 1
-        && selectors[0].trim() == ":root"
-    {
+    if parent_selectors.is_none() && selectors.len() == 1 && selectors[0].trim() == ":root" {
         collect_css_vars(&style_rule.declarations, css_vars);
         return;
     }
@@ -198,9 +195,7 @@ fn collect_keyframes_rule(
     }
 }
 
-fn selector_list_to_strings(
-    selectors: &lightningcss::selector::SelectorList<'_>,
-) -> Vec<String> {
+fn selector_list_to_strings(selectors: &lightningcss::selector::SelectorList<'_>) -> Vec<String> {
     let mut out = Vec::new();
     for selector in selectors.0.iter() {
         if let Ok(s) = selector.to_css_string(PrinterOptions::default()) {
@@ -365,11 +360,19 @@ fn split_var_args(input: &str) -> (&str, Option<&str>) {
 pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
     match name {
         "width" => apply_length_property(value, &mut style.width, &mut style.width_calc),
-        "min-width" => apply_length_property(value, &mut style.min_width, &mut style.min_width_calc),
-        "max-width" => apply_length_property(value, &mut style.max_width, &mut style.max_width_calc),
+        "min-width" => {
+            apply_length_property(value, &mut style.min_width, &mut style.min_width_calc)
+        }
+        "max-width" => {
+            apply_length_property(value, &mut style.max_width, &mut style.max_width_calc)
+        }
         "height" => apply_length_property(value, &mut style.height, &mut style.height_calc),
-        "min-height" => apply_length_property(value, &mut style.min_height, &mut style.min_height_calc),
-        "max-height" => apply_length_property(value, &mut style.max_height, &mut style.max_height_calc),
+        "min-height" => {
+            apply_length_property(value, &mut style.min_height, &mut style.min_height_calc)
+        }
+        "max-height" => {
+            apply_length_property(value, &mut style.max_height, &mut style.max_height_calc)
+        }
 
         "padding" => style.padding = convert_to_ui_rect(value.to_string()),
         "padding-left" => apply_rect_side(value, RectSide::Left, &mut style.padding),
@@ -417,7 +420,9 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
         }
         "flex-grow" => style.flex_grow = value.trim().parse::<f32>().ok(),
         "flex-shrink" => style.flex_shrink = value.trim().parse::<f32>().ok(),
-        "flex-basis" => apply_length_property(value, &mut style.flex_basis, &mut style.flex_basis_calc),
+        "flex-basis" => {
+            apply_length_property(value, &mut style.flex_basis, &mut style.flex_basis_calc)
+        }
         "flex-wrap" => {
             style.flex_wrap = convert_to_bevy_flex_wrap(value.to_string());
         }
@@ -455,6 +460,9 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
             style.background_size = None;
             style.background_attachment = None;
             style.background = convert_to_background(value.to_string(), true);
+        }
+        "backdrop-filter" | "-webkit-backdrop-filter" => {
+            style.backdrop_filter = parse_backdrop_filter(value);
         }
         "background-image" => {
             style.background = convert_to_background(value.to_string(), false);
@@ -1040,11 +1048,7 @@ fn parse_math_value(input: &str) -> Option<CalcValue> {
     let mut parser = MathParser::new(input);
     let value = parser.parse_expression()?;
     parser.skip_ws();
-    if parser.is_eof() {
-        Some(value)
-    } else {
-        None
-    }
+    if parser.is_eof() { Some(value) } else { None }
 }
 
 fn add_values(a: CalcValue, b: CalcValue) -> Option<CalcValue> {
@@ -1349,11 +1353,7 @@ fn parse_calc_expr(input: &str) -> Option<CalcExpr> {
     let mut parser = CalcParser::new(input);
     let expr = parser.parse_expression()?;
     parser.skip_ws();
-    if parser.is_eof() {
-        Some(expr)
-    } else {
-        None
-    }
+    if parser.is_eof() { Some(expr) } else { None }
 }
 
 fn apply_length_property(value: &str, dest: &mut Option<Val>, dest_calc: &mut Option<CalcExpr>) {
@@ -1764,6 +1764,34 @@ fn parse_background_attachment(value: &str) -> Option<BackgroundAttachment> {
     }
 }
 
+fn parse_backdrop_filter(value: &str) -> Option<BackdropFilter> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("none") {
+        return None;
+    }
+
+    let lower = trimmed.to_ascii_lowercase();
+    if !lower.starts_with("blur(") || !trimmed.ends_with(')') {
+        return None;
+    }
+
+    let start = trimmed.find('(')?;
+    let end = trimmed.rfind(')')?;
+    if end <= start + 1 {
+        return None;
+    }
+
+    let inner = &trimmed[start + 1..end];
+    let parsed = parse_math_value(inner.trim())?;
+    let radius = match parsed.unit {
+        CalcUnit::Px => parsed.value,
+        CalcUnit::None if parsed.value == 0.0 => 0.0,
+        _ => return None,
+    };
+
+    Some(BackdropFilter::Blur(radius.max(0.0)))
+}
+
 fn parse_linear_gradient(value: &str) -> Option<LinearGradient> {
     let trimmed = value.trim();
     let lower = trimmed.to_ascii_lowercase();
@@ -1921,14 +1949,10 @@ fn split_color_and_positions(value: &str) -> Option<(String, &str)> {
         let color = trimmed[..=end].to_string();
         (color, &trimmed[end + 1..])
     } else if trimmed.starts_with('#') {
-        let end = trimmed
-            .find(char::is_whitespace)
-            .unwrap_or(trimmed.len());
+        let end = trimmed.find(char::is_whitespace).unwrap_or(trimmed.len());
         (trimmed[..end].to_string(), &trimmed[end..])
     } else {
-        let end = trimmed
-            .find(char::is_whitespace)
-            .unwrap_or(trimmed.len());
+        let end = trimmed.find(char::is_whitespace).unwrap_or(trimmed.len());
         (trimmed[..end].to_string(), &trimmed[end..])
     };
 
@@ -1955,11 +1979,7 @@ fn parse_stop_position(value: &str) -> Option<GradientStopPosition> {
             .map(GradientStopPosition::Percent);
     }
     if let Some(num) = trimmed.strip_suffix("px") {
-        return num
-            .trim()
-            .parse::<f32>()
-            .ok()
-            .map(GradientStopPosition::Px);
+        return num.trim().parse::<f32>().ok().map(GradientStopPosition::Px);
     }
     if trimmed == "0" {
         return Some(GradientStopPosition::Px(0.0));
@@ -2397,11 +2417,7 @@ pub fn convert_to_cursor_style(value: String) -> Option<CursorStyle> {
 
 /// Maps a CSS cursor keyword to a system cursor icon.
 fn parse_cursor_keyword(token: &str) -> Option<SystemCursorIcon> {
-    let token = token
-        .trim()
-        .trim_matches('"')
-        .trim_matches('\'')
-        .trim();
+    let token = token.trim().trim_matches('"').trim_matches('\'').trim();
 
     if token.is_empty() {
         return None;
@@ -2463,7 +2479,12 @@ fn parse_cursor_path(token: &str) -> Option<String> {
         inner = &inner[..end];
     }
 
-    let mut path = inner.trim().trim_matches('"').trim_matches('\'').trim().to_string();
+    let mut path = inner
+        .trim()
+        .trim_matches('"')
+        .trim_matches('\'')
+        .trim()
+        .to_string();
     if path.is_empty() {
         return None;
     }

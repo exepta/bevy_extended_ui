@@ -4,6 +4,22 @@ This document describes all widgets in the project, their corresponding Rust str
 
 ---
 
+## Shared Inner Content Attributes
+
+All spawned HTML widgets now receive a `HtmlInnerContent` component with:
+
+- `innerText`: raw text content of the element.
+- `innerHtml`: serialized inner HTML.
+- `innerBindings`: detected placeholders like `{{user.name}}`.
+
+All three fields can be overridden at runtime via setters:
+
+- `set_inner_text(...)`
+- `set_inner_html(...)`
+- `set_inner_bindings(...)`
+
+---
+
 ## Body (`Body`)
 
 **Struct purpose:** Root container for an HTML structure. Holds an internal `entry` ID and an optional `html_key` (the `<meta name="...">` key of the HTML file).

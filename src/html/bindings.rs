@@ -1,13 +1,13 @@
+use crate::CurrentWidgetState;
+use crate::html::*;
+use crate::widgets::{
+    BindToID, CheckBox, FieldSelectionMulti, FieldSelectionSingle, InputValue, Scrollbar, UIGenID,
+    UIWidgetState,
+};
 use bevy::log::warn;
 use bevy::prelude::*;
 use bevy::ui::{ComputedNode, RelativeCursorPosition, ScrollPosition};
 use std::collections::{HashMap, HashSet};
-use crate::CurrentWidgetState;
-use crate::html::*;
-use crate::widgets::{
-    BindToID, CheckBox, FieldSelectionMulti, FieldSelectionSingle, InputValue, Scrollbar,
-    UIGenID, UIWidgetState,
-};
 
 /// Component tracking focus state for HTML widgets.
 #[derive(Component, Default, Clone, Copy)]
@@ -56,24 +56,45 @@ impl Plugin for HtmlEventBindingsPlugin {
 
         // observer (change)
         app.add_systems(Update, emit_checkbox_change.in_set(HtmlSystemSet::Bindings));
-        app.add_systems(Update, emit_choice_box_change.in_set(HtmlSystemSet::Bindings));
-        app.add_systems(Update, emit_field_set_change.in_set(HtmlSystemSet::Bindings));
+        app.add_systems(
+            Update,
+            emit_choice_box_change.in_set(HtmlSystemSet::Bindings),
+        );
+        app.add_systems(
+            Update,
+            emit_field_set_change.in_set(HtmlSystemSet::Bindings),
+        );
         app.add_systems(Update, emit_input_change.in_set(HtmlSystemSet::Bindings));
         app.add_systems(Update, emit_slider_change.in_set(HtmlSystemSet::Bindings));
         app.add_observer(on_html_change);
 
         // observer (focus)
-        app.add_systems(Update, emit_html_focus_events.in_set(HtmlSystemSet::Bindings));
+        app.add_systems(
+            Update,
+            emit_html_focus_events.in_set(HtmlSystemSet::Bindings),
+        );
         app.add_observer(on_html_focus);
 
         // observer (scroll)
-        app.add_systems(Update, emit_html_scroll_events.in_set(HtmlSystemSet::Bindings));
-        app.add_systems(Update, emit_html_scrollbar_events.in_set(HtmlSystemSet::Bindings));
+        app.add_systems(
+            Update,
+            emit_html_scroll_events.in_set(HtmlSystemSet::Bindings),
+        );
+        app.add_systems(
+            Update,
+            emit_html_scrollbar_events.in_set(HtmlSystemSet::Bindings),
+        );
         app.add_observer(on_html_scroll);
 
         // observer (keyboard)
-        app.add_systems(Update, emit_html_key_down_events.in_set(HtmlSystemSet::Bindings));
-        app.add_systems(Update, emit_html_key_up_events.in_set(HtmlSystemSet::Bindings));
+        app.add_systems(
+            Update,
+            emit_html_key_down_events.in_set(HtmlSystemSet::Bindings),
+        );
+        app.add_systems(
+            Update,
+            emit_html_key_up_events.in_set(HtmlSystemSet::Bindings),
+        );
         app.add_observer(on_html_key_down);
         app.add_observer(on_html_key_up);
 
@@ -104,9 +125,13 @@ pub(crate) fn emit_html_click_events(
 ) {
     let entity = ev.event().entity;
 
-    let Ok((bindings, state_opt, rel_pos, node)) = q_bindings.get(entity) else { return };
+    let Ok((bindings, state_opt, rel_pos, node)) = q_bindings.get(entity) else {
+        return;
+    };
     if let Some(state) = state_opt {
-        if state.disabled { return; }
+        if state.disabled {
+            return;
+        }
     }
     if bindings.onclick.is_some() {
         let position = ev.pointer_location.position;
@@ -120,7 +145,11 @@ pub(crate) fn emit_html_click_events(
                 }
             })
             .unwrap_or(position);
-        commands.trigger(HtmlClick { entity, position, inner_position });
+        commands.trigger(HtmlClick {
+            entity,
+            position,
+            inner_position,
+        });
     }
 }
 
@@ -133,8 +162,12 @@ pub(crate) fn on_html_click(
 ) {
     let entity = click.entity;
 
-    let Ok(bindings) = q_bindings.get(entity) else { return };
-    let Some(name) = bindings.onclick.as_deref() else { return };
+    let Ok(bindings) = q_bindings.get(entity) else {
+        return;
+    };
+    let Some(name) = bindings.onclick.as_deref() else {
+        return;
+    };
 
     if let Some(&sys_id) = reg.click_typed.get(name) {
         commands.run_system_with(sys_id, *click);
@@ -157,7 +190,9 @@ pub(crate) fn emit_html_mouse_over_events(
 ) {
     let entity = ev.event().entity;
 
-    let Ok(bindings) = q_bindings.get(entity) else { return };
+    let Ok(bindings) = q_bindings.get(entity) else {
+        return;
+    };
     if bindings.onmouseover.is_some() {
         commands.trigger(HtmlMouseOver { entity });
     }
@@ -172,8 +207,12 @@ pub(crate) fn on_html_mouse_over(
 ) {
     let entity = over.entity;
 
-    let Ok(bindings) = q_bindings.get(entity) else { return };
-    let Some(name) = bindings.onmouseover.as_deref() else { return };
+    let Ok(bindings) = q_bindings.get(entity) else {
+        return;
+    };
+    let Some(name) = bindings.onmouseover.as_deref() else {
+        return;
+    };
 
     if let Some(&sys_id) = reg.over_typed.get(name) {
         commands.run_system_with(sys_id, *over);
@@ -196,7 +235,9 @@ pub(crate) fn emit_html_mouse_out_events(
 ) {
     let entity = ev.event().entity;
 
-    let Ok(bindings) = q_bindings.get(entity) else { return };
+    let Ok(bindings) = q_bindings.get(entity) else {
+        return;
+    };
     if bindings.onmouseout.is_some() {
         commands.trigger(HtmlMouseOut { entity });
     }
@@ -211,8 +252,12 @@ pub(crate) fn on_html_mouse_out(
 ) {
     let entity = out.entity;
 
-    let Ok(bindings) = q_bindings.get(entity) else { return };
-    let Some(name) = bindings.onmouseout.as_deref() else { return };
+    let Ok(bindings) = q_bindings.get(entity) else {
+        return;
+    };
+    let Some(name) = bindings.onmouseout.as_deref() else {
+        return;
+    };
 
     if let Some(&sys_id) = reg.out_typed.get(name) {
         commands.run_system_with(sys_id, *out);
@@ -272,9 +317,13 @@ pub(crate) fn on_html_init(
 ) {
     let entity = init.entity;
 
-    let Ok(bindings) = q_bindings.get(entity) else { return };
+    let Ok(bindings) = q_bindings.get(entity) else {
+        return;
+    };
 
-    let Some(name) = bindings.oninit.as_deref() else { return };
+    let Some(name) = bindings.oninit.as_deref() else {
+        return;
+    };
 
     if let Some(&sys_id) = reg.init_typed.get(name) {
         commands.run_system_with(sys_id, *init);
@@ -317,11 +366,7 @@ pub(crate) fn emit_field_set_change(
     mut commands: Commands,
     query: Query<
         (Entity, &HtmlEventBindings),
-        Or<(
-            Changed<FieldSelectionSingle>,
-            Changed<FieldSelectionMulti>,
-        )>,
-
+        Or<(Changed<FieldSelectionSingle>, Changed<FieldSelectionMulti>)>,
     >,
 ) {
     for (entity, binding) in &query {
@@ -371,9 +416,13 @@ pub(crate) fn on_html_change(
 ) {
     let entity = init.entity;
 
-    let Ok(bindings) = q_bindings.get(entity) else { return };
+    let Ok(bindings) = q_bindings.get(entity) else {
+        return;
+    };
 
-    let Some(name) = bindings.onchange.as_deref() else { return };
+    let Some(name) = bindings.onchange.as_deref() else {
+        return;
+    };
 
     if let Some(&sys_id) = reg.change_typed.get(name) {
         commands.run_system_with(sys_id, *init);
@@ -392,7 +441,12 @@ pub(crate) fn on_html_change(
 pub(crate) fn emit_html_focus_events(
     mut commands: Commands,
     mut query: Query<
-        (Entity, &HtmlEventBindings, &UIWidgetState, Option<&mut HtmlFocusTracker>),
+        (
+            Entity,
+            &HtmlEventBindings,
+            &UIWidgetState,
+            Option<&mut HtmlFocusTracker>,
+        ),
         Changed<UIWidgetState>,
     >,
 ) {
@@ -403,7 +457,9 @@ pub(crate) fn emit_html_focus_events(
         if let Some(mut focus_state) = focus_state {
             focus_state.focused = state.focused;
         } else if should_track {
-            commands.entity(entity).insert(HtmlFocusTracker { focused: state.focused });
+            commands.entity(entity).insert(HtmlFocusTracker {
+                focused: state.focused,
+            });
         }
 
         if !should_track {
@@ -419,7 +475,10 @@ pub(crate) fn emit_html_focus_events(
             } else {
                 HtmlFocusState::Lost
             };
-            commands.trigger(HtmlFocus { entity, state: focus_state });
+            commands.trigger(HtmlFocus {
+                entity,
+                state: focus_state,
+            });
         }
     }
 }
@@ -433,8 +492,12 @@ pub(crate) fn on_html_focus(
 ) {
     let entity = focus.entity;
 
-    let Ok(bindings) = q_bindings.get(entity) else { return };
-    let Some(name) = bindings.onfoucs.as_deref() else { return };
+    let Ok(bindings) = q_bindings.get(entity) else {
+        return;
+    };
+    let Some(name) = bindings.onfoucs.as_deref() else {
+        return;
+    };
 
     if let Some(&sys_id) = reg.focus_typed.get(name) {
         commands.run_system_with(sys_id, *focus);
@@ -470,7 +533,9 @@ pub(crate) fn emit_html_scroll_events(
 
     let mut fired: HashSet<Entity> = HashSet::new();
     for (scroll_pos, bind) in &scroll_q {
-        let Some((entity, disabled)) = bindings_by_id.get(&bind.0) else { continue };
+        let Some((entity, disabled)) = bindings_by_id.get(&bind.0) else {
+            continue;
+        };
         let current = Vec2::new(scroll_pos.x, scroll_pos.y);
         let last = tracker.positions.get(&bind.0).copied().unwrap_or(current);
         tracker.positions.insert(bind.0, current);
@@ -491,14 +556,26 @@ pub(crate) fn emit_html_scroll_events(
 /// Emits scroll events based on scrollbar changes.
 pub(crate) fn emit_html_scrollbar_events(
     mut commands: Commands,
-    query: Query<(Entity, &Scrollbar, &HtmlEventBindings, Option<&UIWidgetState>), Changed<Scrollbar>>,
+    query: Query<
+        (
+            Entity,
+            &Scrollbar,
+            &HtmlEventBindings,
+            Option<&UIWidgetState>,
+        ),
+        Changed<Scrollbar>,
+    >,
     mut tracker: ResMut<HtmlScrollTracker>,
 ) {
     for (entity, scroll, bindings, state_opt) in &query {
         if bindings.onscroll.is_none() {
             continue;
         }
-        let last_value = tracker.scrollbar_values.get(&entity).copied().unwrap_or(scroll.value);
+        let last_value = tracker
+            .scrollbar_values
+            .get(&entity)
+            .copied()
+            .unwrap_or(scroll.value);
         tracker.scrollbar_values.insert(entity, scroll.value);
 
         if state_opt.map(|s| s.disabled).unwrap_or(false) {
@@ -510,7 +587,12 @@ pub(crate) fn emit_html_scrollbar_events(
             (scroll.value, 0.0, Vec2::new(scroll.value - last_value, 0.0))
         };
 
-        commands.trigger(HtmlScroll { entity, delta, x, y });
+        commands.trigger(HtmlScroll {
+            entity,
+            delta,
+            x,
+            y,
+        });
     }
 }
 
@@ -523,8 +605,12 @@ pub(crate) fn on_html_scroll(
 ) {
     let entity = scroll.entity;
 
-    let Ok(bindings) = q_bindings.get(entity) else { return };
-    let Some(name) = bindings.onscroll.as_deref() else { return };
+    let Ok(bindings) = q_bindings.get(entity) else {
+        return;
+    };
+    let Some(name) = bindings.onscroll.as_deref() else {
+        return;
+    };
 
     if let Some(&sys_id) = reg.scroll_typed.get(name) {
         commands.run_system_with(sys_id, *scroll);
@@ -570,7 +656,9 @@ pub(crate) fn emit_html_key_down_events(
         }
     }
 
-    let Some((entity, bindings, disabled)) = target else { return };
+    let Some((entity, bindings, disabled)) = target else {
+        return;
+    };
     if disabled || bindings.onkeydown.is_none() {
         return;
     }
@@ -611,7 +699,9 @@ pub(crate) fn emit_html_key_up_events(
         }
     }
 
-    let Some((entity, bindings, disabled)) = target else { return };
+    let Some((entity, bindings, disabled)) = target else {
+        return;
+    };
     if disabled || bindings.onkeyup.is_none() {
         return;
     }
@@ -630,8 +720,12 @@ pub(crate) fn on_html_key_down(
 ) {
     let entity = keydown.entity;
 
-    let Ok(bindings) = q_bindings.get(entity) else { return };
-    let Some(name) = bindings.onkeydown.as_deref() else { return };
+    let Ok(bindings) = q_bindings.get(entity) else {
+        return;
+    };
+    let Some(name) = bindings.onkeydown.as_deref() else {
+        return;
+    };
 
     if let Some(&sys_id) = reg.keydown_typed.get(name) {
         commands.run_system_with(sys_id, *keydown);
@@ -651,8 +745,12 @@ pub(crate) fn on_html_key_up(
 ) {
     let entity = keyup.entity;
 
-    let Ok(bindings) = q_bindings.get(entity) else { return };
-    let Some(name) = bindings.onkeyup.as_deref() else { return };
+    let Ok(bindings) = q_bindings.get(entity) else {
+        return;
+    };
+    let Some(name) = bindings.onkeyup.as_deref() else {
+        return;
+    };
 
     if let Some(&sys_id) = reg.keyup_typed.get(name) {
         commands.run_system_with(sys_id, *keyup);
@@ -675,9 +773,13 @@ pub(crate) fn emit_html_drag_start_events(
 ) {
     let entity = ev.event().entity;
 
-    let Ok((bindings, state_opt)) = q_bindings.get(entity) else { return };
+    let Ok((bindings, state_opt)) = q_bindings.get(entity) else {
+        return;
+    };
     if let Some(state) = state_opt {
-        if state.disabled { return; }
+        if state.disabled {
+            return;
+        }
     }
     if bindings.ondragstart.is_some() {
         commands.trigger(HtmlDragStart {
@@ -696,8 +798,12 @@ pub(crate) fn on_html_drag_start(
 ) {
     let entity = drag.entity;
 
-    let Ok(bindings) = q_bindings.get(entity) else { return };
-    let Some(name) = bindings.ondragstart.as_deref() else { return };
+    let Ok(bindings) = q_bindings.get(entity) else {
+        return;
+    };
+    let Some(name) = bindings.ondragstart.as_deref() else {
+        return;
+    };
 
     if let Some(&sys_id) = reg.dragstart_typed.get(name) {
         commands.run_system_with(sys_id, *drag);
@@ -716,9 +822,13 @@ pub(crate) fn emit_html_drag_events(
 ) {
     let entity = ev.event().entity;
 
-    let Ok((bindings, state_opt)) = q_bindings.get(entity) else { return };
+    let Ok((bindings, state_opt)) = q_bindings.get(entity) else {
+        return;
+    };
     if let Some(state) = state_opt {
-        if state.disabled { return; }
+        if state.disabled {
+            return;
+        }
     }
     if bindings.ondrag.is_some() {
         commands.trigger(HtmlDrag {
@@ -737,8 +847,12 @@ pub(crate) fn on_html_drag(
 ) {
     let entity = drag.entity;
 
-    let Ok(bindings) = q_bindings.get(entity) else { return };
-    let Some(name) = bindings.ondrag.as_deref() else { return };
+    let Ok(bindings) = q_bindings.get(entity) else {
+        return;
+    };
+    let Some(name) = bindings.ondrag.as_deref() else {
+        return;
+    };
 
     if let Some(&sys_id) = reg.drag_typed.get(name) {
         commands.run_system_with(sys_id, *drag);
@@ -757,9 +871,13 @@ pub(crate) fn emit_html_drag_stop_events(
 ) {
     let entity = ev.event().entity;
 
-    let Ok((bindings, state_opt)) = q_bindings.get(entity) else { return };
+    let Ok((bindings, state_opt)) = q_bindings.get(entity) else {
+        return;
+    };
     if let Some(state) = state_opt {
-        if state.disabled { return; }
+        if state.disabled {
+            return;
+        }
     }
     if bindings.ondragstop.is_some() {
         commands.trigger(HtmlDragStop {
@@ -778,8 +896,12 @@ pub(crate) fn on_html_drag_stop(
 ) {
     let entity = drag.entity;
 
-    let Ok(bindings) = q_bindings.get(entity) else { return };
-    let Some(name) = bindings.ondragstop.as_deref() else { return };
+    let Ok(bindings) = q_bindings.get(entity) else {
+        return;
+    };
+    let Some(name) = bindings.ondragstop.as_deref() else {
+        return;
+    };
 
     if let Some(&sys_id) = reg.dragstop_typed.get(name) {
         commands.run_system_with(sys_id, *drag);

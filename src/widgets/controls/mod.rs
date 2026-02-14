@@ -1,32 +1,32 @@
-use bevy::camera::visibility::RenderLayers;
-use bevy::ecs::relationship::RelatedSpawnerCommands;
+use crate::ImageCache;
+use crate::styles::{CssClass, CssSource, IconPlace};
 use crate::widgets::controls::button::ButtonWidget;
 use crate::widgets::controls::check_box::CheckBoxWidget;
 use crate::widgets::controls::choice_box::ChoiceBoxWidget;
 use crate::widgets::controls::fieldset::FieldSetWidget;
 use crate::widgets::controls::input::InputWidget;
+use crate::widgets::controls::progress_bar::ProgressBarWidget;
 use crate::widgets::controls::radio_button::RadioButtonWidget;
+use crate::widgets::controls::scroll_bar::ScrollWidget;
 use crate::widgets::controls::slider::SliderWidget;
-use bevy::prelude::*;
-use crate::ImageCache;
-use crate::styles::{CssClass, CssSource, IconPlace};
+use crate::widgets::controls::switch_button::SwitchButtonWidget;
 use crate::widgets::controls::toggle_button::ToggleButtonWidget;
 use crate::widgets::{BindToID, UIWidgetState};
-use crate::widgets::controls::progress_bar::ProgressBarWidget;
-use crate::widgets::controls::scroll_bar::ScrollWidget;
-use crate::widgets::controls::switch_button::SwitchButtonWidget;
+use bevy::camera::visibility::RenderLayers;
+use bevy::ecs::relationship::RelatedSpawnerCommands;
+use bevy::prelude::*;
 
 pub mod button;
 pub mod check_box;
 pub mod choice_box;
 pub mod fieldset;
 pub mod input;
-pub mod radio_button;
-pub mod slider;
-pub mod toggle_button;
-pub mod switch_button;
 mod progress_bar;
+pub mod radio_button;
 mod scroll_bar;
+pub mod slider;
+pub mod switch_button;
+pub mod toggle_button;
 
 /// Marker component for spawned button icon images.
 #[derive(Component)]

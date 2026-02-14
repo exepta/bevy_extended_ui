@@ -72,10 +72,7 @@ pub fn get_or_load_image(
 
     if let Some(embedded_png) = embedded_icon_bytes(path) {
         if !asset_exists_in_project(path) {
-            warn!(
-                "Image not found at '{}', using embedded fallback.",
-                path
-            );
+            warn!("Image not found at '{}', using embedded fallback.", path);
 
             let image = Image::from_buffer(
                 embedded_png,
