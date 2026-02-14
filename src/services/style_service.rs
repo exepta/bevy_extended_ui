@@ -1,3 +1,4 @@
+use crate::ExtendedUiConfiguration;
 use crate::ImageCache;
 use crate::html::HtmlStyle;
 use crate::services::image_service::get_or_load_image;
@@ -10,21 +11,37 @@ use crate::styles::{
     Style, TransformStyle, TransitionProperty, TransitionSpec,
 };
 use crate::widgets::UIWidgetState;
+use std::collections::HashMap;
 
 use bevy::asset::RenderAssetUsages;
 use bevy::color::Srgba;
+use bevy::core_pipeline::core_2d::graph::{Core2d, Node2d};
 use bevy::image::ImageSampler;
 use bevy::math::Rot2;
 use bevy::prelude::*;
 use bevy::reflect::TypePath;
-use bevy::render::render_resource::{
-    AsBindGroup, Extent3d, ShaderType, TextureDimension, TextureFormat,
+use bevy::render::RenderApp;
+use bevy::render::camera::ExtractedCamera;
+use bevy::render::extract_resource::{ExtractResource, ExtractResourcePlugin};
+use bevy::render::render_asset::RenderAssets;
+use bevy::render::render_graph::{
+    NodeRunError, RenderGraphContext, RenderGraphExt, RenderLabel, ViewNode, ViewNodeRunner,
 };
-use bevy::render::view::screenshot::{Screenshot, ScreenshotCaptured};
+use bevy::render::render_phase::{
+    DrawFunctions, PhaseItem, SortedRenderPhase, ViewSortedRenderPhases,
+};
+use bevy::render::render_resource::{
+    AsBindGroup, Extent3d, Origin3d, ShaderType, TexelCopyTextureInfo, TextureAspect,
+    TextureDimension, TextureFormat,
+};
+use bevy::render::texture::GpuImage;
+use bevy::render::view::{ExtractedView, RetainedViewEntity, ViewTarget};
 use bevy::shader::ShaderRef;
 use bevy::ui::{
     ComputedNode, ComputedUiRenderTargetInfo, UiGlobalTransform, UiSystems, UiTransform, Val2,
 };
+use bevy::ui_render::graph::NodeUi;
+use bevy::ui_render::{DrawUiMaterial, TransparentUi, UiCameraView};
 use bevy::window::{CursorIcon, CustomCursor, CustomCursorImage, PrimaryWindow, SystemCursorIcon};
 
 /// Plugin that applies CSS styles, transitions, and animations to UI nodes.
@@ -35,8 +52,8 @@ impl Plugin for StyleService {
     fn build(&self, app: &mut App) {
         app.init_resource::<CssCursorState>();
         app.init_resource::<BackdropCaptureState>();
+        app.add_plugins(ExtractResourcePlugin::<BackdropCaptureState>::default());
         app.add_plugins(UiMaterialPlugin::<BackdropBlurMaterial>::default());
-        app.add_observer(on_backdrop_screenshot_captured);
         app.add_systems(
             PostUpdate,
             (
@@ -50,9 +67,9 @@ impl Plugin for StyleService {
                 apply_background_images_system
                     .after(apply_background_gradients_system)
                     .after(UiSystems::Layout),
-                request_backdrop_capture_system.after(apply_background_images_system),
+                ensure_backdrop_capture_texture_system.after(apply_background_images_system),
                 sync_backdrop_blur_materials_system
-                    .after(request_backdrop_capture_system)
+                    .after(ensure_backdrop_capture_texture_system)
                     .after(apply_background_images_system)
                     .after(UiSystems::Layout),
                 propagate_style_inheritance.after(apply_calc_styles_system),
@@ -60,6 +77,35 @@ impl Plugin for StyleService {
                 update_css_cursor_icons.after(update_widget_styles_system),
             ),
         );
+
+        let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
+            return;
+        };
+        render_app
+            .init_resource::<DeferredBackdropUiPhases>()
+            .add_systems(
+                bevy::render::Render,
+                split_backdrop_ui_phase_items_system
+                    .in_set(bevy::render::RenderSystems::Prepare)
+                    .after(bevy::ui_render::prepare_uimaterial_nodes::<BackdropBlurMaterial>),
+            )
+            .add_render_graph_node::<ViewNodeRunner<BackdropCaptureCopyNode>>(
+                Core2d,
+                BackdropCaptureCopyPass,
+            )
+            .add_render_graph_node::<ViewNodeRunner<BackdropDeferredDrawNode>>(
+                Core2d,
+                BackdropDeferredDrawPass,
+            )
+            .add_render_graph_edges(
+                Core2d,
+                (
+                    NodeUi::UiPass,
+                    BackdropCaptureCopyPass,
+                    BackdropDeferredDrawPass,
+                    Node2d::Upscaling,
+                ),
+            );
     }
 }
 
@@ -100,6 +146,7 @@ struct CssCursorState {
 struct BackdropBlurUniform {
     blur_radius_px: f32,
     overlay_alpha: f32,
+    feedback_compensation: f32,
     viewport_size: Vec2,
     tint: Vec4,
 }
@@ -122,22 +169,28 @@ impl UiMaterial for BackdropBlurMaterial {
     }
 }
 
-#[derive(Resource, Default)]
+#[derive(Resource, Default, Clone, ExtractResource)]
 struct BackdropCaptureState {
     screen_texture: Option<Handle<Image>>,
-    pending: bool,
-    hide_prepared: bool,
     captured_size: UVec2,
-    needs_recapture: bool,
-    failed_attempts: u8,
-    recapture_after_secs: f32,
-    settle_frames: u8,
+    captured_format: Option<TextureFormat>,
+    warmup_frames: u8,
 }
 
-#[derive(Component, Clone)]
-struct BackdropCaptureHidden {
-    previous_visibility: Visibility,
-}
+#[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
+struct BackdropCaptureCopyPass;
+
+#[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
+struct BackdropDeferredDrawPass;
+
+#[derive(Default)]
+struct BackdropCaptureCopyNode;
+
+#[derive(Default)]
+struct BackdropDeferredDrawNode;
+
+#[derive(Resource, Default)]
+struct DeferredBackdropUiPhases(HashMap<RetainedViewEntity, SortedRenderPhase<TransparentUi>>);
 
 /// Convenience alias for mutable style-related UI component access.
 type UiStyleComponents<'w, 's> = (
@@ -943,7 +996,6 @@ fn sync_backdrop_blur_materials_system(
         .map(|w| w.physical_size().as_vec2())
         .unwrap_or(Vec2::ONE)
         .max(Vec2::ONE);
-
     for (entity, ui_style, transition_opt, animation_opt, image_node_opt, material_node_opt) in
         query.iter()
     {
@@ -981,9 +1033,18 @@ fn sync_backdrop_blur_materials_system(
         let uniform = BackdropBlurUniform {
             blur_radius_px: blur_radius,
             overlay_alpha: if has_overlay { 1.0 } else { 0.0 },
+            // The capture texture contains previously composited content.
+            // Keep compensation enabled to reduce tint feedback drift.
+            feedback_compensation: 1.0,
             viewport_size,
             tint,
         };
+
+        let texture_ready =
+            capture_state.screen_texture.is_some() && capture_state.warmup_frames == 0;
+        if !texture_ready && material_node_opt.is_none() {
+            continue;
+        }
 
         if let Some(material_node) = material_node_opt {
             if let Some(material) = materials.get_mut(material_node.id()) {
@@ -1036,251 +1097,243 @@ fn sync_backdrop_blur_materials_system(
     }
 }
 
-fn request_backdrop_capture_system(
-    mut commands: Commands,
-    mut capture_state: ResMut<BackdropCaptureState>,
-    time: Res<Time>,
+fn ensure_backdrop_capture_texture_system(
     window_q: Query<&Window, With<PrimaryWindow>>,
-    blur_query: Query<(
-        Entity,
-        &UiStyle,
-        Option<&StyleTransition>,
-        Option<&StyleAnimation>,
-        Ref<ComputedNode>,
-        Ref<UiGlobalTransform>,
-        Option<&BackdropCaptureHidden>,
-    )>,
-    mut visibility_query: Query<&mut Visibility>,
+    blur_query: Query<(&UiStyle, Option<&StyleTransition>, Option<&StyleAnimation>)>,
+    configuration: Res<ExtendedUiConfiguration>,
+    mut capture_state: ResMut<BackdropCaptureState>,
+    mut images: ResMut<Assets<Image>>,
 ) {
+    let has_backdrop_blur = blur_query
+        .iter()
+        .any(|(ui_style, transition_opt, animation_opt)| {
+            resolved_active_style(ui_style, transition_opt, animation_opt).is_some_and(|style| {
+                matches!(
+                    style.backdrop_filter.as_ref(),
+                    Some(BackdropFilter::Blur(radius)) if *radius > 0.0
+                )
+            })
+        });
+
+    if !has_backdrop_blur {
+        capture_state.screen_texture = None;
+        capture_state.captured_size = UVec2::ZERO;
+        capture_state.captured_format = None;
+        capture_state.warmup_frames = 0;
+        return;
+    }
+
     let Ok(window) = window_q.single() else {
         return;
     };
-    let now = time.elapsed_secs();
     let window_size = window.physical_size();
     if window_size == UVec2::ZERO {
         return;
     }
 
-    if capture_state.captured_size != UVec2::ZERO && capture_state.captured_size != window_size {
-        if !capture_state.needs_recapture {
-            capture_state.needs_recapture = true;
-            // Wait a short moment + a couple of frames so layout/background scaling
-            // catches up before taking the backdrop screenshot.
-            capture_state.recapture_after_secs = now + 0.06;
-            capture_state.settle_frames = 2;
-        }
-    }
+    let texture_format = if configuration.hdr_support {
+        TextureFormat::Rgba16Float
+    } else {
+        TextureFormat::Rgba8UnormSrgb
+    };
 
-    if capture_state.pending {
+    if capture_state.captured_size == window_size
+        && capture_state.captured_format == Some(texture_format)
+    {
+        capture_state.warmup_frames = capture_state.warmup_frames.saturating_sub(1);
         return;
     }
 
-    let mut has_backdrop_blur = false;
-    let mut blur_entities: Vec<(Entity, Option<Visibility>)> = Vec::new();
-    for (
-        entity,
-        ui_style,
-        transition_opt,
-        animation_opt,
-        computed_node,
-        global_transform,
-        hidden_opt,
-    ) in blur_query.iter()
-    {
-        let Some(style) = resolved_active_style(ui_style, transition_opt, animation_opt) else {
+    let reuse_existing_texture = capture_state.screen_texture.is_some();
+    let mut image = Image::new_uninit(
+        Extent3d {
+            width: window_size.x,
+            height: window_size.y,
+            depth_or_array_layers: 1,
+        },
+        TextureDimension::D2,
+        texture_format,
+        RenderAssetUsages::default(),
+    );
+    image.copy_on_resize = reuse_existing_texture;
+    image.sampler = ImageSampler::linear();
+
+    let handle = if let Some(handle) = capture_state.screen_texture.clone() {
+        if let Some(existing) = images.get_mut(handle.id()) {
+            *existing = image;
+            handle
+        } else {
+            images.add(image)
+        }
+    } else {
+        images.add(image)
+    };
+
+    capture_state.screen_texture = Some(handle);
+    capture_state.captured_size = window_size;
+    capture_state.captured_format = Some(texture_format);
+    // Keep the regular translucent background for one frame until the first GPU copy happened.
+    capture_state.warmup_frames = 1;
+}
+
+impl ViewNode for BackdropCaptureCopyNode {
+    type ViewQuery = (
+        Entity,
+        &'static ExtractedCamera,
+        &'static ViewTarget,
+        Option<&'static UiCameraView>,
+    );
+
+    fn run(
+        &self,
+        _graph: &mut RenderGraphContext,
+        render_context: &mut bevy::render::renderer::RenderContext,
+        (view_entity, camera, view_target, ui_camera_view): bevy::ecs::query::QueryItem<
+            Self::ViewQuery,
+        >,
+        world: &World,
+    ) -> Result<(), NodeRunError> {
+        let ui_view_entity = ui_camera_view.map(|v| v.0).unwrap_or(view_entity);
+        let Some(ui_view) = world.get::<ExtractedView>(ui_view_entity) else {
+            return Ok(());
+        };
+        let deferred_phases = world.resource::<DeferredBackdropUiPhases>();
+        let Some(phase) = deferred_phases.0.get(&ui_view.retained_view_entity) else {
+            return Ok(());
+        };
+        if phase.items.is_empty() {
+            return Ok(());
+        }
+
+        let Some(target_size) = camera.physical_target_size else {
+            return Ok(());
+        };
+        if target_size == UVec2::ZERO {
+            return Ok(());
+        }
+
+        let capture_state = world.resource::<BackdropCaptureState>();
+        let Some(screen_texture) = capture_state.screen_texture.clone() else {
+            return Ok(());
+        };
+
+        let gpu_images = world.resource::<RenderAssets<GpuImage>>();
+        let Some(gpu_image) = gpu_images.get(screen_texture.id()) else {
+            return Ok(());
+        };
+
+        if view_target.main_texture_format() != gpu_image.texture_format {
+            return Ok(());
+        }
+
+        let copy_size = Extent3d {
+            width: target_size.x.min(gpu_image.size.width),
+            height: target_size.y.min(gpu_image.size.height),
+            depth_or_array_layers: 1,
+        };
+        if copy_size.width == 0 || copy_size.height == 0 {
+            return Ok(());
+        }
+
+        render_context.command_encoder().copy_texture_to_texture(
+            TexelCopyTextureInfo {
+                texture: view_target.main_texture(),
+                mip_level: 0,
+                origin: Origin3d::ZERO,
+                aspect: TextureAspect::All,
+            },
+            TexelCopyTextureInfo {
+                texture: &gpu_image.texture,
+                mip_level: 0,
+                origin: Origin3d::ZERO,
+                aspect: TextureAspect::All,
+            },
+            copy_size,
+        );
+
+        Ok(())
+    }
+}
+
+fn split_backdrop_ui_phase_items_system(
+    mut phases: ResMut<ViewSortedRenderPhases<TransparentUi>>,
+    draw_functions: Res<DrawFunctions<TransparentUi>>,
+    mut deferred_phases: ResMut<DeferredBackdropUiPhases>,
+) {
+    deferred_phases.0.clear();
+    let backdrop_draw_function = draw_functions
+        .read()
+        .id::<DrawUiMaterial<BackdropBlurMaterial>>();
+
+    for (retained_view, phase) in phases.0.iter_mut() {
+        if phase.items.is_empty() {
+            continue;
+        }
+
+        // Keep all items before the first backdrop material in the regular UI pass.
+        // Defer everything from the first backdrop onward so text / overlays that
+        // should appear above blur remain above it in the deferred pass ordering.
+        let first_backdrop_index = phase
+            .items
+            .iter()
+            .position(|item| item.draw_function() == backdrop_draw_function);
+        let Some(first_backdrop_index) = first_backdrop_index else {
             continue;
         };
-        let should_blur = matches!(
-            style.backdrop_filter.as_ref(),
-            Some(BackdropFilter::Blur(radius)) if *radius > 0.0
+
+        let deferred = phase.items.split_off(first_backdrop_index);
+        if !deferred.is_empty() {
+            deferred_phases
+                .0
+                .insert(*retained_view, SortedRenderPhase { items: deferred });
+        }
+    }
+}
+
+impl ViewNode for BackdropDeferredDrawNode {
+    type ViewQuery = (
+        Entity,
+        &'static ViewTarget,
+        &'static ExtractedCamera,
+        Option<&'static UiCameraView>,
+    );
+
+    fn run(
+        &self,
+        _graph: &mut RenderGraphContext,
+        render_context: &mut bevy::render::renderer::RenderContext,
+        (view_entity, target, camera, ui_camera_view): bevy::ecs::query::QueryItem<Self::ViewQuery>,
+        world: &World,
+    ) -> Result<(), NodeRunError> {
+        let ui_view_entity = ui_camera_view.map(|v| v.0).unwrap_or(view_entity);
+
+        let Some(ui_view) = world.get::<ExtractedView>(ui_view_entity) else {
+            return Ok(());
+        };
+        let deferred_phases = world.resource::<DeferredBackdropUiPhases>();
+        let Some(phase) = deferred_phases.0.get(&ui_view.retained_view_entity) else {
+            return Ok(());
+        };
+        if phase.items.is_empty() {
+            return Ok(());
+        }
+
+        let mut render_pass = render_context.begin_tracked_render_pass(
+            bevy::render::render_resource::RenderPassDescriptor {
+                label: Some("backdrop_deferred_ui"),
+                color_attachments: &[Some(target.get_unsampled_color_attachment())],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            },
         );
-        if !should_blur {
-            continue;
+        if let Some(viewport) = camera.viewport.as_ref() {
+            render_pass.set_camera_viewport(viewport);
         }
-        has_backdrop_blur = true;
-        if computed_node.is_changed() || global_transform.is_changed() {
-            if !capture_state.needs_recapture {
-                capture_state.needs_recapture = true;
-                capture_state.recapture_after_secs = now + 0.05;
-                capture_state.settle_frames = capture_state.settle_frames.max(1);
-            }
-        }
-        let prev_visibility = hidden_opt.map(|marker| marker.previous_visibility.clone());
-        blur_entities.push((entity, prev_visibility));
+
+        let _ = phase.render(&mut render_pass, world, ui_view_entity);
+        Ok(())
     }
-
-    if !has_backdrop_blur {
-        for (entity, prev_visibility) in blur_entities {
-            if let Some(previous_visibility) = prev_visibility {
-                if let Ok(mut visibility) = visibility_query.get_mut(entity) {
-                    *visibility = previous_visibility;
-                }
-                commands.entity(entity).remove::<BackdropCaptureHidden>();
-            }
-        }
-        capture_state.pending = false;
-        capture_state.hide_prepared = false;
-        capture_state.needs_recapture = false;
-        capture_state.failed_attempts = 0;
-        capture_state.recapture_after_secs = 0.0;
-        capture_state.settle_frames = 0;
-        return;
-    }
-
-    let needs_capture = capture_state.screen_texture.is_none() || capture_state.needs_recapture;
-    if !needs_capture {
-        return;
-    }
-
-    if capture_state.needs_recapture && now < capture_state.recapture_after_secs {
-        return;
-    }
-
-    if capture_state.needs_recapture && capture_state.settle_frames > 0 {
-        capture_state.settle_frames -= 1;
-        return;
-    }
-
-    // Phase 1: hide backdrop roots and wait one frame for visibility propagation.
-    if !capture_state.hide_prepared {
-        for (entity, prev_visibility) in blur_entities {
-            if let Ok(mut visibility) = visibility_query.get_mut(entity) {
-                let previous_visibility = prev_visibility.unwrap_or_else(|| visibility.clone());
-                *visibility = Visibility::Hidden;
-                commands
-                    .entity(entity)
-                    .insert(BackdropCaptureHidden { previous_visibility });
-            }
-        }
-        capture_state.hide_prepared = true;
-        return;
-    }
-
-    // Phase 2: capture while hidden. Restore happens in screenshot callback.
-    capture_state.pending = true;
-    commands.spawn(Screenshot::primary_window());
-}
-
-fn screenshot_has_content(image: &Image) -> bool {
-    let Some(data) = image.data.as_ref() else {
-        return false;
-    };
-    if data.is_empty() || data.len() < 4 {
-        return false;
-    }
-
-    let size = image.size();
-    let width = size.x as usize;
-    let height = size.y as usize;
-    if width == 0 || height == 0 {
-        return false;
-    }
-
-    // Reject obviously invalid/empty captures (commonly all-black on early frames).
-    let grid = 8usize;
-    let mut sampled = 0usize;
-    let mut non_black = 0usize;
-
-    for gy in 0..grid {
-        for gx in 0..grid {
-            let x = ((gx + 1) * width) / (grid + 1);
-            let y = ((gy + 1) * height) / (grid + 1);
-            let idx = (y * width + x) * 4;
-            if idx + 3 >= data.len() {
-                continue;
-            }
-            sampled += 1;
-
-            let r = data[idx] as u32;
-            let g = data[idx + 1] as u32;
-            let b = data[idx + 2] as u32;
-            if r + g + b > 12 {
-                non_black += 1;
-            }
-        }
-    }
-
-    sampled > 0 && non_black >= 3
-}
-
-fn on_backdrop_screenshot_captured(
-    trigger: On<ScreenshotCaptured>,
-    mut commands: Commands,
-    time: Res<Time>,
-    window_q: Query<&Window, With<PrimaryWindow>>,
-    mut capture_state: ResMut<BackdropCaptureState>,
-    mut images: ResMut<Assets<Image>>,
-    mut materials: ResMut<Assets<BackdropBlurMaterial>>,
-    mut hidden_query: Query<(Entity, &BackdropCaptureHidden, &mut Visibility)>,
-) {
-    for (entity, marker, mut visibility) in hidden_query.iter_mut() {
-        *visibility = marker.previous_visibility.clone();
-        commands.entity(entity).remove::<BackdropCaptureHidden>();
-    }
-
-    if !capture_state.pending {
-        capture_state.hide_prepared = false;
-        return;
-    }
-
-    let current_window_size = window_q
-        .single()
-        .map(|w| w.physical_size())
-        .unwrap_or(UVec2::ZERO);
-
-    let mut captured_image = trigger.image.clone();
-    captured_image.sampler = ImageSampler::linear();
-    if !screenshot_has_content(&captured_image) {
-        capture_state.failed_attempts = capture_state.failed_attempts.saturating_add(1);
-        capture_state.needs_recapture = true;
-        capture_state.recapture_after_secs = time.elapsed_secs() + 0.15;
-        capture_state.pending = false;
-        capture_state.hide_prepared = false;
-        return;
-    }
-
-    capture_state.failed_attempts = 0;
-    capture_state.captured_size = captured_image.size();
-    let size_matches = current_window_size != UVec2::ZERO
-        && capture_state.captured_size == current_window_size;
-    capture_state.needs_recapture = !size_matches;
-    capture_state.recapture_after_secs = if capture_state.needs_recapture {
-        time.elapsed_secs() + 0.01
-    } else {
-        0.0
-    };
-    if capture_state.needs_recapture {
-        capture_state.settle_frames = capture_state.settle_frames.max(1);
-    } else {
-        capture_state.settle_frames = 0;
-    }
-
-    if captured_image.size() == UVec2::ZERO {
-        capture_state.pending = false;
-        capture_state.hide_prepared = false;
-        return;
-    }
-
-    let active_texture = if let Some(existing_handle) = capture_state.screen_texture.clone() {
-        if let Some(existing) = images.get_mut(existing_handle.id()) {
-            *existing = captured_image;
-            existing_handle
-        } else {
-            let handle = images.add(captured_image);
-            capture_state.screen_texture = Some(handle.clone());
-            handle
-        }
-    } else {
-        let handle = images.add(captured_image);
-        capture_state.screen_texture = Some(handle.clone());
-        handle
-    };
-
-    for (_, material) in materials.iter_mut() {
-        material.screen_texture = active_texture.clone();
-    }
-    capture_state.pending = false;
-    capture_state.hide_prepared = false;
 }
 
 type StyleCandidate<'a> = (&'a String, u32, usize);

@@ -4,6 +4,7 @@
 struct BackdropBlurUniform {
     blur_radius_px: f32,
     overlay_alpha: f32,
+    feedback_compensation: f32,
     viewport_size: vec2<f32>,
     tint: vec4<f32>,
 };
@@ -23,6 +24,15 @@ const MAX_RADIUS: i32 = 24;
 
 fn gaussian_weight(distance_sq: f32, sigma: f32) -> f32 {
     return exp(-distance_sq / (2.0 * sigma * sigma));
+}
+
+fn undo_tint_feedback(color: vec3<f32>, tint: vec4<f32>) -> vec3<f32> {
+    let a = clamp(tint.a, 0.0, 0.95);
+    if (a <= 0.0001) {
+        return color;
+    }
+    let recovered = (color - tint.rgb * a) / max(1.0 - a, 0.001);
+    return clamp(recovered, vec3<f32>(0.0), vec3<f32>(1.0));
 }
 
 @fragment
@@ -52,14 +62,26 @@ fn fragment(in: UiVertexOutput) -> @location(0) vec4<f32> {
 
             let offset = vec2<f32>(f32(x), f32(y)) * sample_step;
             let sample_uv = clamp(screen_uv + offset * texel, vec2<f32>(0.0), vec2<f32>(1.0));
-            let sample_color = textureSample(screen_texture, screen_sampler, sample_uv);
+            var sample_color = textureSample(screen_texture, screen_sampler, sample_uv);
+            if (material.feedback_compensation > 0.5) {
+                sample_color = vec4<f32>(
+                    undo_tint_feedback(sample_color.rgb, material.tint),
+                    sample_color.a,
+                );
+            }
             let weight = gaussian_weight(dot(offset, offset), sigma);
             sum += sample_color * weight;
             weight_sum += weight;
         }
     }
 
-    let base_color = textureSample(screen_texture, screen_sampler, screen_uv);
+    var base_color = textureSample(screen_texture, screen_sampler, screen_uv);
+    if (material.feedback_compensation > 0.5) {
+        base_color = vec4<f32>(
+            undo_tint_feedback(base_color.rgb, material.tint),
+            base_color.a,
+        );
+    }
     let blurred = select(base_color, sum / max(weight_sum, 0.0001), radius > 0);
 
     let background_alpha = clamp(material.tint.a, 0.0, 1.0);
