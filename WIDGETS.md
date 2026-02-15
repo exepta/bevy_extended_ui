@@ -46,9 +46,37 @@ All three fields can be overridden at runtime via setters:
 
 ---
 
+## Form (`Form`)
+
+**Struct purpose:** Container for form controls. Supports `action="handler_name"` to trigger a submit handler via `#[html_fn("handler_name")]`.
+
+Validation is only active inside `<form>`.
+Use `validate="Allways|Always|Send|Interact"` on the form (default: `Send`):
+- `Allways`/`Always`: validates continuously (state/input changes).
+- `Send`: validates only on submit click.
+- `Interact`: validates on input interaction (e.g. typing).
+
+When a child `<button type="submit">` is clicked, the form:
+- validates descendants with `validation`/`required` rules,
+- collects input data into a submit payload (`data` map),
+- calls the `action` handler only if validation passes.
+
+**HTML tag:**
+```html
+<form action="login_action" validate="Send">
+  <input name="username" required />
+  <input name="email" type="email" required />
+  <button type="submit">Login</button>
+</form>
+```
+
+---
+
 ## Button (`Button`)
 
-**Struct purpose:** Clickable button with text plus an optional icon and its placement.
+**Struct purpose:** Clickable button with text plus an optional icon and its placement. Supports `type="button|submit|reset"` (`Auto` when omitted).
+
+Inside a `<form>`, use `type="submit"` to submit the parent form without `onclick`.
 
 **HTML tag:**
 ```html
@@ -134,12 +162,12 @@ All three fields can be overridden at runtime via setters:
 
 ## InputField (`InputField`)
 
-**Struct purpose:** Text input with label, placeholder, icon, type (text/email/date/password/number), and length limit.
+**Struct purpose:** Text input with `name`, label, placeholder, icon, type (text/email/date/password/number), and length limit.
 
 **HTML tag:**
 ```html
 <label for="name">Name</label>
-<input id="name" type="text" placeholder="Your name" maxlength="32" />
+<input id="name" name="name" type="text" placeholder="Your name" maxlength="32" />
 ```
 
 ---

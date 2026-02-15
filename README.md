@@ -32,7 +32,7 @@ Available features:
 - [x] Validation for widgets like required fields.
 - [x] CSS `*` support.
 - [x] Custom Cursor or system cursor support.
-- [ ] Form Widget for validation and submission.
+- [x] Form Widget for validation and submission.
 - [ ] Customizable theme.
 
 There are many other things, but currently you can use the core (HTML / CSS) features.
@@ -110,6 +110,7 @@ Note that currently you can use this binding:
 
 - `onclick`
 - `onchange` Only for `<select>`, `<fieldset>`, `<input>`, `<checkbox>` and `<slider>` elements.
+- `action` on `<form>` for submit handlers with collected input data
 - `oninit`
 - `onmouseover`
 - `onmouseout`

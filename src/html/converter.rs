@@ -294,11 +294,16 @@ fn parse_html_node(
         "button" => {
             let (icon_path, icon_place) = parse_icon_and_text(node);
             let text = node.text_contents().trim().to_string();
+            let button_type = attributes
+                .get("type")
+                .and_then(ButtonType::from_str)
+                .unwrap_or_default();
             Some(HtmlWidgetNode::Button(
                 Button {
                     text,
                     icon_path,
                     icon_place,
+                    button_type,
                     ..default()
                 },
                 meta,
@@ -337,6 +342,40 @@ fn parse_html_node(
 
             Some(HtmlWidgetNode::Div(
                 Div::default(),
+                meta,
+                states,
+                children,
+                functions,
+                widget.clone(),
+                HtmlID::default(),
+            ))
+        }
+
+        "form" => {
+            let mut children = Vec::new();
+            for child in node.children() {
+                if let Some(parsed) = parse_html_node(&child, css_sources, label_map, key, html) {
+                    children.push(parsed);
+                }
+            }
+
+            let action = attributes
+                .get("action")
+                .or_else(|| attributes.get("onsubmit"))
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string);
+            let validate_mode = attributes
+                .get("validate")
+                .and_then(FormValidationMode::from_str)
+                .unwrap_or_default();
+
+            Some(HtmlWidgetNode::Form(
+                Form {
+                    action,
+                    validate_mode,
+                    ..default()
+                },
                 meta,
                 states,
                 children,
@@ -513,6 +552,11 @@ fn parse_html_node(
 
         "input" => {
             let id = attributes.get("id").map(|s| s.to_string());
+            let name = attributes
+                .get("name")
+                .map(str::to_string)
+                .or_else(|| id.clone())
+                .unwrap_or_default();
             let label = id
                 .as_ref()
                 .and_then(|id| label_map.get(id))
@@ -541,6 +585,7 @@ fn parse_html_node(
 
             Some(HtmlWidgetNode::Input(
                 InputField {
+                    name,
                     label,
                     placeholder,
                     text,
