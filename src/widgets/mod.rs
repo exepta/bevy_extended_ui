@@ -2,6 +2,7 @@ mod body;
 mod content;
 mod controls;
 mod div;
+mod form;
 mod validation;
 
 use crate::registry::*;
@@ -10,8 +11,11 @@ use crate::widgets::body::BodyWidget;
 use crate::widgets::content::ExtendedContentWidgets;
 use crate::widgets::controls::ExtendedControlWidgets;
 use crate::widgets::div::DivWidget;
+use crate::widgets::form::FormWidget;
 use bevy::prelude::*;
 use std::fmt;
+
+pub(crate) use validation::evaluate_validation_state;
 
 /// Marker component for UI elements that should ignore the parent widget state.
 ///
@@ -187,6 +191,7 @@ pub enum WidgetKind {
     ChoiceBox,
     Div,
     Divider,
+    Form,
     FieldSet,
     Headline,
     Img,
@@ -211,11 +216,13 @@ impl Plugin for ExtendedWidgetPlugin {
         app.register_type::<UIWidgetState>();
         app.register_type::<ValidationRules>();
         app.register_type::<Body>();
+        app.register_type::<Form>();
         app.add_plugins((
             ExtendedControlWidgets,
             ExtendedContentWidgets,
             BodyWidget,
             DivWidget,
+            FormWidget,
         ));
         app.add_systems(Update, validation::update_validation_states);
     }
@@ -265,8 +272,84 @@ impl Default for Div {
 }
 
 // ===============================================
+//                       Form
+// ===============================================
+
+/// Form container widget with optional submit action handler name.
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+#[require(UIGenID, UIWidgetState, GlobalTransform, InheritedVisibility, Widget)]
+pub struct Form {
+    pub entry: usize,
+    pub action: Option<String>,
+    pub validate_mode: FormValidationMode,
+}
+
+impl Default for Form {
+    /// Creates a default form widget with a unique entry ID.
+    fn default() -> Self {
+        let entry = FORM_ID_POOL.lock().unwrap().acquire();
+        Self {
+            entry,
+            action: None,
+            validate_mode: FormValidationMode::default(),
+        }
+    }
+}
+
+/// Defines when form validation should be evaluated.
+#[derive(Reflect, Default, Debug, Clone, Eq, PartialEq)]
+pub enum FormValidationMode {
+    /// Validate continuously (e.g. focus/hover/input changes).
+    Always,
+    /// Validate only on submit.
+    #[default]
+    Send,
+    /// Validate on direct interaction (e.g. input text changes).
+    Interact,
+}
+
+impl FormValidationMode {
+    /// Parses a validation mode from the form `validate` attribute.
+    pub fn from_str(value: &str) -> Option<FormValidationMode> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "always" | "allways" => Some(FormValidationMode::Always),
+            "send" => Some(FormValidationMode::Send),
+            "interact" => Some(FormValidationMode::Interact),
+            _ => None,
+        }
+    }
+}
+
+// ===============================================
 //                     Button
 // ===============================================
+
+/// Supported button behavior modes.
+#[derive(Reflect, Default, Debug, Clone, Eq, PartialEq)]
+pub enum ButtonType {
+    /// No explicit button type set.
+    #[default]
+    Auto,
+    /// Regular clickable button that does not submit a form.
+    Button,
+    /// Form submit button.
+    Submit,
+    /// Form reset button.
+    Reset,
+}
+
+impl ButtonType {
+    /// Parses a button type from an HTML `type` attribute.
+    pub fn from_str(value: &str) -> Option<ButtonType> {
+        match value.to_ascii_lowercase().as_str() {
+            "button" => Some(ButtonType::Button),
+            "submit" => Some(ButtonType::Submit),
+            "reset" => Some(ButtonType::Reset),
+            _ => None,
+        }
+    }
+}
 
 /// Button widget with optional icon.
 #[derive(Component, Reflect, Debug, Clone)]
@@ -277,6 +360,7 @@ pub struct Button {
     pub text: String,
     pub icon_place: IconPlace,
     pub icon_path: Option<String>,
+    pub button_type: ButtonType,
 }
 
 impl Default for Button {
@@ -289,6 +373,7 @@ impl Default for Button {
             text: String::from("Button"),
             icon_path: None,
             icon_place: IconPlace::default(),
+            button_type: ButtonType::default(),
         }
     }
 }
@@ -595,6 +680,7 @@ impl Default for Img {
 #[require(UIGenID, UIWidgetState, Widget, InputValue)]
 pub struct InputField {
     pub entry: usize,
+    pub name: String,
     pub text: String,
     pub label: String,
     pub placeholder: String,
@@ -612,6 +698,7 @@ impl Default for InputField {
 
         Self {
             entry,
+            name: String::new(),
             text: String::from(""),
             label: String::from("Label"),
             placeholder: String::from(""),

@@ -110,6 +110,7 @@ fn extract_event_type(input_fn: &ItemFn) -> Result<Option<(syn::Ident, Type)>> {
         "HtmlEvent" => format_ident!("HtmlEvent"),
         "HtmlClick" => format_ident!("HtmlClick"),
         "HtmlChange" => format_ident!("HtmlChange"),
+        "HtmlSubmit" => format_ident!("HtmlSubmit"),
         "HtmlInit" => format_ident!("HtmlInit"),
         "HtmlMouseOut" => format_ident!("HtmlMouseOut"),
         "HtmlMouseOver" => format_ident!("HtmlMouseOver"),

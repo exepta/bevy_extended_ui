@@ -19,7 +19,7 @@ use crate::io::{CssAsset, HtmlAsset};
 use crate::styles::Style;
 use crate::styles::parser::apply_property_to_style;
 use crate::widgets::{
-    Body, Button, CheckBox, ChoiceBox, Div, Divider, FieldSet, Headline, Img, InputField,
+    Body, Button, CheckBox, ChoiceBox, Div, Divider, FieldSet, Form, Headline, Img, InputField,
     Paragraph, ProgressBar, RadioButton, Scrollbar, Slider, SwitchButton, ToggleButton,
     ValidationRules, Widget,
 };
@@ -237,6 +237,16 @@ pub enum HtmlWidgetNode {
         Widget,
         HtmlID,
     ),
+    /// A `<form>` container element with nested child nodes.
+    Form(
+        Form,
+        HtmlMeta,
+        HtmlStates,
+        Vec<HtmlWidgetNode>,
+        HtmlEventBindings,
+        Widget,
+        HtmlID,
+    ),
     /// A `<divider>` element.
     Divider(
         Divider,
@@ -411,6 +421,10 @@ pub enum HtmlFnRegistration {
         name: &'static str,
         build: fn(&mut World) -> SystemId<In<HtmlChange>, ()>,
     },
+    HtmlSubmit {
+        name: &'static str,
+        build: fn(&mut World) -> SystemId<In<HtmlSubmit>, ()>,
+    },
     HtmlInit {
         name: &'static str,
         build: fn(&mut World) -> SystemId<In<HtmlInit>, ()>,
@@ -475,6 +489,7 @@ pub struct HtmlFunctionRegistry {
     pub over: HashMap<String, SystemId<In<HtmlEvent>>>,
     pub out: HashMap<String, SystemId<In<HtmlEvent>>>,
     pub change: HashMap<String, SystemId<In<HtmlEvent>>>,
+    pub submit: HashMap<String, SystemId<In<HtmlEvent>>>,
     pub init: HashMap<String, SystemId<In<HtmlEvent>>>,
     pub focus: HashMap<String, SystemId<In<HtmlEvent>>>,
     pub scroll: HashMap<String, SystemId<In<HtmlEvent>>>,
@@ -487,6 +502,7 @@ pub struct HtmlFunctionRegistry {
     pub over_typed: HashMap<String, SystemId<In<HtmlMouseOver>>>,
     pub out_typed: HashMap<String, SystemId<In<HtmlMouseOut>>>,
     pub change_typed: HashMap<String, SystemId<In<HtmlChange>>>,
+    pub submit_typed: HashMap<String, SystemId<In<HtmlSubmit>>>,
     pub init_typed: HashMap<String, SystemId<In<HtmlInit>>>,
     pub focus_typed: HashMap<String, SystemId<In<HtmlFocus>>>,
     pub scroll_typed: HashMap<String, SystemId<In<HtmlScroll>>>,
@@ -552,6 +568,16 @@ pub struct HtmlChange {
     #[event_target]
     pub entity: Entity,
     pub action: HtmlChangeAction,
+}
+
+/// Form submit event emitted by HTML forms.
+#[derive(EntityEvent, Clone)]
+pub struct HtmlSubmit {
+    #[event_target]
+    pub entity: Entity,
+    pub submitter: Entity,
+    pub action: String,
+    pub data: HashMap<String, String>,
 }
 
 /// Init event emitted after widgets are constructed.
@@ -692,6 +718,13 @@ pub fn register_html_fns(world: &mut World) {
                     .change_typed
                     .insert((*name).to_string(), id);
             }
+            HtmlFnRegistration::HtmlSubmit { name, build } => {
+                let id = (*build)(world);
+                world
+                    .resource_mut::<HtmlFunctionRegistry>()
+                    .submit_typed
+                    .insert((*name).to_string(), id);
+            }
             HtmlFnRegistration::HtmlInit { name, build } => {
                 let id = (*build)(world);
                 world
@@ -768,6 +801,7 @@ pub fn register_html_fns(world: &mut World) {
     let mut reg = world.resource_mut::<HtmlFunctionRegistry>();
     for (name, id) in to_insert {
         reg.change.insert(name.clone(), id);
+        reg.submit.insert(name.clone(), id);
         reg.click.insert(name.clone(), id);
         reg.focus.insert(name.clone(), id);
         reg.init.insert(name.clone(), id);
