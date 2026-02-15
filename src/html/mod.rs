@@ -19,8 +19,8 @@ use crate::io::{CssAsset, HtmlAsset};
 use crate::styles::Style;
 use crate::styles::parser::apply_property_to_style;
 use crate::widgets::{
-    Body, Button, CheckBox, ChoiceBox, Div, Divider, FieldSet, Form, Headline, Img, InputField,
-    Paragraph, ProgressBar, RadioButton, Scrollbar, Slider, SwitchButton, ToggleButton,
+    Body, Button, CheckBox, ChoiceBox, ColorPicker, Div, Divider, FieldSet, Form, Headline, Img,
+    InputField, Paragraph, ProgressBar, RadioButton, Scrollbar, Slider, SwitchButton, ToggleButton,
     ValidationRules, Widget,
 };
 
@@ -268,6 +268,15 @@ pub enum HtmlWidgetNode {
     /// A checkbox `<checkbox>`.
     CheckBox(
         CheckBox,
+        HtmlMeta,
+        HtmlStates,
+        HtmlEventBindings,
+        Widget,
+        HtmlID,
+    ),
+    /// A color picker `<colorpicker>`.
+    ColorPicker(
+        ColorPicker,
         HtmlMeta,
         HtmlStates,
         HtmlEventBindings,

@@ -1,9 +1,10 @@
 use crate::CurrentWidgetState;
 use crate::html::*;
 use crate::widgets::{
-    BindToID, Button, ButtonType, CheckBox, ChoiceBox, FieldSelectionMulti, FieldSelectionSingle,
-    Form, FormValidationMode, InputField, InputValue, RadioButton, Scrollbar, Slider, SwitchButton,
-    ToggleButton, UIGenID, UIWidgetState, ValidationRules, evaluate_validation_state,
+    BindToID, Button, ButtonType, CheckBox, ChoiceBox, ColorPicker, FieldSelectionMulti,
+    FieldSelectionSingle, Form, FormValidationMode, InputField, InputValue, RadioButton, Scrollbar,
+    Slider, SwitchButton, ToggleButton, UIGenID, UIWidgetState, ValidationRules,
+    evaluate_validation_state,
 };
 use bevy::log::warn;
 use bevy::prelude::*;
@@ -69,6 +70,10 @@ impl Plugin for HtmlEventBindingsPlugin {
         );
         app.add_systems(Update, emit_input_change.in_set(HtmlSystemSet::Bindings));
         app.add_systems(Update, emit_slider_change.in_set(HtmlSystemSet::Bindings));
+        app.add_systems(
+            Update,
+            emit_color_picker_change.in_set(HtmlSystemSet::Bindings),
+        );
         app.add_observer(on_html_change);
 
         // observer (focus)
@@ -590,6 +595,17 @@ pub(crate) fn emit_field_set_change(
 pub(crate) fn emit_slider_change(
     mut commands: Commands,
     query: Query<(Entity, &HtmlEventBindings), Changed<Slider>>,
+) {
+    for (entity, binding) in &query {
+        emit_change_if_bound(&mut commands, binding, entity, HtmlChangeAction::State);
+    }
+}
+
+/// ColorPicker
+/// Emits change events for color picker widgets.
+pub(crate) fn emit_color_picker_change(
+    mut commands: Commands,
+    query: Query<(Entity, &HtmlEventBindings), Changed<ColorPicker>>,
 ) {
     for (entity, binding) in &query {
         emit_change_if_bound(&mut commands, binding, entity, HtmlChangeAction::State);

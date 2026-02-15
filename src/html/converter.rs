@@ -14,6 +14,7 @@ use crate::html::{
 use crate::io::{CssAsset, DefaultCssHandle, HtmlAsset};
 use crate::lang::{UILang, UiLangState, UiLangVariables, localize_html, vars_fingerprint};
 use crate::styles::IconPlace;
+use crate::styles::parser::convert_to_color;
 use crate::widgets::Button;
 use crate::widgets::*;
 
@@ -324,6 +325,43 @@ fn parse_html_node(
                     icon_path: icon,
                     ..default()
                 },
+                meta,
+                states,
+                functions,
+                widget.clone(),
+                HtmlID::default(),
+            ))
+        }
+
+        "colorpicker" => {
+            let value = attributes
+                .get("value")
+                .and_then(|v| convert_to_color(v.to_string()))
+                .unwrap_or_else(|| Color::srgb_u8(0x42, 0x85, 0xF4));
+
+            let srgba = value.to_srgba();
+            let mut alpha = (srgba.alpha * 255.0).round() as u8;
+
+            if let Some(alpha_attr) = attributes.get("alpha") {
+                let parsed = alpha_attr.trim().parse::<f32>().ok().map(|value| {
+                    if value <= 1.0 {
+                        (value * 255.0).round().clamp(0.0, 255.0) as u8
+                    } else {
+                        value.round().clamp(0.0, 255.0) as u8
+                    }
+                });
+                if let Some(parsed) = parsed {
+                    alpha = parsed;
+                }
+            }
+
+            Some(HtmlWidgetNode::ColorPicker(
+                ColorPicker::from_rgba_u8(
+                    (srgba.red * 255.0).round() as u8,
+                    (srgba.green * 255.0).round() as u8,
+                    (srgba.blue * 255.0).round() as u8,
+                    alpha,
+                ),
                 meta,
                 states,
                 functions,

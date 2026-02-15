@@ -227,6 +227,18 @@ Inside a `<form>`, use `type="submit"` to submit the parent form without `onclic
 
 ---
 
+## ColorPicker (`ColorPicker`)
+
+**Struct purpose:** Canvas-based color selection widget with live `HEX`, `RGB`, and `RGBA` output.
+Supports optional initial `value` (`#hex`, `rgb(...)`, `rgba(...)`) and optional `alpha`.
+
+**HTML tag:**
+```html
+<colorpicker value="#4285f4" alpha="255" onchange="on_color_change"></colorpicker>
+```
+
+---
+
 ## SwitchButton (`SwitchButton`)
 
 **Struct purpose:** Switch widget with a label and optional icon.
