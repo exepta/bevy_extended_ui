@@ -1506,7 +1506,13 @@ fn resolve_selection_colors(
 ) -> (Color, Color) {
     let mut candidates: Vec<(&String, u32, usize)> = Vec::new();
 
-    for (selector, style_pair) in &ui_style.styles {
+    for (key, style_pair) in &ui_style.styles {
+        let selector = if style_pair.selector.is_empty() {
+            key.as_str()
+        } else {
+            style_pair.selector.as_str()
+        };
+
         if !selector.contains("::selection") {
             continue;
         }
@@ -1514,7 +1520,7 @@ fn resolve_selection_colors(
             continue;
         }
         let spec = selector_specificity_for_selection(selector);
-        candidates.push((selector, spec, style_pair.origin));
+        candidates.push((key, spec, style_pair.origin));
     }
 
     if candidates.is_empty() {

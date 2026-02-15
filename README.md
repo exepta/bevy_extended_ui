@@ -28,6 +28,7 @@ Available features:
 - [x] HTML Bind support for interacting with the code.
 - [x] Font support for family and weight.
 - [x] Animation support (`@keyframes`).
+- [x] Breakpoint support (`@media` for window size).
 - [x] Validation for widgets like required fields.
 - [x] CSS `*` support.
 - [x] Custom Cursor or system cursor support.
@@ -234,6 +235,24 @@ Basic `@keyframes` usage example:
 ```
 
 You can now use `@keyframes` in your CSS. There is now a limit tested; this means that you can use any CSS property.
+
+### Breakpoint support
+
+Basic `@media` usage for breakpoints:
+
+```css
+.desktop-panel {
+  display: flex;
+}
+
+@media (max-width: 900px) {
+  .desktop-panel {
+    display: none;
+  }
+}
+```
+
+When the primary window size changes, CSS rules are re-evaluated so you can react to resize events with pure CSS breakpoints.
 
 ### What comes next?
 

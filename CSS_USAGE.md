@@ -126,9 +126,10 @@ Note: `gap` sets both row and column gaps. `row-gap` and `column-gap` override t
 
 ### Background
 
-- `background`: supports `url("...")`, a color, or `linear-gradient(...)`
+- `background`: supports `url("...")`, a color, or `linear-gradient(...)` (also when combined with extra shorthand tokens like `no-repeat` / `center`)
 - `background-image`: supports `url("...")` or `linear-gradient(...)`
 - `background-color`: color only
+- `background-color` and `background-image` are merged on the same internal background object (setting one does not drop the other)
 - `background-position`: supports keywords (`left`, `right`, `top`, `bottom`, `center`) and `%`/`px`
 - `background-size`: supports `auto`, `cover`, `contain`, or `%`/`px` values
 - `background-attachment`: supports `scroll`, `fixed`, `local`
@@ -302,6 +303,23 @@ Tracks support:
 - `px`, `%`, `fr`, `vw`, `vh`, `vmin`, `vmax`
 
 `grid-auto-rows` / `grid-auto-columns` accept a list of tracks (space-separated).
+
+## Media Queries (Breakpoints)
+
+`@media` rules are supported and are re-evaluated automatically when the primary window size changes.
+
+Supported media-query parts:
+
+- media type: `all`, `screen`
+- width: `min-width`, `max-width`, `width`, and range syntax (`width >= 900px`, `600px < width < 900px`)
+- height: `min-height`, `max-height`, `height`, and range syntax
+- orientation: `orientation: portrait` / `orientation: landscape`
+- boolean combinations: `and`, `or`, `not`
+
+Notes:
+
+- Unsupported media features currently evaluate as non-matching.
+- Breakpoints are evaluated against the current primary-window width/height in logical pixels.
 
 ## Limitations
 
