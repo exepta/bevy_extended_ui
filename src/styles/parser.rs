@@ -3,12 +3,16 @@ use crate::styles::{
     AnimationDirection, AnimationKeyframe, AnimationSpec, BackdropFilter, Background,
     BackgroundAttachment, BackgroundPosition, BackgroundPositionValue, BackgroundSize,
     BackgroundSizeValue, CalcExpr, CalcUnit, CalcValue, CursorStyle, FontFamily, FontVal,
-    FontWeight, GradientStop, GradientStopPosition, LinearGradient, ParsedCss, Radius, Style,
-    StylePair, TransformStyle, TransitionProperty, TransitionSpec, TransitionTiming,
+    FontWeight, GradientStop, GradientStopPosition, LinearGradient, MediaQueryCondition, ParsedCss,
+    Radius, Style, StylePair, TransformStyle, TransitionProperty, TransitionSpec, TransitionTiming,
 };
 use bevy::prelude::*;
 use bevy::ui::Val2;
 use bevy::window::SystemCursorIcon;
+use lightningcss::media_query::{
+    MediaCondition, MediaFeature, MediaFeatureComparison, MediaFeatureId, MediaFeatureName,
+    MediaFeatureValue, MediaList, MediaQuery, MediaType, Operator, Qualifier,
+};
 use lightningcss::rules::CssRule;
 use lightningcss::rules::keyframes::KeyframeSelector;
 use lightningcss::stylesheet::{ParserFlags, ParserOptions, PrinterOptions, StyleSheet};
@@ -56,6 +60,7 @@ pub fn load_css(css: &str) -> ParsedCss {
         &mut css_vars,
         &mut style_map,
         &mut keyframes_map,
+        None,
     );
 
     for keyframes in keyframes_map.values_mut() {
@@ -78,6 +83,7 @@ fn collect_css_rules(
     css_vars: &mut HashMap<String, String>,
     style_map: &mut HashMap<String, StylePair>,
     keyframes_map: &mut HashMap<String, Vec<AnimationKeyframe>>,
+    media_condition: Option<MediaQueryCondition>,
 ) {
     for rule in &rules.0 {
         match rule {
@@ -87,6 +93,7 @@ fn collect_css_rules(
                 css_vars,
                 style_map,
                 keyframes_map,
+                media_condition.clone(),
             ),
             CssRule::Nesting(nesting_rule) => collect_style_rule(
                 &nesting_rule.style,
@@ -94,11 +101,13 @@ fn collect_css_rules(
                 css_vars,
                 style_map,
                 keyframes_map,
+                media_condition.clone(),
             ),
             CssRule::NestedDeclarations(nested_rule) => {
                 if let Some(parent_selectors) = parent_selectors {
                     let mut style = StylePair {
                         origin: 0,
+                        media: media_condition.clone(),
                         ..Default::default()
                     };
                     apply_declaration_list(
@@ -116,6 +125,18 @@ fn collect_css_rules(
                     }
                 }
             }
+            CssRule::Media(media_rule) => {
+                let media = media_list_to_condition(&media_rule.query);
+                let combined_media = combine_media_conditions(media_condition.clone(), Some(media));
+                collect_css_rules(
+                    &media_rule.rules,
+                    parent_selectors,
+                    css_vars,
+                    style_map,
+                    keyframes_map,
+                    combined_media,
+                );
+            }
             CssRule::Keyframes(keyframes_rule) => {
                 collect_keyframes_rule(keyframes_rule, css_vars, keyframes_map);
             }
@@ -130,9 +151,14 @@ fn collect_style_rule(
     css_vars: &mut HashMap<String, String>,
     style_map: &mut HashMap<String, StylePair>,
     keyframes_map: &mut HashMap<String, Vec<AnimationKeyframe>>,
+    media_condition: Option<MediaQueryCondition>,
 ) {
     let selectors = selector_list_to_strings(&style_rule.selectors);
-    if parent_selectors.is_none() && selectors.len() == 1 && selectors[0].trim() == ":root" {
+    if parent_selectors.is_none()
+        && media_condition.is_none()
+        && selectors.len() == 1
+        && selectors[0].trim() == ":root"
+    {
         collect_css_vars(&style_rule.declarations, css_vars);
         return;
     }
@@ -141,6 +167,7 @@ fn collect_style_rule(
 
     let mut style = StylePair {
         origin: 0,
+        media: media_condition.clone(),
         ..Default::default()
     };
     let decls = &style_rule.declarations;
@@ -162,7 +189,196 @@ fn collect_style_rule(
         css_vars,
         style_map,
         keyframes_map,
+        media_condition,
     );
+}
+
+fn combine_media_conditions(
+    left: Option<MediaQueryCondition>,
+    right: Option<MediaQueryCondition>,
+) -> Option<MediaQueryCondition> {
+    match (left, right) {
+        (None, None) => None,
+        (Some(condition), None) | (None, Some(condition)) => Some(condition),
+        (Some(MediaQueryCondition::Always), Some(condition))
+        | (Some(condition), Some(MediaQueryCondition::Always)) => Some(condition),
+        (Some(MediaQueryCondition::Never), _) | (_, Some(MediaQueryCondition::Never)) => {
+            Some(MediaQueryCondition::Never)
+        }
+        (Some(left), Some(right)) => Some(MediaQueryCondition::And(vec![left, right])),
+    }
+}
+
+fn media_list_to_condition(media_list: &MediaList<'_>) -> MediaQueryCondition {
+    if media_list.media_queries.is_empty() {
+        return MediaQueryCondition::Always;
+    }
+
+    let mut queries = Vec::with_capacity(media_list.media_queries.len());
+    for query in &media_list.media_queries {
+        queries.push(media_query_to_condition(query));
+    }
+
+    if queries.len() == 1 {
+        queries.remove(0)
+    } else {
+        MediaQueryCondition::Or(queries)
+    }
+}
+
+fn media_query_to_condition(query: &MediaQuery<'_>) -> MediaQueryCondition {
+    let media_type_condition = match query.media_type {
+        MediaType::All | MediaType::Screen => MediaQueryCondition::Always,
+        _ => MediaQueryCondition::Never,
+    };
+
+    let condition = query
+        .condition
+        .as_ref()
+        .map(media_condition_to_condition)
+        .unwrap_or(MediaQueryCondition::Always);
+
+    let mut combined = if matches!(media_type_condition, MediaQueryCondition::Always) {
+        condition
+    } else {
+        MediaQueryCondition::And(vec![media_type_condition, condition])
+    };
+
+    if matches!(query.qualifier, Some(Qualifier::Not)) {
+        combined = MediaQueryCondition::Not(Box::new(combined));
+    }
+
+    combined
+}
+
+fn media_condition_to_condition(condition: &MediaCondition<'_>) -> MediaQueryCondition {
+    match condition {
+        MediaCondition::Feature(feature) => media_feature_to_condition(feature),
+        MediaCondition::Not(inner) => {
+            MediaQueryCondition::Not(Box::new(media_condition_to_condition(inner)))
+        }
+        MediaCondition::Operation {
+            operator,
+            conditions,
+        } => {
+            let mut mapped = Vec::with_capacity(conditions.len());
+            for part in conditions {
+                mapped.push(media_condition_to_condition(part));
+            }
+
+            match operator {
+                Operator::And => MediaQueryCondition::And(mapped),
+                Operator::Or => MediaQueryCondition::Or(mapped),
+            }
+        }
+        MediaCondition::Unknown(_) => MediaQueryCondition::Never,
+    }
+}
+
+fn media_feature_to_condition(feature: &MediaFeature<'_>) -> MediaQueryCondition {
+    match feature {
+        MediaFeature::Plain { name, value } => match_media_feature(name, value, None),
+        MediaFeature::Range {
+            name,
+            operator,
+            value,
+        } => match_media_feature(name, value, Some(*operator)),
+        MediaFeature::Interval {
+            name,
+            start,
+            start_operator,
+            end,
+            end_operator,
+        } => {
+            let start =
+                match_media_feature(name, start, Some(opposite_comparison(*start_operator)));
+            let end = match_media_feature(name, end, Some(*end_operator));
+            MediaQueryCondition::And(vec![start, end])
+        }
+        MediaFeature::Boolean { .. } => MediaQueryCondition::Never,
+    }
+}
+
+fn opposite_comparison(comparison: MediaFeatureComparison) -> MediaFeatureComparison {
+    match comparison {
+        MediaFeatureComparison::Equal => MediaFeatureComparison::Equal,
+        MediaFeatureComparison::GreaterThan => MediaFeatureComparison::LessThan,
+        MediaFeatureComparison::GreaterThanEqual => MediaFeatureComparison::LessThanEqual,
+        MediaFeatureComparison::LessThan => MediaFeatureComparison::GreaterThan,
+        MediaFeatureComparison::LessThanEqual => MediaFeatureComparison::GreaterThanEqual,
+    }
+}
+
+fn match_media_feature(
+    name: &MediaFeatureName<'_, MediaFeatureId>,
+    value: &MediaFeatureValue<'_>,
+    comparison: Option<MediaFeatureComparison>,
+) -> MediaQueryCondition {
+    match name {
+        MediaFeatureName::Standard(MediaFeatureId::Width)
+        | MediaFeatureName::Standard(MediaFeatureId::DeviceWidth) => {
+            map_length_feature(value, comparison, true)
+        }
+        MediaFeatureName::Standard(MediaFeatureId::Height)
+        | MediaFeatureName::Standard(MediaFeatureId::DeviceHeight) => {
+            map_length_feature(value, comparison, false)
+        }
+        MediaFeatureName::Standard(MediaFeatureId::Orientation) => map_orientation_feature(value),
+        _ => MediaQueryCondition::Never,
+    }
+}
+
+fn map_length_feature(
+    value: &MediaFeatureValue<'_>,
+    comparison: Option<MediaFeatureComparison>,
+    is_width: bool,
+) -> MediaQueryCondition {
+    let MediaFeatureValue::Length(length) = value else {
+        return MediaQueryCondition::Never;
+    };
+
+    let Some(px) = length.to_px() else {
+        return MediaQueryCondition::Never;
+    };
+
+    let op = comparison.unwrap_or(MediaFeatureComparison::Equal);
+    if is_width {
+        match op {
+            MediaFeatureComparison::Equal => MediaQueryCondition::Width(px),
+            MediaFeatureComparison::GreaterThan => {
+                MediaQueryCondition::Not(Box::new(MediaQueryCondition::MaxWidth(px)))
+            }
+            MediaFeatureComparison::GreaterThanEqual => MediaQueryCondition::MinWidth(px),
+            MediaFeatureComparison::LessThan => {
+                MediaQueryCondition::Not(Box::new(MediaQueryCondition::MinWidth(px)))
+            }
+            MediaFeatureComparison::LessThanEqual => MediaQueryCondition::MaxWidth(px),
+        }
+    } else {
+        match op {
+            MediaFeatureComparison::Equal => MediaQueryCondition::Height(px),
+            MediaFeatureComparison::GreaterThan => {
+                MediaQueryCondition::Not(Box::new(MediaQueryCondition::MaxHeight(px)))
+            }
+            MediaFeatureComparison::GreaterThanEqual => MediaQueryCondition::MinHeight(px),
+            MediaFeatureComparison::LessThan => {
+                MediaQueryCondition::Not(Box::new(MediaQueryCondition::MinHeight(px)))
+            }
+            MediaFeatureComparison::LessThanEqual => MediaQueryCondition::MaxHeight(px),
+        }
+    }
+}
+
+fn map_orientation_feature(value: &MediaFeatureValue<'_>) -> MediaQueryCondition {
+    let MediaFeatureValue::Ident(ident) = value else {
+        return MediaQueryCondition::Never;
+    };
+
+    match ident.0.as_ref().to_ascii_lowercase().as_str() {
+        "landscape" => MediaQueryCondition::OrientationLandscape,
+        "portrait" => MediaQueryCondition::OrientationPortrait,
+        _ => MediaQueryCondition::Never,
+    }
 }
 
 fn collect_keyframes_rule(
@@ -281,13 +497,26 @@ fn apply_declaration_list(
 }
 
 fn merge_style_map(style_map: &mut HashMap<String, StylePair>, selector: &str, style: &StylePair) {
+    let key = selector_map_key(selector, style.media.as_ref());
+
     style_map
-        .entry(selector.to_string())
+        .entry(key)
         .and_modify(|existing| {
             existing.normal.merge(&style.normal);
             existing.important.merge(&style.important);
         })
-        .or_insert_with(|| style.clone());
+        .or_insert_with(|| {
+            let mut cloned = style.clone();
+            cloned.selector = selector.to_string();
+            cloned
+        });
+}
+
+fn selector_map_key(selector: &str, media: Option<&MediaQueryCondition>) -> String {
+    match media {
+        Some(media) => format!("{selector}@@media({})", media.cache_key()),
+        None => selector.to_string(),
+    }
 }
 
 /// Resolves a `var(...)` reference using the collected CSS variables.
@@ -450,10 +679,7 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
         }
 
         "background-color" => {
-            style.background = Some(Background {
-                color: convert_to_color(value.to_string()).unwrap_or(Color::WHITE),
-                ..default()
-            });
+            apply_background_color(style, value);
         }
         "background" => {
             style.background_position = None;
@@ -465,7 +691,7 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
             style.backdrop_filter = parse_backdrop_filter(value);
         }
         "background-image" => {
-            style.background = convert_to_background(value.to_string(), false);
+            apply_background_image(style, value);
         }
         "background-position" => {
             style.background_position = parse_background_position(value);
@@ -1637,27 +1863,148 @@ fn parse_color_components(value: &str, name: &str, expected: usize) -> Option<Ve
 pub fn convert_to_background(value: String, all_types: bool) -> Option<Background> {
     let trimmed = value.trim();
 
-    if let Some(gradient) = parse_linear_gradient(trimmed) {
-        return Some(Background {
-            gradient: Some(gradient),
-            ..default()
-        });
+    let mut background = Background::default();
+    let mut has_any = false;
+
+    if let Some(image_or_gradient) = parse_background_image_layer(trimmed) {
+        background.image = image_or_gradient.image;
+        background.gradient = image_or_gradient.gradient;
+        has_any = true;
     }
 
-    if trimmed.starts_with("url(") {
-        let url = trimmed.trim_start_matches("url(").trim_end_matches(")");
-        Some(Background {
-            image: Some(url.to_string().replace("\"", "")),
-            ..default()
-        })
-    } else {
-        if all_types {
-            let color = convert_to_color(value.to_string()).unwrap_or_default();
-            return Some(Background { color, ..default() });
+    if all_types {
+        if let Some(color) = parse_background_color_layer(trimmed) {
+            background.color = color;
+            has_any = true;
+        }
+    }
+
+    if has_any { Some(background) } else { None }
+}
+
+fn apply_background_color(style: &mut Style, value: &str) {
+    let Some(color) = convert_to_color(value.to_string()) else {
+        return;
+    };
+
+    let mut background = style.background.clone().unwrap_or_default();
+    background.color = color;
+    style.background = Some(background);
+}
+
+fn apply_background_image(style: &mut Style, value: &str) {
+    if value.trim().eq_ignore_ascii_case("none") {
+        if let Some(mut background) = style.background.clone() {
+            background.image = None;
+            background.gradient = None;
+            style.background = if background.color == Color::NONE {
+                None
+            } else {
+                Some(background)
+            };
+        }
+        return;
+    }
+
+    let Some(parsed) = parse_background_image_layer(value.trim()) else {
+        return;
+    };
+
+    let mut background = style.background.clone().unwrap_or_default();
+    background.image = parsed.image;
+    background.gradient = parsed.gradient;
+    style.background = Some(background);
+}
+
+fn parse_background_image_layer(value: &str) -> Option<Background> {
+    if let Some(gradient_fn) = extract_css_function(value, "linear-gradient") {
+        if let Some(gradient) = parse_linear_gradient(gradient_fn.as_str()) {
+            return Some(Background {
+                gradient: Some(gradient),
+                ..default()
+            });
+        }
+    }
+
+    if let Some(url_fn) = extract_css_function(value, "url") {
+        let inner = &url_fn[4..url_fn.len() - 1];
+        let image = inner
+            .trim()
+            .trim_matches('"')
+            .trim_matches('\'')
+            .to_string();
+        if !image.is_empty() {
+            return Some(Background {
+                image: Some(image),
+                ..default()
+            });
+        }
+    }
+
+    None
+}
+
+fn parse_background_color_layer(value: &str) -> Option<Color> {
+    if let Some(color) = convert_to_color(value.to_string()) {
+        return Some(color);
+    }
+
+    let stripped = strip_known_background_functions(value);
+    for token in stripped.split_whitespace() {
+        let candidate = token.trim().trim_end_matches(',').trim_matches('/');
+        if candidate.is_empty() {
+            continue;
         }
 
-        None
+        if let Some(color) = convert_to_color(candidate.to_string()) {
+            return Some(color);
+        }
     }
+
+    None
+}
+
+fn strip_known_background_functions(value: &str) -> String {
+    let mut output = value.to_string();
+    loop {
+        let mut removed = false;
+        for name in ["linear-gradient", "url"] {
+            if let Some(call) = extract_css_function(output.as_str(), name) {
+                output = output.replacen(call.as_str(), " ", 1);
+                removed = true;
+            }
+        }
+
+        if !removed {
+            break;
+        }
+    }
+
+    output
+}
+
+fn extract_css_function(input: &str, function_name: &str) -> Option<String> {
+    let lower = input.to_ascii_lowercase();
+    let needle = format!("{function_name}(");
+    let start = lower.find(&needle)?;
+    let mut depth = 0i32;
+    let mut end = None;
+
+    for (idx, ch) in input[start..].char_indices() {
+        match ch {
+            '(' => depth += 1,
+            ')' => {
+                depth -= 1;
+                if depth == 0 {
+                    end = Some(start + idx + 1);
+                    break;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    end.map(|end_idx| input[start..end_idx].to_string())
 }
 
 fn parse_background_position(value: &str) -> Option<BackgroundPosition> {
@@ -2809,4 +3156,104 @@ fn parse_radius_values(value: &str) -> Option<Vec<Val>> {
         vals.push(val);
     }
     Some(vals)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn keeps_base_and_media_variants_for_same_selector() {
+        let parsed = load_css(
+            r#"
+            .panel { width: 200px; }
+            @media (max-width: 900px) {
+                .panel { display: none; }
+            }
+        "#,
+        );
+
+        let mut base_count = 0usize;
+        let mut media_count = 0usize;
+
+        for pair in parsed.styles.values() {
+            if pair.selector != ".panel" {
+                continue;
+            }
+
+            if pair.media.is_some() {
+                media_count += 1;
+            } else {
+                base_count += 1;
+            }
+        }
+
+        assert_eq!(base_count, 1);
+        assert_eq!(media_count, 1);
+    }
+
+    #[test]
+    fn evaluates_max_width_breakpoint() {
+        let parsed = load_css(
+            r#"
+            @media (max-width: 800px) {
+                .hide-me { display: none; }
+            }
+        "#,
+        );
+
+        let pair = parsed
+            .styles
+            .values()
+            .find(|pair| pair.selector == ".hide-me")
+            .expect("missing parsed .hide-me style");
+
+        let media = pair.media.as_ref().expect("missing media condition");
+        assert!(media.matches_viewport(Vec2::new(640.0, 360.0)));
+        assert!(!media.matches_viewport(Vec2::new(920.0, 360.0)));
+    }
+
+    #[test]
+    fn background_image_gradient_preserves_existing_color() {
+        let mut style = Style::default();
+        apply_property_to_style(&mut style, "background-color", "rgba(16, 24, 40, 45)");
+        apply_property_to_style(
+            &mut style,
+            "background-image",
+            "linear-gradient(to right, #ffffff, #000000)",
+        );
+
+        let background = style.background.expect("missing background");
+        assert!(background.gradient.is_some());
+        assert_eq!(background.image, None);
+        assert_ne!(background.color, Color::NONE);
+    }
+
+    #[test]
+    fn background_shorthand_parses_gradient_with_extra_tokens() {
+        let mut style = Style::default();
+        apply_property_to_style(
+            &mut style,
+            "background",
+            "linear-gradient(to bottom left, #ff6336, #4f00b1) no-repeat center",
+        );
+
+        let background = style.background.expect("missing background");
+        assert!(background.gradient.is_some());
+    }
+
+    #[test]
+    fn background_color_after_gradient_keeps_gradient() {
+        let mut style = Style::default();
+        apply_property_to_style(
+            &mut style,
+            "background",
+            "linear-gradient(to right, #ff0000, #00ff00)",
+        );
+        apply_property_to_style(&mut style, "background-color", "#112233");
+
+        let background = style.background.expect("missing background");
+        assert!(background.gradient.is_some());
+        assert_ne!(background.color, Color::NONE);
+    }
 }

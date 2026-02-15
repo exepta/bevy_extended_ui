@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy::window::PrimaryWindow;
 use once_cell::sync::Lazy;
 use std::collections::{HashMap, HashSet};
 use std::sync::RwLock;
@@ -22,6 +23,22 @@ pub struct CssUsers {
     pub users: HashMap<AssetId<CssAsset>, HashSet<Entity>>,
 }
 
+/// Stores the last known primary-window size to detect breakpoint changes.
+#[derive(Resource, Debug, Clone, Copy)]
+struct CssViewportTracker {
+    width: f32,
+    height: f32,
+}
+
+impl Default for CssViewportTracker {
+    fn default() -> Self {
+        Self {
+            width: -1.0,
+            height: -1.0,
+        }
+    }
+}
+
 /// Plugin that keeps UI styles in sync with CSS assets.
 pub struct CssService;
 
@@ -30,11 +47,13 @@ impl Plugin for CssService {
     fn build(&self, app: &mut App) {
         app.init_resource::<ExistingCssIDs>();
         app.init_resource::<CssUsers>();
+        app.init_resource::<CssViewportTracker>();
         app.add_systems(
             Update,
             (
                 invalidate_css_cache_on_asset_change,
                 update_css_users_index,
+                mark_css_users_dirty_on_viewport_change,
                 apply_css_to_entities,
             )
                 .chain(),
@@ -74,6 +93,101 @@ fn update_css_users_index(
     }
 }
 
+/// Marks all CSS users dirty when the primary window size changes.
+fn mark_css_users_dirty_on_viewport_change(
+    mut commands: Commands,
+    mut viewport_tracker: ResMut<CssViewportTracker>,
+    window_query: Query<&Window, With<PrimaryWindow>>,
+    css_assets: Res<Assets<CssAsset>>,
+    css_query: Query<(Entity, &CssSource)>,
+) {
+    let Ok(window) = window_query.single() else {
+        return;
+    };
+
+    let width = window.resolution.width();
+    let height = window.resolution.height();
+    let viewport_changed = (viewport_tracker.width - width).abs() > 0.5
+        || (viewport_tracker.height - height).abs() > 0.5;
+
+    if !viewport_changed {
+        return;
+    }
+
+    let prev_viewport = Vec2::new(viewport_tracker.width, viewport_tracker.height);
+    let next_viewport = Vec2::new(width, height);
+
+    let breakpoint_changed = if prev_viewport.x < 0.0 || prev_viewport.y < 0.0 {
+        // Initial resize tracking warm-up: startup CssSource insertion already triggers CSS apply.
+        false
+    } else {
+        media_match_changed_between_viewports(&css_query, &css_assets, prev_viewport, next_viewport)
+    };
+
+    viewport_tracker.width = width;
+    viewport_tracker.height = height;
+
+    if !breakpoint_changed {
+        return;
+    }
+
+    for (entity, _) in css_query.iter() {
+        if let Ok(mut entity_commands) = commands.get_entity(entity) {
+            entity_commands.insert(CssDirty);
+        }
+    }
+}
+
+/// Returns true when at least one media rule changes match state between two viewports.
+fn media_match_changed_between_viewports(
+    css_query: &Query<(Entity, &CssSource)>,
+    css_assets: &Assets<CssAsset>,
+    prev_viewport: Vec2,
+    next_viewport: Vec2,
+) -> bool {
+    let mut seen_assets = HashSet::new();
+
+    for (_, css_source) in css_query.iter() {
+        for handle in &css_source.0 {
+            let asset_id = handle.id();
+            if !seen_assets.insert(asset_id) {
+                continue;
+            }
+
+            let parsed = if let Some(cached) = PARSED_CSS_CACHE
+                .read()
+                .ok()
+                .and_then(|cache| cache.get(&asset_id).cloned())
+            {
+                cached
+            } else {
+                let Some(css_asset) = css_assets.get(handle) else {
+                    continue;
+                };
+                let parsed = load_css(&css_asset.text);
+                if let Ok(mut cache) = PARSED_CSS_CACHE.write() {
+                    cache.insert(asset_id, parsed.clone());
+                }
+                parsed
+            };
+
+            for style in parsed.styles.values() {
+                let Some(media) = style.media.as_ref() else {
+                    continue;
+                };
+
+                let old_match = media.matches_viewport(prev_viewport);
+                let new_match = media.matches_viewport(next_viewport);
+                if old_match != new_match {
+                    return true;
+                }
+            }
+        }
+    }
+
+    false
+}
+
 /// Applies merged CSS styles to entities that are dirty or affected by changes.
 fn apply_css_to_entities(
     mut commands: Commands,
@@ -84,6 +198,10 @@ fn apply_css_to_entities(
 
     // CHANGED: include entities that got CssDirty added
     query_changed_source: Query<
+        (Entity, Option<&CssDirty>),
+        Or<(Changed<CssSource>, Added<CssSource>, Added<CssDirty>)>,
+    >,
+    query_all_source: Query<
         (
             Entity,
             &CssSource,
@@ -93,8 +211,9 @@ fn apply_css_to_entities(
             Option<&ChildOf>,
             Option<&CssDirty>,
         ),
-        Or<(Changed<CssSource>, Added<CssSource>, Added<CssDirty>)>,
+        With<CssSource>,
     >,
+    window_query: Query<&Window, With<PrimaryWindow>>,
 
     parent_query: Query<(
         Option<&CssID>,
@@ -108,7 +227,7 @@ fn apply_css_to_entities(
     let mut dirty: HashSet<Entity> = HashSet::new();
 
     // Entities whose CssSource changed / was added / got CssDirty
-    for (e, _, _, _, _, _, _) in query_changed_source.iter() {
+    for (e, _) in query_changed_source.iter() {
         dirty.insert(e);
     }
 
@@ -129,16 +248,14 @@ fn apply_css_to_entities(
         return;
     }
 
+    let viewport = window_query
+        .single()
+        .map(|window| Vec2::new(window.resolution.width(), window.resolution.height()))
+        .unwrap_or(Vec2::ZERO);
+
     for entity in dirty {
-        // We need CssSource and selector metadata to compute styles.
-        // If the entity is dirty only due to CssUsers (asset event),
-        // it might not match the query filter above. So we must fetch it.
-        //
-        // Best: have a second query for "all CssSource users".
-        // Minimal change: just try get() from query_changed_source; if it fails, skip.
-        // (If you want: I can provide the "all query" variant.)
-        let Ok((_, css_source, id, class, tag, parent, _dirty_marker)) =
-            query_changed_source.get(entity)
+        let Ok((_, css_source, id, class, tag, parent, dirty_marker)) =
+            query_all_source.get(entity)
         else {
             continue;
         };
@@ -151,6 +268,7 @@ fn apply_css_to_entities(
             tag,
             parent,
             &parent_query,
+            viewport,
         );
 
         let primary_css = css_source.0.first().cloned().unwrap_or_default();
@@ -163,7 +281,10 @@ fn apply_css_to_entities(
         };
 
         match style_query.get(entity) {
-            Ok(Some(existing)) if existing.styles != final_style.styles => {
+            Ok(Some(existing))
+                if existing.styles != final_style.styles
+                    || existing.keyframes != final_style.keyframes =>
+            {
                 commands
                     .entity(entity)
                     .queue_silenced(move |mut ew: EntityWorldMut| {
@@ -179,14 +300,22 @@ fn apply_css_to_entities(
                         ew.remove::<CssDirty>();
                     });
             }
-            _ => {}
+            _ => {
+                if dirty_marker.is_some() {
+                    commands
+                        .entity(entity)
+                        .queue_silenced(|mut ew: EntityWorldMut| {
+                            ew.remove::<CssDirty>();
+                        });
+                }
+            }
         }
     }
 }
 
 /// Loads and merges CSS styles from multiple sources with selector matching.
 fn load_and_merge_styles_from_assets(
-    sources: &Vec<Handle<CssAsset>>,
+    sources: &[Handle<CssAsset>],
     css_assets: &Assets<CssAsset>,
     id: Option<&CssID>,
     class: Option<&CssClass>,
@@ -198,6 +327,7 @@ fn load_and_merge_styles_from_assets(
         Option<&TagName>,
         Option<&ChildOf>,
     )>,
+    viewport: Vec2,
 ) -> ParsedCss {
     let mut merged_styles: HashMap<String, StylePair> = HashMap::new();
     let mut merged_keyframes: HashMap<String, Vec<AnimationKeyframe>> = HashMap::new();
@@ -222,12 +352,23 @@ fn load_and_merge_styles_from_assets(
             parsed
         };
 
-        for (selector, new_style) in parsed_map.styles.iter() {
+        for (selector_key, new_style) in parsed_map.styles.iter() {
+            if let Some(media) = &new_style.media {
+                if !media.matches_viewport(viewport) {
+                    continue;
+                }
+            }
+
+            let selector = if new_style.selector.is_empty() {
+                selector_key.as_str()
+            } else {
+                new_style.selector.as_str()
+            };
             let selector_parts = parse_selector_steps(selector);
 
             if matches_selector_chain(&selector_parts, id, class, tag, parent, parent_query) {
                 merged_styles
-                    .entry(selector.clone())
+                    .entry(selector_key.clone())
                     .and_modify(|existing| {
                         existing.normal.merge(&new_style.normal);
                         existing.important.merge(&new_style.important);

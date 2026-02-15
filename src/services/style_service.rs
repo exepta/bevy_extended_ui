@@ -13,8 +13,8 @@ use crate::styles::{
 use crate::widgets::UIWidgetState;
 use std::collections::HashMap;
 
-use bevy::asset::{load_internal_asset, uuid_handle};
 use bevy::asset::RenderAssetUsages;
+use bevy::asset::{load_internal_asset, uuid_handle};
 use bevy::color::Srgba;
 use bevy::core_pipeline::core_2d::graph::{Core2d, Node2d};
 use bevy::image::ImageSampler;
@@ -325,16 +325,22 @@ pub fn update_widget_styles_system(
         let mut base_styles: Vec<(&String, u32, usize)> = vec![];
         let mut pseudo_styles: Vec<(&String, u32, usize)> = vec![];
 
-        for (sel, style_pair) in &ui_style.styles {
-            if sel.contains("::") {
+        for (key, style_pair) in &ui_style.styles {
+            let selector = if style_pair.selector.is_empty() {
+                key.as_str()
+            } else {
+                style_pair.selector.as_str()
+            };
+
+            if selector.contains("::") {
                 continue;
             }
-            if selector_matches_state(sel, &state) {
-                let specificity = selector_specificity(sel);
-                if sel.contains(':') {
-                    pseudo_styles.push((sel, specificity, style_pair.origin));
+            if selector_matches_state(selector, &state) {
+                let specificity = selector_specificity(selector);
+                if selector.contains(':') {
+                    pseudo_styles.push((key, specificity, style_pair.origin));
                 } else {
-                    base_styles.push((sel, specificity, style_pair.origin));
+                    base_styles.push((key, specificity, style_pair.origin));
                 }
             }
         }

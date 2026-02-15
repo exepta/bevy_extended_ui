@@ -47,8 +47,8 @@ h2 {
 }
 
 .glass-basic {
-    background-color: rgba(16, 24, 40, 0.3);
-    backdrop-filter: blur(40px);
+    background-color: rgba(16, 24, 40, 0.45);
+    backdrop-filter: blur(10px);
 }
 
 .glass-gradient {

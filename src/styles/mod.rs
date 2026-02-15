@@ -673,12 +673,99 @@ pub struct ParsedCss {
     pub keyframes: HashMap<String, Vec<AnimationKeyframe>>,
 }
 
+/// Breakpoint/media condition expression used for CSS `@media` rules.
+#[derive(Debug, Clone, PartialEq)]
+pub enum MediaQueryCondition {
+    Always,
+    Never,
+    MinWidth(f32),
+    MaxWidth(f32),
+    Width(f32),
+    MinHeight(f32),
+    MaxHeight(f32),
+    Height(f32),
+    OrientationLandscape,
+    OrientationPortrait,
+    Not(Box<MediaQueryCondition>),
+    And(Vec<MediaQueryCondition>),
+    Or(Vec<MediaQueryCondition>),
+}
+
+impl MediaQueryCondition {
+    /// Returns true if the condition matches the given viewport size.
+    pub fn matches_viewport(&self, viewport: Vec2) -> bool {
+        const EPSILON: f32 = 0.5;
+
+        match self {
+            MediaQueryCondition::Always => true,
+            MediaQueryCondition::Never => false,
+            MediaQueryCondition::MinWidth(value) => viewport.x + EPSILON >= *value,
+            MediaQueryCondition::MaxWidth(value) => viewport.x - EPSILON <= *value,
+            MediaQueryCondition::Width(value) => (viewport.x - *value).abs() <= EPSILON,
+            MediaQueryCondition::MinHeight(value) => viewport.y + EPSILON >= *value,
+            MediaQueryCondition::MaxHeight(value) => viewport.y - EPSILON <= *value,
+            MediaQueryCondition::Height(value) => (viewport.y - *value).abs() <= EPSILON,
+            MediaQueryCondition::OrientationLandscape => viewport.x >= viewport.y,
+            MediaQueryCondition::OrientationPortrait => viewport.y > viewport.x,
+            MediaQueryCondition::Not(inner) => !inner.matches_viewport(viewport),
+            MediaQueryCondition::And(parts) => parts
+                .iter()
+                .all(|condition| condition.matches_viewport(viewport)),
+            MediaQueryCondition::Or(parts) => parts
+                .iter()
+                .any(|condition| condition.matches_viewport(viewport)),
+        }
+    }
+
+    /// Produces a deterministic key used to separate media-scoped selector entries.
+    pub fn cache_key(&self) -> String {
+        match self {
+            MediaQueryCondition::Always => "always".to_string(),
+            MediaQueryCondition::Never => "never".to_string(),
+            MediaQueryCondition::MinWidth(value) => format!("minw:{value:.3}"),
+            MediaQueryCondition::MaxWidth(value) => format!("maxw:{value:.3}"),
+            MediaQueryCondition::Width(value) => format!("w:{value:.3}"),
+            MediaQueryCondition::MinHeight(value) => format!("minh:{value:.3}"),
+            MediaQueryCondition::MaxHeight(value) => format!("maxh:{value:.3}"),
+            MediaQueryCondition::Height(value) => format!("h:{value:.3}"),
+            MediaQueryCondition::OrientationLandscape => "orientation:landscape".to_string(),
+            MediaQueryCondition::OrientationPortrait => "orientation:portrait".to_string(),
+            MediaQueryCondition::Not(inner) => format!("not({})", inner.cache_key()),
+            MediaQueryCondition::And(parts) => {
+                let mut key = String::from("and(");
+                for (idx, part) in parts.iter().enumerate() {
+                    if idx > 0 {
+                        key.push(',');
+                    }
+                    key.push_str(&part.cache_key());
+                }
+                key.push(')');
+                key
+            }
+            MediaQueryCondition::Or(parts) => {
+                let mut key = String::from("or(");
+                for (idx, part) in parts.iter().enumerate() {
+                    if idx > 0 {
+                        key.push(',');
+                    }
+                    key.push_str(&part.cache_key());
+                }
+                key.push(')');
+                key
+            }
+        }
+    }
+}
+
 /// Pair of normal and !important styles with origin tracking.
 #[derive(Reflect, Default, Debug, Clone, PartialEq)]
 pub struct StylePair {
     pub important: Style,
     pub normal: Style,
     pub origin: usize,
+    pub selector: String,
+    #[reflect(ignore)]
+    pub media: Option<MediaQueryCondition>,
 }
 
 /// Transforms parsed from CSS transform properties.
