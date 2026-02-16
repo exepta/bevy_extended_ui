@@ -5,7 +5,6 @@ use crate::widgets::{
     UIGenID, UIWidgetState, WidgetId, WidgetKind,
 };
 use bevy::camera::visibility::RenderLayers;
-use bevy::color::Srgba;
 use bevy::prelude::*;
 use bevy::ui::{ComputedNode, UiGlobalTransform, UiScale};
 use bevy::window::PrimaryWindow;
@@ -23,21 +22,19 @@ struct ToolTipText;
 #[derive(Component)]
 struct ToolTipNose;
 
-/// Runtime state for tooltip target tracking and visibility animation.
+/// Runtime state for tooltip target tracking.
 #[derive(Component, Default)]
 struct ToolTipRuntime {
     target: Option<Entity>,
-    alpha: f32,
 }
 
-/// Cached base colors used for fade animation.
-#[derive(Component)]
-struct ToolTipVisual {
-    base_bg: Srgba,
-    base_text: Srgba,
-    base_nose: Srgba,
-    captured: bool,
-}
+/// Base class list for tooltip root (user classes + internal classes).
+#[derive(Component, Clone)]
+struct ToolTipClassBase(Vec<String>);
+
+/// Base class list for tooltip nose.
+#[derive(Component, Clone)]
+struct ToolTipNoseClassBase(Vec<String>);
 
 /// Tracks active click/drag trigger states for tooltip targets.
 #[derive(Resource, Default)]
@@ -82,21 +79,25 @@ impl Plugin for ToolTipWidget {
 fn internal_node_creation_system(
     mut commands: Commands,
     query: Query<
-        (Entity, &UIGenID, &ToolTip, Option<&CssSource>),
+        (Entity, &UIGenID, &ToolTip, Option<&CssSource>, Option<&CssClass>),
         (With<ToolTip>, Without<ToolTipBase>),
     >,
     config: Res<ExtendedUiConfiguration>,
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
 
-    for (entity, ui_id, tooltip, source_opt) in query.iter() {
+    for (entity, ui_id, tooltip, source_opt, class_opt) in query.iter() {
         let css_source = source_opt.cloned().unwrap_or_default();
+
+        let mut root_classes = class_opt.map(|c| c.0.clone()).unwrap_or_default();
+        if !root_classes.iter().any(|c| c == "tooltip") {
+            root_classes.push("tooltip".to_string());
+        }
 
         let mut node = Node::default();
         node.position_type = PositionType::Absolute;
         node.left = Val::Px(0.0);
         node.top = Val::Px(0.0);
-        node.padding = UiRect::axes(Val::Px(10.0), Val::Px(6.0));
 
         commands
             .entity(entity)
@@ -107,28 +108,26 @@ fn internal_node_creation_system(
                     id: tooltip.entry,
                     kind: WidgetKind::ToolTip,
                 },
-                BackgroundColor(Color::srgba_u8(24, 24, 30, 235)),
+                // Visual style should come from CSS.
+                BackgroundColor::default(),
+                BorderColor::default(),
                 ZIndex(10_000),
                 Pickable::IGNORE,
                 UiTransform::default(),
                 css_source.clone(),
                 TagName("tool-tip".to_string()),
-                CssClass(vec!["tooltip".to_string()]),
+                CssClass(root_classes.clone()),
+                ToolTipClassBase(root_classes),
                 RenderLayers::layer(*layer),
                 ToolTipBase,
                 ToolTipRuntime::default(),
-                ToolTipVisual {
-                    base_bg: Color::srgba_u8(24, 24, 30, 235).to_srgba(),
-                    base_text: Color::WHITE.to_srgba(),
-                    base_nose: Color::srgba_u8(24, 24, 30, 235).to_srgba(),
-                    captured: false,
-                },
             ))
             .with_children(|builder| {
                 builder.spawn((
                     Name::new(format!("ToolTip-Text-{}", tooltip.entry)),
+                    Node::default(),
                     Text::new(tooltip.text.clone()),
-                    TextColor(Color::WHITE),
+                    TextColor::default(),
                     TextFont::default(),
                     TextLayout::default(),
                     Pickable::IGNORE,
@@ -147,17 +146,19 @@ fn internal_node_creation_system(
                 nose_node.left = Val::Px(0.0);
                 nose_node.top = Val::Px(0.0);
 
+                let nose_classes = vec!["tooltip-nose".to_string()];
+
                 builder.spawn((
                     Name::new(format!("ToolTip-Nose-{}", tooltip.entry)),
                     nose_node,
-                    BackgroundColor(Color::srgba_u8(24, 24, 30, 235)),
-                    UiTransform {
-                        rotation: Rot2::radians(std::f32::consts::FRAC_PI_4),
-                        ..default()
-                    },
+                    BackgroundColor::default(),
+                    BorderColor::default(),
+                    UiTransform::default(),
+                    ZIndex(9_999),
                     Pickable::IGNORE,
                     css_source.clone(),
-                    CssClass(vec!["tooltip-nose".to_string()]),
+                    CssClass(nose_classes.clone()),
+                    ToolTipNoseClassBase(nose_classes),
                     BindToID(ui_id.get()),
                     UIWidgetState::default(),
                     RenderLayers::layer(*layer),
@@ -444,9 +445,38 @@ fn place_nose(node: &mut Node, side: ToolTipSide, tip_w: f32, tip_h: f32) {
     }
 }
 
-/// Positions and animates visible tooltips near the mouse cursor.
+fn side_to_tooltip_class(side: ToolTipSide) -> &'static str {
+    match side {
+        ToolTipSide::Top => "tooltip-side-top",
+        ToolTipSide::Bottom => "tooltip-side-bottom",
+        ToolTipSide::Left => "tooltip-side-left",
+        ToolTipSide::Right => "tooltip-side-right",
+    }
+}
+
+fn side_to_nose_class(side: ToolTipSide) -> &'static str {
+    match side {
+        ToolTipSide::Top => "tooltip-nose-side-top",
+        ToolTipSide::Bottom => "tooltip-nose-side-bottom",
+        ToolTipSide::Left => "tooltip-nose-side-left",
+        ToolTipSide::Right => "tooltip-nose-side-right",
+    }
+}
+
+fn set_css_classes(classes: &mut CssClass, base: &[String], dynamic: &[&str]) {
+    let mut next = base.to_vec();
+    for class in dynamic {
+        if !next.iter().any(|c| c == class) {
+            next.push((*class).to_string());
+        }
+    }
+    if classes.0 != next {
+        classes.0 = next;
+    }
+}
+
+/// Positions tooltips and updates state classes.
 fn update_tooltip_visuals(
-    time: Res<Time>,
     window_q: Query<&Window, With<PrimaryWindow>>,
     ui_scale: Res<UiScale>,
     target_state_q: Query<&UIWidgetState>,
@@ -458,12 +488,11 @@ fn update_tooltip_visuals(
             &ToolTip,
             &mut Node,
             &mut Visibility,
-            &mut BackgroundColor,
-            &mut UiTransform,
+            &mut CssClass,
+            &ToolTipClassBase,
             Option<&ChildOf>,
             &Children,
-            &mut ToolTipRuntime,
-            &mut ToolTipVisual,
+            &ToolTipRuntime,
             Option<&ComputedNode>,
         ),
         (
@@ -473,9 +502,8 @@ fn update_tooltip_visuals(
             Without<ToolTipText>,
         ),
     >,
-    mut text_q: Query<&mut TextColor, (With<ToolTipText>, Without<ToolTip>, Without<ToolTipNose>)>,
     mut nose_q: Query<
-        (&mut Node, &mut BackgroundColor, &mut Visibility),
+        (&mut Node, &mut Visibility, &mut CssClass, &ToolTipNoseClassBase),
         (With<ToolTipNose>, Without<ToolTip>, Without<ToolTipText>),
     >,
 ) {
@@ -492,22 +520,23 @@ fn update_tooltip_visuals(
         tooltip,
         mut node,
         mut visibility,
-        mut bg_color,
-        mut transform,
+        mut css_class,
+        class_base,
         parent_opt,
         children,
-        mut runtime,
-        mut visual,
+        runtime,
         computed,
     ) in tooltip_q.iter_mut()
     {
         let Some(target) = runtime.target else {
             *visibility = Visibility::Hidden;
+            set_css_classes(&mut css_class, &class_base.0, &["tooltip-closed"]);
             continue;
         };
 
         let Ok(target_state) = target_state_q.get(target) else {
             *visibility = Visibility::Hidden;
+            set_css_classes(&mut css_class, &class_base.0, &["tooltip-closed"]);
             continue;
         };
 
@@ -519,33 +548,25 @@ fn update_tooltip_visuals(
         let needs_cursor = tooltip.variant == ToolTipVariant::Follow;
         let should_show = trigger_active && (!needs_cursor || cursor_position.is_some());
 
-        let speed = 12.0;
-        let dt = time.delta_secs();
-
-        if should_show {
-            runtime.alpha = (runtime.alpha + dt * speed).min(1.0);
-        } else {
-            runtime.alpha = (runtime.alpha - dt * speed).max(0.0);
-        }
-
-        if !visual.captured {
-            visual.base_bg = bg_color.0.to_srgba();
-            for child in children.iter() {
-                if let Ok(text_color) = text_q.get_mut(child) {
-                    visual.base_text = text_color.0.to_srgba();
-                }
-                if let Ok((_, nose_bg, _)) = nose_q.get_mut(child) {
-                    visual.base_nose = nose_bg.0.to_srgba();
-                }
-            }
-            visual.captured = true;
-        }
-
-        if runtime.alpha <= 0.01 && !should_show {
+        if !should_show {
             *visibility = Visibility::Hidden;
+            set_css_classes(
+                &mut css_class,
+                &class_base.0,
+                &[
+                    "tooltip-closed",
+                    if tooltip.variant == ToolTipVariant::Point {
+                        "tooltip-point"
+                    } else {
+                        "tooltip-follow"
+                    },
+                ],
+            );
+
             for child in children.iter() {
-                if let Ok((_, _, mut nose_visibility)) = nose_q.get_mut(child) {
+                if let Ok((_, mut nose_visibility, mut nose_class, nose_base)) = nose_q.get_mut(child) {
                     *nose_visibility = Visibility::Hidden;
+                    set_css_classes(&mut nose_class, &nose_base.0, &["tooltip-nose-closed"]);
                 }
             }
             continue;
@@ -585,29 +606,35 @@ fn update_tooltip_visuals(
                     gap,
                 )
             }),
-            ToolTipVariant::Point => target_geometry_q.get(target).ok().map(|(target_node, target_transform)| {
-                let target_size = target_node.size() / sf;
-                let target_top_left = target_transform
-                    .affine()
-                    .transform_point2(-(target_node.size() * 0.5))
-                    / sf;
+            ToolTipVariant::Point => {
+                target_geometry_q
+                    .get(target)
+                    .ok()
+                    .map(|(target_node, target_transform)| {
+                        let target_size = target_node.size() / sf;
+                        let target_top_left = target_transform
+                            .affine()
+                            .transform_point2(-(target_node.size() * 0.5))
+                            / sf;
 
-                place_point(
-                    target_top_left,
-                    target_size,
-                    tip_w,
-                    tip_h,
-                    tooltip.alignment,
-                    tooltip.prio,
-                    window_width,
-                    window_height,
-                    margin,
-                    gap,
-                )
-            }),
+                        place_point(
+                            target_top_left,
+                            target_size,
+                            tip_w,
+                            tip_h,
+                            tooltip.alignment,
+                            tooltip.prio,
+                            window_width,
+                            window_height,
+                            margin,
+                            gap,
+                        )
+                    })
+            }
         };
 
         let Some((x, y, side)) = placement else {
+            *visibility = Visibility::Hidden;
             continue;
         };
 
@@ -615,49 +642,31 @@ fn update_tooltip_visuals(
         node.left = Val::Px(x - parent_top_left.x);
         node.top = Val::Px(y - parent_top_left.y);
 
-        for child in children.iter() {
-            if let Ok((mut nose_node, mut nose_bg, mut nose_visibility)) = nose_q.get_mut(child) {
-                if tooltip.variant == ToolTipVariant::Point {
-                    place_nose(&mut nose_node, side, tip_w, tip_h);
-                    *nose_visibility = Visibility::Inherited;
-                    nose_bg.0 = Color::srgba(
-                        visual.base_nose.red,
-                        visual.base_nose.green,
-                        visual.base_nose.blue,
-                        visual.base_nose.alpha * runtime.alpha,
-                    );
-                } else {
-                    *nose_visibility = Visibility::Hidden;
-                }
-            }
-        }
-
-        let eased = runtime.alpha * runtime.alpha * (3.0 - 2.0 * runtime.alpha);
-        transform.scale = Vec2::splat(0.94 + 0.06 * eased);
-
-        bg_color.0 = Color::srgba(
-            visual.base_bg.red,
-            visual.base_bg.green,
-            visual.base_bg.blue,
-            visual.base_bg.alpha * eased,
+        let tooltip_variant_class = if tooltip.variant == ToolTipVariant::Point {
+            "tooltip-point"
+        } else {
+            "tooltip-follow"
+        };
+        set_css_classes(
+            &mut css_class,
+            &class_base.0,
+            &["tooltip-open", tooltip_variant_class, side_to_tooltip_class(side)],
         );
 
         for child in children.iter() {
-            if let Ok(mut text_color) = text_q.get_mut(child) {
-                text_color.0 = Color::srgba(
-                    visual.base_text.red,
-                    visual.base_text.green,
-                    visual.base_text.blue,
-                    visual.base_text.alpha * eased,
-                );
-            }
-            if let Ok((_, mut nose_bg, _)) = nose_q.get_mut(child) {
-                nose_bg.0 = Color::srgba(
-                    visual.base_nose.red,
-                    visual.base_nose.green,
-                    visual.base_nose.blue,
-                    visual.base_nose.alpha * eased,
-                );
+            if let Ok((mut nose_node, mut nose_visibility, mut nose_class, nose_base)) = nose_q.get_mut(child) {
+                if tooltip.variant == ToolTipVariant::Point {
+                    place_nose(&mut nose_node, side, tip_w, tip_h);
+                    *nose_visibility = Visibility::Inherited;
+                    set_css_classes(
+                        &mut nose_class,
+                        &nose_base.0,
+                        &["tooltip-nose-open", side_to_nose_class(side)],
+                    );
+                } else {
+                    *nose_visibility = Visibility::Hidden;
+                    set_css_classes(&mut nose_class, &nose_base.0, &["tooltip-nose-closed"]);
+                }
             }
         }
     }

@@ -653,7 +653,11 @@ fn parse_html_node(
         }
 
         "tool-tip" => {
-            let text = node.text_contents().trim().to_string();
+            let text = node
+                .text_contents()
+                .split_whitespace()
+                .collect::<Vec<_>>()
+                .join(" ");
             let for_id = attributes
                 .get("for")
                 .map(str::trim)

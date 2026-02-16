@@ -164,7 +164,12 @@ fn internal_node_creation_system(
                         head.spawn((
                             Name::new(format!("ColorPicker-Trigger-Hex-{}", picker.entry)),
                             Text::new(format!("HEX  {}", picker.hex())),
-                            TextColor(trigger_text_color(picker.red, picker.green, picker.blue)),
+                            TextColor(trigger_text_color(
+                                picker.red,
+                                picker.green,
+                                picker.blue,
+                                picker.alpha,
+                            )),
                             TextFont::default(),
                             TextLayout::default(),
                             Pickable::IGNORE,
@@ -511,7 +516,7 @@ fn sync_color_picker_visual_state(
             let mut trigger_bg_q = params.p0();
             for (mut color, bind, maybe_styles) in trigger_bg_q.iter_mut() {
                 if bind.0 == id.0 {
-                    let background = Color::srgb_u8(picker.red, picker.green, picker.blue);
+                    let background = Color::srgba_u8(picker.red, picker.green, picker.blue, picker.alpha);
                     *color = BackgroundColor(background);
 
                     if let Some(mut styles) = maybe_styles {
@@ -587,7 +592,8 @@ fn sync_color_picker_visual_state(
             for (mut text, mut text_color, bind, maybe_styles) in hex_q.iter_mut() {
                 if bind.0 == id.0 {
                     text.0 = format!("{}", picker.hex());
-                    text_color.0 = trigger_text_color(picker.red, picker.green, picker.blue);
+                    text_color.0 =
+                        trigger_text_color(picker.red, picker.green, picker.blue, picker.alpha);
 
                     if let Some(mut styles) = maybe_styles {
                         for (_, style) in styles.styles.iter_mut() {
@@ -623,7 +629,13 @@ fn perceived_luminance(red: u8, green: u8, blue: u8) -> f32 {
     0.2126 * r + 0.7152 * g + 0.0722 * b
 }
 
-fn trigger_text_color(red: u8, green: u8, blue: u8) -> Color {
+fn trigger_text_color(red: u8, green: u8, blue: u8, alpha: u8) -> Color {
+    // If trigger background is translucent, force dark text for readability
+    // against likely bright surfaces behind it.
+    if alpha < 150 {
+        return Color::BLACK;
+    }
+
     // Hard guarantee for bright/white backgrounds.
     if red >= 245 && green >= 245 && blue >= 245 {
         return Color::BLACK;
