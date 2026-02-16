@@ -47,7 +47,19 @@ impl Plugin for CssService {
     fn build(&self, app: &mut App) {
         app.init_resource::<ExistingCssIDs>();
         app.init_resource::<CssUsers>();
+        #[cfg(not(all(feature = "wasm-default", target_arch = "wasm32")))]
         app.init_resource::<CssViewportTracker>();
+        #[cfg(all(feature = "wasm-default", target_arch = "wasm32"))]
+        app.add_systems(
+            Update,
+            (
+                invalidate_css_cache_on_asset_change,
+                update_css_users_index,
+                apply_css_to_entities_legacy,
+            )
+                .chain(),
+        );
+        #[cfg(not(all(feature = "wasm-default", target_arch = "wasm32")))]
         app.add_systems(
             Update,
             (
@@ -346,6 +358,104 @@ fn apply_css_to_entities(
     }
 }
 
+/// Legacy CSS apply path used for WASM compatibility mode.
+///
+/// This intentionally mirrors the pre-breakpoint-refresh behavior.
+#[cfg(all(feature = "wasm-default", target_arch = "wasm32"))]
+fn apply_css_to_entities_legacy(
+    mut commands: Commands,
+    css_assets: Res<Assets<CssAsset>>,
+    mut css_events: MessageReader<AssetEvent<CssAsset>>,
+    css_users: Res<CssUsers>,
+    query_changed_source: Query<
+        (
+            Entity,
+            &CssSource,
+            Option<&CssID>,
+            Option<&CssClass>,
+            Option<&TagName>,
+            Option<&ChildOf>,
+            Option<&CssDirty>,
+        ),
+        Or<(Changed<CssSource>, Added<CssSource>, Added<CssDirty>)>,
+    >,
+    parent_query: Query<(
+        Option<&CssID>,
+        Option<&CssClass>,
+        Option<&TagName>,
+        Option<&ChildOf>,
+    )>,
+    style_query: Query<Option<&UiStyle>>,
+) {
+    let mut dirty: HashSet<Entity> = HashSet::new();
+
+    for (e, _, _, _, _, _, _) in query_changed_source.iter() {
+        dirty.insert(e);
+    }
+
+    for ev in css_events.read() {
+        let id = match ev {
+            AssetEvent::Modified { id } | AssetEvent::Removed { id } => Some(*id),
+            _ => None,
+        };
+        let Some(id) = id else { continue };
+
+        if let Some(users) = css_users.users.get(&id) {
+            dirty.extend(users.iter().copied());
+        }
+    }
+
+    if dirty.is_empty() {
+        return;
+    }
+
+    for entity in dirty {
+        let Ok((_, css_source, id, class, tag, parent, _dirty_marker)) =
+            query_changed_source.get(entity)
+        else {
+            continue;
+        };
+
+        let merged_css = load_and_merge_styles_from_assets_legacy(
+            &css_source.0,
+            &css_assets,
+            id,
+            class,
+            tag,
+            parent,
+            &parent_query,
+        );
+
+        let primary_css = css_source.0.first().cloned().unwrap_or_default();
+        let final_style = UiStyle {
+            css: primary_css,
+            styles: merged_css.styles,
+            keyframes: merged_css.keyframes,
+            active_style: None,
+        };
+
+        match style_query.get(entity) {
+            Ok(Some(existing)) if existing.styles != final_style.styles => {
+                commands
+                    .entity(entity)
+                    .queue_silenced(move |mut ew: EntityWorldMut| {
+                        ew.insert(final_style);
+                        ew.remove::<CssDirty>();
+                    });
+            }
+            Ok(None) => {
+                commands
+                    .entity(entity)
+                    .queue_silenced(move |mut ew: EntityWorldMut| {
+                        ew.insert(final_style);
+                        ew.remove::<CssDirty>();
+                    });
+            }
+            _ => {}
+        }
+    }
+}
+
 /// Loads and merges CSS styles from multiple sources with selector matching.
 fn load_and_merge_styles_from_assets(
     sources: &[Handle<CssAsset>],
@@ -391,6 +501,64 @@ fn load_and_merge_styles_from_assets(
                         existing.normal.merge(&new_style.normal);
                         existing.important.merge(&new_style.important);
                         existing.origin = index; // Update origin to the latest source
+                    })
+                    .or_insert_with(|| {
+                        let mut s = new_style.clone();
+                        s.origin = index;
+                        s
+                    });
+            }
+        }
+
+        for (name, keyframes) in parsed_map.keyframes.iter() {
+            merged_keyframes.insert(name.clone(), keyframes.clone());
+        }
+    }
+
+    ParsedCss {
+        styles: merged_styles,
+        keyframes: merged_keyframes,
+    }
+}
+
+#[cfg(all(feature = "wasm-default", target_arch = "wasm32"))]
+fn load_and_merge_styles_from_assets_legacy(
+    sources: &[Handle<CssAsset>],
+    css_assets: &Assets<CssAsset>,
+    id: Option<&CssID>,
+    class: Option<&CssClass>,
+    tag: Option<&TagName>,
+    parent: Option<&ChildOf>,
+    parent_query: &Query<(
+        Option<&CssID>,
+        Option<&CssClass>,
+        Option<&TagName>,
+        Option<&ChildOf>,
+    )>,
+) -> ParsedCss {
+    let mut merged_styles: HashMap<String, StylePair> = HashMap::new();
+    let mut merged_keyframes: HashMap<String, Vec<AnimationKeyframe>> = HashMap::new();
+
+    for (index, handle) in sources.iter().enumerate() {
+        let Some(parsed_map) = get_or_parse_css(handle, css_assets) else {
+            continue;
+        };
+
+        for (selector_key, new_style) in parsed_map.styles.iter() {
+            let selector = if new_style.selector.is_empty() {
+                selector_key.as_str()
+            } else {
+                new_style.selector.as_str()
+            };
+            let selector_parts = parse_selector_steps(selector);
+
+            if matches_selector_chain(&selector_parts, id, class, tag, parent, parent_query) {
+                merged_styles
+                    .entry(selector_key.clone())
+                    .and_modify(|existing| {
+                        existing.normal.merge(&new_style.normal);
+                        existing.important.merge(&new_style.important);
+                        existing.origin = index;
                     })
                     .or_insert_with(|| {
                         let mut s = new_style.clone();

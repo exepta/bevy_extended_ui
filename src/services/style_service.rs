@@ -804,7 +804,17 @@ fn apply_calc_styles_system(
     }
 }
 
-#[cfg(all(feature = "wasm-breakpoints", target_arch = "wasm32"))]
+#[cfg(all(feature = "wasm-default", target_arch = "wasm32"))]
+fn resolve_layout_viewport(window_q: &Query<&Window, With<PrimaryWindow>>) -> Option<Vec2> {
+    let window = window_q.single().ok()?;
+    Some(window.resolution.size())
+}
+
+#[cfg(all(
+    feature = "wasm-breakpoints",
+    not(feature = "wasm-default"),
+    target_arch = "wasm32"
+))]
 fn resolve_layout_viewport(_window_q: &Query<&Window, With<PrimaryWindow>>) -> Option<Vec2> {
     let window = web_sys::window()?;
     let width = window.inner_width().ok()?.as_f64()? as f32;
