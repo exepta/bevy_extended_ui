@@ -56,15 +56,15 @@ bevy_extended_ui_macros = "1.4.0"
 ```
 
 #### Features
-| Feature            | Description                               |
-|--------------------|-------------------------------------------|
-| `default`          | Enables `css-breakpoints`.                |
+| Feature            | Description                                                                                          |
+|--------------------|------------------------------------------------------------------------------------------------------|
+| `default`          | Enables `css-breakpoints`.                                                                           |
 | `wasm-default`     | Web preset: `wasm-breakpoints` + `clipboard-wasm` with legacy WASM CSS/style pipeline compatibility. |
-| `css-breakpoints`  | Desktop breakpoints via primary window.   |
-| `wasm-breakpoints` | WASM breakpoints via browser viewport.    |
-| `fluent`           | Enables Fluent Language support.          |
-| `properties-lang`  | Enables Java Properties Language support. |
-| `clipboard-wasm`   | Enables WASM clipboard support web.       |
+| `css-breakpoints`  | Desktop breakpoints via primary window.                                                              |
+| `wasm-breakpoints` | WASM breakpoints via browser viewport.                                                               |
+| `fluent`           | Enables Fluent Language support.                                                                     |
+| `properties-lang`  | Enables Java Properties Language support.                                                            |
+| `clipboard-wasm`   | Enables WASM clipboard support web.                                                                  |
 
 Then, you add the plugin to your `main.rs` or on any point at a build function:
 
@@ -274,9 +274,11 @@ If anyone has any ideas, I'd be happy to hear them.
 
 | `Bevy` version | `bevy_extended_ui` version |
 |----------------|----------------------------|
-| 0.18.0         | 1.2.0 - 1.3.0              |
+| 0.18.0         | 1.2.0 - 1.4.0              |
 | 0.17.0         | 1.0.0 - 1.1.0              |
 | 0.16.0         | 0.1.0 - 0.2.2              |
+
+> _Note:_ Version 0.1.0–0.3.0 are deprecated and will not be supported. If you’re interested in a version for bevy 0.16, then create an issue!
 
 ### Important Links
 

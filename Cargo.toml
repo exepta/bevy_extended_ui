@@ -44,7 +44,7 @@ version = "0.1.0"
 #               Dependencies               #
 ############################################
 
-# Bevy 0.17.0 main library
+# Bevy 0.18.0 main library
 [dependencies.bevy]
 version = "0.18.0"
 default-features = false
