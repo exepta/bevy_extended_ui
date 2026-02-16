@@ -6,7 +6,7 @@
 </head>
 <body>
     <div class="scene">
-        <div class="glass-card glass-basic">
+        <div id="test" class="glass-card glass-basic">
             <h2>Backdrop Blur</h2>
             <p>background: rgba(..., 0.45)</p>
             <p>backdrop-filter: blur(10px)</p>
@@ -17,6 +17,8 @@
             <p>background-image: linear-gradient(...)</p>
             <p>backdrop-filter: blur(14px)</p>
         </div>
+
+        <tool-tip for="test" variant="point" prio="top" alignment="vertical" trigger="hover">Hello World</tool-tip>
     </div>
 </body>
 </html>

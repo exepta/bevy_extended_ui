@@ -172,6 +172,7 @@ fn collect_html_ids(nodes: &Vec<HtmlWidgetNode>, ids: &mut Vec<HtmlID>) {
             | HtmlWidgetNode::Img(_, _, _, _, _, id)
             | HtmlWidgetNode::Input(_, _, _, _, _, id)
             | HtmlWidgetNode::Paragraph(_, _, _, _, _, id)
+            | HtmlWidgetNode::ToolTip(_, _, _, _, _, id)
             | HtmlWidgetNode::ProgressBar(_, _, _, _, _, id)
             | HtmlWidgetNode::RadioButton(_, _, _, _, _, id)
             | HtmlWidgetNode::Scrollbar(_, _, _, _, _, id)
@@ -322,6 +323,15 @@ fn spawn_widget_node(
                 id,
             )
         }
+        HtmlWidgetNode::ToolTip(tooltip, meta, states, functions, widget, id) => spawn_with_meta(
+            commands,
+            tooltip.clone(),
+            meta,
+            states,
+            functions,
+            widget,
+            id,
+        ),
         HtmlWidgetNode::ProgressBar(progress_bar, meta, states, functions, widget, id) => {
             spawn_with_meta(
                 commands,

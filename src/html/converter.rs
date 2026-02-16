@@ -652,6 +652,48 @@ fn parse_html_node(
             ))
         }
 
+        "tool-tip" => {
+            let text = node.text_contents().trim().to_string();
+            let for_id = attributes
+                .get("for")
+                .map(str::trim)
+                .map(|value| value.trim_start_matches('#').to_string())
+                .filter(|value| !value.is_empty());
+            let variant = attributes
+                .get("variant")
+                .and_then(ToolTipVariant::from_str)
+                .unwrap_or_default();
+            let prio = attributes
+                .get("prio")
+                .and_then(ToolTipPriority::from_str)
+                .unwrap_or_default();
+            let alignment = attributes
+                .get("alignment")
+                .and_then(ToolTipAlignment::from_str)
+                .unwrap_or_default();
+            let trigger = attributes
+                .get("trigger")
+                .map(parse_tooltip_triggers)
+                .unwrap_or_else(|| vec![ToolTipTrigger::Hover]);
+
+            Some(HtmlWidgetNode::ToolTip(
+                ToolTip {
+                    text,
+                    for_id,
+                    variant,
+                    prio,
+                    alignment,
+                    trigger,
+                    ..default()
+                },
+                meta,
+                states,
+                functions,
+                widget.clone(),
+                HtmlID::default(),
+            ))
+        }
+
         "progressbar" => {
             let min = attributes
                 .get("min")
@@ -985,6 +1027,30 @@ fn parse_inner_content(node: &NodeRef) -> HtmlInnerContent {
     let inner_bindings = extract_inner_bindings(&inner_html);
 
     HtmlInnerContent::new(inner_text, inner_html, inner_bindings)
+}
+
+/// Parses tooltip trigger attribute values like `"hover | click"`.
+fn parse_tooltip_triggers(value: &str) -> Vec<ToolTipTrigger> {
+    let mut out = Vec::new();
+
+    for token in value.split(['|', ',', ' ']) {
+        let trimmed = token.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        if let Some(trigger) = ToolTipTrigger::from_str(trimmed) {
+            if !out.contains(&trigger) {
+                out.push(trigger);
+            }
+        }
+    }
+
+    if out.is_empty() {
+        out.push(ToolTipTrigger::Hover);
+    }
+
+    out
 }
 
 /// Extracts unique `{{...}}` placeholders from serialized content.

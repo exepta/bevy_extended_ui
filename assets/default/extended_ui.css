@@ -282,6 +282,32 @@ p {
     color: var(--text-color);
 }
 
+/* ToolTip */
+
+tool-tip {
+    position: absolute;
+    width: auto;
+    max-width: 300px;
+    min-height: 26px;
+    display: flex;
+    align-items: center;
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: rgba(24, 24, 30, 0.3);
+    color: var(--text-color);
+    font-size: 12px;
+    z-index: 10000;
+    pointer-events: none;
+
+    > .tooltip-text {
+        color: var(--text-color);
+    }
+
+    > .tooltip-nose {
+        pointer-events: none;
+    }
+}
+
 /* Progress Bar */
 
 progressbar {

@@ -21,7 +21,7 @@ use crate::styles::parser::apply_property_to_style;
 use crate::widgets::{
     Body, Button, CheckBox, ChoiceBox, ColorPicker, Div, Divider, FieldSet, Form, Headline, Img,
     InputField, Paragraph, ProgressBar, RadioButton, Scrollbar, Slider, SwitchButton, ToggleButton,
-    ValidationRules, Widget,
+    ToolTip, ValidationRules, Widget,
 };
 
 pub static HTML_ID_COUNTER: AtomicUsize = AtomicUsize::new(1);
@@ -325,6 +325,15 @@ pub enum HtmlWidgetNode {
     /// A paragraph `<p>`.
     Paragraph(
         Paragraph,
+        HtmlMeta,
+        HtmlStates,
+        HtmlEventBindings,
+        Widget,
+        HtmlID,
+    ),
+    /// A tooltip `<tool-tip>`.
+    ToolTip(
+        ToolTip,
         HtmlMeta,
         HtmlStates,
         HtmlEventBindings,
