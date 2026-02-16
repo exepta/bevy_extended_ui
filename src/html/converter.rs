@@ -14,6 +14,7 @@ use crate::html::{
 use crate::io::{CssAsset, DefaultCssHandle, HtmlAsset};
 use crate::lang::{UILang, UiLangState, UiLangVariables, localize_html, vars_fingerprint};
 use crate::styles::IconPlace;
+use crate::styles::parser::convert_to_color;
 use crate::widgets::Button;
 use crate::widgets::*;
 
@@ -294,11 +295,16 @@ fn parse_html_node(
         "button" => {
             let (icon_path, icon_place) = parse_icon_and_text(node);
             let text = node.text_contents().trim().to_string();
+            let button_type = attributes
+                .get("type")
+                .and_then(ButtonType::from_str)
+                .unwrap_or_default();
             Some(HtmlWidgetNode::Button(
                 Button {
                     text,
                     icon_path,
                     icon_place,
+                    button_type,
                     ..default()
                 },
                 meta,
@@ -327,6 +333,43 @@ fn parse_html_node(
             ))
         }
 
+        "colorpicker" => {
+            let value = attributes
+                .get("value")
+                .and_then(|v| convert_to_color(v.to_string()))
+                .unwrap_or_else(|| Color::srgb_u8(0x42, 0x85, 0xF4));
+
+            let srgba = value.to_srgba();
+            let mut alpha = (srgba.alpha * 255.0).round() as u8;
+
+            if let Some(alpha_attr) = attributes.get("alpha") {
+                let parsed = alpha_attr.trim().parse::<f32>().ok().map(|value| {
+                    if value <= 1.0 {
+                        (value * 255.0).round().clamp(0.0, 255.0) as u8
+                    } else {
+                        value.round().clamp(0.0, 255.0) as u8
+                    }
+                });
+                if let Some(parsed) = parsed {
+                    alpha = parsed;
+                }
+            }
+
+            Some(HtmlWidgetNode::ColorPicker(
+                ColorPicker::from_rgba_u8(
+                    (srgba.red * 255.0).round() as u8,
+                    (srgba.green * 255.0).round() as u8,
+                    (srgba.blue * 255.0).round() as u8,
+                    alpha,
+                ),
+                meta,
+                states,
+                functions,
+                widget.clone(),
+                HtmlID::default(),
+            ))
+        }
+
         "div" => {
             let mut children = Vec::new();
             for child in node.children() {
@@ -337,6 +380,40 @@ fn parse_html_node(
 
             Some(HtmlWidgetNode::Div(
                 Div::default(),
+                meta,
+                states,
+                children,
+                functions,
+                widget.clone(),
+                HtmlID::default(),
+            ))
+        }
+
+        "form" => {
+            let mut children = Vec::new();
+            for child in node.children() {
+                if let Some(parsed) = parse_html_node(&child, css_sources, label_map, key, html) {
+                    children.push(parsed);
+                }
+            }
+
+            let action = attributes
+                .get("action")
+                .or_else(|| attributes.get("onsubmit"))
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string);
+            let validate_mode = attributes
+                .get("validate")
+                .and_then(FormValidationMode::from_str)
+                .unwrap_or_default();
+
+            Some(HtmlWidgetNode::Form(
+                Form {
+                    action,
+                    validate_mode,
+                    ..default()
+                },
                 meta,
                 states,
                 children,
@@ -513,6 +590,11 @@ fn parse_html_node(
 
         "input" => {
             let id = attributes.get("id").map(|s| s.to_string());
+            let name = attributes
+                .get("name")
+                .map(str::to_string)
+                .or_else(|| id.clone())
+                .unwrap_or_default();
             let label = id
                 .as_ref()
                 .and_then(|id| label_map.get(id))
@@ -541,6 +623,7 @@ fn parse_html_node(
 
             Some(HtmlWidgetNode::Input(
                 InputField {
+                    name,
                     label,
                     placeholder,
                     text,
@@ -561,6 +644,52 @@ fn parse_html_node(
             let text = node.text_contents().trim().to_string();
             Some(HtmlWidgetNode::Paragraph(
                 Paragraph { text, ..default() },
+                meta,
+                states,
+                functions,
+                widget.clone(),
+                HtmlID::default(),
+            ))
+        }
+
+        "tool-tip" => {
+            let text = node
+                .text_contents()
+                .split_whitespace()
+                .collect::<Vec<_>>()
+                .join(" ");
+            let for_id = attributes
+                .get("for")
+                .map(str::trim)
+                .map(|value| value.trim_start_matches('#').to_string())
+                .filter(|value| !value.is_empty());
+            let variant = attributes
+                .get("variant")
+                .and_then(ToolTipVariant::from_str)
+                .unwrap_or_default();
+            let prio = attributes
+                .get("prio")
+                .and_then(ToolTipPriority::from_str)
+                .unwrap_or_default();
+            let alignment = attributes
+                .get("alignment")
+                .and_then(ToolTipAlignment::from_str)
+                .unwrap_or_default();
+            let trigger = attributes
+                .get("trigger")
+                .map(parse_tooltip_triggers)
+                .unwrap_or_else(|| vec![ToolTipTrigger::Hover]);
+
+            Some(HtmlWidgetNode::ToolTip(
+                ToolTip {
+                    text,
+                    for_id,
+                    variant,
+                    prio,
+                    alignment,
+                    trigger,
+                    ..default()
+                },
                 meta,
                 states,
                 functions,
@@ -902,6 +1031,30 @@ fn parse_inner_content(node: &NodeRef) -> HtmlInnerContent {
     let inner_bindings = extract_inner_bindings(&inner_html);
 
     HtmlInnerContent::new(inner_text, inner_html, inner_bindings)
+}
+
+/// Parses tooltip trigger attribute values like `"hover | click"`.
+fn parse_tooltip_triggers(value: &str) -> Vec<ToolTipTrigger> {
+    let mut out = Vec::new();
+
+    for token in value.split(['|', ',', ' ']) {
+        let trimmed = token.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        if let Some(trigger) = ToolTipTrigger::from_str(trimmed) {
+            if !out.contains(&trigger) {
+                out.push(trigger);
+            }
+        }
+    }
+
+    if out.is_empty() {
+        out.push(ToolTipTrigger::Hover);
+    }
+
+    out
 }
 
 /// Extracts unique `{{...}}` placeholders from serialized content.

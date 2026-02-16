@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta name="breakpoint-test">
+    <meta charset="UTF-8">
+    <title>Breakpoint Demo</title>
+    <link rel="stylesheet" href="breakpoint.css">
+</head>
+<body>
+    <div id="window-info">
+        <h3 id="window-size">0px x 0px</h3>
+        <p>Resize the window. Cards disappear at CSS breakpoints.</p>
+    </div>
+
+    <div class="card-grid">
+        <div class="card">
+            <h4>Always visible</h4>
+            <p>This card is visible on every size.</p>
+        </div>
+
+        <div class="card bp-1100">
+            <h4>Hide <= 1100px</h4>
+            <p>Uses @media (max-width: 1100px).</p>
+        </div>
+
+        <div class="card bp-900">
+            <h4>Hide <= 900px</h4>
+            <p>Useful for switching to compact tablet layouts.</p>
+        </div>
+
+        <div class="card bp-700">
+            <h4>Hide <= 700px</h4>
+            <p>Useful for minimal mobile UI.</p>
+        </div>
+    </div>
+</body>
+</html>

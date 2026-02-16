@@ -8,6 +8,7 @@ Use these attributes in your HTML:
 
 - `onclick`
 - `onchange`
+- `action` (on `<form>`, submit handler name)
 - `oninit`
 - `onmouseover`
 - `onmouseout`
@@ -55,6 +56,13 @@ All events include `target` (the Bevy `Entity` that fired the event).
 
 - `target`
 - `state`: `Gained` or `Lost`
+
+### HtmlSubmit
+
+- `target`: submitted form entity
+- `submitter`: clicked submit button entity
+- `action`: form action handler name
+- `data`: collected input map (`name -> value`)
 
 ### HtmlScroll
 

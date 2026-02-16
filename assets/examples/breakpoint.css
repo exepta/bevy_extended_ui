@@ -1,0 +1,137 @@
+:root {
+    --bg-a: #0f1822;
+    --bg-b: #0b1119;
+    --panel: rgba(11, 24, 40, 0.78);
+    --panel-border: rgba(110, 180, 255, 0.28);
+    --text-main: #eaf4ff;
+    --text-muted: #b6cce1;
+}
+
+body {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    background: #081320;
+}
+
+#window-info {
+    position: absolute;
+    left: 12px;
+    top: 12px;
+    width: 330px;
+    display: flex;
+    flex-direction: column;
+    justify-content: start;
+    align-items: start;
+    gap: 4px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--panel-border);
+    background: var(--panel);
+    color: var(--text-muted);
+}
+
+#window-size {
+    width: 100%;
+    margin: 0;
+    color: var(--text-main);
+    font-size: 22px;
+    text-wrap: wrap;
+}
+
+#window-info p {
+    width: 100%;
+    margin: 0;
+    font-size: 12px;
+    text-wrap: wrap;
+}
+
+.card-grid {
+    width: 94%;
+    max-width: 1120px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: stretch;
+    gap: 12px;
+}
+
+.card {
+    width: 250px;
+    min-height: 132px;
+    display: flex;
+    flex-direction: column;
+    justify-content: start;
+    align-items: start;
+    gap: 8px;
+    padding: 14px;
+    border-radius: 10px;
+    border: 1px solid rgba(121, 195, 255, 0.2);
+    background: rgba(14, 30, 49, 0.75);
+    color: var(--text-main);
+}
+
+.card h4 {
+    width: 100%;
+    margin: 0;
+    font-size: 18px;
+    text-wrap: wrap;
+}
+
+.card p {
+    width: 100%;
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 13px;
+    text-wrap: wrap;
+}
+
+/* Reflow first: keep cards, but fit them by wrapping and resizing. */
+@media (max-width: 1160px) {
+    .card {
+        width: 46%;
+    }
+}
+
+/* Then hide one optional card if space gets too tight. */
+@media (max-width: 900px) {
+    .bp-1100 {
+        display: none;
+    }
+
+    .card {
+        width: 46%;
+    }
+
+    #window-info {
+        width: 280px;
+    }
+}
+
+/* Mobile: one card per row, still only hide gradually. */
+@media (max-width: 700px) {
+    .bp-900 {
+        display: none;
+    }
+
+    .card {
+        width: 92%;
+    }
+
+    #window-info {
+        width: 248px;
+    }
+
+    #window-size {
+        font-size: 18px;
+    }
+}
+
+@media (max-width: 500px) {
+    .bp-700 {
+        display: none;
+    }
+}

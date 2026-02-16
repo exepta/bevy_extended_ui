@@ -8,6 +8,7 @@ use std::sync::Mutex;
 pub static UI_ID_GENERATE: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
 pub static BODY_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
 pub static DIV_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
+pub static FORM_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
 pub static BUTTON_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
 pub static CHECK_BOX_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
 pub static CHOICE_BOX_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
@@ -17,10 +18,12 @@ pub static HEADLINE_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPoo
 pub static IMAGE_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
 pub static INPUT_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
 pub static PARAGRAPH_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
+pub static TOOL_TIP_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
 pub static PROGRESS_BAR_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
 pub static RADIO_BUTTON_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
 pub static SCROLL_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
 pub static SLIDER_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
+pub static COLOR_PICKER_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
 pub static SWITCH_BUTTON_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
 pub static TOGGLE_BUTTON_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
 
@@ -417,11 +420,16 @@ fn despawn_widget_ids(
             match widget_id.kind {
                 WidgetKind::Body => BODY_ID_POOL.lock().unwrap().release(widget_id.id),
                 WidgetKind::Div => DIV_ID_POOL.lock().unwrap().release(widget_id.id),
+                WidgetKind::Form => FORM_ID_POOL.lock().unwrap().release(widget_id.id),
                 WidgetKind::Headline => HEADLINE_ID_POOL.lock().unwrap().release(widget_id.id),
                 WidgetKind::Paragraph => PARAGRAPH_ID_POOL.lock().unwrap().release(widget_id.id),
+                WidgetKind::ToolTip => TOOL_TIP_ID_POOL.lock().unwrap().release(widget_id.id),
                 WidgetKind::Button => BUTTON_ID_POOL.lock().unwrap().release(widget_id.id),
                 WidgetKind::CheckBox => CHECK_BOX_ID_POOL.lock().unwrap().release(widget_id.id),
                 WidgetKind::Slider => SLIDER_ID_POOL.lock().unwrap().release(widget_id.id),
+                WidgetKind::ColorPicker => {
+                    COLOR_PICKER_ID_POOL.lock().unwrap().release(widget_id.id)
+                }
                 WidgetKind::InputField => INPUT_ID_POOL.lock().unwrap().release(widget_id.id),
                 WidgetKind::ChoiceBox => CHOICE_BOX_ID_POOL.lock().unwrap().release(widget_id.id),
                 WidgetKind::Img => IMAGE_ID_POOL.lock().unwrap().release(widget_id.id),

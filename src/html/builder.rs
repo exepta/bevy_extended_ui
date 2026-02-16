@@ -165,12 +165,14 @@ fn collect_html_ids(nodes: &Vec<HtmlWidgetNode>, ids: &mut Vec<HtmlID>) {
             }
             HtmlWidgetNode::Button(_, _, _, _, _, id)
             | HtmlWidgetNode::CheckBox(_, _, _, _, _, id)
+            | HtmlWidgetNode::ColorPicker(_, _, _, _, _, id)
             | HtmlWidgetNode::ChoiceBox(_, _, _, _, _, id)
             | HtmlWidgetNode::Divider(_, _, _, _, _, id)
             | HtmlWidgetNode::Headline(_, _, _, _, _, id)
             | HtmlWidgetNode::Img(_, _, _, _, _, id)
             | HtmlWidgetNode::Input(_, _, _, _, _, id)
             | HtmlWidgetNode::Paragraph(_, _, _, _, _, id)
+            | HtmlWidgetNode::ToolTip(_, _, _, _, _, id)
             | HtmlWidgetNode::ProgressBar(_, _, _, _, _, id)
             | HtmlWidgetNode::RadioButton(_, _, _, _, _, id)
             | HtmlWidgetNode::Scrollbar(_, _, _, _, _, id)
@@ -180,6 +182,10 @@ fn collect_html_ids(nodes: &Vec<HtmlWidgetNode>, ids: &mut Vec<HtmlID>) {
                 ids.push(id.clone());
             }
             HtmlWidgetNode::Div(_, _, _, children, _, _, id) => {
+                ids.push(id.clone());
+                collect_html_ids(children, ids);
+            }
+            HtmlWidgetNode::Form(_, _, _, children, _, _, id) => {
                 ids.push(id.clone());
                 collect_html_ids(children, ids);
             }
@@ -226,6 +232,17 @@ fn spawn_widget_node(
             widget,
             id,
         ),
+        HtmlWidgetNode::ColorPicker(color_picker, meta, states, functions, widget, id) => {
+            spawn_with_meta(
+                commands,
+                color_picker.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+            )
+        }
         HtmlWidgetNode::ChoiceBox(choice_box, meta, states, functions, widget, id) => {
             spawn_with_meta(
                 commands,
@@ -240,6 +257,15 @@ fn spawn_widget_node(
         HtmlWidgetNode::Div(div, meta, states, children, functions, widget, id) => {
             let entity =
                 spawn_with_meta(commands, div.clone(), meta, states, functions, widget, id);
+            for child in children {
+                let child_entity = spawn_widget_node(commands, child, asset_server, Some(entity));
+                commands.entity(entity).add_child(child_entity);
+            }
+            entity
+        }
+        HtmlWidgetNode::Form(form, meta, states, children, functions, widget, id) => {
+            let entity =
+                spawn_with_meta(commands, form.clone(), meta, states, functions, widget, id);
             for child in children {
                 let child_entity = spawn_widget_node(commands, child, asset_server, Some(entity));
                 commands.entity(entity).add_child(child_entity);
@@ -297,6 +323,15 @@ fn spawn_widget_node(
                 id,
             )
         }
+        HtmlWidgetNode::ToolTip(tooltip, meta, states, functions, widget, id) => spawn_with_meta(
+            commands,
+            tooltip.clone(),
+            meta,
+            states,
+            functions,
+            widget,
+            id,
+        ),
         HtmlWidgetNode::ProgressBar(progress_bar, meta, states, functions, widget, id) => {
             spawn_with_meta(
                 commands,

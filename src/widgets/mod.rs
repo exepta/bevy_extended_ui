@@ -2,7 +2,9 @@ mod body;
 mod content;
 mod controls;
 mod div;
+mod form;
 mod validation;
+mod widget_util;
 
 use crate::registry::*;
 use crate::styles::IconPlace;
@@ -10,8 +12,11 @@ use crate::widgets::body::BodyWidget;
 use crate::widgets::content::ExtendedContentWidgets;
 use crate::widgets::controls::ExtendedControlWidgets;
 use crate::widgets::div::DivWidget;
+use crate::widgets::form::FormWidget;
 use bevy::prelude::*;
 use std::fmt;
+
+pub(crate) use validation::evaluate_validation_state;
 
 /// Marker component for UI elements that should ignore the parent widget state.
 ///
@@ -171,7 +176,7 @@ fn apply_pattern_rule(args: &str, rules: &mut ValidationRules) {
     rules.pattern = Some(stripped.to_string());
 }
 
-/// Component carrying a widget ID and its kind.
+/// Component carrying a widget ID and it's kind.
 #[derive(Component, Clone, Copy, Debug)]
 pub struct WidgetId {
     pub id: usize,
@@ -183,15 +188,18 @@ pub struct WidgetId {
 pub enum WidgetKind {
     Body,
     Button,
+    ColorPicker,
     CheckBox,
     ChoiceBox,
     Div,
     Divider,
+    Form,
     FieldSet,
     Headline,
     Img,
     InputField,
     Paragraph,
+    ToolTip,
     ProgressBar,
     RadioButton,
     Scrollbar,
@@ -211,11 +219,13 @@ impl Plugin for ExtendedWidgetPlugin {
         app.register_type::<UIWidgetState>();
         app.register_type::<ValidationRules>();
         app.register_type::<Body>();
+        app.register_type::<Form>();
         app.add_plugins((
             ExtendedControlWidgets,
             ExtendedContentWidgets,
             BodyWidget,
             DivWidget,
+            FormWidget,
         ));
         app.add_systems(Update, validation::update_validation_states);
     }
@@ -265,8 +275,84 @@ impl Default for Div {
 }
 
 // ===============================================
+//                       Form
+// ===============================================
+
+/// Form the container widget with an optional submit action handler name.
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+#[require(UIGenID, UIWidgetState, GlobalTransform, InheritedVisibility, Widget)]
+pub struct Form {
+    pub entry: usize,
+    pub action: Option<String>,
+    pub validate_mode: FormValidationMode,
+}
+
+impl Default for Form {
+    /// Creates a default form widget with a unique entry ID.
+    fn default() -> Self {
+        let entry = FORM_ID_POOL.lock().unwrap().acquire();
+        Self {
+            entry,
+            action: None,
+            validate_mode: FormValidationMode::default(),
+        }
+    }
+}
+
+/// Defines when form validation should be evaluated.
+#[derive(Reflect, Default, Debug, Clone, Eq, PartialEq)]
+pub enum FormValidationMode {
+    /// Validate continuously (e.g. focus/hover/input changes).
+    Always,
+    /// Validate only on submit.
+    #[default]
+    Send,
+    /// Validate on direct interaction (e.g. input text changes).
+    Interact,
+}
+
+impl FormValidationMode {
+    /// Parses a validation mode from the form `validate` attribute.
+    pub fn from_str(value: &str) -> Option<FormValidationMode> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "always" | "all" => Some(FormValidationMode::Always),
+            "send" => Some(FormValidationMode::Send),
+            "interact" => Some(FormValidationMode::Interact),
+            _ => None,
+        }
+    }
+}
+
+// ===============================================
 //                     Button
 // ===============================================
+
+/// Supported button behavior modes.
+#[derive(Reflect, Default, Debug, Clone, Eq, PartialEq)]
+pub enum ButtonType {
+    /// No explicit button type set.
+    #[default]
+    Auto,
+    /// Regular clickable button that does not submit a form.
+    Button,
+    /// Form submit button.
+    Submit,
+    /// Form reset button.
+    Reset,
+}
+
+impl ButtonType {
+    /// Parses a button type from an HTML `type` attribute.
+    pub fn from_str(value: &str) -> Option<ButtonType> {
+        match value.to_ascii_lowercase().as_str() {
+            "button" => Some(ButtonType::Button),
+            "submit" => Some(ButtonType::Submit),
+            "reset" => Some(ButtonType::Reset),
+            _ => None,
+        }
+    }
+}
 
 /// Button widget with optional icon.
 #[derive(Component, Reflect, Debug, Clone)]
@@ -277,6 +363,7 @@ pub struct Button {
     pub text: String,
     pub icon_place: IconPlace,
     pub icon_path: Option<String>,
+    pub button_type: ButtonType,
 }
 
 impl Default for Button {
@@ -289,6 +376,7 @@ impl Default for Button {
             text: String::from("Button"),
             icon_path: None,
             icon_place: IconPlace::default(),
+            button_type: ButtonType::default(),
         }
     }
 }
@@ -595,6 +683,7 @@ impl Default for Img {
 #[require(UIGenID, UIWidgetState, Widget, InputValue)]
 pub struct InputField {
     pub entry: usize,
+    pub name: String,
     pub text: String,
     pub label: String,
     pub placeholder: String,
@@ -612,6 +701,7 @@ impl Default for InputField {
 
         Self {
             entry,
+            name: String::new(),
             text: String::from(""),
             label: String::from("Label"),
             placeholder: String::from(""),
@@ -705,6 +795,124 @@ impl Default for Paragraph {
         Self {
             entry,
             text: String::from(""),
+        }
+    }
+}
+
+// ===============================================
+//                     ToolTip
+// ===============================================
+
+/// Tooltip positioning behavior.
+#[derive(Reflect, Default, Debug, Clone, Copy, Eq, PartialEq)]
+pub enum ToolTipVariant {
+    /// Tooltip follows the cursor.
+    #[default]
+    Follow,
+    /// Tooltip is anchored to the target element.
+    Point,
+}
+
+impl ToolTipVariant {
+    /// Parses a tooltip variant from a string.
+    pub fn from_str(value: &str) -> Option<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "follow" => Some(Self::Follow),
+            "point" => Some(Self::Point),
+            _ => None,
+        }
+    }
+}
+
+/// Preferred side for tooltip placement.
+#[derive(Reflect, Default, Debug, Clone, Copy, Eq, PartialEq)]
+pub enum ToolTipPriority {
+    Top,
+    Bottom,
+    Left,
+    #[default]
+    Right,
+}
+
+impl ToolTipPriority {
+    /// Parses a tooltip priority from a string.
+    pub fn from_str(value: &str) -> Option<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "top" => Some(Self::Top),
+            "bottom" => Some(Self::Bottom),
+            "left" => Some(Self::Left),
+            "right" => Some(Self::Right),
+            _ => None,
+        }
+    }
+}
+
+/// Axis along which tooltip side preference is resolved.
+#[derive(Reflect, Default, Debug, Clone, Copy, Eq, PartialEq)]
+pub enum ToolTipAlignment {
+    Vertical,
+    #[default]
+    Horizontal,
+}
+
+impl ToolTipAlignment {
+    /// Parses a tooltip alignment from a string.
+    pub fn from_str(value: &str) -> Option<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "vertical" => Some(Self::Vertical),
+            "horizontal" => Some(Self::Horizontal),
+            _ => None,
+        }
+    }
+}
+
+/// Trigger mode controlling when a tooltip becomes visible.
+#[derive(Reflect, Debug, Clone, Copy, Eq, PartialEq)]
+pub enum ToolTipTrigger {
+    Hover,
+    Click,
+    Drag,
+}
+
+impl ToolTipTrigger {
+    /// Parses one trigger token from a string.
+    pub fn from_str(value: &str) -> Option<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "hover" => Some(Self::Hover),
+            "click" => Some(Self::Click),
+            "drag" => Some(Self::Drag),
+            _ => None,
+        }
+    }
+}
+
+/// Tooltip widget that binds to either a parent element or an explicit `for` id target.
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+#[require(UIGenID, UIWidgetState, Widget)]
+pub struct ToolTip {
+    pub entry: usize,
+    pub text: String,
+    pub for_id: Option<String>,
+    pub variant: ToolTipVariant,
+    pub prio: ToolTipPriority,
+    pub alignment: ToolTipAlignment,
+    pub trigger: Vec<ToolTipTrigger>,
+}
+
+impl Default for ToolTip {
+    /// Creates a default tooltip widget.
+    fn default() -> Self {
+        let entry = TOOL_TIP_ID_POOL.lock().unwrap().acquire();
+
+        Self {
+            entry,
+            text: String::new(),
+            for_id: None,
+            variant: ToolTipVariant::default(),
+            prio: ToolTipPriority::default(),
+            alignment: ToolTipAlignment::default(),
+            trigger: vec![ToolTipTrigger::Hover],
         }
     }
 }
@@ -834,6 +1042,149 @@ impl Default for Slider {
             max: 100.0,
         }
     }
+}
+
+// ===============================================
+//                    Color Picker
+// ===============================================
+
+/// Color picker widget with HSV interaction and RGB/RGBA/HEX output values.
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+#[require(UIGenID, UIWidgetState, Widget)]
+pub struct ColorPicker {
+    pub entry: usize,
+    pub red: u8,
+    pub green: u8,
+    pub blue: u8,
+    pub alpha: u8,
+    pub hue: f32,
+    pub saturation: f32,
+    pub value: f32,
+}
+
+impl Default for ColorPicker {
+    /// Creates a default color picker set to Google blue.
+    fn default() -> Self {
+        let entry = COLOR_PICKER_ID_POOL.lock().unwrap().acquire();
+        Self::from_rgba_u8_with_entry(entry, 0x42, 0x85, 0xF4, 255)
+    }
+}
+
+impl ColorPicker {
+    /// Creates a color picker from RGBA bytes.
+    pub fn from_rgba_u8(red: u8, green: u8, blue: u8, alpha: u8) -> Self {
+        let entry = COLOR_PICKER_ID_POOL.lock().unwrap().acquire();
+        Self::from_rgba_u8_with_entry(entry, red, green, blue, alpha)
+    }
+
+    fn from_rgba_u8_with_entry(entry: usize, red: u8, green: u8, blue: u8, alpha: u8) -> Self {
+        let (hue, saturation, value) = rgb_u8_to_hsv(red, green, blue);
+        Self {
+            entry,
+            red,
+            green,
+            blue,
+            alpha,
+            hue,
+            saturation,
+            value,
+        }
+    }
+
+    /// Updates RGB values from HSV while preserving alpha.
+    pub fn set_hsv(&mut self, hue: f32, saturation: f32, value: f32) {
+        self.hue = hue.rem_euclid(360.0);
+        self.saturation = saturation.clamp(0.0, 1.0);
+        self.value = value.clamp(0.0, 1.0);
+        let (r, g, b) = hsv_to_rgb_u8(self.hue, self.saturation, self.value);
+        self.red = r;
+        self.green = g;
+        self.blue = b;
+    }
+
+    /// Updates HSV values from RGB while preserving alpha.
+    pub fn set_rgb(&mut self, red: u8, green: u8, blue: u8) {
+        self.red = red;
+        self.green = green;
+        self.blue = blue;
+        let (hue, saturation, value) = rgb_u8_to_hsv(red, green, blue);
+        self.hue = hue;
+        self.saturation = saturation;
+        self.value = value;
+    }
+
+    /// Returns the current color as a HEX string (`#RRGGBB`).
+    pub fn hex(&self) -> String {
+        format!("#{:02X}{:02X}{:02X}", self.red, self.green, self.blue)
+    }
+
+    /// Returns the current color as an `rgb(r, g, b)` string.
+    pub fn rgb_string(&self) -> String {
+        format!("rgb({}, {}, {})", self.red, self.green, self.blue)
+    }
+
+    /// Returns the current color as an `rgba(r, g, b, a)` string (alpha in `0..255`).
+    pub fn rgba_string(&self) -> String {
+        format!(
+            "rgba({}, {}, {}, {})",
+            self.red, self.green, self.blue, self.alpha
+        )
+    }
+}
+
+pub fn hsv_to_rgb_u8(hue: f32, saturation: f32, value: f32) -> (u8, u8, u8) {
+    let h = hue.rem_euclid(360.0);
+    let s = saturation.clamp(0.0, 1.0);
+    let v = value.clamp(0.0, 1.0);
+
+    if s <= f32::EPSILON {
+        let gray = (v * 255.0).round() as u8;
+        return (gray, gray, gray);
+    }
+
+    let c = v * s;
+    let x = c * (1.0 - (((h / 60.0) % 2.0) - 1.0).abs());
+    let m = v - c;
+
+    let (r1, g1, b1) = match h as i32 {
+        0..=59 => (c, x, 0.0),
+        60..=119 => (x, c, 0.0),
+        120..=179 => (0.0, c, x),
+        180..=239 => (0.0, x, c),
+        240..=299 => (x, 0.0, c),
+        _ => (c, 0.0, x),
+    };
+
+    let to_u8 = |f: f32| ((f + m).clamp(0.0, 1.0) * 255.0).round() as u8;
+    (to_u8(r1), to_u8(g1), to_u8(b1))
+}
+
+fn rgb_u8_to_hsv(red: u8, green: u8, blue: u8) -> (f32, f32, f32) {
+    let r = red as f32 / 255.0;
+    let g = green as f32 / 255.0;
+    let b = blue as f32 / 255.0;
+
+    let max = r.max(g.max(b));
+    let min = r.min(g.min(b));
+    let delta = max - min;
+
+    let hue = if delta <= f32::EPSILON {
+        0.0
+    } else if (max - r).abs() <= f32::EPSILON {
+        60.0 * (((g - b) / delta).rem_euclid(6.0))
+    } else if (max - g).abs() <= f32::EPSILON {
+        60.0 * (((b - r) / delta) + 2.0)
+    } else {
+        60.0 * (((r - g) / delta) + 4.0)
+    };
+
+    let saturation = if max <= f32::EPSILON {
+        0.0
+    } else {
+        delta / max
+    };
+    (hue.rem_euclid(360.0), saturation, max)
 }
 
 // ===============================================

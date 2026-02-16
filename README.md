@@ -28,10 +28,11 @@ Available features:
 - [x] HTML Bind support for interacting with the code.
 - [x] Font support for family and weight.
 - [x] Animation support (`@keyframes`).
+- [x] Breakpoint support (`@media` for window size).
 - [x] Validation for widgets like required fields.
 - [x] CSS `*` support.
 - [x] Custom Cursor or system cursor support.
-- [ ] Form Widget for validation and submission.
+- [x] Form Widget for validation and submission.
 - [ ] Customizable theme.
 
 There are many other things, but currently you can use the core (HTML / CSS) features.
@@ -55,12 +56,15 @@ bevy_extended_ui_macros = "1.4.0"
 ```
 
 #### Features
-| Feature           | Description                               |
-|-------------------|-------------------------------------------|
-| `default`         | Enables all default features.             |
-| `fluent`          | Enables Fluent Language support.          |
-| `properties-lang` | Enables Java Properties Language support. |
-| `clipboard-wasm`  | Enables WASM clipboard support web.       |
+| Feature            | Description                                                                                          |
+|--------------------|------------------------------------------------------------------------------------------------------|
+| `default`          | Enables `css-breakpoints`.                                                                           |
+| `wasm-default`     | Web preset: `wasm-breakpoints` + `clipboard-wasm` with legacy WASM CSS/style pipeline compatibility. |
+| `css-breakpoints`  | Desktop breakpoints via primary window.                                                              |
+| `wasm-breakpoints` | WASM breakpoints via browser viewport.                                                               |
+| `fluent`           | Enables Fluent Language support.                                                                     |
+| `properties-lang`  | Enables Java Properties Language support.                                                            |
+| `clipboard-wasm`   | Enables WASM clipboard support web.                                                                  |
 
 Then, you add the plugin to your `main.rs` or on any point at a build function:
 
@@ -108,7 +112,8 @@ fn test_click(In(event): In<HtmlEvent>) {
 Note that currently you can use this binding:
 
 - `onclick`
-- `onchange` Only for `<select>`, `<fieldset>`, `<input>`, `<checkbox>` and `<slider>` elements.
+- `onchange` Only for `<select>`, `<fieldset>`, `<input>`, `<checkbox>`, `<slider>` and `<colorpicker>` elements.
+- `action` on `<form>` for submit handlers with collected input data
 - `oninit`
 - `onmouseover`
 - `onmouseout`
@@ -235,6 +240,28 @@ Basic `@keyframes` usage example:
 
 You can now use `@keyframes` in your CSS. There is now a limit tested; this means that you can use any CSS property.
 
+### Breakpoint support
+
+Basic `@media` usage for breakpoints:
+
+```css
+.desktop-panel {
+  display: flex;
+}
+
+@media (max-width: 900px) {
+  .desktop-panel {
+    display: none;
+  }
+}
+```
+
+Breakpoint runtime source is feature-based:
+
+- `css-breakpoints` (default): tracks Bevy `PrimaryWindow` size.
+- `wasm-breakpoints`: tracks browser viewport (`window.innerWidth/innerHeight`) for WASM and overrides `css-breakpoints` when enabled.
+- `wasm-default`: enables `wasm-breakpoints` and `clipboard-wasm` as a web preset.
+
 ### What comes next?
 
 Next, I'd like to build a website that's structured like React documentation.
@@ -247,9 +274,11 @@ If anyone has any ideas, I'd be happy to hear them.
 
 | `Bevy` version | `bevy_extended_ui` version |
 |----------------|----------------------------|
-| 0.18.0         | 1.2.0 - 1.3.0              |
+| 0.18.0         | 1.2.0 - 1.4.0              |
 | 0.17.0         | 1.0.0 - 1.1.0              |
 | 0.16.0         | 0.1.0 - 0.2.2              |
+
+> _Note:_ Version 0.1.0–0.3.0 are deprecated and will not be supported. If you’re interested in a version for bevy 0.16, then create an issue!
 
 ### Important Links
 
