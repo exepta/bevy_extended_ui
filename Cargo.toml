@@ -21,7 +21,7 @@ name = "bevy_extended_ui"
 path = "src/lib.rs"
 
 [features]
-default = ["css-breakpoints"]
+default = ["css-breakpoints", "fluent"]
 css-breakpoints = []
 wasm-breakpoints = ["dep:web-sys"]
 fluent = ["dep:i18n", "dep:i18n-fluent", "dep:unic-langid"]
