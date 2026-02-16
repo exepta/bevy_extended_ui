@@ -165,6 +165,7 @@ fn collect_html_ids(nodes: &Vec<HtmlWidgetNode>, ids: &mut Vec<HtmlID>) {
             }
             HtmlWidgetNode::Button(_, _, _, _, _, id)
             | HtmlWidgetNode::CheckBox(_, _, _, _, _, id)
+            | HtmlWidgetNode::ColorPicker(_, _, _, _, _, id)
             | HtmlWidgetNode::ChoiceBox(_, _, _, _, _, id)
             | HtmlWidgetNode::Divider(_, _, _, _, _, id)
             | HtmlWidgetNode::Headline(_, _, _, _, _, id)
@@ -230,6 +231,17 @@ fn spawn_widget_node(
             widget,
             id,
         ),
+        HtmlWidgetNode::ColorPicker(color_picker, meta, states, functions, widget, id) => {
+            spawn_with_meta(
+                commands,
+                color_picker.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+            )
+        }
         HtmlWidgetNode::ChoiceBox(choice_box, meta, states, functions, widget, id) => {
             spawn_with_meta(
                 commands,

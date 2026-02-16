@@ -75,6 +75,25 @@ fn invalidate_css_cache_on_asset_change(mut ev: MessageReader<AssetEvent<CssAsse
     }
 }
 
+fn get_or_parse_css(handle: &Handle<CssAsset>, css_assets: &Assets<CssAsset>) -> Option<ParsedCss> {
+    let asset_id = handle.id();
+
+    if let Some(cached) = PARSED_CSS_CACHE
+        .read()
+        .ok()
+        .and_then(|cache| cache.get(&asset_id).cloned())
+    {
+        return Some(cached);
+    }
+
+    let css_asset = css_assets.get(handle)?;
+    let parsed = load_css(&css_asset.text);
+    if let Ok(mut cache) = PARSED_CSS_CACHE.write() {
+        cache.insert(asset_id, parsed.clone());
+    }
+    Some(parsed)
+}
+
 /// Updates the reverse index of entities using each CSS asset.
 fn update_css_users_index(
     mut css_users: ResMut<CssUsers>,
@@ -138,7 +157,7 @@ fn mark_css_users_dirty_on_viewport_change(
     }
 }
 
-/// Returns true when at least one media rule changes match state between two viewports.
+/// Returns true when at least one media rule changes the match state between two viewports.
 fn media_match_changed_between_viewports(
     css_query: &Query<(Entity, &CssSource)>,
     css_assets: &Assets<CssAsset>,
@@ -154,21 +173,8 @@ fn media_match_changed_between_viewports(
                 continue;
             }
 
-            let parsed = if let Some(cached) = PARSED_CSS_CACHE
-                .read()
-                .ok()
-                .and_then(|cache| cache.get(&asset_id).cloned())
-            {
-                cached
-            } else {
-                let Some(css_asset) = css_assets.get(handle) else {
-                    continue;
-                };
-                let parsed = load_css(&css_asset.text);
-                if let Ok(mut cache) = PARSED_CSS_CACHE.write() {
-                    cache.insert(asset_id, parsed.clone());
-                }
-                parsed
+            let Some(parsed) = get_or_parse_css(handle, css_assets) else {
+                continue;
             };
 
             for style in parsed.styles.values() {
@@ -333,23 +339,8 @@ fn load_and_merge_styles_from_assets(
     let mut merged_keyframes: HashMap<String, Vec<AnimationKeyframe>> = HashMap::new();
 
     for (index, handle) in sources.iter().enumerate() {
-        let asset_id = handle.id();
-
-        let parsed_map = if let Some(cached) = PARSED_CSS_CACHE
-            .read()
-            .ok()
-            .and_then(|c| c.get(&asset_id).cloned())
-        {
-            cached
-        } else {
-            let Some(css_asset) = css_assets.get(handle) else {
-                continue;
-            };
-            let parsed = load_css(&css_asset.text);
-            if let Ok(mut cache) = PARSED_CSS_CACHE.write() {
-                cache.insert(asset_id, parsed.clone());
-            }
-            parsed
+        let Some(parsed_map) = get_or_parse_css(handle, css_assets) else {
+            continue;
         };
 
         for (selector_key, new_style) in parsed_map.styles.iter() {
@@ -372,7 +363,7 @@ fn load_and_merge_styles_from_assets(
                     .and_modify(|existing| {
                         existing.normal.merge(&new_style.normal);
                         existing.important.merge(&new_style.important);
-                        existing.origin = index; // Update origin to latest source
+                        existing.origin = index; // Update origin to the latest source
                     })
                     .or_insert_with(|| {
                         let mut s = new_style.clone();

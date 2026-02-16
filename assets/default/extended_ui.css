@@ -592,6 +592,121 @@ slider {
     }
 }
 
+/* Color Picker */
+
+colorpicker {
+    width: auto;
+    min-height: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    flex-direction: column;
+    position: relative;
+    overflow: visible;
+}
+
+colorpicker > .color-picker-trigger {
+    min-width: 220px;
+    height: 42px;
+    padding: 0 12px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: row;
+    gap: 6px;
+    border: 1px #dadce0;
+    border-radius: 12px;
+    box-shadow: 0 1px 2px rgba(60, 64, 67, 0.25);
+    transition: all 0.2s;
+    cursor: pointer;
+}
+
+colorpicker > .color-picker-trigger > .color-value-hex {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+colorpicker > .color-picker-modal {
+    width: 340px;
+    min-height: 294px;
+    padding: 14px;
+    display: flex;
+    justify-content: flex-start;
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+    position: absolute;
+    border: 1px #dadce0;
+    border-radius: 16px;
+    background: #ffffff;
+    box-shadow: 0 10px 30px rgba(60, 64, 67, 0.32);
+    z-index: 20;
+}
+
+colorpicker > .color-picker-modal > .color-canvas {
+    width: 100%;
+    height: 192px;
+    min-height: 192px;
+    border-radius: 12px;
+    border: 1px #dadce0;
+    overflow: hidden;
+    position: relative;
+}
+
+colorpicker > .color-picker-modal > .color-canvas > .color-canvas-thumb {
+    width: 14px;
+    height: 14px;
+    min-width: 14px;
+    min-height: 14px;
+    border-radius: 50%;
+    border: 2px #ffffff;
+    box-shadow: 0 0 0 1px rgba(32, 33, 36, 0.55);
+}
+
+colorpicker > .color-picker-modal > .color-hue-track,
+colorpicker > .color-picker-modal > .color-alpha-track {
+    width: 100%;
+    height: 14px;
+    min-height: 14px;
+    border-radius: 999px;
+    border: 1px #dadce0;
+    overflow: hidden;
+    position: relative;
+}
+
+colorpicker > .color-picker-modal > .color-hue-track > .color-track-thumb,
+colorpicker > .color-picker-modal > .color-alpha-track > .color-track-thumb {
+    width: 14px;
+    height: 14px;
+    min-width: 14px;
+    min-height: 14px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: 2px #1a73e8;
+    box-shadow: 0 0 0 1px rgba(32, 33, 36, 0.35);
+}
+
+colorpicker > .color-picker-modal > .color-values {
+    width: 100%;
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
+}
+
+colorpicker .color-value {
+    color: #5f6368;
+    font-size: 13px;
+    font-weight: 400;
+}
+
+colorpicker > .color-picker-modal > .color-values > .color-value-rgba {
+    color: #202124;
+    font-weight: 600;
+}
+
 /* Switch Button */
 
 switch {

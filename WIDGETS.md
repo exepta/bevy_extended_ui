@@ -52,7 +52,7 @@ All three fields can be overridden at runtime via setters:
 
 Validation is only active inside `<form>`.
 Use `validate="Allways|Always|Send|Interact"` on the form (default: `Send`):
-- `Allways`/`Always`: validates continuously (state/input changes).
+- `All`/`Always`: validates continuously (state/input changes).
 - `Send`: validates only on submit click.
 - `Interact`: validates on input interaction (e.g. typing).
 
@@ -223,6 +223,18 @@ Inside a `<form>`, use `type="submit"` to submit the parent form without `onclic
 **HTML tag:**
 ```html
 <slider min="0" max="100" value="50" step="5"></slider>
+```
+
+---
+
+## ColorPicker (`ColorPicker`)
+
+**Struct purpose:** Canvas-based color selection widget with live `HEX`, `RGB`, and `RGBA` output.
+Supports optional initial `value` (`#hex`, `rgb(...)`, `rgba(...)`) and optional `alpha`.
+
+**HTML tag:**
+```html
+<colorpicker value="#4285f4" alpha="255" onchange="on_color_change"></colorpicker>
 ```
 
 ---

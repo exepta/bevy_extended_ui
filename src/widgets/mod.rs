@@ -4,6 +4,7 @@ mod controls;
 mod div;
 mod form;
 mod validation;
+mod widget_util;
 
 use crate::registry::*;
 use crate::styles::IconPlace;
@@ -175,7 +176,7 @@ fn apply_pattern_rule(args: &str, rules: &mut ValidationRules) {
     rules.pattern = Some(stripped.to_string());
 }
 
-/// Component carrying a widget ID and its kind.
+/// Component carrying a widget ID and it's kind.
 #[derive(Component, Clone, Copy, Debug)]
 pub struct WidgetId {
     pub id: usize,
@@ -187,6 +188,7 @@ pub struct WidgetId {
 pub enum WidgetKind {
     Body,
     Button,
+    ColorPicker,
     CheckBox,
     ChoiceBox,
     Div,
@@ -275,7 +277,7 @@ impl Default for Div {
 //                       Form
 // ===============================================
 
-/// Form container widget with optional submit action handler name.
+/// Form the container widget with an optional submit action handler name.
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, GlobalTransform, InheritedVisibility, Widget)]
@@ -313,7 +315,7 @@ impl FormValidationMode {
     /// Parses a validation mode from the form `validate` attribute.
     pub fn from_str(value: &str) -> Option<FormValidationMode> {
         match value.trim().to_ascii_lowercase().as_str() {
-            "always" | "allways" => Some(FormValidationMode::Always),
+            "always" | "all" => Some(FormValidationMode::Always),
             "send" => Some(FormValidationMode::Send),
             "interact" => Some(FormValidationMode::Interact),
             _ => None,
@@ -921,6 +923,149 @@ impl Default for Slider {
             max: 100.0,
         }
     }
+}
+
+// ===============================================
+//                    Color Picker
+// ===============================================
+
+/// Color picker widget with HSV interaction and RGB/RGBA/HEX output values.
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+#[require(UIGenID, UIWidgetState, Widget)]
+pub struct ColorPicker {
+    pub entry: usize,
+    pub red: u8,
+    pub green: u8,
+    pub blue: u8,
+    pub alpha: u8,
+    pub hue: f32,
+    pub saturation: f32,
+    pub value: f32,
+}
+
+impl Default for ColorPicker {
+    /// Creates a default color picker set to Google blue.
+    fn default() -> Self {
+        let entry = COLOR_PICKER_ID_POOL.lock().unwrap().acquire();
+        Self::from_rgba_u8_with_entry(entry, 0x42, 0x85, 0xF4, 255)
+    }
+}
+
+impl ColorPicker {
+    /// Creates a color picker from RGBA bytes.
+    pub fn from_rgba_u8(red: u8, green: u8, blue: u8, alpha: u8) -> Self {
+        let entry = COLOR_PICKER_ID_POOL.lock().unwrap().acquire();
+        Self::from_rgba_u8_with_entry(entry, red, green, blue, alpha)
+    }
+
+    fn from_rgba_u8_with_entry(entry: usize, red: u8, green: u8, blue: u8, alpha: u8) -> Self {
+        let (hue, saturation, value) = rgb_u8_to_hsv(red, green, blue);
+        Self {
+            entry,
+            red,
+            green,
+            blue,
+            alpha,
+            hue,
+            saturation,
+            value,
+        }
+    }
+
+    /// Updates RGB values from HSV while preserving alpha.
+    pub fn set_hsv(&mut self, hue: f32, saturation: f32, value: f32) {
+        self.hue = hue.rem_euclid(360.0);
+        self.saturation = saturation.clamp(0.0, 1.0);
+        self.value = value.clamp(0.0, 1.0);
+        let (r, g, b) = hsv_to_rgb_u8(self.hue, self.saturation, self.value);
+        self.red = r;
+        self.green = g;
+        self.blue = b;
+    }
+
+    /// Updates HSV values from RGB while preserving alpha.
+    pub fn set_rgb(&mut self, red: u8, green: u8, blue: u8) {
+        self.red = red;
+        self.green = green;
+        self.blue = blue;
+        let (hue, saturation, value) = rgb_u8_to_hsv(red, green, blue);
+        self.hue = hue;
+        self.saturation = saturation;
+        self.value = value;
+    }
+
+    /// Returns the current color as a HEX string (`#RRGGBB`).
+    pub fn hex(&self) -> String {
+        format!("#{:02X}{:02X}{:02X}", self.red, self.green, self.blue)
+    }
+
+    /// Returns the current color as an `rgb(r, g, b)` string.
+    pub fn rgb_string(&self) -> String {
+        format!("rgb({}, {}, {})", self.red, self.green, self.blue)
+    }
+
+    /// Returns the current color as an `rgba(r, g, b, a)` string (alpha in `0..255`).
+    pub fn rgba_string(&self) -> String {
+        format!(
+            "rgba({}, {}, {}, {})",
+            self.red, self.green, self.blue, self.alpha
+        )
+    }
+}
+
+pub fn hsv_to_rgb_u8(hue: f32, saturation: f32, value: f32) -> (u8, u8, u8) {
+    let h = hue.rem_euclid(360.0);
+    let s = saturation.clamp(0.0, 1.0);
+    let v = value.clamp(0.0, 1.0);
+
+    if s <= f32::EPSILON {
+        let gray = (v * 255.0).round() as u8;
+        return (gray, gray, gray);
+    }
+
+    let c = v * s;
+    let x = c * (1.0 - (((h / 60.0) % 2.0) - 1.0).abs());
+    let m = v - c;
+
+    let (r1, g1, b1) = match h as i32 {
+        0..=59 => (c, x, 0.0),
+        60..=119 => (x, c, 0.0),
+        120..=179 => (0.0, c, x),
+        180..=239 => (0.0, x, c),
+        240..=299 => (x, 0.0, c),
+        _ => (c, 0.0, x),
+    };
+
+    let to_u8 = |f: f32| ((f + m).clamp(0.0, 1.0) * 255.0).round() as u8;
+    (to_u8(r1), to_u8(g1), to_u8(b1))
+}
+
+fn rgb_u8_to_hsv(red: u8, green: u8, blue: u8) -> (f32, f32, f32) {
+    let r = red as f32 / 255.0;
+    let g = green as f32 / 255.0;
+    let b = blue as f32 / 255.0;
+
+    let max = r.max(g.max(b));
+    let min = r.min(g.min(b));
+    let delta = max - min;
+
+    let hue = if delta <= f32::EPSILON {
+        0.0
+    } else if (max - r).abs() <= f32::EPSILON {
+        60.0 * (((g - b) / delta).rem_euclid(6.0))
+    } else if (max - g).abs() <= f32::EPSILON {
+        60.0 * (((b - r) / delta) + 2.0)
+    } else {
+        60.0 * (((r - g) / delta) + 4.0)
+    };
+
+    let saturation = if max <= f32::EPSILON {
+        0.0
+    } else {
+        delta / max
+    };
+    (hue.rem_euclid(360.0), saturation, max)
 }
 
 // ===============================================
