@@ -3256,4 +3256,34 @@ mod tests {
         assert!(background.gradient.is_some());
         assert_ne!(background.color, Color::NONE);
     }
+
+    #[test]
+    fn parses_body_flex_layout_properties() {
+        let parsed = load_css(
+            r#"
+            body {
+                width: 100vw;
+                height: 100vh;
+                display: flex;
+                flex-direction: column;
+                justify-content: flex-start;
+                align-items: flex-start;
+                flex-wrap: wrap;
+                background: linear-gradient(to bottom right, #6a00ff, #ff006a);
+            }
+        "#,
+        );
+
+        let pair = parsed
+            .styles
+            .values()
+            .find(|pair| pair.selector == "body")
+            .expect("missing parsed body style");
+
+        assert_eq!(pair.normal.display, Some(Display::Flex));
+        assert_eq!(pair.normal.flex_direction, Some(FlexDirection::Column));
+        assert_eq!(pair.normal.justify_content, Some(JustifyContent::FlexStart));
+        assert_eq!(pair.normal.align_items, Some(AlignItems::FlexStart));
+        assert_eq!(pair.normal.flex_wrap, Some(FlexWrap::Wrap));
+    }
 }

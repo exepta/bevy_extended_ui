@@ -306,7 +306,7 @@ Tracks support:
 
 ## Media Queries (Breakpoints)
 
-`@media` rules are supported and are re-evaluated automatically when the primary window size changes.
+`@media` rules are supported and are re-evaluated automatically when the configured viewport changes.
 
 Supported media-query parts:
 
@@ -319,7 +319,8 @@ Supported media-query parts:
 Notes:
 
 - Unsupported media features currently evaluate as non-matching.
-- Breakpoints are evaluated against the current primary-window width/height in logical pixels.
+- `css-breakpoints` (default) evaluates against Bevy `PrimaryWindow` width/height in logical pixels.
+- `wasm-breakpoints` evaluates against browser viewport (`window.innerWidth/innerHeight`) and overrides `css-breakpoints` when enabled.
 
 ## Limitations
 

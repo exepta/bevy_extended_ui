@@ -64,6 +64,11 @@ impl Plugin for StyleService {
         app.init_resource::<BackdropCaptureState>();
         app.add_plugins(ExtractResourcePlugin::<BackdropCaptureState>::default());
         app.add_plugins(UiMaterialPlugin::<BackdropBlurMaterial>::default());
+        #[cfg(not(all(feature = "wasm-default", target_arch = "wasm32")))]
+        app.add_systems(
+            PostUpdate,
+            mark_new_nodes_for_style_refresh.before(update_widget_styles_system),
+        );
         app.add_systems(
             PostUpdate,
             (
@@ -151,6 +156,10 @@ struct CssCursorState {
     active: bool,
     previous: Option<CursorIcon>,
 }
+
+/// Marker to force a style application pass when a UI node was just created.
+#[derive(Component)]
+pub(crate) struct StyleRefreshOnNodeAdded;
 
 #[derive(ShaderType, Clone, Copy, Debug)]
 struct BackdropBlurUniform {
@@ -299,6 +308,16 @@ fn update_css_cursor_icons(
     }
 }
 
+#[cfg(not(all(feature = "wasm-default", target_arch = "wasm32")))]
+fn mark_new_nodes_for_style_refresh(
+    mut commands: Commands,
+    query: Query<Entity, (Added<Node>, With<UiStyle>)>,
+) {
+    for entity in query.iter() {
+        commands.entity(entity).insert(StyleRefreshOnNodeAdded);
+    }
+}
+
 /// Computes active styles for widgets and applies them to UI components.
 pub fn update_widget_styles_system(
     mut commands: Commands,
@@ -307,9 +326,15 @@ pub fn update_widget_styles_system(
             Entity,
             Option<&UIWidgetState>,
             Option<&HtmlStyle>,
+            Option<&StyleRefreshOnNodeAdded>,
             &mut UiStyle,
         ),
-        Or<(Changed<UiStyle>, Changed<HtmlStyle>, Changed<UIWidgetState>)>,
+        Or<(
+            Changed<UiStyle>,
+            Changed<HtmlStyle>,
+            Changed<UIWidgetState>,
+            Added<StyleRefreshOnNodeAdded>,
+        )>,
     >,
     mut transition_query: Query<Option<&mut StyleTransition>>,
     mut animation_query: Query<Option<&mut StyleAnimation>>,
@@ -319,8 +344,9 @@ pub fn update_widget_styles_system(
     mut image_cache: ResMut<ImageCache>,
     mut images: ResMut<Assets<Image>>,
 ) {
-    for (entity, state_opt, html_style_opt, mut ui_style) in query.iter_mut() {
+    for (entity, state_opt, html_style_opt, refresh_on_node_added, mut ui_style) in query.iter_mut() {
         let state = state_opt.cloned().unwrap_or_default();
+        let node_added = refresh_on_node_added.is_some();
 
         let mut base_styles: Vec<(&String, u32, usize)> = vec![];
         let mut pseudo_styles: Vec<(&String, u32, usize)> = vec![];
@@ -413,11 +439,17 @@ pub fn update_widget_styles_system(
             }
 
             apply_transform_style_if_blocked(&mut qs, entity, &final_style, &copy_spec);
+            if node_added {
+                commands.entity(entity).remove::<StyleRefreshOnNodeAdded>();
+            }
             continue;
         }
 
         if let Some(transition) = transition.as_mut() {
             if !has_changed {
+                if node_added {
+                    commands.entity(entity).remove::<StyleRefreshOnNodeAdded>();
+                }
                 continue;
             }
 
@@ -432,10 +464,13 @@ pub fn update_widget_styles_system(
             transition.to_transform = to_transform;
 
             apply_transform_style_if_blocked(&mut qs, entity, &final_style, &transition.spec);
+            if node_added {
+                commands.entity(entity).remove::<StyleRefreshOnNodeAdded>();
+            }
             continue;
         }
 
-        if !has_changed {
+        if !has_changed && !node_added {
             continue;
         }
 
@@ -447,6 +482,10 @@ pub fn update_widget_styles_system(
                 &mut image_cache,
                 &mut images,
             );
+        }
+
+        if node_added {
+            commands.entity(entity).remove::<StyleRefreshOnNodeAdded>();
         }
     }
 }
@@ -621,11 +660,7 @@ fn apply_calc_styles_system(
     computed_query: Query<&ComputedNode>,
     window_q: Query<&Window, With<PrimaryWindow>>,
 ) {
-    let viewport = window_q
-        .iter()
-        .next()
-        .map(|window| window.resolution.size())
-        .unwrap_or_default();
+    let viewport = resolve_layout_viewport(&window_q).unwrap_or_default();
 
     for (_entity, ui_style, transition_opt, animation_opt, parent_opt, node_opt) in query.iter_mut()
     {
@@ -767,6 +802,43 @@ fn apply_calc_styles_system(
             node.column_gap = val;
         }
     }
+}
+
+#[cfg(all(feature = "wasm-default", target_arch = "wasm32"))]
+fn resolve_layout_viewport(window_q: &Query<&Window, With<PrimaryWindow>>) -> Option<Vec2> {
+    let window = window_q.single().ok()?;
+    Some(window.resolution.size())
+}
+
+#[cfg(all(
+    feature = "wasm-breakpoints",
+    not(feature = "wasm-default"),
+    target_arch = "wasm32"
+))]
+fn resolve_layout_viewport(_window_q: &Query<&Window, With<PrimaryWindow>>) -> Option<Vec2> {
+    let window = web_sys::window()?;
+    let width = window.inner_width().ok()?.as_f64()? as f32;
+    let height = window.inner_height().ok()?.as_f64()? as f32;
+    Some(Vec2::new(width, height))
+}
+
+#[cfg(all(feature = "wasm-breakpoints", not(target_arch = "wasm32")))]
+fn resolve_layout_viewport(_window_q: &Query<&Window, With<PrimaryWindow>>) -> Option<Vec2> {
+    None
+}
+
+#[cfg(all(not(feature = "wasm-breakpoints"), feature = "css-breakpoints"))]
+fn resolve_layout_viewport(window_q: &Query<&Window, With<PrimaryWindow>>) -> Option<Vec2> {
+    let window = window_q.single().ok()?;
+    Some(window.resolution.size())
+}
+
+#[cfg(all(
+    not(feature = "wasm-breakpoints"),
+    not(feature = "css-breakpoints")
+))]
+fn resolve_layout_viewport(_window_q: &Query<&Window, With<PrimaryWindow>>) -> Option<Vec2> {
+    None
 }
 
 fn apply_background_gradients_system(

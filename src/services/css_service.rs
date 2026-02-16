@@ -47,7 +47,19 @@ impl Plugin for CssService {
     fn build(&self, app: &mut App) {
         app.init_resource::<ExistingCssIDs>();
         app.init_resource::<CssUsers>();
+        #[cfg(not(all(feature = "wasm-default", target_arch = "wasm32")))]
         app.init_resource::<CssViewportTracker>();
+        #[cfg(all(feature = "wasm-default", target_arch = "wasm32"))]
+        app.add_systems(
+            Update,
+            (
+                invalidate_css_cache_on_asset_change,
+                update_css_users_index,
+                apply_css_to_entities_legacy,
+            )
+                .chain(),
+        );
+        #[cfg(not(all(feature = "wasm-default", target_arch = "wasm32")))]
         app.add_systems(
             Update,
             (
@@ -112,7 +124,7 @@ fn update_css_users_index(
     }
 }
 
-/// Marks all CSS users dirty when the primary window size changes.
+/// Marks all CSS users dirty when the active breakpoint viewport changes.
 fn mark_css_users_dirty_on_viewport_change(
     mut commands: Commands,
     mut viewport_tracker: ResMut<CssViewportTracker>,
@@ -120,21 +132,18 @@ fn mark_css_users_dirty_on_viewport_change(
     css_assets: Res<Assets<CssAsset>>,
     css_query: Query<(Entity, &CssSource)>,
 ) {
-    let Ok(window) = window_query.single() else {
+    let Some(next_viewport) = resolve_breakpoint_viewport(&window_query) else {
         return;
     };
 
-    let width = window.resolution.width();
-    let height = window.resolution.height();
-    let viewport_changed = (viewport_tracker.width - width).abs() > 0.5
-        || (viewport_tracker.height - height).abs() > 0.5;
+    let viewport_changed = (viewport_tracker.width - next_viewport.x).abs() > 0.5
+        || (viewport_tracker.height - next_viewport.y).abs() > 0.5;
 
     if !viewport_changed {
         return;
     }
 
     let prev_viewport = Vec2::new(viewport_tracker.width, viewport_tracker.height);
-    let next_viewport = Vec2::new(width, height);
 
     let breakpoint_changed = if prev_viewport.x < 0.0 || prev_viewport.y < 0.0 {
         // Initial resize tracking warm-up: startup CssSource insertion already triggers CSS apply.
@@ -143,8 +152,8 @@ fn mark_css_users_dirty_on_viewport_change(
         media_match_changed_between_viewports(&css_query, &css_assets, prev_viewport, next_viewport)
     };
 
-    viewport_tracker.width = width;
-    viewport_tracker.height = height;
+    viewport_tracker.width = next_viewport.x;
+    viewport_tracker.height = next_viewport.y;
 
     if !breakpoint_changed {
         return;
@@ -155,6 +164,39 @@ fn mark_css_users_dirty_on_viewport_change(
             entity_commands.insert(CssDirty);
         }
     }
+}
+
+/// Returns the viewport used for media-query breakpoints.
+///
+/// Feature behavior:
+/// - `wasm-breakpoints` overrides `css-breakpoints` when enabled.
+/// - `css-breakpoints` reads from Bevy's primary window (desktop/default).
+/// - no active breakpoint feature returns `None`.
+#[cfg(all(feature = "wasm-breakpoints", target_arch = "wasm32"))]
+fn resolve_breakpoint_viewport(_window_query: &Query<&Window, With<PrimaryWindow>>) -> Option<Vec2> {
+    let window = web_sys::window()?;
+    let width = window.inner_width().ok()?.as_f64()? as f32;
+    let height = window.inner_height().ok()?.as_f64()? as f32;
+    Some(Vec2::new(width, height))
+}
+
+#[cfg(all(feature = "wasm-breakpoints", not(target_arch = "wasm32")))]
+fn resolve_breakpoint_viewport(_window_query: &Query<&Window, With<PrimaryWindow>>) -> Option<Vec2> {
+    None
+}
+
+#[cfg(all(not(feature = "wasm-breakpoints"), feature = "css-breakpoints"))]
+fn resolve_breakpoint_viewport(window_query: &Query<&Window, With<PrimaryWindow>>) -> Option<Vec2> {
+    let window = window_query.single().ok()?;
+    Some(Vec2::new(window.resolution.width(), window.resolution.height()))
+}
+
+#[cfg(all(
+    not(feature = "wasm-breakpoints"),
+    not(feature = "css-breakpoints")
+))]
+fn resolve_breakpoint_viewport(_window_query: &Query<&Window, With<PrimaryWindow>>) -> Option<Vec2> {
+    None
 }
 
 /// Returns true when at least one media rule changes the match state between two viewports.
@@ -254,10 +296,7 @@ fn apply_css_to_entities(
         return;
     }
 
-    let viewport = window_query
-        .single()
-        .map(|window| Vec2::new(window.resolution.width(), window.resolution.height()))
-        .unwrap_or(Vec2::ZERO);
+    let viewport = resolve_breakpoint_viewport(&window_query).unwrap_or(Vec2::ZERO);
 
     for entity in dirty {
         let Ok((_, css_source, id, class, tag, parent, dirty_marker)) =
@@ -319,6 +358,104 @@ fn apply_css_to_entities(
     }
 }
 
+/// Legacy CSS apply path used for WASM compatibility mode.
+///
+/// This intentionally mirrors the pre-breakpoint-refresh behavior.
+#[cfg(all(feature = "wasm-default", target_arch = "wasm32"))]
+fn apply_css_to_entities_legacy(
+    mut commands: Commands,
+    css_assets: Res<Assets<CssAsset>>,
+    mut css_events: MessageReader<AssetEvent<CssAsset>>,
+    css_users: Res<CssUsers>,
+    query_changed_source: Query<
+        (
+            Entity,
+            &CssSource,
+            Option<&CssID>,
+            Option<&CssClass>,
+            Option<&TagName>,
+            Option<&ChildOf>,
+            Option<&CssDirty>,
+        ),
+        Or<(Changed<CssSource>, Added<CssSource>, Added<CssDirty>)>,
+    >,
+    parent_query: Query<(
+        Option<&CssID>,
+        Option<&CssClass>,
+        Option<&TagName>,
+        Option<&ChildOf>,
+    )>,
+    style_query: Query<Option<&UiStyle>>,
+) {
+    let mut dirty: HashSet<Entity> = HashSet::new();
+
+    for (e, _, _, _, _, _, _) in query_changed_source.iter() {
+        dirty.insert(e);
+    }
+
+    for ev in css_events.read() {
+        let id = match ev {
+            AssetEvent::Modified { id } | AssetEvent::Removed { id } => Some(*id),
+            _ => None,
+        };
+        let Some(id) = id else { continue };
+
+        if let Some(users) = css_users.users.get(&id) {
+            dirty.extend(users.iter().copied());
+        }
+    }
+
+    if dirty.is_empty() {
+        return;
+    }
+
+    for entity in dirty {
+        let Ok((_, css_source, id, class, tag, parent, _dirty_marker)) =
+            query_changed_source.get(entity)
+        else {
+            continue;
+        };
+
+        let merged_css = load_and_merge_styles_from_assets_legacy(
+            &css_source.0,
+            &css_assets,
+            id,
+            class,
+            tag,
+            parent,
+            &parent_query,
+        );
+
+        let primary_css = css_source.0.first().cloned().unwrap_or_default();
+        let final_style = UiStyle {
+            css: primary_css,
+            styles: merged_css.styles,
+            keyframes: merged_css.keyframes,
+            active_style: None,
+        };
+
+        match style_query.get(entity) {
+            Ok(Some(existing)) if existing.styles != final_style.styles => {
+                commands
+                    .entity(entity)
+                    .queue_silenced(move |mut ew: EntityWorldMut| {
+                        ew.insert(final_style);
+                        ew.remove::<CssDirty>();
+                    });
+            }
+            Ok(None) => {
+                commands
+                    .entity(entity)
+                    .queue_silenced(move |mut ew: EntityWorldMut| {
+                        ew.insert(final_style);
+                        ew.remove::<CssDirty>();
+                    });
+            }
+            _ => {}
+        }
+    }
+}
+
 /// Loads and merges CSS styles from multiple sources with selector matching.
 fn load_and_merge_styles_from_assets(
     sources: &[Handle<CssAsset>],
@@ -364,6 +501,64 @@ fn load_and_merge_styles_from_assets(
                         existing.normal.merge(&new_style.normal);
                         existing.important.merge(&new_style.important);
                         existing.origin = index; // Update origin to the latest source
+                    })
+                    .or_insert_with(|| {
+                        let mut s = new_style.clone();
+                        s.origin = index;
+                        s
+                    });
+            }
+        }
+
+        for (name, keyframes) in parsed_map.keyframes.iter() {
+            merged_keyframes.insert(name.clone(), keyframes.clone());
+        }
+    }
+
+    ParsedCss {
+        styles: merged_styles,
+        keyframes: merged_keyframes,
+    }
+}
+
+#[cfg(all(feature = "wasm-default", target_arch = "wasm32"))]
+fn load_and_merge_styles_from_assets_legacy(
+    sources: &[Handle<CssAsset>],
+    css_assets: &Assets<CssAsset>,
+    id: Option<&CssID>,
+    class: Option<&CssClass>,
+    tag: Option<&TagName>,
+    parent: Option<&ChildOf>,
+    parent_query: &Query<(
+        Option<&CssID>,
+        Option<&CssClass>,
+        Option<&TagName>,
+        Option<&ChildOf>,
+    )>,
+) -> ParsedCss {
+    let mut merged_styles: HashMap<String, StylePair> = HashMap::new();
+    let mut merged_keyframes: HashMap<String, Vec<AnimationKeyframe>> = HashMap::new();
+
+    for (index, handle) in sources.iter().enumerate() {
+        let Some(parsed_map) = get_or_parse_css(handle, css_assets) else {
+            continue;
+        };
+
+        for (selector_key, new_style) in parsed_map.styles.iter() {
+            let selector = if new_style.selector.is_empty() {
+                selector_key.as_str()
+            } else {
+                new_style.selector.as_str()
+            };
+            let selector_parts = parse_selector_steps(selector);
+
+            if matches_selector_chain(&selector_parts, id, class, tag, parent, parent_query) {
+                merged_styles
+                    .entry(selector_key.clone())
+                    .and_modify(|existing| {
+                        existing.normal.merge(&new_style.normal);
+                        existing.important.merge(&new_style.important);
+                        existing.origin = index;
                     })
                     .or_insert_with(|| {
                         let mut s = new_style.clone();
