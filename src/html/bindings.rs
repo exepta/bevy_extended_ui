@@ -852,6 +852,27 @@ pub(crate) fn on_html_scroll(
 //                       Keyboard
 // =================================================
 
+fn find_keyboard_target_entity(
+    current_widget_state: &CurrentWidgetState,
+    q_bindings: &Query<(Entity, &UIGenID, &HtmlEventBindings, &UIWidgetState)>,
+) -> Option<Entity> {
+    if current_widget_state.widget_id != 0 {
+        for (entity, id, _, _) in q_bindings {
+            if id.get() == current_widget_state.widget_id {
+                return Some(entity);
+            }
+        }
+    }
+
+    for (entity, _, _, state) in q_bindings {
+        if state.focused {
+            return Some(entity);
+        }
+    }
+
+    None
+}
+
 /// Emits key-down events for the focused widget.
 pub(crate) fn emit_html_key_down_events(
     mut commands: Commands,
@@ -864,29 +885,13 @@ pub(crate) fn emit_html_key_down_events(
         return;
     }
 
-    let mut target = None;
-    if current_widget_state.widget_id != 0 {
-        for (entity, id, bindings, state) in &q_bindings {
-            if id.get() == current_widget_state.widget_id {
-                target = Some((entity, bindings, state.disabled));
-                break;
-            }
-        }
-    }
-
-    if target.is_none() {
-        for (entity, _, bindings, state) in &q_bindings {
-            if state.focused {
-                target = Some((entity, bindings, state.disabled));
-                break;
-            }
-        }
-    }
-
-    let Some((entity, bindings, disabled)) = target else {
+    let Some(entity) = find_keyboard_target_entity(&current_widget_state, &q_bindings) else {
         return;
     };
-    if disabled || bindings.onkeydown.is_none() {
+    let Ok((_, _, bindings, state)) = q_bindings.get(entity) else {
+        return;
+    };
+    if state.disabled || bindings.onkeydown.is_none() {
         return;
     }
 
@@ -907,29 +912,13 @@ pub(crate) fn emit_html_key_up_events(
         return;
     }
 
-    let mut target = None;
-    if current_widget_state.widget_id != 0 {
-        for (entity, id, bindings, state) in &q_bindings {
-            if id.get() == current_widget_state.widget_id {
-                target = Some((entity, bindings, state.disabled));
-                break;
-            }
-        }
-    }
-
-    if target.is_none() {
-        for (entity, _, bindings, state) in &q_bindings {
-            if state.focused {
-                target = Some((entity, bindings, state.disabled));
-                break;
-            }
-        }
-    }
-
-    let Some((entity, bindings, disabled)) = target else {
+    let Some(entity) = find_keyboard_target_entity(&current_widget_state, &q_bindings) else {
         return;
     };
-    if disabled || bindings.onkeyup.is_none() {
+    let Ok((_, _, bindings, state)) = q_bindings.get(entity) else {
+        return;
+    };
+    if state.disabled || bindings.onkeyup.is_none() {
         return;
     }
 

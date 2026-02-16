@@ -692,6 +692,19 @@ pub enum MediaQueryCondition {
 }
 
 impl MediaQueryCondition {
+    fn compound_cache_key(prefix: &str, parts: &[MediaQueryCondition]) -> String {
+        let mut key = String::from(prefix);
+        key.push('(');
+        for (idx, part) in parts.iter().enumerate() {
+            if idx > 0 {
+                key.push(',');
+            }
+            key.push_str(&part.cache_key());
+        }
+        key.push(')');
+        key
+    }
+
     /// Returns true if the condition matches the given viewport size.
     pub fn matches_viewport(&self, viewport: Vec2) -> bool {
         const EPSILON: f32 = 0.5;
@@ -731,28 +744,8 @@ impl MediaQueryCondition {
             MediaQueryCondition::OrientationLandscape => "orientation:landscape".to_string(),
             MediaQueryCondition::OrientationPortrait => "orientation:portrait".to_string(),
             MediaQueryCondition::Not(inner) => format!("not({})", inner.cache_key()),
-            MediaQueryCondition::And(parts) => {
-                let mut key = String::from("and(");
-                for (idx, part) in parts.iter().enumerate() {
-                    if idx > 0 {
-                        key.push(',');
-                    }
-                    key.push_str(&part.cache_key());
-                }
-                key.push(')');
-                key
-            }
-            MediaQueryCondition::Or(parts) => {
-                let mut key = String::from("or(");
-                for (idx, part) in parts.iter().enumerate() {
-                    if idx > 0 {
-                        key.push(',');
-                    }
-                    key.push_str(&part.cache_key());
-                }
-                key.push(')');
-                key
-            }
+            MediaQueryCondition::And(parts) => Self::compound_cache_key("and", parts),
+            MediaQueryCondition::Or(parts) => Self::compound_cache_key("or", parts),
         }
     }
 }

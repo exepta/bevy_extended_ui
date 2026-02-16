@@ -840,7 +840,7 @@ fn parse_time_seconds(token: &str) -> Option<f32> {
     None
 }
 
-/// Parses a CSS transition shorthand into a `TransitionSpec`.
+/// Parses CSS transition shorthand into a `TransitionSpec`.
 fn parse_transition(value: &str) -> Option<TransitionSpec> {
     let mut spec = TransitionSpec::default();
     let mut has_duration = false;
@@ -895,7 +895,7 @@ fn parse_transition(value: &str) -> Option<TransitionSpec> {
     }
 }
 
-/// Parses a CSS animation shorthand into an `AnimationSpec`.
+/// Parses S animation shorthand into an `AnimationSpec`.
 fn parse_animation(value: &str) -> Option<AnimationSpec> {
     let mut spec = AnimationSpec::default();
     let mut has_duration = false;

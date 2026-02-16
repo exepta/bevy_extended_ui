@@ -1,7 +1,7 @@
 use crate::styles::components::UiStyle;
 use crate::styles::paint::Colored;
 use crate::styles::{CssClass, CssSource, TagName};
-use crate::widgets::{BindToID, ColorPicker, UIGenID, UIWidgetState, WidgetId, WidgetKind};
+use crate::widgets::{hsv_to_rgb_u8, BindToID, ColorPicker, UIGenID, UIWidgetState, WidgetId, WidgetKind};
 use crate::{CurrentWidgetState, ExtendedUiConfiguration};
 use bevy::asset::RenderAssetUsages;
 use bevy::camera::visibility::RenderLayers;
@@ -586,7 +586,7 @@ fn sync_color_picker_visual_state(
             let mut hex_q = params.p4();
             for (mut text, mut text_color, bind, maybe_styles) in hex_q.iter_mut() {
                 if bind.0 == id.0 {
-                    text.0 = format!("HEX  {}", picker.hex());
+                    text.0 = format!("{}", picker.hex());
                     text_color.0 = trigger_text_color(picker.red, picker.green, picker.blue);
 
                     if let Some(mut styles) = maybe_styles {
@@ -875,8 +875,8 @@ fn generate_sv_canvas_image(hue: f32) -> Image {
 
     for y in 0..SV_CANVAS_SIZE {
         for x in 0..SV_CANVAS_SIZE {
-            let s = x as f32 / (SV_CANVAS_SIZE.saturating_sub(1)) as f32;
-            let v = 1.0 - y as f32 / (SV_CANVAS_SIZE.saturating_sub(1)) as f32;
+            let s = x as f32 / SV_CANVAS_SIZE.saturating_sub(1) as f32;
+            let v = 1.0 - y as f32 / SV_CANVAS_SIZE.saturating_sub(1) as f32;
             let (r, g, b) = hsv_to_rgb_u8(hue, s, v);
             let idx = ((y * SV_CANVAS_SIZE + x) * 4) as usize;
             data[idx] = r;
@@ -907,7 +907,7 @@ fn generate_hue_track_image() -> Image {
 
     for y in 0..TRACK_HEIGHT {
         for x in 0..TRACK_WIDTH {
-            let hue = x as f32 / (TRACK_WIDTH.saturating_sub(1)) as f32 * 360.0;
+            let hue = x as f32 / TRACK_WIDTH.saturating_sub(1) as f32 * 360.0;
             let (r, g, b) = hsv_to_rgb_u8(hue, 1.0, 1.0);
             let idx = ((y * TRACK_WIDTH + x) * 4) as usize;
             data[idx] = r;
@@ -938,7 +938,7 @@ fn generate_alpha_track_image(red: u8, green: u8, blue: u8) -> Image {
 
     for y in 0..TRACK_HEIGHT {
         for x in 0..TRACK_WIDTH {
-            let alpha = x as f32 / (TRACK_WIDTH.saturating_sub(1)) as f32;
+            let alpha = x as f32 / TRACK_WIDTH.saturating_sub(1) as f32;
             let checker = ((x / 8 + y / 8) % 2) as u8;
             let base = if checker == 0 { 232_u8 } else { 206_u8 };
 
@@ -968,31 +968,4 @@ fn generate_alpha_track_image(red: u8, green: u8, blue: u8) -> Image {
     );
     image.sampler = ImageSampler::linear();
     image
-}
-
-fn hsv_to_rgb_u8(hue: f32, saturation: f32, value: f32) -> (u8, u8, u8) {
-    let h = hue.rem_euclid(360.0);
-    let s = saturation.clamp(0.0, 1.0);
-    let v = value.clamp(0.0, 1.0);
-
-    if s <= f32::EPSILON {
-        let gray = (v * 255.0).round() as u8;
-        return (gray, gray, gray);
-    }
-
-    let c = v * s;
-    let x = c * (1.0 - (((h / 60.0) % 2.0) - 1.0).abs());
-    let m = v - c;
-
-    let (r1, g1, b1) = match h as i32 {
-        0..=59 => (c, x, 0.0),
-        60..=119 => (x, c, 0.0),
-        120..=179 => (0.0, c, x),
-        180..=239 => (0.0, x, c),
-        240..=299 => (x, 0.0, c),
-        _ => (c, 0.0, x),
-    };
-
-    let to_u8 = |f: f32| ((f + m).clamp(0.0, 1.0) * 255.0).round() as u8;
-    (to_u8(r1), to_u8(g1), to_u8(b1))
 }

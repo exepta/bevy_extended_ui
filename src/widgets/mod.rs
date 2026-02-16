@@ -4,6 +4,7 @@ mod controls;
 mod div;
 mod form;
 mod validation;
+mod widget_util;
 
 use crate::registry::*;
 use crate::styles::IconPlace;
@@ -175,7 +176,7 @@ fn apply_pattern_rule(args: &str, rules: &mut ValidationRules) {
     rules.pattern = Some(stripped.to_string());
 }
 
-/// Component carrying a widget ID and its kind.
+/// Component carrying a widget ID and it's kind.
 #[derive(Component, Clone, Copy, Debug)]
 pub struct WidgetId {
     pub id: usize,
@@ -276,7 +277,7 @@ impl Default for Div {
 //                       Form
 // ===============================================
 
-/// Form container widget with optional submit action handler name.
+/// Form the container widget with an optional submit action handler name.
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, GlobalTransform, InheritedVisibility, Widget)]
@@ -314,7 +315,7 @@ impl FormValidationMode {
     /// Parses a validation mode from the form `validate` attribute.
     pub fn from_str(value: &str) -> Option<FormValidationMode> {
         match value.trim().to_ascii_lowercase().as_str() {
-            "always" | "allways" => Some(FormValidationMode::Always),
+            "always" | "all" => Some(FormValidationMode::Always),
             "send" => Some(FormValidationMode::Send),
             "interact" => Some(FormValidationMode::Interact),
             _ => None,
@@ -1013,7 +1014,7 @@ impl ColorPicker {
     }
 }
 
-fn hsv_to_rgb_u8(hue: f32, saturation: f32, value: f32) -> (u8, u8, u8) {
+pub fn hsv_to_rgb_u8(hue: f32, saturation: f32, value: f32) -> (u8, u8, u8) {
     let h = hue.rem_euclid(360.0);
     let s = saturation.clamp(0.0, 1.0);
     let v = value.clamp(0.0, 1.0);

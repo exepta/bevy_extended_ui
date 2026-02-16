@@ -52,7 +52,7 @@ All three fields can be overridden at runtime via setters:
 
 Validation is only active inside `<form>`.
 Use `validate="Allways|Always|Send|Interact"` on the form (default: `Send`):
-- `Allways`/`Always`: validates continuously (state/input changes).
+- `All`/`Always`: validates continuously (state/input changes).
 - `Send`: validates only on submit click.
 - `Interact`: validates on input interaction (e.g. typing).
 
