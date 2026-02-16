@@ -21,7 +21,9 @@ name = "bevy_extended_ui"
 path = "src/lib.rs"
 
 [features]
-default = []
+default = ["css-breakpoints"]
+css-breakpoints = []
+wasm-breakpoints = ["dep:web-sys"]
 fluent = ["dep:i18n", "dep:i18n-fluent", "dep:unic-langid"]
 properties-lang = ["dep:i18n", "dep:i18n-properties"]
 clipboard-wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:web-sys"]
@@ -111,4 +113,4 @@ arboard = "3.5.0"
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen = { version = "0.2.92", optional = true }
 wasm-bindgen-futures = { version = "0.4.42", optional = true }
-web-sys = { version = "0.3.69", features = ["Navigator", "Clipboard"], optional = true }
+web-sys = { version = "0.3.69", features = ["Navigator", "Clipboard", "Window"], optional = true }

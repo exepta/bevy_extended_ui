@@ -112,7 +112,7 @@ fn update_css_users_index(
     }
 }
 
-/// Marks all CSS users dirty when the primary window size changes.
+/// Marks all CSS users dirty when the active breakpoint viewport changes.
 fn mark_css_users_dirty_on_viewport_change(
     mut commands: Commands,
     mut viewport_tracker: ResMut<CssViewportTracker>,
@@ -120,21 +120,18 @@ fn mark_css_users_dirty_on_viewport_change(
     css_assets: Res<Assets<CssAsset>>,
     css_query: Query<(Entity, &CssSource)>,
 ) {
-    let Ok(window) = window_query.single() else {
+    let Some(next_viewport) = resolve_breakpoint_viewport(&window_query) else {
         return;
     };
 
-    let width = window.resolution.width();
-    let height = window.resolution.height();
-    let viewport_changed = (viewport_tracker.width - width).abs() > 0.5
-        || (viewport_tracker.height - height).abs() > 0.5;
+    let viewport_changed = (viewport_tracker.width - next_viewport.x).abs() > 0.5
+        || (viewport_tracker.height - next_viewport.y).abs() > 0.5;
 
     if !viewport_changed {
         return;
     }
 
     let prev_viewport = Vec2::new(viewport_tracker.width, viewport_tracker.height);
-    let next_viewport = Vec2::new(width, height);
 
     let breakpoint_changed = if prev_viewport.x < 0.0 || prev_viewport.y < 0.0 {
         // Initial resize tracking warm-up: startup CssSource insertion already triggers CSS apply.
@@ -143,8 +140,8 @@ fn mark_css_users_dirty_on_viewport_change(
         media_match_changed_between_viewports(&css_query, &css_assets, prev_viewport, next_viewport)
     };
 
-    viewport_tracker.width = width;
-    viewport_tracker.height = height;
+    viewport_tracker.width = next_viewport.x;
+    viewport_tracker.height = next_viewport.y;
 
     if !breakpoint_changed {
         return;
@@ -155,6 +152,39 @@ fn mark_css_users_dirty_on_viewport_change(
             entity_commands.insert(CssDirty);
         }
     }
+}
+
+/// Returns the viewport used for media-query breakpoints.
+///
+/// Feature behavior:
+/// - `wasm-breakpoints` overrides `css-breakpoints` when enabled.
+/// - `css-breakpoints` reads from Bevy's primary window (desktop/default).
+/// - no active breakpoint feature returns `None`.
+#[cfg(all(feature = "wasm-breakpoints", target_arch = "wasm32"))]
+fn resolve_breakpoint_viewport(_window_query: &Query<&Window, With<PrimaryWindow>>) -> Option<Vec2> {
+    let window = web_sys::window()?;
+    let width = window.inner_width().ok()?.as_f64()? as f32;
+    let height = window.inner_height().ok()?.as_f64()? as f32;
+    Some(Vec2::new(width, height))
+}
+
+#[cfg(all(feature = "wasm-breakpoints", not(target_arch = "wasm32")))]
+fn resolve_breakpoint_viewport(_window_query: &Query<&Window, With<PrimaryWindow>>) -> Option<Vec2> {
+    None
+}
+
+#[cfg(all(not(feature = "wasm-breakpoints"), feature = "css-breakpoints"))]
+fn resolve_breakpoint_viewport(window_query: &Query<&Window, With<PrimaryWindow>>) -> Option<Vec2> {
+    let window = window_query.single().ok()?;
+    Some(Vec2::new(window.resolution.width(), window.resolution.height()))
+}
+
+#[cfg(all(
+    not(feature = "wasm-breakpoints"),
+    not(feature = "css-breakpoints")
+))]
+fn resolve_breakpoint_viewport(_window_query: &Query<&Window, With<PrimaryWindow>>) -> Option<Vec2> {
+    None
 }
 
 /// Returns true when at least one media rule changes the match state between two viewports.
@@ -254,10 +284,7 @@ fn apply_css_to_entities(
         return;
     }
 
-    let viewport = window_query
-        .single()
-        .map(|window| Vec2::new(window.resolution.width(), window.resolution.height()))
-        .unwrap_or(Vec2::ZERO);
+    let viewport = resolve_breakpoint_viewport(&window_query).unwrap_or(Vec2::ZERO);
 
     for entity in dirty {
         let Ok((_, css_source, id, class, tag, parent, dirty_marker)) =

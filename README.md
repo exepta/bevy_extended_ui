@@ -56,12 +56,14 @@ bevy_extended_ui_macros = "1.4.0"
 ```
 
 #### Features
-| Feature           | Description                               |
-|-------------------|-------------------------------------------|
-| `default`         | Enables all default features.             |
-| `fluent`          | Enables Fluent Language support.          |
-| `properties-lang` | Enables Java Properties Language support. |
-| `clipboard-wasm`  | Enables WASM clipboard support web.       |
+| Feature            | Description                               |
+|--------------------|-------------------------------------------|
+| `default`          | Enables `css-breakpoints`.                |
+| `css-breakpoints`  | Desktop breakpoints via primary window.   |
+| `wasm-breakpoints` | WASM breakpoints via browser viewport.    |
+| `fluent`           | Enables Fluent Language support.          |
+| `properties-lang`  | Enables Java Properties Language support. |
+| `clipboard-wasm`   | Enables WASM clipboard support web.       |
 
 Then, you add the plugin to your `main.rs` or on any point at a build function:
 
@@ -253,7 +255,10 @@ Basic `@media` usage for breakpoints:
 }
 ```
 
-When the primary window size changes, CSS rules are re-evaluated so you can react to resize events with pure CSS breakpoints.
+Breakpoint runtime source is feature-based:
+
+- `css-breakpoints` (default): tracks Bevy `PrimaryWindow` size.
+- `wasm-breakpoints`: tracks browser viewport (`window.innerWidth/innerHeight`) for WASM and overrides `css-breakpoints` when enabled.
 
 ### What comes next?
 
