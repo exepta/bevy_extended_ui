@@ -64,6 +64,7 @@ impl Plugin for StyleService {
         app.init_resource::<BackdropCaptureState>();
         app.add_plugins(ExtractResourcePlugin::<BackdropCaptureState>::default());
         app.add_plugins(UiMaterialPlugin::<BackdropBlurMaterial>::default());
+        #[cfg(not(all(feature = "wasm-default", target_arch = "wasm32")))]
         app.add_systems(
             PostUpdate,
             mark_new_nodes_for_style_refresh.before(update_widget_styles_system),
@@ -307,6 +308,7 @@ fn update_css_cursor_icons(
     }
 }
 
+#[cfg(not(all(feature = "wasm-default", target_arch = "wasm32")))]
 fn mark_new_nodes_for_style_refresh(
     mut commands: Commands,
     query: Query<Entity, (Added<Node>, With<UiStyle>)>,

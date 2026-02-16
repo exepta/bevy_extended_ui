@@ -24,6 +24,7 @@ path = "src/lib.rs"
 default = ["css-breakpoints", "fluent"]
 css-breakpoints = []
 wasm-breakpoints = ["dep:web-sys"]
+wasm-default = ["wasm-breakpoints", "clipboard-wasm"]
 fluent = ["dep:i18n", "dep:i18n-fluent", "dep:unic-langid"]
 properties-lang = ["dep:i18n", "dep:i18n-properties"]
 clipboard-wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:web-sys"]

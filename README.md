@@ -59,6 +59,7 @@ bevy_extended_ui_macros = "1.4.0"
 | Feature            | Description                               |
 |--------------------|-------------------------------------------|
 | `default`          | Enables `css-breakpoints`.                |
+| `wasm-default`     | Web preset: `wasm-breakpoints` + `clipboard-wasm` and legacy style-refresh pipeline on WASM. |
 | `css-breakpoints`  | Desktop breakpoints via primary window.   |
 | `wasm-breakpoints` | WASM breakpoints via browser viewport.    |
 | `fluent`           | Enables Fluent Language support.          |
@@ -259,6 +260,7 @@ Breakpoint runtime source is feature-based:
 
 - `css-breakpoints` (default): tracks Bevy `PrimaryWindow` size.
 - `wasm-breakpoints`: tracks browser viewport (`window.innerWidth/innerHeight`) for WASM and overrides `css-breakpoints` when enabled.
+- `wasm-default`: enables `wasm-breakpoints` and `clipboard-wasm` as a web preset.
 
 ### What comes next?
 
