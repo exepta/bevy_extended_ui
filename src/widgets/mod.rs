@@ -199,6 +199,7 @@ pub enum WidgetKind {
     Img,
     InputField,
     Paragraph,
+    ToolTip,
     ProgressBar,
     RadioButton,
     Scrollbar,
@@ -794,6 +795,124 @@ impl Default for Paragraph {
         Self {
             entry,
             text: String::from(""),
+        }
+    }
+}
+
+// ===============================================
+//                     ToolTip
+// ===============================================
+
+/// Tooltip positioning behavior.
+#[derive(Reflect, Default, Debug, Clone, Copy, Eq, PartialEq)]
+pub enum ToolTipVariant {
+    /// Tooltip follows the cursor.
+    #[default]
+    Follow,
+    /// Tooltip is anchored to the target element.
+    Point,
+}
+
+impl ToolTipVariant {
+    /// Parses a tooltip variant from a string.
+    pub fn from_str(value: &str) -> Option<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "follow" => Some(Self::Follow),
+            "point" => Some(Self::Point),
+            _ => None,
+        }
+    }
+}
+
+/// Preferred side for tooltip placement.
+#[derive(Reflect, Default, Debug, Clone, Copy, Eq, PartialEq)]
+pub enum ToolTipPriority {
+    Top,
+    Bottom,
+    Left,
+    #[default]
+    Right,
+}
+
+impl ToolTipPriority {
+    /// Parses a tooltip priority from a string.
+    pub fn from_str(value: &str) -> Option<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "top" => Some(Self::Top),
+            "bottom" => Some(Self::Bottom),
+            "left" => Some(Self::Left),
+            "right" => Some(Self::Right),
+            _ => None,
+        }
+    }
+}
+
+/// Axis along which tooltip side preference is resolved.
+#[derive(Reflect, Default, Debug, Clone, Copy, Eq, PartialEq)]
+pub enum ToolTipAlignment {
+    Vertical,
+    #[default]
+    Horizontal,
+}
+
+impl ToolTipAlignment {
+    /// Parses a tooltip alignment from a string.
+    pub fn from_str(value: &str) -> Option<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "vertical" => Some(Self::Vertical),
+            "horizontal" => Some(Self::Horizontal),
+            _ => None,
+        }
+    }
+}
+
+/// Trigger mode controlling when a tooltip becomes visible.
+#[derive(Reflect, Debug, Clone, Copy, Eq, PartialEq)]
+pub enum ToolTipTrigger {
+    Hover,
+    Click,
+    Drag,
+}
+
+impl ToolTipTrigger {
+    /// Parses one trigger token from a string.
+    pub fn from_str(value: &str) -> Option<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "hover" => Some(Self::Hover),
+            "click" => Some(Self::Click),
+            "drag" => Some(Self::Drag),
+            _ => None,
+        }
+    }
+}
+
+/// Tooltip widget that binds to either a parent element or an explicit `for` id target.
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+#[require(UIGenID, UIWidgetState, Widget)]
+pub struct ToolTip {
+    pub entry: usize,
+    pub text: String,
+    pub for_id: Option<String>,
+    pub variant: ToolTipVariant,
+    pub prio: ToolTipPriority,
+    pub alignment: ToolTipAlignment,
+    pub trigger: Vec<ToolTipTrigger>,
+}
+
+impl Default for ToolTip {
+    /// Creates a default tooltip widget.
+    fn default() -> Self {
+        let entry = TOOL_TIP_ID_POOL.lock().unwrap().acquire();
+
+        Self {
+            entry,
+            text: String::new(),
+            for_id: None,
+            variant: ToolTipVariant::default(),
+            prio: ToolTipPriority::default(),
+            alignment: ToolTipAlignment::default(),
+            trigger: vec![ToolTipTrigger::Hover],
         }
     }
 }

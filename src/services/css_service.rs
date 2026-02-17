@@ -247,7 +247,15 @@ fn apply_css_to_entities(
     // CHANGED: include entities that got CssDirty added
     query_changed_source: Query<
         (Entity, Option<&CssDirty>),
-        Or<(Changed<CssSource>, Added<CssSource>, Added<CssDirty>)>,
+        Or<(
+            Changed<CssSource>,
+            Added<CssSource>,
+            Added<CssDirty>,
+            Changed<CssClass>,
+            Changed<CssID>,
+            Changed<TagName>,
+            Changed<ChildOf>,
+        )>,
     >,
     query_all_source: Query<
         (
@@ -377,7 +385,15 @@ fn apply_css_to_entities_legacy(
             Option<&ChildOf>,
             Option<&CssDirty>,
         ),
-        Or<(Changed<CssSource>, Added<CssSource>, Added<CssDirty>)>,
+        Or<(
+            Changed<CssSource>,
+            Added<CssSource>,
+            Added<CssDirty>,
+            Changed<CssClass>,
+            Changed<CssID>,
+            Changed<TagName>,
+            Changed<ChildOf>,
+        )>,
     >,
     parent_query: Query<(
         Option<&CssID>,
