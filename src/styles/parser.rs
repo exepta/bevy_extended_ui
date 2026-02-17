@@ -1799,7 +1799,7 @@ pub fn convert_to_font_size(value: String) -> Option<FontVal> {
 /// - Named colors (e.g. `"red"`, `"white"`, `"transparent"`)
 /// - Hex colors (e.g. `"#ff00ff"`, `"#00000000"` for transparent)
 /// - RGB: `"rgb(255, 0, 0)"`
-/// - RGBA: `"rgba(255, 0, 0, 128)"`
+/// - RGBA: `"rgba(255, 0, 0, 0.5)"`, `"rgba(255, 0, 0, 128)"`
 ///
 /// # Parameters
 /// - `value`: A [`String`] representing a color in any CSS-compatible format.
@@ -1823,8 +1823,8 @@ pub fn convert_to_color(value: String) -> Option<Color> {
         }
     } else if let Some(parts) = parse_color_components(trimmed, "rgb", 3) {
         color = Some(Color::srgb_u8(parts[0], parts[1], parts[2]));
-    } else if let Some(parts) = parse_color_components(trimmed, "rgba", 4) {
-        color = Some(Color::srgba_u8(parts[0], parts[1], parts[2], parts[3]));
+    } else if let Some((r, g, b, a)) = parse_rgba_components(trimmed) {
+        color = Some(Color::srgba(r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0, a));
     } else {
         color = Colored::named(trimmed);
     }
@@ -1833,8 +1833,7 @@ pub fn convert_to_color(value: String) -> Option<Color> {
 }
 
 fn parse_color_components(value: &str, name: &str, expected: usize) -> Option<Vec<u8>> {
-    let prefix = format!("{name}(");
-    let inner = value.strip_prefix(&prefix)?.strip_suffix(')')?;
+    let inner = parse_color_function_inner(value, name)?;
     let parts: Vec<_> = inner.split(',').map(str::trim).collect();
     if parts.len() != expected {
         return None;
@@ -1845,6 +1844,31 @@ fn parse_color_components(value: &str, name: &str, expected: usize) -> Option<Ve
         values.push(part.parse::<u8>().ok()?);
     }
     Some(values)
+}
+
+fn parse_rgba_components(value: &str) -> Option<(u8, u8, u8, f32)> {
+    let inner = parse_color_function_inner(value, "rgba")?;
+    let parts: Vec<_> = inner.split(',').map(str::trim).collect();
+    if parts.len() != 4 {
+        return None;
+    }
+
+    let r = parts[0].parse::<u8>().ok()?;
+    let g = parts[1].parse::<u8>().ok()?;
+    let b = parts[2].parse::<u8>().ok()?;
+    let raw_alpha = parts[3].parse::<f32>().ok()?;
+    let alpha = if raw_alpha > 1.0 {
+        (raw_alpha / 255.0).clamp(0.0, 1.0)
+    } else {
+        raw_alpha.clamp(0.0, 1.0)
+    };
+
+    Some((r, g, b, alpha))
+}
+
+fn parse_color_function_inner<'a>(value: &'a str, name: &str) -> Option<&'a str> {
+    let prefix = format!("{name}(");
+    value.strip_prefix(&prefix)?.strip_suffix(')')
 }
 
 /// Converts a CSS `background` value into a [`Background`] struct.
@@ -2574,11 +2598,13 @@ pub fn convert_to_bevy_box_shadow(value: String) -> Option<BoxShadow> {
 
 /// Parses a CSS border shorthand string into a [`UiRect`] for border widths and a [`Color`].
 ///
-/// The input string is expected to be in the form `"WIDTH COLOR"` where:
-/// - WIDTH is a length value (e.g. `"5px"`, `"10%"`, `"10vw"`, or `"0"`).
-/// - COLOR is an optional CSS color string (e.g. `"#ff0000"`, `"rgba(255,0,0,1)"`).
+/// Supports common border shorthand variants such as:
+/// - `"2px #ccd2de"`
+/// - `"2px solid #ccd2de"`
+/// - `"2px rgba(192, 198, 210, 0.95)"`
+/// - `"2px solid rgba(192, 198, 210, 0.95)"`
 ///
-/// If the color is missing, defaults to transparent.
+/// The first parsable length token is used as border width. Color is optional and defaults to transparent.
 ///
 /// # Parameters
 /// - `value`: CSS border shorthand string.
@@ -2588,24 +2614,34 @@ pub fn convert_to_bevy_box_shadow(value: String) -> Option<BoxShadow> {
 /// - `None` if the width is missing or cannot be parsed.
 ///
 pub fn convert_css_border(value: String) -> Option<(UiRect, Color)> {
-    /// Parses a single border width token into a `Val`.
-    fn parse_val(input: &str) -> Option<Val> {
-        convert_to_val(input.to_string())
-    }
-
     let parts: Vec<&str> = value.split_whitespace().collect();
     if parts.is_empty() {
         return None;
     }
 
-    let rect_val = parse_val(parts[0])?;
-    let rect = UiRect::all(rect_val);
+    let mut rect_val: Option<Val> = None;
+    let mut color: Option<Color> = None;
 
-    let color = if parts.len() > 1 {
-        convert_to_color(parts[1].to_string())?
-    } else {
-        Colored::TRANSPARENT
-    };
+    for (index, part) in parts.iter().enumerate() {
+        if rect_val.is_none() {
+            rect_val = convert_to_val((*part).to_string());
+            if rect_val.is_some() {
+                continue;
+            }
+        }
+
+        if color.is_none() {
+            let color_candidate = parts[index..].join(" ");
+            if let Some(parsed_color) = convert_to_color(color_candidate) {
+                color = Some(parsed_color);
+                break;
+            }
+        }
+    }
+
+    let rect_val = rect_val?;
+    let rect = UiRect::all(rect_val);
+    let color = color.unwrap_or(Colored::TRANSPARENT);
 
     Some((rect, color))
 }
@@ -3285,5 +3321,29 @@ mod tests {
         assert_eq!(pair.normal.justify_content, Some(JustifyContent::FlexStart));
         assert_eq!(pair.normal.align_items, Some(AlignItems::FlexStart));
         assert_eq!(pair.normal.flex_wrap, Some(FlexWrap::Wrap));
+    }
+
+    #[test]
+    fn parses_border_shorthand_rgba_with_spaces() {
+        let parsed =
+            convert_css_border("2px rgba(192, 198, 210, 0.95)".to_string()).expect("border");
+
+        assert_eq!(parsed.0, UiRect::all(Val::Px(2.0)));
+        assert_eq!(
+            parsed.1,
+            convert_to_color("rgba(192, 198, 210, 0.95)".to_string()).expect("color")
+        );
+    }
+
+    #[test]
+    fn parses_border_shorthand_with_style_token() {
+        let parsed =
+            convert_css_border("2px solid rgba(192, 198, 210, 0.95)".to_string()).expect("border");
+
+        assert_eq!(parsed.0, UiRect::all(Val::Px(2.0)));
+        assert_eq!(
+            parsed.1,
+            convert_to_color("rgba(192, 198, 210, 0.95)".to_string()).expect("color")
+        );
     }
 }

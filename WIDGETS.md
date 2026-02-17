@@ -183,6 +183,58 @@ Inside a `<form>`, use `type="submit"` to submit the parent form without `onclic
 
 ---
 
+## ToolTip (`ToolTip`)
+
+**Struct purpose:** Tooltip that follows the mouse cursor and is bound to a target widget.
+It is only active when a target exists:
+- implicit target via parent widget (`<tool-tip>` is child of container/button/input/...),
+- explicit target via `for="some_id"`.
+
+Behavior:
+- supports trigger modes `hover`, `click`, `drag` (single or combined, e.g. `hover | click`),
+- supports variants:
+  - `follow` (default): follows cursor with `12px` offset,
+  - `point`: anchored to target (does not follow cursor) and shows a nose pointing to the target,
+- supports placement settings:
+  - `prio="top|bottom|left|right"` (default: `right`),
+  - `alignment="horizontal|vertical"` (default: `horizontal`),
+- for `point`, tooltip placement is centered relative to the target on the opposite axis,
+- automatic viewport collision handling (fallback to opposite side).
+
+Attributes:
+- `variant`: `point | follow` (default: `follow`)
+- `prio`: `top | bottom | left | right` (default: `right`)
+- `alignment`: `vertical | horizontal` (default: `horizontal`)
+- `trigger`: `click | hover | drag` (default: `hover`)
+
+**HTML tag (parent binding):**
+```html
+<div>
+  <tool-tip>Hello world</tool-tip>
+</div>
+```
+
+**HTML tag (`for` binding):**
+```html
+<div id="test"></div>
+<tool-tip for="test">Hello world</tool-tip>
+```
+
+**HTML tag (full attributes):**
+```html
+<tool-tip
+  for="test"
+  variant="point"
+  prio="top"
+  alignment="vertical"
+  trigger="hover | click"
+>
+  Hello world
+</tool-tip>
+```
+
+---
+
 ## ProgressBar (`ProgressBar`)
 
 **Struct purpose:** Progress indicator with `min`, `max`, and `value`.
