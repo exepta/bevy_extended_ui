@@ -792,12 +792,13 @@ impl Default for InputField {
 }
 
 /// Supported input types for input fields.
-#[derive(Reflect, Default, Debug, Clone, Eq, PartialEq)]
+#[derive(Reflect, Default, Debug, Clone, Copy, Eq, PartialEq)]
 pub enum InputType {
     #[default]
     Text,
     Email,
     Date,
+    Range,
     Password,
     Number,
 }
@@ -810,6 +811,7 @@ impl InputType {
             InputType::Number => c.is_ascii_digit() || "+-*/() ".contains(c),
             InputType::Email => c.is_ascii_alphanumeric() || c == '@' || c == '.' || c == '-',
             InputType::Date => c.is_ascii_digit() || c == '/' || c == '-' || c == '.',
+            InputType::Range => c.is_ascii_digit() || c == '/' || c == '-' || c == '.' || c == ' ',
         }
     }
 
@@ -821,6 +823,7 @@ impl InputType {
             "number" => Some(InputType::Number),
             "email" => Some(InputType::Email),
             "date" => Some(InputType::Date),
+            "range" => Some(InputType::Range),
             _ => None,
         }
     }

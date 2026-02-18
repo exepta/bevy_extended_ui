@@ -217,6 +217,7 @@ input {
     &:focus {
         border-color: var(--primary);
         color: var(--text-color);
+        z-index: 30000;
     }
 
     &:focus > .input-label {
@@ -295,6 +296,11 @@ date-picker {
 
     &:focus {
         border-color: #90caf9;
+        z-index: 30000;
+    }
+
+    &:checked {
+        z-index: 30000;
     }
 
     > .date-picker-field {
@@ -354,7 +360,7 @@ date-picker {
         align-items: flex-start;
         flex-direction: column;
         gap: 10px;
-        z-index: 999;
+        z-index: 30001;
 
         > .date-picker-header {
             position: relative;
@@ -466,10 +472,10 @@ date-picker {
             align-items: center;
             flex-direction: row;
             flex-wrap: wrap;
-            gap: 2px;
+            gap: 0;
 
             > .date-picker-weekday {
-                width: 40px;
+                width: calc(100% / 7);
                 height: 24px;
                 display: flex;
                 justify-content: center;
@@ -489,10 +495,12 @@ date-picker {
             align-items: center;
             flex-direction: row;
             flex-wrap: wrap;
-            gap: 2px;
+            column-gap: 0;
+            row-gap: 2px;
+            overflow: hidden;
 
             > .date-picker-day {
-                width: 40px;
+                width: calc(100% / 7);
                 height: 36px;
                 border-radius: 18px;
                 display: flex;
@@ -519,11 +527,24 @@ date-picker {
                     background: rgba(120, 135, 176, 0.28);
                 }
 
+                &:focus:not(:checked) {
+                    background: var(--primary-transparent-layer);
+                    border-radius: 0;
+                }
+
                 &:checked {
                     background: var(--primary);
                     > .date-picker-day-text {
                         color: #ffffff;
                     }
+                }
+
+                &:checked:invalid {
+                    border-radius: 6px 0 0 6px;
+                }
+
+                &:checked:focus:not(:invalid) {
+                    border-radius: 0 6px 6px 0;
                 }
 
                 &:disabled {
@@ -637,9 +658,11 @@ date-picker {
     height: 0;
     min-width: 0;
     min-height: 0;
-    border: none;
+    border: 0px;
+    border-radius: 0px;
     background: transparent;
     cursor: default;
+    z-index: 30000;
 
     > .date-picker-popover {
         top: 58px;

@@ -98,10 +98,20 @@ struct DatePickerDayText {
     index: usize,
 }
 
+const DATE_PICKER_OVERLAY_Z: i32 = 30_000;
+
+/// Stores the previous z-index of a bound input while its date picker is open.
+#[derive(Component, Clone, Copy, Debug)]
+struct DatePickerLiftedZ {
+    previous: i32,
+}
+
 /// Runtime date picker state (calendar view + parsed constraints).
 #[derive(Component, Clone, Debug)]
 struct DatePickerState {
     selected: Option<SimpleDate>,
+    range_start: Option<SimpleDate>,
+    range_end: Option<SimpleDate>,
     min: Option<SimpleDate>,
     max: Option<SimpleDate>,
     view_year: i32,
@@ -120,6 +130,12 @@ struct SimpleDate {
     year: i32,
     month: u32,
     day: u32,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum PickerSelectionMode {
+    Single,
+    Range,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -181,9 +197,9 @@ fn internal_node_creation_system(
                 .find(|(css_id, _)| css_id.0.as_str() == for_id.as_str())
             {
                 Some((_css_id, input)) => {
-                    if input.input_type != InputType::Date {
+                    if !input_supports_date_picker(input.input_type) {
                         warn!(
-                            "DatePicker '{}' requires target input '#{}' to use type='date'",
+                            "DatePicker '{}' requires target input '#{}' to use type='date' or type='range'",
                             picker.entry, for_id
                         );
                     }
@@ -205,7 +221,20 @@ fn internal_node_creation_system(
                 .map(|(_, input)| input)
         });
         let date_pattern = resolve_date_pattern(picker, bound_input);
-        let selected = parse_picker_date(&picker.value, date_pattern);
+        let selection_mode = resolve_selection_mode(bound_input);
+        let (range_start, range_end, selected) = match selection_mode {
+            PickerSelectionMode::Single => {
+                let selected = parse_picker_date(&picker.value, date_pattern);
+                (None, None, selected)
+            }
+            PickerSelectionMode::Range => {
+                let parsed = parse_picker_range(&picker.value, date_pattern);
+                let start = parsed.map(|(start, _)| start);
+                let end = parsed.and_then(|(_, end)| end);
+                let selected = end.or(start);
+                (start, end, selected)
+            }
+        };
         let min = picker
             .min
             .as_deref()
@@ -244,6 +273,8 @@ fn internal_node_creation_system(
                 RenderLayers::layer(layer),
                 DatePickerState {
                     selected,
+                    range_start,
+                    range_end,
                     min,
                     max,
                     view_year: start.year,
@@ -256,11 +287,14 @@ fn internal_node_creation_system(
                     year_end,
                 },
                 DatePickerBase,
-                InputValue(
-                    selected
+                InputValue(match selection_mode {
+                    PickerSelectionMode::Single => selected
                         .map(|date| format_for_display(date, date_pattern))
                         .unwrap_or_default(),
-                ),
+                    PickerSelectionMode::Range => {
+                        format_range_for_display(range_start, range_end, date_pattern)
+                    }
+                }),
             ))
             .observe(on_internal_cursor_entered)
             .observe(on_internal_cursor_leave)
@@ -345,6 +379,7 @@ fn internal_node_creation_system(
                             Val::Px(0.),
                             Val::Px(0.),
                         ),
+                        ZIndex::default(),
                         UIWidgetState::default(),
                         css_source.clone(),
                         CssClass(vec!["date-picker-popover".to_string()]),
@@ -818,7 +853,15 @@ fn sync_bound_date_picker_targets(
         ),
     >,
     mut input_query: Query<
-        (Entity, &UIGenID, &CssID, &mut InputField, &mut InputValue),
+        (
+            Entity,
+            &UIGenID,
+            &CssID,
+            &mut InputField,
+            &mut InputValue,
+            &mut ZIndex,
+            Option<&DatePickerLiftedZ>,
+        ),
         (
             With<InputField>,
             Without<DatePickerBase>,
@@ -835,10 +878,11 @@ fn sync_bound_date_picker_targets(
             continue;
         };
         let mut effective_pattern = resolve_date_pattern(&picker, None);
+        let mut selection_mode = PickerSelectionMode::Single;
 
         let mut resolved_target = false;
         let mut valid_target = false;
-        for (target_entity, target_id, css_id, mut input, mut target_value) in
+        for (target_entity, target_id, css_id, mut input, mut target_value, mut target_z, lifted) in
             input_query.iter_mut()
         {
             if css_id.0 != *for_id {
@@ -846,7 +890,11 @@ fn sync_bound_date_picker_targets(
             }
             resolved_target = true;
 
-            if input.input_type != InputType::Date {
+            if !input_supports_date_picker(input.input_type) {
+                if let Some(previous) = lifted {
+                    target_z.0 = previous.previous;
+                    commands.entity(target_entity).remove::<DatePickerLiftedZ>();
+                }
                 ui_state.open = false;
                 ui_state.checked = false;
                 ui_state.focused = false;
@@ -856,6 +904,7 @@ fn sync_bound_date_picker_targets(
                 break;
             }
             valid_target = true;
+            selection_mode = resolve_selection_mode(Some(&input));
             effective_pattern = resolve_date_pattern(&picker, Some(&input));
 
             // Anchor the hidden date-picker host to the input field, so popover positioning follows it.
@@ -869,15 +918,57 @@ fn sync_bound_date_picker_targets(
 
             let target_is_active = current_widget_state.widget_id == target_id.get();
             let picker_is_active = current_widget_state.widget_id == ui_id.get();
+            let should_elevate_target = ui_state.open
+                || picker_is_active
+                || target_is_active
+                || state.month_list_open
+                || state.year_list_open;
+            if should_elevate_target {
+                if lifted.is_none() {
+                    commands.entity(target_entity).insert(DatePickerLiftedZ {
+                        previous: target_z.0,
+                    });
+                }
+                if target_z.0 < DATE_PICKER_OVERLAY_Z {
+                    target_z.0 = DATE_PICKER_OVERLAY_Z;
+                }
+            } else if let Some(previous) = lifted {
+                target_z.0 = previous.previous;
+                commands.entity(target_entity).remove::<DatePickerLiftedZ>();
+            }
+
             if state.pending_bound_write_back {
-                let picker_bound_value = if let Some(selected) = state.selected {
-                    format_for_display(selected, effective_pattern)
-                } else if let Some(parsed) = parse_picker_date(&picker.value, effective_pattern) {
-                    format_for_display(parsed, effective_pattern)
-                } else if !picker.value.trim().is_empty() {
-                    picker.value.clone()
-                } else {
-                    String::new()
+                let picker_bound_value = match selection_mode {
+                    PickerSelectionMode::Single => {
+                        if let Some(selected) = state.selected {
+                            format_for_display(selected, effective_pattern)
+                        } else if let Some(parsed) =
+                            parse_picker_date(&picker.value, effective_pattern)
+                        {
+                            format_for_display(parsed, effective_pattern)
+                        } else if !picker.value.trim().is_empty() {
+                            picker.value.clone()
+                        } else {
+                            String::new()
+                        }
+                    }
+                    PickerSelectionMode::Range => {
+                        if state.range_start.is_some() {
+                            format_range_for_display(
+                                state.range_start,
+                                state.range_end,
+                                effective_pattern,
+                            )
+                        } else if let Some((start, end)) =
+                            parse_picker_range(&picker.value, effective_pattern)
+                        {
+                            format_range_for_display(Some(start), end, effective_pattern)
+                        } else if !picker.value.trim().is_empty() {
+                            picker.value.clone()
+                        } else {
+                            String::new()
+                        }
+                    }
                 };
 
                 if input.text != picker_bound_value {
@@ -898,22 +989,44 @@ fn sync_bound_date_picker_targets(
                 } else {
                     input.text.clone()
                 };
-                let normalized = parse_picker_date(&bound_value, effective_pattern)
-                    .map(|date| format_for_display(date, effective_pattern))
-                    .unwrap_or(bound_value);
+                let normalized =
+                    normalize_bound_value_for_mode(&bound_value, effective_pattern, selection_mode);
                 if picker.value != normalized {
                     picker.value = normalized;
                 }
             } else if picker_is_active {
                 ui_state.focused = true;
-                let picker_bound_value = if let Some(selected) = state.selected {
-                    format_for_display(selected, effective_pattern)
-                } else if let Some(parsed) = parse_picker_date(&picker.value, effective_pattern) {
-                    format_for_display(parsed, effective_pattern)
-                } else if !picker.value.trim().is_empty() {
-                    picker.value.clone()
-                } else {
-                    String::new()
+                let picker_bound_value = match selection_mode {
+                    PickerSelectionMode::Single => {
+                        if let Some(selected) = state.selected {
+                            format_for_display(selected, effective_pattern)
+                        } else if let Some(parsed) =
+                            parse_picker_date(&picker.value, effective_pattern)
+                        {
+                            format_for_display(parsed, effective_pattern)
+                        } else if !picker.value.trim().is_empty() {
+                            picker.value.clone()
+                        } else {
+                            String::new()
+                        }
+                    }
+                    PickerSelectionMode::Range => {
+                        if state.range_start.is_some() {
+                            format_range_for_display(
+                                state.range_start,
+                                state.range_end,
+                                effective_pattern,
+                            )
+                        } else if let Some((start, end)) =
+                            parse_picker_range(&picker.value, effective_pattern)
+                        {
+                            format_range_for_display(Some(start), end, effective_pattern)
+                        } else if !picker.value.trim().is_empty() {
+                            picker.value.clone()
+                        } else {
+                            String::new()
+                        }
+                    }
                 };
                 if !picker_bound_value.is_empty() {
                     if input.text != picker_bound_value {
@@ -930,9 +1043,8 @@ fn sync_bound_date_picker_targets(
                 } else {
                     input.text.clone()
                 };
-                let normalized = parse_picker_date(&bound_value, effective_pattern)
-                    .map(|date| format_for_display(date, effective_pattern))
-                    .unwrap_or(bound_value);
+                let normalized =
+                    normalize_bound_value_for_mode(&bound_value, effective_pattern, selection_mode);
                 if picker.value != normalized {
                     picker.value = normalized;
                 }
@@ -953,19 +1065,48 @@ fn sync_bound_date_picker_targets(
             continue;
         }
 
-        let parsed_value = parse_picker_date(&picker.value, effective_pattern);
-        if parsed_value != state.selected {
-            state.selected = parsed_value;
-            if let Some(selected) = state.selected {
-                state.view_year = selected.year;
-                state.view_month = selected.month;
+        match selection_mode {
+            PickerSelectionMode::Single => {
+                let parsed_value = parse_picker_date(&picker.value, effective_pattern);
+                if parsed_value != state.selected {
+                    state.selected = parsed_value;
+                    state.range_start = None;
+                    state.range_end = None;
+                    if let Some(selected) = state.selected {
+                        state.view_year = selected.year;
+                        state.view_month = selected.month;
+                    }
+                }
+            }
+            PickerSelectionMode::Range => {
+                let parsed_range = parse_picker_range(&picker.value, effective_pattern);
+                let parsed_start = parsed_range.map(|(start, _)| start);
+                let parsed_end = parsed_range.and_then(|(_, end)| end);
+                let parsed_selected = parsed_end.or(parsed_start);
+                if parsed_start != state.range_start
+                    || parsed_end != state.range_end
+                    || parsed_selected != state.selected
+                {
+                    state.range_start = parsed_start;
+                    state.range_end = parsed_end;
+                    state.selected = parsed_selected;
+                    if let Some(selected) = state.selected {
+                        state.view_year = selected.year;
+                        state.view_month = selected.month;
+                    }
+                }
             }
         }
 
-        let formatted = state
-            .selected
-            .map(|date| format_for_display(date, effective_pattern))
-            .unwrap_or_default();
+        let formatted = match selection_mode {
+            PickerSelectionMode::Single => state
+                .selected
+                .map(|date| format_for_display(date, effective_pattern))
+                .unwrap_or_default(),
+            PickerSelectionMode::Range => {
+                format_range_for_display(state.range_start, state.range_end, effective_pattern)
+            }
+        };
         if input_value.0 != formatted {
             input_value.0 = formatted;
         }
@@ -980,6 +1121,7 @@ fn sync_date_picker_visuals(
             &mut DatePickerState,
             &mut InputValue,
             &mut UIWidgetState,
+            &mut ZIndex,
             &UIGenID,
         ),
         (
@@ -1037,13 +1179,22 @@ fn sync_date_picker_visuals(
         >,
     )>,
 ) {
-    for (mut picker, mut state, mut input_value, ui_state, ui_id) in picker_query.iter_mut() {
+    for (mut picker, mut state, mut input_value, ui_state, mut root_z, ui_id) in
+        picker_query.iter_mut()
+    {
+        root_z.0 = if ui_state.open && !ui_state.disabled {
+            DATE_PICKER_OVERLAY_Z
+        } else {
+            0
+        };
+
         let bound_input = picker.for_id.as_ref().and_then(|for_id| {
             input_targets
                 .iter()
                 .find(|(css_id, _)| css_id.0.as_str() == for_id.as_str())
                 .map(|(_, input)| input)
         });
+        let selection_mode = resolve_selection_mode(bound_input);
         let effective_pattern = resolve_date_pattern(&picker, bound_input);
         state.min = picker
             .min
@@ -1057,19 +1208,48 @@ fn sync_date_picker_visuals(
         state.year_start = year_start;
         state.year_end = year_end;
 
-        let parsed_value = parse_picker_date(&picker.value, effective_pattern);
-        if parsed_value != state.selected {
-            state.selected = parsed_value;
-            if let Some(selected) = state.selected {
-                state.view_year = selected.year;
-                state.view_month = selected.month;
+        match selection_mode {
+            PickerSelectionMode::Single => {
+                let parsed_value = parse_picker_date(&picker.value, effective_pattern);
+                if parsed_value != state.selected {
+                    state.selected = parsed_value;
+                    state.range_start = None;
+                    state.range_end = None;
+                    if let Some(selected) = state.selected {
+                        state.view_year = selected.year;
+                        state.view_month = selected.month;
+                    }
+                }
+            }
+            PickerSelectionMode::Range => {
+                let parsed_range = parse_picker_range(&picker.value, effective_pattern);
+                let parsed_start = parsed_range.map(|(start, _)| start);
+                let parsed_end = parsed_range.and_then(|(_, end)| end);
+                let parsed_selected = parsed_end.or(parsed_start);
+                if parsed_start != state.range_start
+                    || parsed_end != state.range_end
+                    || parsed_selected != state.selected
+                {
+                    state.range_start = parsed_start;
+                    state.range_end = parsed_end;
+                    state.selected = parsed_selected;
+                    if let Some(selected) = state.selected {
+                        state.view_year = selected.year;
+                        state.view_month = selected.month;
+                    }
+                }
             }
         }
 
-        let formatted = state
-            .selected
-            .map(|date| format_for_display(date, effective_pattern))
-            .unwrap_or_default();
+        let formatted = match selection_mode {
+            PickerSelectionMode::Single => state
+                .selected
+                .map(|date| format_for_display(date, effective_pattern))
+                .unwrap_or_default(),
+            PickerSelectionMode::Range => {
+                format_range_for_display(state.range_start, state.range_end, effective_pattern)
+            }
+        };
         if input_value.0 != formatted {
             input_value.0 = formatted.clone();
         }
@@ -1077,7 +1257,10 @@ fn sync_date_picker_visuals(
             picker.value = formatted;
         }
 
-        let has_value = state.selected.is_some();
+        let has_value = match selection_mode {
+            PickerSelectionMode::Single => state.selected.is_some(),
+            PickerSelectionMode::Range => state.range_start.is_some(),
+        };
         let float_label = ui_state.focused || ui_state.open || has_value;
 
         {
@@ -1108,7 +1291,13 @@ fn sync_date_picker_visuals(
         }
 
         let placeholder = if picker.placeholder.trim().is_empty() {
-            default_placeholder_for_format(effective_pattern)
+            match selection_mode {
+                PickerSelectionMode::Single => default_placeholder_for_format(effective_pattern),
+                PickerSelectionMode::Range => {
+                    let single = default_placeholder_for_format(effective_pattern);
+                    format!("{single} - {single}")
+                }
+            }
         } else {
             picker.placeholder.clone()
         };
@@ -1120,8 +1309,18 @@ fn sync_date_picker_visuals(
                     continue;
                 }
 
-                if let Some(selected) = state.selected {
-                    value_text.0 = format_for_display(selected, effective_pattern);
+                if has_value {
+                    value_text.0 = match selection_mode {
+                        PickerSelectionMode::Single => state
+                            .selected
+                            .map(|selected| format_for_display(selected, effective_pattern))
+                            .unwrap_or_default(),
+                        PickerSelectionMode::Range => format_range_for_display(
+                            state.range_start,
+                            state.range_end,
+                            effective_pattern,
+                        ),
+                    };
                     value_color.0 = Color::srgb(0.96, 0.97, 1.0);
                 } else {
                     value_text.0 = placeholder.clone();
@@ -1174,6 +1373,8 @@ fn sync_date_picker_visuals(
                     day_state.readonly = true;
                     day_state.disabled = true;
                     day_state.hovered = false;
+                    day_state.focused = false;
+                    day_state.invalid = false;
                     continue;
                 }
 
@@ -1184,10 +1385,41 @@ fn sync_date_picker_visuals(
                     continue;
                 };
 
-                day_state.checked = state.selected == Some(cell.date);
-                day_state.readonly = !cell.in_current_month;
-                day_state.disabled =
+                let is_endpoint = match selection_mode {
+                    PickerSelectionMode::Single => state.selected == Some(cell.date),
+                    PickerSelectionMode::Range => {
+                        state.range_start == Some(cell.date) || state.range_end == Some(cell.date)
+                    }
+                };
+                let is_range_start = selection_mode == PickerSelectionMode::Range
+                    && state.range_start == Some(cell.date);
+                let is_range_end = selection_mode == PickerSelectionMode::Range
+                    && state.range_end == Some(cell.date);
+                let same_start_end = is_range_start && is_range_end;
+                let in_range = match selection_mode {
+                    PickerSelectionMode::Single => false,
+                    PickerSelectionMode::Range => {
+                        in_selected_range(cell.date, state.range_start, state.range_end)
+                    }
+                };
+                let readonly = !cell.in_current_month;
+                let disabled =
                     ui_state.disabled || !is_date_allowed(cell.date, state.min, state.max);
+                let highlight_range = in_range && !is_endpoint && !readonly && !disabled;
+                let decorate_range_caps = selection_mode == PickerSelectionMode::Range
+                    && state.range_start.is_some()
+                    && state.range_end.is_some()
+                    && !same_start_end
+                    && !readonly
+                    && !disabled;
+                let range_start_cap = decorate_range_caps && is_range_start;
+                let range_end_cap = decorate_range_caps && is_range_end;
+
+                day_state.checked = is_endpoint;
+                day_state.readonly = readonly;
+                day_state.disabled = disabled;
+                day_state.focused = highlight_range || range_end_cap;
+                day_state.invalid = range_start_cap;
                 if day_state.disabled || day_state.readonly {
                     day_state.hovered = false;
                 }
@@ -1211,6 +1443,8 @@ fn sync_date_picker_visuals(
                     text_state.readonly = true;
                     text_state.disabled = true;
                     text_state.hovered = false;
+                    text_state.focused = false;
+                    text_state.invalid = false;
                     continue;
                 }
 
@@ -1221,20 +1455,49 @@ fn sync_date_picker_visuals(
                 };
 
                 text.0 = cell.date.day.to_string();
-                let selected = state.selected == Some(cell.date);
+                let selected = match selection_mode {
+                    PickerSelectionMode::Single => state.selected == Some(cell.date),
+                    PickerSelectionMode::Range => {
+                        state.range_start == Some(cell.date) || state.range_end == Some(cell.date)
+                    }
+                };
+                let is_range_start = selection_mode == PickerSelectionMode::Range
+                    && state.range_start == Some(cell.date);
+                let is_range_end = selection_mode == PickerSelectionMode::Range
+                    && state.range_end == Some(cell.date);
+                let same_start_end = is_range_start && is_range_end;
+                let in_range = match selection_mode {
+                    PickerSelectionMode::Single => false,
+                    PickerSelectionMode::Range => {
+                        in_selected_range(cell.date, state.range_start, state.range_end)
+                    }
+                };
                 let readonly = !cell.in_current_month;
                 let disabled =
                     ui_state.disabled || !is_date_allowed(cell.date, state.min, state.max);
+                let highlight_range = in_range && !selected && !readonly && !disabled;
+                let decorate_range_caps = selection_mode == PickerSelectionMode::Range
+                    && state.range_start.is_some()
+                    && state.range_end.is_some()
+                    && !same_start_end
+                    && !readonly
+                    && !disabled;
+                let range_start_cap = decorate_range_caps && is_range_start;
+                let range_end_cap = decorate_range_caps && is_range_end;
 
                 text_state.checked = selected;
                 text_state.readonly = readonly;
                 text_state.disabled = disabled;
+                text_state.focused = highlight_range || range_end_cap;
+                text_state.invalid = range_start_cap;
                 if disabled {
                     text_state.hovered = false;
                 }
 
                 text_color.0 = if selected {
                     Color::WHITE
+                } else if highlight_range {
+                    Color::srgb(0.88, 0.9, 0.98)
                 } else if disabled {
                     Color::srgb(0.31, 0.33, 0.41)
                 } else if readonly {
@@ -1811,17 +2074,27 @@ fn on_month_click(
         let updated_date = clamp_date_to_bounds(candidate, state.min, state.max);
         let date = updated_date.unwrap_or(candidate);
 
+        let mut selection_mode = PickerSelectionMode::Single;
         let mut effective_pattern = resolve_date_pattern(&picker, None);
         if let Some(for_id) = picker.for_id.as_ref() {
             for (css_id, _target_id, field, _field_value) in input_query.iter_mut() {
                 if css_id.0 != *for_id {
                     continue;
                 }
-                if field.input_type == InputType::Date {
+                if input_supports_date_picker(field.input_type) {
                     effective_pattern = resolve_date_pattern(&picker, Some(&field));
+                    selection_mode = resolve_selection_mode(Some(&field));
                 }
                 break;
             }
+        }
+
+        if selection_mode == PickerSelectionMode::Range {
+            ui_state.focused = true;
+            ui_state.open = true;
+            ui_state.checked = true;
+            current_widget_state.widget_id = id.get();
+            break;
         }
 
         state.selected = Some(date);
@@ -1838,7 +2111,7 @@ fn on_month_click(
                 if css_id.0 != *for_id {
                     continue;
                 }
-                if field.input_type != InputType::Date {
+                if !input_supports_date_picker(field.input_type) {
                     break;
                 }
                 field.text = formatted.clone();
@@ -1922,17 +2195,27 @@ fn on_year_click(
         let updated_date = clamp_date_to_bounds(candidate, state.min, state.max);
 
         let date = updated_date.unwrap_or(candidate);
+        let mut selection_mode = PickerSelectionMode::Single;
         let mut effective_pattern = resolve_date_pattern(&picker, None);
         if let Some(for_id) = picker.for_id.as_ref() {
             for (css_id, _target_id, field, _field_value) in input_query.iter_mut() {
                 if css_id.0 != *for_id {
                     continue;
                 }
-                if field.input_type == InputType::Date {
+                if input_supports_date_picker(field.input_type) {
                     effective_pattern = resolve_date_pattern(&picker, Some(&field));
+                    selection_mode = resolve_selection_mode(Some(&field));
                 }
                 break;
             }
+        }
+
+        if selection_mode == PickerSelectionMode::Range {
+            ui_state.focused = true;
+            ui_state.open = true;
+            ui_state.checked = true;
+            current_widget_state.widget_id = id.get();
+            break;
         }
 
         state.selected = Some(date);
@@ -1949,7 +2232,7 @@ fn on_year_click(
                 if css_id.0 != *for_id {
                     continue;
                 }
-                if field.input_type != InputType::Date {
+                if !input_supports_date_picker(field.input_type) {
                     break;
                 }
                 field.text = formatted.clone();
@@ -2057,17 +2340,27 @@ fn on_month_list_click(
         let updated_date = clamp_date_to_bounds(candidate, state.min, state.max);
         let date = updated_date.unwrap_or(candidate);
 
+        let mut selection_mode = PickerSelectionMode::Single;
         let mut effective_pattern = resolve_date_pattern(&picker, None);
         if let Some(for_id) = picker.for_id.as_ref() {
             for (css_id, _target_id, field, _field_value) in input_query.iter_mut() {
                 if css_id.0 != *for_id {
                     continue;
                 }
-                if field.input_type == InputType::Date {
+                if input_supports_date_picker(field.input_type) {
                     effective_pattern = resolve_date_pattern(&picker, Some(&field));
+                    selection_mode = resolve_selection_mode(Some(&field));
                 }
                 break;
             }
+        }
+
+        if selection_mode == PickerSelectionMode::Range {
+            ui_state.focused = true;
+            ui_state.open = true;
+            ui_state.checked = true;
+            current_widget_state.widget_id = id.get();
+            break;
         }
 
         state.selected = Some(date);
@@ -2084,7 +2377,7 @@ fn on_month_list_click(
                 if css_id.0 != *for_id {
                     continue;
                 }
-                if field.input_type != InputType::Date {
+                if !input_supports_date_picker(field.input_type) {
                     break;
                 }
                 field.text = formatted.clone();
@@ -2187,17 +2480,27 @@ fn on_year_list_click(
             .min(days_in_month(candidate.year, candidate.month));
         let updated_date = clamp_date_to_bounds(candidate, state.min, state.max);
         let date = updated_date.unwrap_or(candidate);
+        let mut selection_mode = PickerSelectionMode::Single;
         let mut effective_pattern = resolve_date_pattern(&picker, None);
         if let Some(for_id) = picker.for_id.as_ref() {
             for (css_id, _target_id, field, _field_value) in input_query.iter_mut() {
                 if css_id.0 != *for_id {
                     continue;
                 }
-                if field.input_type == InputType::Date {
+                if input_supports_date_picker(field.input_type) {
                     effective_pattern = resolve_date_pattern(&picker, Some(&field));
+                    selection_mode = resolve_selection_mode(Some(&field));
                 }
                 break;
             }
+        }
+
+        if selection_mode == PickerSelectionMode::Range {
+            ui_state.focused = true;
+            ui_state.open = true;
+            ui_state.checked = true;
+            current_widget_state.widget_id = id.get();
+            break;
         }
 
         state.selected = Some(date);
@@ -2214,7 +2517,7 @@ fn on_year_list_click(
                 if css_id.0 != *for_id {
                     continue;
                 }
-                if field.input_type != InputType::Date {
+                if !input_supports_date_picker(field.input_type) {
                     break;
                 }
                 field.text = formatted.clone();
@@ -2283,26 +2586,58 @@ fn on_day_click(
             return;
         }
 
-        state.selected = Some(cell.date);
-        state.view_year = cell.date.year;
-        state.view_month = cell.date.month;
-        state.month_list_open = false;
-        state.year_list_open = false;
-        state.year_list_centered = false;
+        let mut selection_mode = PickerSelectionMode::Single;
         let mut effective_pattern = resolve_date_pattern(&picker, None);
         if let Some(for_id) = picker.for_id.as_ref() {
             for (css_id, _target_id, field, _field_value) in input_query.iter_mut() {
                 if css_id.0 != *for_id {
                     continue;
                 }
-                if field.input_type == InputType::Date {
+                if input_supports_date_picker(field.input_type) {
                     effective_pattern = resolve_date_pattern(&picker, Some(&field));
+                    selection_mode = resolve_selection_mode(Some(&field));
                 }
                 break;
             }
         }
 
-        let formatted = format_for_display(cell.date, effective_pattern);
+        state.view_year = cell.date.year;
+        state.view_month = cell.date.month;
+        state.month_list_open = false;
+        state.year_list_open = false;
+        state.year_list_centered = false;
+
+        let mut keep_open = false;
+        let formatted = match selection_mode {
+            PickerSelectionMode::Single => {
+                state.selected = Some(cell.date);
+                state.range_start = None;
+                state.range_end = None;
+                format_for_display(cell.date, effective_pattern)
+            }
+            PickerSelectionMode::Range => {
+                keep_open = true;
+                match (state.range_start, state.range_end) {
+                    (None, _) | (Some(_), Some(_)) => {
+                        state.range_start = Some(cell.date);
+                        state.range_end = None;
+                        state.selected = Some(cell.date);
+                    }
+                    (Some(start), None) => {
+                        if cell.date < start {
+                            state.range_start = Some(cell.date);
+                            state.range_end = Some(start);
+                            state.selected = Some(start);
+                        } else {
+                            state.range_start = Some(start);
+                            state.range_end = Some(cell.date);
+                            state.selected = Some(cell.date);
+                        }
+                    }
+                }
+                format_range_for_display(state.range_start, state.range_end, effective_pattern)
+            }
+        };
         picker.value = formatted.clone();
         input_value.0 = formatted.clone();
         state.pending_bound_write_back = true;
@@ -2313,7 +2648,7 @@ fn on_day_click(
                 if css_id.0 != *for_id {
                     continue;
                 }
-                if field.input_type != InputType::Date {
+                if !input_supports_date_picker(field.input_type) {
                     break;
                 }
 
@@ -2325,8 +2660,8 @@ fn on_day_click(
         }
 
         ui_state.focused = true;
-        ui_state.open = false;
-        ui_state.checked = false;
+        ui_state.open = keep_open;
+        ui_state.checked = keep_open;
         current_widget_state.widget_id = bound_target_widget_id.unwrap_or(id.get());
         break;
     }
@@ -2515,7 +2850,7 @@ fn resolve_date_pattern(picker: &DatePicker, bound_input: Option<&InputField>) -
     }
 
     if let Some(input) = bound_input {
-        if input.input_type == InputType::Date {
+        if input_supports_date_picker(input.input_type) {
             if let Some(spec) = input
                 .date_format
                 .as_deref()
@@ -2530,6 +2865,18 @@ fn resolve_date_pattern(picker: &DatePicker, bound_input: Option<&InputField>) -
     }
 
     pattern_from_date_format(picker.format)
+}
+
+fn input_supports_date_picker(input_type: InputType) -> bool {
+    matches!(input_type, InputType::Date | InputType::Range)
+}
+
+fn resolve_selection_mode(bound_input: Option<&InputField>) -> PickerSelectionMode {
+    if bound_input.is_some_and(|input| input.input_type == InputType::Range) {
+        PickerSelectionMode::Range
+    } else {
+        PickerSelectionMode::Single
+    }
 }
 
 fn default_separator_for_order(order: DateFieldOrder) -> char {
@@ -2663,6 +3010,90 @@ fn format_for_display(date: SimpleDate, pattern: DatePattern) -> String {
         DateFieldOrder::YearMonthDay => {
             format!("{:04}{sep}{:02}{sep}{:02}", date.year, date.month, date.day)
         }
+    }
+}
+
+fn format_range_for_display(
+    start: Option<SimpleDate>,
+    end: Option<SimpleDate>,
+    pattern: DatePattern,
+) -> String {
+    match (start, end) {
+        (Some(start), Some(end)) => {
+            format!(
+                "{} - {}",
+                format_for_display(start, pattern),
+                format_for_display(end, pattern)
+            )
+        }
+        (Some(start), None) => format_for_display(start, pattern),
+        _ => String::new(),
+    }
+}
+
+fn parse_picker_range(
+    value: &str,
+    pattern: DatePattern,
+) -> Option<(SimpleDate, Option<SimpleDate>)> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    if let Some((left, right)) = split_range_parts(trimmed) {
+        let mut start = parse_picker_date(left, pattern)?;
+        let mut end = if right.is_empty() {
+            None
+        } else {
+            parse_picker_date(right, pattern)
+        };
+        if let Some(end_date) = end {
+            if end_date < start {
+                start = end_date;
+                end = Some(parse_picker_date(left, pattern)?);
+            }
+        }
+        return Some((start, end));
+    }
+
+    parse_picker_date(trimmed, pattern).map(|single| (single, None))
+}
+
+fn split_range_parts(value: &str) -> Option<(&str, &str)> {
+    for delimiter in [" - ", " – ", " — "] {
+        if let Some((left, right)) = value.split_once(delimiter) {
+            return Some((left.trim(), right.trim()));
+        }
+    }
+    None
+}
+
+fn normalize_bound_value_for_mode(
+    value: &str,
+    pattern: DatePattern,
+    mode: PickerSelectionMode,
+) -> String {
+    match mode {
+        PickerSelectionMode::Single => parse_picker_date(value, pattern)
+            .map(|date| format_for_display(date, pattern))
+            .unwrap_or_else(|| value.to_string()),
+        PickerSelectionMode::Range => parse_picker_range(value, pattern)
+            .map(|(start, end)| format_range_for_display(Some(start), end, pattern))
+            .unwrap_or_else(|| value.to_string()),
+    }
+}
+
+fn in_selected_range(date: SimpleDate, start: Option<SimpleDate>, end: Option<SimpleDate>) -> bool {
+    let Some(start) = start else {
+        return false;
+    };
+    let Some(end) = end else {
+        return false;
+    };
+    if start <= end {
+        date >= start && date <= end
+    } else {
+        date >= end && date <= start
     }
 }
 
