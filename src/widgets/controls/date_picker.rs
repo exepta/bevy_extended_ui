@@ -38,6 +38,10 @@ struct DatePickerPopover;
 #[derive(Component)]
 struct DatePickerHeaderLabel;
 
+/// Marker component for the header month toggle button.
+#[derive(Component)]
+struct DatePickerHeaderMonthButton;
+
 /// Marker component for the header year toggle button.
 #[derive(Component)]
 struct DatePickerHeaderYearButton;
@@ -58,10 +62,20 @@ struct DatePickerGrid;
 #[derive(Component)]
 struct DatePickerYearList;
 
+/// Marker component for the month picker list container.
+#[derive(Component)]
+struct DatePickerMonthList;
+
 /// Marker component for one year option entry.
 #[derive(Component)]
 struct DatePickerYearOption {
     year: i32,
+}
+
+/// Marker component for one month option entry.
+#[derive(Component)]
+struct DatePickerMonthOption {
+    month: u32,
 }
 
 /// Marker component for previous-month button.
@@ -92,6 +106,7 @@ struct DatePickerState {
     max: Option<SimpleDate>,
     view_year: i32,
     view_month: u32,
+    month_list_open: bool,
     year_list_open: bool,
     year_list_centered: bool,
     pending_bound_write_back: bool,
@@ -233,6 +248,7 @@ fn internal_node_creation_system(
                     max,
                     view_year: start.year,
                     view_month: start.month,
+                    month_list_open: false,
                     year_list_open: false,
                     year_list_centered: false,
                     pending_bound_write_back: false,
@@ -407,21 +423,49 @@ fn internal_node_creation_system(
                                         BindToID(id.get()),
                                     ))
                                     .with_children(|center| {
-                                        center.spawn((
-                                            Name::new(format!("DatePicker-Month-{}", picker.entry)),
-                                            Node::default(),
-                                            Text::new(""),
-                                            TextColor::default(),
-                                            TextFont::default(),
-                                            TextLayout::default(),
-                                            UIWidgetState::default(),
-                                            css_source.clone(),
-                                            CssClass(vec!["date-picker-month-label".to_string()]),
-                                            RenderLayers::layer(layer),
-                                            Pickable::IGNORE,
-                                            DatePickerHeaderLabel,
-                                            BindToID(id.get()),
-                                        ));
+                                        center
+                                            .spawn((
+                                                Name::new(format!(
+                                                    "DatePicker-Month-Button-{}",
+                                                    picker.entry
+                                                )),
+                                                Node::default(),
+                                                UIWidgetState::default(),
+                                                IgnoreParentState,
+                                                css_source.clone(),
+                                                CssClass(vec![
+                                                    "date-picker-month-button".to_string(),
+                                                ]),
+                                                RenderLayers::layer(layer),
+                                                Pickable::default(),
+                                                DatePickerHeaderMonthButton,
+                                                BindToID(id.get()),
+                                            ))
+                                            .with_children(|button| {
+                                                button.spawn((
+                                                    Name::new(format!(
+                                                        "DatePicker-Month-{}",
+                                                        picker.entry
+                                                    )),
+                                                    Node::default(),
+                                                    Text::new(""),
+                                                    TextColor::default(),
+                                                    TextFont::default(),
+                                                    TextLayout::default(),
+                                                    UIWidgetState::default(),
+                                                    css_source.clone(),
+                                                    CssClass(vec![
+                                                        "date-picker-month-label".to_string(),
+                                                    ]),
+                                                    RenderLayers::layer(layer),
+                                                    Pickable::IGNORE,
+                                                    DatePickerHeaderLabel,
+                                                    BindToID(id.get()),
+                                                ));
+                                            })
+                                            .observe(on_month_toggle_click)
+                                            .observe(on_nav_cursor_entered)
+                                            .observe(on_nav_cursor_leave);
 
                                         center
                                             .spawn((
@@ -579,7 +623,7 @@ fn internal_node_creation_system(
                                 BindToID(id.get()),
                             ))
                             .with_children(|grid| {
-                                for index in 0..49 {
+                                for index in 0..42 {
                                     grid.spawn((
                                         Name::new(format!(
                                             "DatePicker-Day-{}-{}",
@@ -685,6 +729,69 @@ fn internal_node_creation_system(
                                         .observe(on_year_cursor_leave);
                                 }
                             });
+
+                        popover
+                            .spawn((
+                                Name::new(format!("DatePicker-Months-{}", picker.entry)),
+                                Node::default(),
+                                UIWidgetState::default(),
+                                css_source.clone(),
+                                CssClass(vec!["date-picker-months".to_string()]),
+                                RenderLayers::layer(layer),
+                                Visibility::Hidden,
+                                Pickable::default(),
+                                DatePickerMonthList,
+                                BindToID(id.get()),
+                            ))
+                            .insert(ScrollPosition::default())
+                            .observe(on_month_list_click)
+                            .with_children(|months| {
+                                for month in 1..=12 {
+                                    months
+                                        .spawn((
+                                            Name::new(format!(
+                                                "DatePicker-Month-Option-{}-{}",
+                                                picker.entry, month
+                                            )),
+                                            Node::default(),
+                                            RelativeCursorPosition::default(),
+                                            UIWidgetState::default(),
+                                            IgnoreParentState,
+                                            css_source.clone(),
+                                            CssClass(vec!["date-picker-month-option".to_string()]),
+                                            RenderLayers::layer(layer),
+                                            Pickable::default(),
+                                            DatePickerMonthOption { month },
+                                            BindToID(id.get()),
+                                        ))
+                                        .with_children(|option| {
+                                            option.spawn((
+                                                Name::new(format!(
+                                                    "DatePicker-Month-Option-Text-{}-{}",
+                                                    picker.entry, month
+                                                )),
+                                                Text::new(month_short_name(month).to_string()),
+                                                TextColor::default(),
+                                                TextFont::default(),
+                                                TextLayout::new_with_justify(
+                                                    bevy::text::Justify::Center,
+                                                )
+                                                .with_no_wrap(),
+                                                UIWidgetState::default(),
+                                                css_source.clone(),
+                                                CssClass(vec![
+                                                    "date-picker-month-option-text".to_string(),
+                                                ]),
+                                                RenderLayers::layer(layer),
+                                                Pickable::IGNORE,
+                                                BindToID(id.get()),
+                                            ));
+                                        })
+                                        .observe(on_month_click)
+                                        .observe(on_month_cursor_entered)
+                                        .observe(on_month_cursor_leave);
+                                }
+                            });
                     });
             });
     }
@@ -743,6 +850,7 @@ fn sync_bound_date_picker_targets(
                 ui_state.open = false;
                 ui_state.checked = false;
                 ui_state.focused = false;
+                state.month_list_open = false;
                 state.year_list_open = false;
                 state.year_list_centered = false;
                 break;
@@ -836,6 +944,7 @@ fn sync_bound_date_picker_targets(
             ui_state.open = false;
             ui_state.checked = false;
             ui_state.focused = false;
+            state.month_list_open = false;
             state.year_list_open = false;
             state.year_list_centered = false;
             continue;
@@ -896,7 +1005,13 @@ fn sync_date_picker_visuals(
         Query<(&mut Visibility, &BindToID), With<DatePickerPopover>>,
         Query<(&mut Text, &BindToID), With<DatePickerHeaderLabel>>,
         Query<
-            (&mut UIWidgetState, &DatePickerDayButton, &BindToID),
+            (
+                &mut UIWidgetState,
+                &DatePickerDayButton,
+                &BindToID,
+                &mut Node,
+                &mut Visibility,
+            ),
             (
                 With<DatePickerDayButton>,
                 Without<DatePickerBase>,
@@ -911,6 +1026,7 @@ fn sync_date_picker_visuals(
                 &mut UIWidgetState,
                 &DatePickerDayText,
                 &BindToID,
+                &mut Visibility,
             ),
             (
                 With<DatePickerDayText>,
@@ -1039,12 +1155,30 @@ fn sync_date_picker_visuals(
         }
 
         let cells = build_calendar_cells(state.view_year, state.view_month);
+        let visible_rows = visible_calendar_row_count(state.view_year, state.view_month);
+        let visible_cell_count = visible_rows * 7;
         {
             let mut day_query = params.p4();
-            for (mut day_state, button, bind_id) in day_query.iter_mut() {
+            for (mut day_state, button, bind_id, mut day_node, mut day_visibility) in
+                day_query.iter_mut()
+            {
                 if bind_id.0 != ui_id.get() {
                     continue;
                 }
+
+                let hidden = button.index >= visible_cell_count;
+                if hidden {
+                    day_node.display = Display::None;
+                    *day_visibility = Visibility::Hidden;
+                    day_state.checked = false;
+                    day_state.readonly = true;
+                    day_state.disabled = true;
+                    day_state.hovered = false;
+                    continue;
+                }
+
+                day_node.display = Display::Flex;
+                *day_visibility = Visibility::Inherited;
 
                 let Some(cell) = cells.get(button.index) else {
                     continue;
@@ -1062,12 +1196,25 @@ fn sync_date_picker_visuals(
 
         {
             let mut day_text_query = params.p5();
-            for (mut text, mut text_color, mut text_state, text_info, bind_id) in
+            for (mut text, mut text_color, mut text_state, text_info, bind_id, mut visibility) in
                 day_text_query.iter_mut()
             {
                 if bind_id.0 != ui_id.get() {
                     continue;
                 }
+
+                let hidden = text_info.index >= visible_cell_count;
+                if hidden {
+                    text.0.clear();
+                    *visibility = Visibility::Hidden;
+                    text_state.checked = false;
+                    text_state.readonly = true;
+                    text_state.disabled = true;
+                    text_state.hovered = false;
+                    continue;
+                }
+
+                *visibility = Visibility::Inherited;
 
                 let Some(cell) = cells.get(text_info.index) else {
                     continue;
@@ -1100,14 +1247,25 @@ fn sync_date_picker_visuals(
     }
 }
 
-/// Synchronizes year-list visibility and year option states.
+/// Synchronizes month/year panel visibility and option states.
 fn sync_year_picker_panel(
     mut picker_query: Query<(&mut DatePickerState, &UIWidgetState, &UIGenID), With<DatePickerBase>>,
     mut month_year_params: ParamSet<(
         Query<(&mut Text, &BindToID), (With<DatePickerHeaderYearText>, Without<DatePickerBase>)>,
         Query<
-            (&mut UIWidgetState, &BindToID),
-            (With<DatePickerHeaderYearButton>, Without<DatePickerBase>),
+            (
+                &mut UIWidgetState,
+                &BindToID,
+                Option<&DatePickerHeaderYearButton>,
+                Option<&DatePickerHeaderMonthButton>,
+            ),
+            (
+                Or<(
+                    With<DatePickerHeaderYearButton>,
+                    With<DatePickerHeaderMonthButton>,
+                )>,
+                Without<DatePickerBase>,
+            ),
         >,
         Query<(&mut Visibility, &mut Node, &BindToID), With<DatePickerWeekdays>>,
         Query<(&mut Visibility, &mut Node, &BindToID), With<DatePickerGrid>>,
@@ -1132,11 +1290,19 @@ fn sync_year_picker_panel(
             ),
             (With<DatePickerYearOption>, Without<DatePickerBase>),
         >,
+        Query<(&mut Visibility, &mut Node, &BindToID), With<DatePickerMonthList>>,
+        Query<
+            (&mut UIWidgetState, &DatePickerMonthOption, &BindToID),
+            (With<DatePickerMonthOption>, Without<DatePickerBase>),
+        >,
     )>,
 ) {
     for (mut state, picker_ui, picker_id) in picker_query.iter_mut() {
-        let show_year_list = picker_ui.open && state.year_list_open && !picker_ui.disabled;
-        let hide_calendar = show_year_list;
+        let show_month_list =
+            picker_ui.open && state.month_list_open && !state.year_list_open && !picker_ui.disabled;
+        let show_year_list =
+            picker_ui.open && state.year_list_open && !state.month_list_open && !picker_ui.disabled;
+        let hide_calendar = show_year_list || show_month_list;
 
         {
             let mut year_label_query = month_year_params.p0();
@@ -1149,14 +1315,22 @@ fn sync_year_picker_panel(
         }
 
         {
-            let mut year_button_query = month_year_params.p1();
-            for (mut year_state, bind_id) in year_button_query.iter_mut() {
+            let mut button_query = month_year_params.p1();
+            for (mut button_state, bind_id, is_year, is_month) in button_query.iter_mut() {
                 if bind_id.0 != picker_id.get() {
                     continue;
                 }
-                year_state.checked = show_year_list;
-                if !show_year_list {
-                    year_state.hovered = false;
+
+                if is_year.is_some() {
+                    button_state.checked = show_year_list;
+                    if !show_year_list {
+                        button_state.hovered = false;
+                    }
+                } else if is_month.is_some() {
+                    button_state.checked = show_month_list;
+                    if !show_month_list {
+                        button_state.hovered = false;
+                    }
                 }
             }
         }
@@ -1247,10 +1421,43 @@ fn sync_year_picker_panel(
                 }
             }
         }
+
+        {
+            let mut months_query = month_year_params.p6();
+            for (mut visibility, mut node, bind_id) in months_query.iter_mut() {
+                if bind_id.0 != picker_id.get() {
+                    continue;
+                }
+                if show_month_list {
+                    *visibility = Visibility::Inherited;
+                    node.display = Display::Flex;
+                } else {
+                    *visibility = Visibility::Hidden;
+                    node.display = Display::None;
+                }
+            }
+        }
+
+        {
+            let mut option_query = month_year_params.p7();
+            for (mut option_state, option, bind_id) in option_query.iter_mut() {
+                if bind_id.0 != picker_id.get() {
+                    continue;
+                }
+
+                let disabled = picker_ui.disabled
+                    || !is_month_allowed(state.view_year, option.month, state.min, state.max);
+                option_state.checked = option.month == state.view_month;
+                option_state.disabled = disabled;
+                if disabled || !show_month_list {
+                    option_state.hovered = false;
+                }
+            }
+        }
     }
 }
 
-/// Handles mouse-wheel scrolling for the year picker list.
+/// Handles mouse-wheel scrolling for the month/year picker lists.
 fn handle_year_scroll_events(
     mut scroll_events: MessageReader<MouseWheel>,
     time: Res<Time>,
@@ -1262,9 +1469,12 @@ fn handle_year_scroll_events(
             &mut ScrollPosition,
             &ComputedNode,
         ),
-        With<DatePickerYearList>,
+        Or<(With<DatePickerYearList>, With<DatePickerMonthList>)>,
     >,
-    option_query: Query<(&ComputedNode, &ChildOf), With<DatePickerYearOption>>,
+    option_query: Query<
+        (&ComputedNode, &ChildOf),
+        Or<(With<DatePickerYearOption>, With<DatePickerMonthOption>)>,
+    >,
 ) {
     if scroll_events.is_empty() {
         return;
@@ -1318,6 +1528,7 @@ fn close_unfocused_date_pickers(
         if !state.focused && state.open {
             state.open = false;
             state.checked = false;
+            picker_state.month_list_open = false;
             picker_state.year_list_open = false;
             picker_state.year_list_centered = false;
         }
@@ -1361,6 +1572,7 @@ fn on_field_click(
             state.open = new_open;
             state.checked = new_open;
             if !new_open {
+                picker_state.month_list_open = false;
                 picker_state.year_list_open = false;
                 picker_state.year_list_centered = false;
             }
@@ -1368,6 +1580,7 @@ fn on_field_click(
         } else {
             state.open = false;
             state.checked = false;
+            picker_state.month_list_open = false;
             picker_state.year_list_open = false;
             picker_state.year_list_centered = false;
         }
@@ -1402,6 +1615,7 @@ fn on_prev_click(
         let (year, month) = shift_month(state.view_year, state.view_month, -1);
         state.view_year = year;
         state.view_month = month;
+        state.month_list_open = false;
         state.year_list_open = false;
         state.year_list_centered = false;
         ui_state.focused = true;
@@ -1440,6 +1654,43 @@ fn on_next_click(
         let (year, month) = shift_month(state.view_year, state.view_month, 1);
         state.view_year = year;
         state.view_month = month;
+        state.month_list_open = false;
+        state.year_list_open = false;
+        state.year_list_centered = false;
+        ui_state.focused = true;
+        ui_state.open = true;
+        ui_state.checked = true;
+        current_widget_state.widget_id = id.get();
+        break;
+    }
+
+    trigger.propagate(false);
+}
+
+/// Toggles the month picker list.
+fn on_month_toggle_click(
+    mut trigger: On<Pointer<Click>>,
+    bind_query: Query<&BindToID, With<DatePickerHeaderMonthButton>>,
+    mut picker_query: Query<
+        (&UIGenID, &mut DatePickerState, &mut UIWidgetState),
+        With<DatePickerBase>,
+    >,
+    mut current_widget_state: ResMut<CurrentWidgetState>,
+) {
+    let Ok(bind) = bind_query.get(trigger.entity) else {
+        return;
+    };
+
+    for (id, mut state, mut ui_state) in picker_query.iter_mut() {
+        if id.get() != bind.0 {
+            continue;
+        }
+        if ui_state.disabled {
+            trigger.propagate(false);
+            return;
+        }
+
+        state.month_list_open = !state.month_list_open;
         state.year_list_open = false;
         state.year_list_centered = false;
         ui_state.focused = true;
@@ -1476,6 +1727,7 @@ fn on_year_toggle_click(
         }
 
         state.year_list_open = !state.year_list_open;
+        state.month_list_open = false;
         if state.year_list_open {
             state.year_list_centered = false;
         } else {
@@ -1485,6 +1737,121 @@ fn on_year_toggle_click(
         ui_state.open = true;
         ui_state.checked = true;
         current_widget_state.widget_id = id.get();
+        break;
+    }
+
+    trigger.propagate(false);
+}
+
+/// Selects a month from the month list.
+fn on_month_click(
+    mut trigger: On<Pointer<Click>>,
+    month_query: Query<(&BindToID, &DatePickerMonthOption), With<DatePickerMonthOption>>,
+    parent_query: Query<&ChildOf>,
+    mut picker_query: Query<
+        (
+            &UIGenID,
+            &mut DatePicker,
+            &mut DatePickerState,
+            &mut UIWidgetState,
+            &mut InputValue,
+        ),
+        (With<DatePickerBase>, Without<InputField>),
+    >,
+    mut input_query: Query<
+        (&CssID, &UIGenID, &mut InputField, &mut InputValue),
+        (With<InputField>, Without<DatePickerBase>),
+    >,
+    mut current_widget_state: ResMut<CurrentWidgetState>,
+) {
+    let Some((bind_id, month_value)) =
+        resolve_month_option_from_entity(trigger.entity, &month_query, &parent_query)
+    else {
+        return;
+    };
+
+    for (id, mut picker, mut state, mut ui_state, mut picker_value) in picker_query.iter_mut() {
+        if id.get() != bind_id {
+            continue;
+        }
+        if ui_state.disabled {
+            trigger.propagate(false);
+            return;
+        }
+        if !(1..=12).contains(&month_value) {
+            trigger.propagate(false);
+            return;
+        }
+        if !is_month_allowed(state.view_year, month_value, state.min, state.max) {
+            trigger.propagate(false);
+            return;
+        }
+
+        state.view_month = month_value;
+        state.month_list_open = false;
+        state.year_list_open = false;
+        state.year_list_centered = false;
+
+        let mut candidate = if let Some(selected) = state.selected {
+            SimpleDate {
+                year: state.view_year,
+                month: month_value,
+                day: selected.day,
+            }
+        } else {
+            SimpleDate {
+                year: state.view_year,
+                month: month_value,
+                day: 1,
+            }
+        };
+        candidate.day = candidate
+            .day
+            .min(days_in_month(candidate.year, candidate.month));
+        let updated_date = clamp_date_to_bounds(candidate, state.min, state.max);
+        let date = updated_date.unwrap_or(candidate);
+
+        let mut effective_pattern = resolve_date_pattern(&picker, None);
+        if let Some(for_id) = picker.for_id.as_ref() {
+            for (css_id, _target_id, field, _field_value) in input_query.iter_mut() {
+                if css_id.0 != *for_id {
+                    continue;
+                }
+                if field.input_type == InputType::Date {
+                    effective_pattern = resolve_date_pattern(&picker, Some(&field));
+                }
+                break;
+            }
+        }
+
+        state.selected = Some(date);
+        state.view_year = date.year;
+        state.view_month = date.month;
+        let formatted = format_for_display(date, effective_pattern);
+        picker.value = formatted.clone();
+        picker_value.0 = formatted.clone();
+        state.pending_bound_write_back = true;
+
+        let mut bound_target_widget_id: Option<usize> = None;
+        if let Some(for_id) = picker.for_id.as_ref() {
+            for (css_id, target_id, mut field, mut field_value) in input_query.iter_mut() {
+                if css_id.0 != *for_id {
+                    continue;
+                }
+                if field.input_type != InputType::Date {
+                    break;
+                }
+                field.text = formatted.clone();
+                field_value.0 = formatted.clone();
+                bound_target_widget_id = Some(target_id.get());
+                break;
+            }
+        }
+
+        ui_state.focused = true;
+        ui_state.open = true;
+        ui_state.checked = true;
+        current_widget_state.widget_id = bound_target_widget_id.unwrap_or(id.get());
         break;
     }
 
@@ -1532,6 +1899,7 @@ fn on_year_click(
         }
 
         state.view_year = year_value;
+        state.month_list_open = false;
         state.year_list_open = false;
         state.year_list_centered = false;
 
@@ -1554,6 +1922,141 @@ fn on_year_click(
         let updated_date = clamp_date_to_bounds(candidate, state.min, state.max);
 
         let date = updated_date.unwrap_or(candidate);
+        let mut effective_pattern = resolve_date_pattern(&picker, None);
+        if let Some(for_id) = picker.for_id.as_ref() {
+            for (css_id, _target_id, field, _field_value) in input_query.iter_mut() {
+                if css_id.0 != *for_id {
+                    continue;
+                }
+                if field.input_type == InputType::Date {
+                    effective_pattern = resolve_date_pattern(&picker, Some(&field));
+                }
+                break;
+            }
+        }
+
+        state.selected = Some(date);
+        state.view_year = date.year;
+        state.view_month = date.month;
+        let formatted = format_for_display(date, effective_pattern);
+        picker.value = formatted.clone();
+        picker_value.0 = formatted.clone();
+        state.pending_bound_write_back = true;
+
+        let mut bound_target_widget_id: Option<usize> = None;
+        if let Some(for_id) = picker.for_id.as_ref() {
+            for (css_id, target_id, mut field, mut field_value) in input_query.iter_mut() {
+                if css_id.0 != *for_id {
+                    continue;
+                }
+                if field.input_type != InputType::Date {
+                    break;
+                }
+                field.text = formatted.clone();
+                field_value.0 = formatted.clone();
+                bound_target_widget_id = Some(target_id.get());
+                break;
+            }
+        }
+
+        ui_state.focused = true;
+        ui_state.open = true;
+        ui_state.checked = true;
+        current_widget_state.widget_id = bound_target_widget_id.unwrap_or(id.get());
+        break;
+    }
+
+    trigger.propagate(false);
+}
+
+/// Fallback month selection when the click lands on the month-list container.
+fn on_month_list_click(
+    mut trigger: On<Pointer<Click>>,
+    month_list_query: Query<&BindToID, With<DatePickerMonthList>>,
+    month_query: Query<(&BindToID, &DatePickerMonthOption), With<DatePickerMonthOption>>,
+    parent_query: Query<&ChildOf>,
+    month_option_query: Query<(&DatePickerMonthOption, &BindToID, &RelativeCursorPosition)>,
+    mut picker_query: Query<
+        (
+            &UIGenID,
+            &mut DatePicker,
+            &mut DatePickerState,
+            &mut UIWidgetState,
+            &mut InputValue,
+        ),
+        (With<DatePickerBase>, Without<InputField>),
+    >,
+    mut input_query: Query<
+        (&CssID, &UIGenID, &mut InputField, &mut InputValue),
+        (With<InputField>, Without<DatePickerBase>),
+    >,
+    mut current_widget_state: ResMut<CurrentWidgetState>,
+) {
+    if resolve_month_option_from_entity(trigger.event_target(), &month_query, &parent_query)
+        .is_some()
+    {
+        trigger.propagate(false);
+        return;
+    }
+
+    let Ok(bind) = month_list_query.get(trigger.entity) else {
+        return;
+    };
+
+    let mut hovered_month: Option<u32> = None;
+    for (option, option_bind, rel) in month_option_query.iter() {
+        if option_bind.0 != bind.0 {
+            continue;
+        }
+        if rel.cursor_over() {
+            hovered_month = Some(option.month);
+            break;
+        }
+    }
+
+    let Some(month_value) = hovered_month else {
+        trigger.propagate(false);
+        return;
+    };
+
+    for (id, mut picker, mut state, mut ui_state, mut picker_value) in picker_query.iter_mut() {
+        if id.get() != bind.0 {
+            continue;
+        }
+        if ui_state.disabled || !state.month_list_open {
+            trigger.propagate(false);
+            return;
+        }
+
+        let month_value = month_value.clamp(1, 12);
+        if !is_month_allowed(state.view_year, month_value, state.min, state.max) {
+            trigger.propagate(false);
+            return;
+        }
+        state.view_month = month_value;
+        state.month_list_open = false;
+        state.year_list_open = false;
+        state.year_list_centered = false;
+
+        let mut candidate = if let Some(selected) = state.selected {
+            SimpleDate {
+                year: state.view_year,
+                month: month_value,
+                day: selected.day,
+            }
+        } else {
+            SimpleDate {
+                year: state.view_year,
+                month: month_value,
+                day: 1,
+            }
+        };
+        candidate.day = candidate
+            .day
+            .min(days_in_month(candidate.year, candidate.month));
+        let updated_date = clamp_date_to_bounds(candidate, state.min, state.max);
+        let date = updated_date.unwrap_or(candidate);
+
         let mut effective_pattern = resolve_date_pattern(&picker, None);
         if let Some(for_id) = picker.for_id.as_ref() {
             for (css_id, _target_id, field, _field_value) in input_query.iter_mut() {
@@ -1662,6 +2165,7 @@ fn on_year_list_click(
         let year_value = year_value.clamp(state.year_start, state.year_end);
 
         state.view_year = year_value;
+        state.month_list_open = false;
         state.year_list_open = false;
         state.year_list_centered = false;
 
@@ -1764,6 +2268,12 @@ fn on_day_click(
         }
 
         let cells = build_calendar_cells(state.view_year, state.view_month);
+        let visible_rows = visible_calendar_row_count(state.view_year, state.view_month);
+        let visible_cell_count = visible_rows * 7;
+        if day_button.index >= visible_cell_count {
+            trigger.propagate(false);
+            return;
+        }
         let Some(cell) = cells.get(day_button.index).copied() else {
             break;
         };
@@ -1776,6 +2286,7 @@ fn on_day_click(
         state.selected = Some(cell.date);
         state.view_year = cell.date.year;
         state.view_month = cell.date.month;
+        state.month_list_open = false;
         state.year_list_open = false;
         state.year_list_centered = false;
         let mut effective_pattern = resolve_date_pattern(&picker, None);
@@ -1889,6 +2400,7 @@ fn on_nav_cursor_entered(
         Or<(
             With<DatePickerPrevButton>,
             With<DatePickerNextButton>,
+            With<DatePickerHeaderMonthButton>,
             With<DatePickerHeaderYearButton>,
         )>,
     >,
@@ -1907,6 +2419,7 @@ fn on_nav_cursor_leave(
         Or<(
             With<DatePickerPrevButton>,
             With<DatePickerNextButton>,
+            With<DatePickerHeaderMonthButton>,
             With<DatePickerHeaderYearButton>,
         )>,
     >,
@@ -1934,6 +2447,30 @@ fn on_year_cursor_entered(
 fn on_year_cursor_leave(
     mut trigger: On<Pointer<Out>>,
     mut query: Query<&mut UIWidgetState, With<DatePickerYearOption>>,
+) {
+    if let Ok(mut state) = query.get_mut(trigger.entity) {
+        state.hovered = false;
+    }
+    trigger.propagate(false);
+}
+
+/// Sets hovered state for month entries.
+fn on_month_cursor_entered(
+    mut trigger: On<Pointer<Over>>,
+    mut query: Query<&mut UIWidgetState, With<DatePickerMonthOption>>,
+) {
+    if let Ok(mut state) = query.get_mut(trigger.entity) {
+        if !state.disabled {
+            state.hovered = true;
+        }
+    }
+    trigger.propagate(false);
+}
+
+/// Clears hovered state for month entries.
+fn on_month_cursor_leave(
+    mut trigger: On<Pointer<Out>>,
+    mut query: Query<&mut UIWidgetState, With<DatePickerMonthOption>>,
 ) {
     if let Ok(mut state) = query.get_mut(trigger.entity) {
         state.hovered = false;
@@ -2181,6 +2718,21 @@ fn resolve_year_option_from_entity(
     None
 }
 
+fn resolve_month_option_from_entity(
+    start: Entity,
+    month_query: &Query<(&BindToID, &DatePickerMonthOption), With<DatePickerMonthOption>>,
+    parent_query: &Query<&ChildOf>,
+) -> Option<(usize, u32)> {
+    let mut current = Some(start);
+    while let Some(entity) = current {
+        if let Ok((bind, month_option)) = month_query.get(entity) {
+            return Some((bind.0, month_option.month));
+        }
+        current = parent_query.get(entity).ok().map(|parent| parent.parent());
+    }
+    None
+}
+
 fn parse_iso_date(value: &str) -> Option<SimpleDate> {
     let mut parts = value.trim().split('-');
     let year = parts.next()?.trim().parse::<i32>().ok()?;
@@ -2281,8 +2833,8 @@ fn build_calendar_cells(year: i32, month: u32) -> Vec<CalendarCell> {
     let (next_year, next_month) = shift_month(year, month, 1);
     let prev_days = days_in_month(prev_year, prev_month) as usize;
 
-    let mut cells = Vec::with_capacity(49);
-    for idx in 0..49 {
+    let mut cells = Vec::with_capacity(42);
+    for idx in 0..42 {
         if idx < first {
             let day = prev_days - (first - idx) + 1;
             cells.push(CalendarCell {
@@ -2321,6 +2873,18 @@ fn build_calendar_cells(year: i32, month: u32) -> Vec<CalendarCell> {
     }
 
     cells
+}
+
+fn visible_calendar_row_count(year: i32, month: u32) -> usize {
+    let first_sunday_index = day_of_week(SimpleDate {
+        year,
+        month,
+        day: 1,
+    }) as usize;
+    let first = (first_sunday_index + 6) % 7;
+    let current_days = days_in_month(year, month) as usize;
+    let weeks = (first + current_days).div_ceil(7);
+    weeks.max(5)
 }
 
 fn is_date_allowed(date: SimpleDate, min: Option<SimpleDate>, max: Option<SimpleDate>) -> bool {
@@ -2375,6 +2939,51 @@ fn month_name(month: u32) -> &'static str {
         12 => "December",
         _ => "Unknown",
     }
+}
+
+fn month_short_name(month: u32) -> &'static str {
+    match month {
+        1 => "Jan",
+        2 => "Feb",
+        3 => "Mar",
+        4 => "Apr",
+        5 => "May",
+        6 => "Jun",
+        7 => "Jul",
+        8 => "Aug",
+        9 => "Sep",
+        10 => "Oct",
+        11 => "Nov",
+        12 => "Dec",
+        _ => "???",
+    }
+}
+
+fn is_month_allowed(
+    year: i32,
+    month: u32,
+    min: Option<SimpleDate>,
+    max: Option<SimpleDate>,
+) -> bool {
+    let Some(first) = make_date(year, month, 1) else {
+        return false;
+    };
+    let Some(last) = make_date(year, month, days_in_month(year, month)) else {
+        return false;
+    };
+
+    if let Some(min) = min {
+        if last < min {
+            return false;
+        }
+    }
+    if let Some(max) = max {
+        if first > max {
+            return false;
+        }
+    }
+
+    true
 }
 
 fn resolve_year_range(
