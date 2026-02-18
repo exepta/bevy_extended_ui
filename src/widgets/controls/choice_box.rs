@@ -2,6 +2,7 @@ use crate::services::image_service::{DEFAULT_CHOICE_BOX_KEY, get_or_load_image};
 use crate::styles::components::UiStyle;
 use crate::styles::paint::Colored;
 use crate::styles::{CssClass, CssSource, FontVal, TagName};
+use crate::widgets::widget_util::wheel_delta_y;
 use crate::widgets::{
     BindToID, ChoiceBox, ChoiceOption, IgnoreParentState, UIGenID, UIWidgetState, WidgetId,
     WidgetKind,
@@ -11,7 +12,6 @@ use bevy::camera::visibility::RenderLayers;
 use bevy::ecs::relationship::RelatedSpawnerCommands;
 use bevy::input::mouse::MouseWheel;
 use bevy::prelude::*;
-use crate::widgets::widget_util::wheel_delta_y;
 
 /// Marker component for initialized choice box widgets.
 #[derive(Component)]

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta name="date-picker-test">
+    <meta charset="UTF-8">
+    <title>Date Picker</title>
+    <link rel="stylesheet" href="base.css">
+</head>
+<body>
+
+<div class="display-center" style="gap: 14px; flex-direction: column;">
+    <h3 id="selected-date">Selected: -</h3>
+
+    <label for="birthday">Birthday</label>
+    <input
+            id="birthday"
+            name="birthday"
+            type="date"
+            value="24.07.2023"
+            format="dd.mm.yyyy"
+            onchange="on_date_change">
+
+    <date-picker
+            for="birthday"
+            min="01.01.2022"
+            max="31.12.2026"
+            onchange="on_date_change">
+    </date-picker>
+</div>
+
+</body>
+</html>

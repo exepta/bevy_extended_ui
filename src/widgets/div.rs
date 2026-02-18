@@ -2,13 +2,13 @@ use std::collections::HashMap;
 
 use crate::styles::paint::Colored;
 use crate::styles::{CssClass, CssSource, TagName};
+use crate::widgets::widget_util::wheel_delta_y;
 use crate::widgets::{BindToID, Div, Scrollbar, UIGenID, UIWidgetState, WidgetId, WidgetKind};
 use crate::{CurrentWidgetState, ExtendedUiConfiguration};
 use bevy::camera::visibility::RenderLayers;
 use bevy::input::mouse::MouseWheel;
 use bevy::prelude::*;
 use bevy::ui::ScrollPosition;
-use crate::widgets::widget_util::wheel_delta_y;
 
 /// Marker component for initialized div widgets.
 #[derive(Component)]

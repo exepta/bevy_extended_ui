@@ -604,6 +604,11 @@ fn parse_html_node(
             let text = attributes.get("value").unwrap_or("").to_string();
             let placeholder = attributes.get("placeholder").unwrap_or("").to_string();
             let input_type = attributes.get("type").unwrap_or("text").to_string();
+            let date_format = attributes
+                .get("format")
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string);
             let icon_path = attributes.get("icon").unwrap_or("");
             let icon: Option<String> = if !icon_path.is_empty() {
                 Some(String::from(icon_path))
@@ -628,8 +633,68 @@ fn parse_html_node(
                     placeholder,
                     text,
                     input_type: InputType::from_str(&input_type).unwrap_or_default(),
+                    date_format,
                     icon_path: icon,
                     cap_text_at: cap,
+                    ..default()
+                },
+                meta,
+                states,
+                functions,
+                widget.clone(),
+                HtmlID::default(),
+            ))
+        }
+
+        "date-picker" => {
+            let for_id = attributes
+                .get("for")
+                .map(str::trim)
+                .map(|value| value.trim_start_matches('#').to_string())
+                .filter(|value| !value.is_empty());
+            let id = attributes.get("id").map(|s| s.to_string());
+            let name = attributes
+                .get("name")
+                .map(str::to_string)
+                .or_else(|| id.clone())
+                .unwrap_or_default();
+            let label = attributes
+                .get("label")
+                .map(str::to_string)
+                .or_else(|| id.as_ref().and_then(|id| label_map.get(id)).cloned())
+                .unwrap_or_else(|| "Date".to_string());
+            let placeholder = attributes.get("placeholder").unwrap_or("").to_string();
+            let value = attributes.get("value").unwrap_or("").to_string();
+            let min = attributes.get("min").map(str::to_string);
+            let max = attributes.get("max").map(str::to_string);
+            let format_pattern = attributes
+                .get("format")
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string);
+            let format = format_pattern
+                .as_deref()
+                .and_then(DateFormat::from_str)
+                .unwrap_or_default();
+            let mut meta = meta;
+            if for_id.is_some() {
+                let classes = meta.class.get_or_insert_with(Vec::new);
+                if !classes.iter().any(|class| class == "date-picker-bound") {
+                    classes.push("date-picker-bound".to_string());
+                }
+            }
+
+            Some(HtmlWidgetNode::DatePicker(
+                DatePicker {
+                    for_id,
+                    name,
+                    label,
+                    placeholder,
+                    value,
+                    min,
+                    max,
+                    format_pattern,
+                    format,
                     ..default()
                 },
                 meta,

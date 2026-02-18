@@ -344,7 +344,8 @@ pub fn update_widget_styles_system(
     mut image_cache: ResMut<ImageCache>,
     mut images: ResMut<Assets<Image>>,
 ) {
-    for (entity, state_opt, html_style_opt, refresh_on_node_added, mut ui_style) in query.iter_mut() {
+    for (entity, state_opt, html_style_opt, refresh_on_node_added, mut ui_style) in query.iter_mut()
+    {
         let state = state_opt.cloned().unwrap_or_default();
         let node_added = refresh_on_node_added.is_some();
 
@@ -833,10 +834,7 @@ fn resolve_layout_viewport(window_q: &Query<&Window, With<PrimaryWindow>>) -> Op
     Some(window.resolution.size())
 }
 
-#[cfg(all(
-    not(feature = "wasm-breakpoints"),
-    not(feature = "css-breakpoints")
-))]
+#[cfg(all(not(feature = "wasm-breakpoints"), not(feature = "css-breakpoints")))]
 fn resolve_layout_viewport(_window_q: &Query<&Window, With<PrimaryWindow>>) -> Option<Vec2> {
     None
 }
