@@ -17,6 +17,7 @@ pub static FIELDSET_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPoo
 pub static HEADLINE_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
 pub static IMAGE_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
 pub static INPUT_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
+pub static DATE_PICKER_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
 pub static PARAGRAPH_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
 pub static TOOL_TIP_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
 pub static PROGRESS_BAR_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
@@ -431,6 +432,7 @@ fn despawn_widget_ids(
                     COLOR_PICKER_ID_POOL.lock().unwrap().release(widget_id.id)
                 }
                 WidgetKind::InputField => INPUT_ID_POOL.lock().unwrap().release(widget_id.id),
+                WidgetKind::DatePicker => DATE_PICKER_ID_POOL.lock().unwrap().release(widget_id.id),
                 WidgetKind::ChoiceBox => CHOICE_BOX_ID_POOL.lock().unwrap().release(widget_id.id),
                 WidgetKind::Img => IMAGE_ID_POOL.lock().unwrap().release(widget_id.id),
                 WidgetKind::ProgressBar => {

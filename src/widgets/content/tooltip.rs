@@ -79,7 +79,13 @@ impl Plugin for ToolTipWidget {
 fn internal_node_creation_system(
     mut commands: Commands,
     query: Query<
-        (Entity, &UIGenID, &ToolTip, Option<&CssSource>, Option<&CssClass>),
+        (
+            Entity,
+            &UIGenID,
+            &ToolTip,
+            Option<&CssSource>,
+            Option<&CssClass>,
+        ),
         (With<ToolTip>, Without<ToolTipBase>),
     >,
     config: Res<ExtendedUiConfiguration>,
@@ -177,7 +183,8 @@ fn track_click_trigger(
     widget_q: Query<(), With<WidgetId>>,
     body_q: Query<(), With<Body>>,
 ) {
-    let Some(owner) = resolve_owner_widget(ev.event_target(), &parents_q, &widget_q, &body_q) else {
+    let Some(owner) = resolve_owner_widget(ev.event_target(), &parents_q, &widget_q, &body_q)
+    else {
         trigger_state.clicked.clear();
         return;
     };
@@ -388,12 +395,16 @@ fn place_point(
 
     let calc = |s: ToolTipSide| -> (f32, f32) {
         match s {
-            ToolTipSide::Right => (target_top_left.x + target_size.x + gap, center.y - tip_h * 0.5),
+            ToolTipSide::Right => (
+                target_top_left.x + target_size.x + gap,
+                center.y - tip_h * 0.5,
+            ),
             ToolTipSide::Left => (target_top_left.x - tip_w - gap, center.y - tip_h * 0.5),
             ToolTipSide::Top => (center.x - tip_w * 0.5, target_top_left.y - tip_h - gap),
-            ToolTipSide::Bottom => {
-                (center.x - tip_w * 0.5, target_top_left.y + target_size.y + gap)
-            }
+            ToolTipSide::Bottom => (
+                center.x - tip_w * 0.5,
+                target_top_left.y + target_size.y + gap,
+            ),
         }
     };
 
@@ -503,7 +514,12 @@ fn update_tooltip_visuals(
         ),
     >,
     mut nose_q: Query<
-        (&mut Node, &mut Visibility, &mut CssClass, &ToolTipNoseClassBase),
+        (
+            &mut Node,
+            &mut Visibility,
+            &mut CssClass,
+            &ToolTipNoseClassBase,
+        ),
         (With<ToolTipNose>, Without<ToolTip>, Without<ToolTipText>),
     >,
 ) {
@@ -544,7 +560,8 @@ fn update_tooltip_visuals(
         let target_clicked = trigger_state.clicked.contains(&target) && !target_state.disabled;
         let target_dragging = trigger_state.dragging.contains(&target) && !target_state.disabled;
 
-        let trigger_active = is_trigger_active(tooltip, target_hovered, target_clicked, target_dragging);
+        let trigger_active =
+            is_trigger_active(tooltip, target_hovered, target_clicked, target_dragging);
         let needs_cursor = tooltip.variant == ToolTipVariant::Follow;
         let should_show = trigger_active && (!needs_cursor || cursor_position.is_some());
 
@@ -564,7 +581,9 @@ fn update_tooltip_visuals(
             );
 
             for child in children.iter() {
-                if let Ok((_, mut nose_visibility, mut nose_class, nose_base)) = nose_q.get_mut(child) {
+                if let Ok((_, mut nose_visibility, mut nose_class, nose_base)) =
+                    nose_q.get_mut(child)
+                {
                     *nose_visibility = Visibility::Hidden;
                     set_css_classes(&mut nose_class, &nose_base.0, &["tooltip-nose-closed"]);
                 }
@@ -650,11 +669,17 @@ fn update_tooltip_visuals(
         set_css_classes(
             &mut css_class,
             &class_base.0,
-            &["tooltip-open", tooltip_variant_class, side_to_tooltip_class(side)],
+            &[
+                "tooltip-open",
+                tooltip_variant_class,
+                side_to_tooltip_class(side),
+            ],
         );
 
         for child in children.iter() {
-            if let Ok((mut nose_node, mut nose_visibility, mut nose_class, nose_base)) = nose_q.get_mut(child) {
+            if let Ok((mut nose_node, mut nose_visibility, mut nose_class, nose_base)) =
+                nose_q.get_mut(child)
+            {
                 if tooltip.variant == ToolTipVariant::Point {
                     place_nose(&mut nose_node, side, tip_w, tip_h);
                     *nose_visibility = Visibility::Inherited;

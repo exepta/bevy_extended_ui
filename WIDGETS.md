@@ -172,6 +172,38 @@ Inside a `<form>`, use `type="submit"` to submit the parent form without `onclic
 
 ---
 
+## DatePicker (`DatePicker`)
+
+**Struct purpose:** MUI-style date picker popover with month navigation and selected value storage.
+Supports `name`, `label`, `placeholder`, `value`, `min`, `max`, `format`, and `for`.
+
+`value`, `min`, and `max` use ISO format (`YYYY-MM-DD`).
+`format` controls visual display and supports `mdy`, `dmy`, and `ymd`.
+
+`for="input_id"` binds the picker to an existing input field.  
+The target input **must** use `type="date"`.
+
+**HTML tag:**
+```html
+<label for="birthday">Birthday</label>
+<date-picker
+  id="birthday"
+  name="birthday"
+  value="1998-07-24"
+  min="1900-01-01"
+  max="2100-12-31"
+  format="mdy"
+></date-picker>
+```
+
+**HTML tag (bound to input):**
+```html
+<input type="date" id="test" />
+<date-picker for="test"></date-picker>
+```
+
+---
+
 ## Paragraph (`Paragraph`)
 
 **Struct purpose:** Paragraph with free-form text.

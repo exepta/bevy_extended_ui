@@ -173,7 +173,9 @@ fn mark_css_users_dirty_on_viewport_change(
 /// - `css-breakpoints` reads from Bevy's primary window (desktop/default).
 /// - no active breakpoint feature returns `None`.
 #[cfg(all(feature = "wasm-breakpoints", target_arch = "wasm32"))]
-fn resolve_breakpoint_viewport(_window_query: &Query<&Window, With<PrimaryWindow>>) -> Option<Vec2> {
+fn resolve_breakpoint_viewport(
+    _window_query: &Query<&Window, With<PrimaryWindow>>,
+) -> Option<Vec2> {
     let window = web_sys::window()?;
     let width = window.inner_width().ok()?.as_f64()? as f32;
     let height = window.inner_height().ok()?.as_f64()? as f32;
@@ -181,21 +183,25 @@ fn resolve_breakpoint_viewport(_window_query: &Query<&Window, With<PrimaryWindow
 }
 
 #[cfg(all(feature = "wasm-breakpoints", not(target_arch = "wasm32")))]
-fn resolve_breakpoint_viewport(_window_query: &Query<&Window, With<PrimaryWindow>>) -> Option<Vec2> {
+fn resolve_breakpoint_viewport(
+    _window_query: &Query<&Window, With<PrimaryWindow>>,
+) -> Option<Vec2> {
     None
 }
 
 #[cfg(all(not(feature = "wasm-breakpoints"), feature = "css-breakpoints"))]
 fn resolve_breakpoint_viewport(window_query: &Query<&Window, With<PrimaryWindow>>) -> Option<Vec2> {
     let window = window_query.single().ok()?;
-    Some(Vec2::new(window.resolution.width(), window.resolution.height()))
+    Some(Vec2::new(
+        window.resolution.width(),
+        window.resolution.height(),
+    ))
 }
 
-#[cfg(all(
-    not(feature = "wasm-breakpoints"),
-    not(feature = "css-breakpoints")
-))]
-fn resolve_breakpoint_viewport(_window_query: &Query<&Window, With<PrimaryWindow>>) -> Option<Vec2> {
+#[cfg(all(not(feature = "wasm-breakpoints"), not(feature = "css-breakpoints")))]
+fn resolve_breakpoint_viewport(
+    _window_query: &Query<&Window, With<PrimaryWindow>>,
+) -> Option<Vec2> {
     None
 }
 

@@ -1,10 +1,10 @@
 use crate::CurrentWidgetState;
 use crate::html::*;
 use crate::widgets::{
-    BindToID, Button, ButtonType, CheckBox, ChoiceBox, ColorPicker, FieldSelectionMulti,
-    FieldSelectionSingle, Form, FormValidationMode, InputField, InputValue, RadioButton, Scrollbar,
-    Slider, SwitchButton, ToggleButton, UIGenID, UIWidgetState, ValidationRules,
-    evaluate_validation_state,
+    BindToID, Button, ButtonType, CheckBox, ChoiceBox, ColorPicker, DatePicker,
+    FieldSelectionMulti, FieldSelectionSingle, Form, FormValidationMode, InputField, InputValue,
+    RadioButton, Scrollbar, Slider, SwitchButton, ToggleButton, UIGenID, UIWidgetState,
+    ValidationRules, evaluate_validation_state,
 };
 use bevy::log::warn;
 use bevy::prelude::*;
@@ -196,6 +196,7 @@ pub(crate) fn emit_html_submit_events(
         Query<&ChildOf>,
         Query<&Children>,
         Query<(&InputField, &InputValue)>,
+        Query<(&DatePicker, &InputValue)>,
         Query<(
             &ValidationRules,
             &mut UIWidgetState,
@@ -280,7 +281,7 @@ pub(crate) fn emit_html_submit_events(
 
     {
         let mut valid = true;
-        let mut validation_q = params.p5();
+        let mut validation_q = params.p6();
         match validate_mode {
             FormValidationMode::Send => {
                 for entity in &descendants {
@@ -342,12 +343,26 @@ pub(crate) fn emit_html_submit_events(
     let mut data: HashMap<String, String> = HashMap::new();
     {
         let input_q = params.p4();
-        for entity in descendants {
-            if let Ok((input, value)) = input_q.get(entity) {
+        for entity in &descendants {
+            if let Ok((input, value)) = input_q.get(*entity) {
                 let key = if input.name.trim().is_empty() {
                     format!("input_{}", input.entry)
                 } else {
                     input.name.clone()
+                };
+                data.insert(key, value.0.clone());
+            }
+        }
+    }
+
+    {
+        let date_picker_q = params.p5();
+        for entity in &descendants {
+            if let Ok((picker, value)) = date_picker_q.get(*entity) {
+                let key = if picker.name.trim().is_empty() {
+                    format!("date_picker_{}", picker.entry)
+                } else {
+                    picker.name.clone()
                 };
                 data.insert(key, value.0.clone());
             }

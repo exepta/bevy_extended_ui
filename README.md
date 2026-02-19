@@ -112,7 +112,7 @@ fn test_click(In(event): In<HtmlEvent>) {
 Note that currently you can use this binding:
 
 - `onclick`
-- `onchange` Only for `<select>`, `<fieldset>`, `<input>`, `<checkbox>`, `<slider>` and `<colorpicker>` elements.
+- `onchange` Only for `<select>`, `<fieldset>`, `<input>`, `<date-picker>`, `<checkbox>`, `<slider>` and `<colorpicker>` elements.
 - `action` on `<form>` for submit handlers with collected input data
 - `oninit`
 - `onmouseover`

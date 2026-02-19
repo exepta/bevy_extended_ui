@@ -1,7 +1,9 @@
 use crate::styles::components::UiStyle;
 use crate::styles::paint::Colored;
 use crate::styles::{CssClass, CssSource, TagName};
-use crate::widgets::{hsv_to_rgb_u8, BindToID, ColorPicker, UIGenID, UIWidgetState, WidgetId, WidgetKind};
+use crate::widgets::{
+    BindToID, ColorPicker, UIGenID, UIWidgetState, WidgetId, WidgetKind, hsv_to_rgb_u8,
+};
 use crate::{CurrentWidgetState, ExtendedUiConfiguration};
 use bevy::asset::RenderAssetUsages;
 use bevy::camera::visibility::RenderLayers;
@@ -516,7 +518,8 @@ fn sync_color_picker_visual_state(
             let mut trigger_bg_q = params.p0();
             for (mut color, bind, maybe_styles) in trigger_bg_q.iter_mut() {
                 if bind.0 == id.0 {
-                    let background = Color::srgba_u8(picker.red, picker.green, picker.blue, picker.alpha);
+                    let background =
+                        Color::srgba_u8(picker.red, picker.green, picker.blue, picker.alpha);
                     *color = BackgroundColor(background);
 
                     if let Some(mut styles) = maybe_styles {
