@@ -7,10 +7,10 @@
     --headline-sec: #aaaabc;
     --text-color: #e8e8fd;
     --text-color-dark: #b4b4c1;
-    --disabled-text: #3d3d44;
-    --disabled-text-darker: #323239;
-    --gray-background: #323239;
-    --gray-background-disabled: #3d3d44;
+    --disabled-text: #262d39;
+    --disabled-text-darker: #1f2630;
+    --gray-background: #1f2630;
+    --gray-background-disabled: #262d39;
 }
 
 /* Button */
