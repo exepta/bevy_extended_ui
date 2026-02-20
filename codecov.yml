@@ -1,0 +1,19 @@
+codecov:
+  require_ci_to_pass: true
+
+coverage:
+  precision: 2
+  round: down
+  range: "0...100"
+  status:
+    project:
+      default:
+        target: 80%
+    patch:
+      default:
+        target: 80%
+
+# NOTE: src/html/bindings.rs is currently excluded from Codecov checks
+# because this module is not tested yet.
+ignore:
+  - "src/html/bindings.rs"

@@ -2,6 +2,7 @@ mod bindings;
 pub mod builder;
 pub mod converter;
 pub mod reload;
+mod unit_tests;
 
 pub use inventory;
 
