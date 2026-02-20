@@ -5,6 +5,7 @@ mod div;
 mod form;
 mod validation;
 mod widget_util;
+mod unit_tests;
 
 use crate::registry::*;
 use crate::styles::IconPlace;

@@ -18,6 +18,8 @@ pub mod services;
 pub mod styles;
 pub mod utils;
 pub mod widgets;
+mod unit_tests;
+
 pub use lang::{UILang, UiLangVariables};
 
 /// A cache mapping image paths to their loaded handles,
