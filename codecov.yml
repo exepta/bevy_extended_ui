@@ -17,3 +17,4 @@ coverage:
 # because this module is not tested yet.
 ignore:
   - "src/html/bindings.rs"
+  - "crates/bevy_extended_ui_macros/src/lib.rs"

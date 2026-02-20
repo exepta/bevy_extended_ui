@@ -2,6 +2,7 @@ mod css_service;
 pub mod image_service;
 mod state_service;
 mod style_service;
+mod unit_tests;
 
 use crate::services::css_service::CssService;
 use crate::services::image_service::ImageCacheService;
