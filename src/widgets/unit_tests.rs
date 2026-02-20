@@ -50,8 +50,9 @@ mod tests {
 
     #[test]
     fn validation_rules_from_attribute_parses_required_length_and_pattern() {
-        let rules = ValidationRules::from_attribute("required & length(2, 5) & pattern('^[a-z]+$')")
-            .expect("rules should parse");
+        let rules =
+            ValidationRules::from_attribute("required & length(2, 5) & pattern('^[a-z]+$')")
+                .expect("rules should parse");
 
         assert!(rules.required);
         assert_eq!(rules.min_length, Some(2));
@@ -77,8 +78,14 @@ mod tests {
 
     #[test]
     fn form_validation_mode_parser_works() {
-        assert_eq!(FormValidationMode::from_str("all"), Some(FormValidationMode::Always));
-        assert_eq!(FormValidationMode::from_str("send"), Some(FormValidationMode::Send));
+        assert_eq!(
+            FormValidationMode::from_str("all"),
+            Some(FormValidationMode::Always)
+        );
+        assert_eq!(
+            FormValidationMode::from_str("send"),
+            Some(FormValidationMode::Send)
+        );
         assert_eq!(
             FormValidationMode::from_str("interact"),
             Some(FormValidationMode::Interact)
@@ -128,7 +135,10 @@ mod tests {
     #[test]
     fn date_format_parser_works() {
         assert_eq!(DateFormat::from_str("mdy"), Some(DateFormat::MonthDayYear));
-        assert_eq!(DateFormat::from_str("day-month-year"), Some(DateFormat::DayMonthYear));
+        assert_eq!(
+            DateFormat::from_str("day-month-year"),
+            Some(DateFormat::DayMonthYear)
+        );
         assert_eq!(DateFormat::from_str("iso"), Some(DateFormat::YearMonthDay));
         assert_eq!(DateFormat::from_str("bad"), None);
     }
@@ -156,10 +166,16 @@ mod tests {
 
     #[test]
     fn tooltip_parsers_work() {
-        assert_eq!(ToolTipVariant::from_str("point"), Some(ToolTipVariant::Point));
+        assert_eq!(
+            ToolTipVariant::from_str("point"),
+            Some(ToolTipVariant::Point)
+        );
         assert_eq!(ToolTipVariant::from_str("x"), None);
 
-        assert_eq!(ToolTipPriority::from_str("left"), Some(ToolTipPriority::Left));
+        assert_eq!(
+            ToolTipPriority::from_str("left"),
+            Some(ToolTipPriority::Left)
+        );
         assert_eq!(ToolTipPriority::from_str("x"), None);
 
         assert_eq!(
@@ -168,7 +184,10 @@ mod tests {
         );
         assert_eq!(ToolTipAlignment::from_str("x"), None);
 
-        assert_eq!(ToolTipTrigger::from_str("hover"), Some(ToolTipTrigger::Hover));
+        assert_eq!(
+            ToolTipTrigger::from_str("hover"),
+            Some(ToolTipTrigger::Hover)
+        );
         assert_eq!(ToolTipTrigger::from_str("x"), None);
     }
 
@@ -320,14 +339,14 @@ mod tests {
         let input = app
             .world_mut()
             .spawn((
-            ValidationRules {
-                required: true,
-                min_length: Some(2),
-                ..default()
-            },
-            UIWidgetState::default(),
-            InputValue(String::new()),
-        ))
+                ValidationRules {
+                    required: true,
+                    min_length: Some(2),
+                    ..default()
+                },
+                UIWidgetState::default(),
+                InputValue(String::new()),
+            ))
             .id();
 
         app.world_mut().entity_mut(form).add_child(input);
@@ -339,7 +358,8 @@ mod tests {
                 .invalid
         );
 
-        app.world_mut().entity_mut(input)
+        app.world_mut()
+            .entity_mut(input)
             .insert(InputValue("ok".to_string()));
         app.update();
         assert!(
@@ -367,13 +387,13 @@ mod tests {
         let input = app
             .world_mut()
             .spawn((
-            ValidationRules {
-                required: true,
-                ..default()
-            },
-            UIWidgetState::default(),
-            InputValue(String::new()),
-        ))
+                ValidationRules {
+                    required: true,
+                    ..default()
+                },
+                UIWidgetState::default(),
+                InputValue(String::new()),
+            ))
             .id();
 
         app.world_mut().entity_mut(form).add_child(input);
@@ -396,16 +416,16 @@ mod tests {
         let input = app
             .world_mut()
             .spawn((
-            ValidationRules {
-                required: true,
-                ..default()
-            },
-            UIWidgetState {
-                invalid: true,
-                ..default()
-            },
-            InputValue(String::new()),
-        ))
+                ValidationRules {
+                    required: true,
+                    ..default()
+                },
+                UIWidgetState {
+                    invalid: true,
+                    ..default()
+                },
+                InputValue(String::new()),
+            ))
             .id();
 
         app.update();
@@ -459,10 +479,7 @@ mod tests {
         app.insert_resource(ImageCache::default());
         app.init_asset::<Image>();
 
-        app.add_plugins((
-            ExtendedContentWidgets,
-            ExtendedControlWidgets,
-        ));
+        app.add_plugins((ExtendedContentWidgets, ExtendedControlWidgets));
     }
 
     #[test]

@@ -152,7 +152,10 @@ mod tests {
             ("x".to_string(), source(None)),
             ("y".to_string(), source(None)),
         ]);
-        assert_eq!(registry.current, Some(vec!["x".to_string(), "y".to_string()]));
+        assert_eq!(
+            registry.current,
+            Some(vec!["x".to_string(), "y".to_string()])
+        );
     }
 
     #[test]
@@ -194,7 +197,10 @@ mod tests {
 
         assert_eq!(keycode_to_char(KeyCode::Digit0, false, true), Some('}'));
         assert_eq!(keycode_to_char(KeyCode::Digit7, true, false), Some('/'));
-        assert_eq!(keycode_to_char(KeyCode::IntlBackslash, false, true), Some('|'));
+        assert_eq!(
+            keycode_to_char(KeyCode::IntlBackslash, false, true),
+            Some('|')
+        );
         assert_eq!(keycode_to_char(KeyCode::Space, false, false), Some(' '));
     }
 
@@ -250,10 +256,9 @@ mod tests {
         }
         app.update();
 
-        let mut query = app.world_mut().query_filtered::<
-            (&Camera, &RenderLayers, Has<Hdr>),
-            With<super::super::UiCamera>,
-        >();
+        let mut query = app
+            .world_mut()
+            .query_filtered::<(&Camera, &RenderLayers, Has<Hdr>), With<super::super::UiCamera>>();
         let rows: Vec<_> = query.iter(app.world()).collect();
         assert_eq!(rows.len(), 1);
         let (camera, layers, has_hdr) = rows[0];
@@ -267,7 +272,9 @@ mod tests {
         }
         app.update();
 
-        let mut query = app.world_mut().query_filtered::<Has<Hdr>, With<super::super::UiCamera>>();
+        let mut query = app
+            .world_mut()
+            .query_filtered::<Has<Hdr>, With<super::super::UiCamera>>();
         let rows: Vec<_> = query.iter(app.world()).collect();
         assert_eq!(rows, vec![false]);
     }
@@ -288,10 +295,9 @@ mod tests {
         }
         app.update();
 
-        let mut query = app.world_mut().query_filtered::<
-            (&Camera, Has<IsDefaultUiCamera>),
-            With<super::super::UiCamera>,
-        >();
+        let mut query = app
+            .world_mut()
+            .query_filtered::<(&Camera, Has<IsDefaultUiCamera>), With<super::super::UiCamera>>();
         let rows: Vec<_> = query.iter(app.world()).collect();
         assert_eq!(rows.len(), 1);
         let (camera, has_default_marker) = rows[0];
@@ -320,5 +326,4 @@ mod tests {
         let count = query.iter(app.world()).count();
         assert_eq!(count, 0);
     }
-
 }

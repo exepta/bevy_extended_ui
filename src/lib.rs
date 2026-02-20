@@ -16,9 +16,9 @@ pub mod lang;
 pub mod registry;
 pub mod services;
 pub mod styles;
+mod unit_tests;
 pub mod utils;
 pub mod widgets;
-mod unit_tests;
 
 pub use lang::{UILang, UiLangVariables};
 
