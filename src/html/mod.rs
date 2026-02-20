@@ -2,6 +2,7 @@ mod bindings;
 pub mod builder;
 pub mod converter;
 pub mod reload;
+mod unit_tests;
 
 pub use inventory;
 
@@ -19,9 +20,9 @@ use crate::io::{CssAsset, HtmlAsset};
 use crate::styles::Style;
 use crate::styles::parser::apply_property_to_style;
 use crate::widgets::{
-    Body, Button, CheckBox, ChoiceBox, ColorPicker, Div, Divider, FieldSet, Form, Headline, Img,
-    InputField, Paragraph, ProgressBar, RadioButton, Scrollbar, Slider, SwitchButton, ToggleButton,
-    ToolTip, ValidationRules, Widget,
+    Body, Button, CheckBox, ChoiceBox, ColorPicker, DatePicker, Div, Divider, FieldSet, Form,
+    Headline, Img, InputField, Paragraph, ProgressBar, RadioButton, Scrollbar, Slider,
+    SwitchButton, ToggleButton, ToolTip, ValidationRules, Widget,
 };
 
 pub static HTML_ID_COUNTER: AtomicUsize = AtomicUsize::new(1);
@@ -286,6 +287,15 @@ pub enum HtmlWidgetNode {
     /// A dropdown or select box.
     ChoiceBox(
         ChoiceBox,
+        HtmlMeta,
+        HtmlStates,
+        HtmlEventBindings,
+        Widget,
+        HtmlID,
+    ),
+    /// A date picker `<date-picker>`.
+    DatePicker(
+        DatePicker,
         HtmlMeta,
         HtmlStates,
         HtmlEventBindings,

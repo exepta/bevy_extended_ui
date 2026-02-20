@@ -1,3 +1,5 @@
+mod unit_tests;
+
 use bevy::asset::io::Reader;
 use bevy::asset::{AssetLoader, LoadContext};
 use bevy::prelude::*;

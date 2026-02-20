@@ -5,6 +5,7 @@ mod div;
 mod form;
 mod validation;
 mod widget_util;
+mod unit_tests;
 
 use crate::registry::*;
 use crate::styles::IconPlace;
@@ -191,6 +192,7 @@ pub enum WidgetKind {
     ColorPicker,
     CheckBox,
     ChoiceBox,
+    DatePicker,
     Div,
     Divider,
     Form,
@@ -674,6 +676,79 @@ impl Default for Img {
 }
 
 // ===============================================
+//                   DatePicker
+// ===============================================
+
+/// Date value display format for date picker widgets.
+#[derive(Reflect, Default, Debug, Clone, Copy, Eq, PartialEq)]
+pub enum DateFormat {
+    #[default]
+    MonthDayYear,
+    DayMonthYear,
+    YearMonthDay,
+}
+
+impl DateFormat {
+    /// Parses a date format from a string.
+    pub fn from_str(value: &str) -> Option<DateFormat> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "mdy" | "mm/dd/yyyy" | "mm-dd-yyyy" | "mm.dd.yyyy" | "month-day-year" => {
+                Some(DateFormat::MonthDayYear)
+            }
+            "dmy" | "dd/mm/yyyy" | "dd-mm-yyyy" | "dd.mm.yyyy" | "day-month-year" => {
+                Some(DateFormat::DayMonthYear)
+            }
+            "ymd" | "yyyy-mm-dd" | "yyyy/mm/dd" | "yyyy.mm.dd" | "year-month-day" | "iso" => {
+                Some(DateFormat::YearMonthDay)
+            }
+            _ => None,
+        }
+    }
+}
+
+/// Date picker widget with an anchored calendar popover.
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+#[require(UIGenID, UIWidgetState, Widget, InputValue)]
+pub struct DatePicker {
+    pub entry: usize,
+    /// Optional input id this picker binds to (`for="input-id"`).
+    pub for_id: Option<String>,
+    pub name: String,
+    pub label: String,
+    pub placeholder: String,
+    /// Stored in the configured display format.
+    pub value: String,
+    /// Optional minimum selectable date (`YYYY-MM-DD`).
+    pub min: Option<String>,
+    /// Optional maximum selectable date (`YYYY-MM-DD`).
+    pub max: Option<String>,
+    /// Optional explicit date format string, e.g. `dd.MM.yyyy`.
+    pub format_pattern: Option<String>,
+    pub format: DateFormat,
+}
+
+impl Default for DatePicker {
+    /// Creates a default date picker widget.
+    fn default() -> Self {
+        let entry = DATE_PICKER_ID_POOL.lock().unwrap().acquire();
+
+        Self {
+            entry,
+            for_id: None,
+            name: String::new(),
+            label: String::from("Date"),
+            placeholder: String::new(),
+            value: String::new(),
+            min: None,
+            max: None,
+            format_pattern: None,
+            format: DateFormat::default(),
+        }
+    }
+}
+
+// ===============================================
 //                   InputField
 // ===============================================
 
@@ -691,6 +766,8 @@ pub struct InputField {
     pub clear_after_focus_lost: bool,
     pub icon_path: Option<String>,
     pub input_type: InputType,
+    /// Optional date format string used when `input_type="date"`.
+    pub date_format: Option<String>,
     pub cap_text_at: InputCap,
 }
 
@@ -710,17 +787,19 @@ impl Default for InputField {
             icon_path: None,
             cap_text_at: InputCap::default(),
             input_type: InputType::default(),
+            date_format: None,
         }
     }
 }
 
 /// Supported input types for input fields.
-#[derive(Reflect, Default, Debug, Clone, Eq, PartialEq)]
+#[derive(Reflect, Default, Debug, Clone, Copy, Eq, PartialEq)]
 pub enum InputType {
     #[default]
     Text,
     Email,
     Date,
+    Range,
     Password,
     Number,
 }
@@ -733,6 +812,7 @@ impl InputType {
             InputType::Number => c.is_ascii_digit() || "+-*/() ".contains(c),
             InputType::Email => c.is_ascii_alphanumeric() || c == '@' || c == '.' || c == '-',
             InputType::Date => c.is_ascii_digit() || c == '/' || c == '-' || c == '.',
+            InputType::Range => c.is_ascii_digit() || c == '/' || c == '-' || c == '.' || c == ' ',
         }
     }
 
@@ -744,6 +824,7 @@ impl InputType {
             "number" => Some(InputType::Number),
             "email" => Some(InputType::Email),
             "date" => Some(InputType::Date),
+            "range" => Some(InputType::Range),
             _ => None,
         }
     }

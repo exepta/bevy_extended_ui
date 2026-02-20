@@ -1824,7 +1824,12 @@ pub fn convert_to_color(value: String) -> Option<Color> {
     } else if let Some(parts) = parse_color_components(trimmed, "rgb", 3) {
         color = Some(Color::srgb_u8(parts[0], parts[1], parts[2]));
     } else if let Some((r, g, b, a)) = parse_rgba_components(trimmed) {
-        color = Some(Color::srgba(r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0, a));
+        color = Some(Color::srgba(
+            r as f32 / 255.0,
+            g as f32 / 255.0,
+            b as f32 / 255.0,
+            a,
+        ));
     } else {
         color = Colored::named(trimmed);
     }
