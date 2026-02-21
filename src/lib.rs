@@ -1,5 +1,6 @@
 use crate::html::ExtendedUiHtmlPlugin;
 use crate::io::ExtendedIoPlugin;
+use crate::registry::ExtendedRegistryPlugin;
 use crate::services::ExtendedServicePlugin;
 use crate::styles::ExtendedStylingPlugin;
 use crate::widgets::ExtendedWidgetPlugin;
@@ -7,18 +8,19 @@ use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
 use bevy::render::view::Hdr;
 use std::collections::HashMap;
-use crate::registry::ExtendedRegistryPlugin;
 
+pub mod example_utils;
 pub mod html;
 pub mod io;
 pub mod lang;
 pub mod registry;
 pub mod services;
 pub mod styles;
+mod unit_tests;
 pub mod utils;
 pub mod widgets;
-pub mod example_utils;
-pub use lang::{UiLangVariables, UILang};
+
+pub use lang::{UILang, UiLangVariables};
 
 /// A cache mapping image paths to their loaded handles,
 /// preventing duplicate loads and allowing cleanup of unused images.

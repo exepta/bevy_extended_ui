@@ -12,10 +12,13 @@ use bevy_extended_ui_macros::html_fn;
 fn main() {
     let mut app = make_app("Debug Html UI - events");
 
-    app.add_systems(Startup, |mut reg: ResMut<UiRegistry>, asset_server: Res<AssetServer>| {
-        let handle: Handle<HtmlAsset> = asset_server.load("examples/events.html");
-        reg.add_and_use("events_test".to_string(), HtmlSource::from_handle(handle));
-    });
+    app.add_systems(
+        Startup,
+        |mut reg: ResMut<UiRegistry>, asset_server: Res<AssetServer>| {
+            let handle: Handle<HtmlAsset> = asset_server.load("examples/events.html");
+            reg.add_and_use("events_test".to_string(), HtmlSource::from_handle(handle));
+        },
+    );
 
     app.run();
 }
@@ -50,7 +53,10 @@ fn ev_out(In(event): In<HtmlMouseOut>) {
 /// Logs change events.
 #[html_fn("ev_change")]
 fn ev_change(In(event): In<HtmlChange>) {
-    info!("change target: {:?} action: {:?}", event.entity, event.action);
+    info!(
+        "change target: {:?} action: {:?}",
+        event.entity, event.action
+    );
 }
 
 /// Logs focus events.
@@ -83,17 +89,26 @@ fn ev_key_up(In(event): In<HtmlKeyUp>) {
 /// Logs drag start events.
 #[html_fn("ev_drag_start")]
 fn ev_drag_start(In(event): In<HtmlDragStart>) {
-    info!("drag start target: {:?} position: {:?}", event.entity, event.position);
+    info!(
+        "drag start target: {:?} position: {:?}",
+        event.entity, event.position
+    );
 }
 
 /// Logs drag events.
 #[html_fn("ev_drag")]
 fn ev_drag(In(event): In<HtmlDrag>) {
-    info!("drag target: {:?} position: {:?}", event.entity, event.position);
+    info!(
+        "drag target: {:?} position: {:?}",
+        event.entity, event.position
+    );
 }
 
 /// Logs drag stop events.
 #[html_fn("ev_drag_stop")]
 fn ev_drag_stop(In(event): In<HtmlDragStop>) {
-    info!("drag stop target: {:?} position: {:?}", event.entity, event.position);
+    info!(
+        "drag stop target: {:?} position: {:?}",
+        event.entity, event.position
+    );
 }

@@ -4,6 +4,22 @@ This document describes all widgets in the project, their corresponding Rust str
 
 ---
 
+## Shared Inner Content Attributes
+
+All spawned HTML widgets now receive a `HtmlInnerContent` component with:
+
+- `innerText`: raw text content of the element.
+- `innerHtml`: serialized inner HTML.
+- `innerBindings`: detected placeholders like `{{user.name}}`.
+
+All three fields can be overridden at runtime via setters:
+
+- `set_inner_text(...)`
+- `set_inner_html(...)`
+- `set_inner_bindings(...)`
+
+---
+
 ## Body (`Body`)
 
 **Struct purpose:** Root container for an HTML structure. Holds an internal `entry` ID and an optional `html_key` (the `<meta name="...">` key of the HTML file).
@@ -30,9 +46,37 @@ This document describes all widgets in the project, their corresponding Rust str
 
 ---
 
+## Form (`Form`)
+
+**Struct purpose:** Container for form controls. Supports `action="handler_name"` to trigger a submit handler via `#[html_fn("handler_name")]`.
+
+Validation is only active inside `<form>`.
+Use `validate="Allways|Always|Send|Interact"` on the form (default: `Send`):
+- `All`/`Always`: validates continuously (state/input changes).
+- `Send`: validates only on submit click.
+- `Interact`: validates on input interaction (e.g. typing).
+
+When a child `<button type="submit">` is clicked, the form:
+- validates descendants with `validation`/`required` rules,
+- collects input data into a submit payload (`data` map),
+- calls the `action` handler only if validation passes.
+
+**HTML tag:**
+```html
+<form action="login_action" validate="Send">
+  <input name="username" required />
+  <input name="email" type="email" required />
+  <button type="submit">Login</button>
+</form>
+```
+
+---
+
 ## Button (`Button`)
 
-**Struct purpose:** Clickable button with text plus an optional icon and its placement.
+**Struct purpose:** Clickable button with text plus an optional icon and its placement. Supports `type="button|submit|reset"` (`Auto` when omitted).
+
+Inside a `<form>`, use `type="submit"` to submit the parent form without `onclick`.
 
 **HTML tag:**
 ```html
@@ -118,12 +162,44 @@ This document describes all widgets in the project, their corresponding Rust str
 
 ## InputField (`InputField`)
 
-**Struct purpose:** Text input with label, placeholder, icon, type (text/email/date/password/number), and length limit.
+**Struct purpose:** Text input with `name`, label, placeholder, icon, type (text/email/date/password/number), and length limit.
 
 **HTML tag:**
 ```html
 <label for="name">Name</label>
-<input id="name" type="text" placeholder="Your name" maxlength="32" />
+<input id="name" name="name" type="text" placeholder="Your name" maxlength="32" />
+```
+
+---
+
+## DatePicker (`DatePicker`)
+
+**Struct purpose:** MUI-style date picker popover with month navigation and selected value storage.
+Supports `name`, `label`, `placeholder`, `value`, `min`, `max`, `format`, and `for`.
+
+`value`, `min`, and `max` use ISO format (`YYYY-MM-DD`).
+`format` controls visual display and supports `mdy`, `dmy`, and `ymd`.
+
+`for="input_id"` binds the picker to an existing input field.  
+The target input **must** use `type="date"`.
+
+**HTML tag:**
+```html
+<label for="birthday">Birthday</label>
+<date-picker
+  id="birthday"
+  name="birthday"
+  value="1998-07-24"
+  min="1900-01-01"
+  max="2100-12-31"
+  format="mdy"
+></date-picker>
+```
+
+**HTML tag (bound to input):**
+```html
+<input type="date" id="test" />
+<date-picker for="test"></date-picker>
 ```
 
 ---
@@ -135,6 +211,58 @@ This document describes all widgets in the project, their corresponding Rust str
 **HTML tag:**
 ```html
 <p>This is a paragraph.</p>
+```
+
+---
+
+## ToolTip (`ToolTip`)
+
+**Struct purpose:** Tooltip that follows the mouse cursor and is bound to a target widget.
+It is only active when a target exists:
+- implicit target via parent widget (`<tool-tip>` is child of container/button/input/...),
+- explicit target via `for="some_id"`.
+
+Behavior:
+- supports trigger modes `hover`, `click`, `drag` (single or combined, e.g. `hover | click`),
+- supports variants:
+  - `follow` (default): follows cursor with `12px` offset,
+  - `point`: anchored to target (does not follow cursor) and shows a nose pointing to the target,
+- supports placement settings:
+  - `prio="top|bottom|left|right"` (default: `right`),
+  - `alignment="horizontal|vertical"` (default: `horizontal`),
+- for `point`, tooltip placement is centered relative to the target on the opposite axis,
+- automatic viewport collision handling (fallback to opposite side).
+
+Attributes:
+- `variant`: `point | follow` (default: `follow`)
+- `prio`: `top | bottom | left | right` (default: `right`)
+- `alignment`: `vertical | horizontal` (default: `horizontal`)
+- `trigger`: `click | hover | drag` (default: `hover`)
+
+**HTML tag (parent binding):**
+```html
+<div>
+  <tool-tip>Hello world</tool-tip>
+</div>
+```
+
+**HTML tag (`for` binding):**
+```html
+<div id="test"></div>
+<tool-tip for="test">Hello world</tool-tip>
+```
+
+**HTML tag (full attributes):**
+```html
+<tool-tip
+  for="test"
+  variant="point"
+  prio="top"
+  alignment="vertical"
+  trigger="hover | click"
+>
+  Hello world
+</tool-tip>
 ```
 
 ---
@@ -179,6 +307,18 @@ This document describes all widgets in the project, their corresponding Rust str
 **HTML tag:**
 ```html
 <slider min="0" max="100" value="50" step="5"></slider>
+```
+
+---
+
+## ColorPicker (`ColorPicker`)
+
+**Struct purpose:** Canvas-based color selection widget with live `HEX`, `RGB`, and `RGBA` output.
+Supports optional initial `value` (`#hex`, `rgb(...)`, `rgba(...)`) and optional `alpha`.
+
+**HTML tag:**
+```html
+<colorpicker value="#4285f4" alpha="255" onchange="on_color_change"></colorpicker>
 ```
 
 ---

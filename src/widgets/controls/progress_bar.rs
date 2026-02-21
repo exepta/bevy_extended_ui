@@ -1,11 +1,11 @@
+use crate::ExtendedUiConfiguration;
+use crate::styles::components::UiStyle;
+use crate::styles::paint::Colored;
+use crate::styles::{CssClass, CssSource, TagName};
+use crate::widgets::{BindToID, ProgressBar, UIGenID, UIWidgetState, WidgetId, WidgetKind};
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
-use crate::ExtendedUiConfiguration;
-use crate::styles::{CssClass, CssSource, TagName};
-use crate::styles::components::UiStyle;
-use crate::styles::paint::Colored;
-use crate::widgets::{BindToID, ProgressBar, UIGenID, UIWidgetState, WidgetId, WidgetKind};
 
 /// Marker component for initialized progress bar widgets.
 #[derive(Component)]
@@ -27,7 +27,11 @@ impl Plugin for ProgressBarWidget {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
-            (internal_node_creation_system, update_progress_bars, initialize_progress_bar_visual_state)
+            (
+                internal_node_creation_system,
+                update_progress_bars,
+                initialize_progress_bar_visual_state,
+            )
                 .chain(),
         );
     }
@@ -36,7 +40,10 @@ impl Plugin for ProgressBarWidget {
 /// Initializes UI nodes for progress bar widgets.
 fn internal_node_creation_system(
     mut commands: Commands,
-    query: Query<(Entity, &UIGenID, &ProgressBar, Option<&CssSource>), (With<ProgressBar>, Without<ProgressBarBase>)>,
+    query: Query<
+        (Entity, &UIGenID, &ProgressBar, Option<&CssSource>),
+        (With<ProgressBar>, Without<ProgressBarBase>),
+    >,
     config: Res<ExtendedUiConfiguration>,
 ) {
     let layer = config.render_layers.first().copied().unwrap_or(1);
@@ -58,7 +65,13 @@ fn internal_node_creation_system(
                 BackgroundColor::default(),
                 ImageNode::default(),
                 BorderColor::default(),
-                BoxShadow::new(Colored::TRANSPARENT, Val::Px(0.), Val::Px(0.), Val::Px(0.), Val::Px(0.)),
+                BoxShadow::new(
+                    Colored::TRANSPARENT,
+                    Val::Px(0.),
+                    Val::Px(0.),
+                    Val::Px(0.),
+                    Val::Px(0.),
+                ),
                 ZIndex::default(),
                 Pickable::IGNORE,
                 css_source.clone(),
@@ -95,11 +108,15 @@ fn update_progress_bars(
     mut query: Query<(&ProgressBar, &ComputedNode, &Children, &UIGenID), With<ProgressBarBase>>,
     mut track_query: Query<(&mut Node, &BindToID, &mut UiStyle), With<ProgressBarTrack>>,
 ) {
-    let Ok(window) = window_query.single() else { return };
+    let Ok(window) = window_query.single() else {
+        return;
+    };
     let sf = window.scale_factor() * ui_scale.0;
 
     for (progress_bar, computed_node, children, ui_id) in query.iter_mut() {
-        let progress = ((progress_bar.value - progress_bar.min) / (progress_bar.max - progress_bar.min)).clamp(0.0, 1.0);
+        let progress = ((progress_bar.value - progress_bar.min)
+            / (progress_bar.max - progress_bar.min))
+            .clamp(0.0, 1.0);
 
         let base_width = computed_node.size().x / sf;
         let fill_width = progress * base_width;
@@ -122,11 +139,20 @@ fn update_progress_bars(
 fn initialize_progress_bar_visual_state(
     mut commands: Commands,
     ui_scale: Res<UiScale>,
-    mut query: Query<(Entity, &ProgressBar, &ComputedNode, &Children, &UIGenID, Option<&ProgressBarNeedInit>)>,
+    mut query: Query<(
+        Entity,
+        &ProgressBar,
+        &ComputedNode,
+        &Children,
+        &UIGenID,
+        Option<&ProgressBarNeedInit>,
+    )>,
     mut track_query: Query<(&mut Node, &mut UiStyle, &BindToID), With<ProgressBarTrack>>,
     window_query: Query<&Window, With<PrimaryWindow>>,
 ) {
-    let Ok(window) = window_query.single() else { return };
+    let Ok(window) = window_query.single() else {
+        return;
+    };
     let sf = window.scale_factor() * ui_scale.0;
 
     for (entity, progress_bar, computed_node, children, ui_id, needs_init) in query.iter_mut() {
@@ -139,7 +165,8 @@ fn initialize_progress_bar_visual_state(
             continue;
         }
 
-        let progress = (progress_bar.value - progress_bar.min) / (progress_bar.max - progress_bar.min);
+        let progress =
+            (progress_bar.value - progress_bar.min) / (progress_bar.max - progress_bar.min);
         let fill_width = progress.clamp(0.0, 1.0) * total_width;
 
         for child in children.iter() {

@@ -1,17 +1,10 @@
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
 use syn::{
+    FnArg, GenericArgument, ItemFn, LitStr, PathArguments, Result, Type, TypePath,
     parse::{Parse, ParseStream},
     parse_macro_input,
     token::Eq,
-    FnArg,
-    GenericArgument,
-    ItemFn,
-    LitStr,
-    PathArguments,
-    Result,
-    Type,
-    TypePath,
 };
 
 /// Parsed attribute arguments for the `html_fn` macro.
@@ -24,9 +17,13 @@ impl Parse for HtmlFnAttr {
     fn parse(input: ParseStream) -> Result<Self> {
         if input.peek(Eq) {
             let _eq: Eq = input.parse()?;
-            Ok(Self { name: input.parse()? })
+            Ok(Self {
+                name: input.parse()?,
+            })
         } else {
-            Ok(Self { name: input.parse()? })
+            Ok(Self {
+                name: input.parse()?,
+            })
         }
     }
 }
@@ -113,6 +110,7 @@ fn extract_event_type(input_fn: &ItemFn) -> Result<Option<(syn::Ident, Type)>> {
         "HtmlEvent" => format_ident!("HtmlEvent"),
         "HtmlClick" => format_ident!("HtmlClick"),
         "HtmlChange" => format_ident!("HtmlChange"),
+        "HtmlSubmit" => format_ident!("HtmlSubmit"),
         "HtmlInit" => format_ident!("HtmlInit"),
         "HtmlMouseOut" => format_ident!("HtmlMouseOut"),
         "HtmlMouseOver" => format_ident!("HtmlMouseOver"),

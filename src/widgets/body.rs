@@ -1,7 +1,7 @@
 use crate::html::HtmlStyle;
+use crate::registry::UiRegistry;
 use crate::styles::{CssSource, Style, TagName};
 use crate::widgets::{Body, UIGenID, UIWidgetState, WidgetId, WidgetKind};
-use crate::registry::UiRegistry;
 use crate::{CurrentWidgetState, ExtendedUiConfiguration};
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;

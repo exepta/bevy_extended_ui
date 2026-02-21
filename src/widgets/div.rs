@@ -1,13 +1,14 @@
 use std::collections::HashMap;
 
-use bevy::camera::visibility::RenderLayers;
-use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
-use bevy::prelude::*;
-use bevy::ui::ScrollPosition;
 use crate::styles::paint::Colored;
 use crate::styles::{CssClass, CssSource, TagName};
+use crate::widgets::widget_util::wheel_delta_y;
 use crate::widgets::{BindToID, Div, Scrollbar, UIGenID, UIWidgetState, WidgetId, WidgetKind};
 use crate::{CurrentWidgetState, ExtendedUiConfiguration};
+use bevy::camera::visibility::RenderLayers;
+use bevy::input::mouse::MouseWheel;
+use bevy::prelude::*;
+use bevy::ui::ScrollPosition;
 
 /// Marker component for initialized div widgets.
 #[derive(Component)]
@@ -168,12 +169,19 @@ fn ensure_div_scroll_structure(
             let mut content_node = Node::default();
             content_node.width = Val::Percent(100.0);
             content_node.height = Val::Percent(100.0);
-            content_node.overflow.y = if wants_scroll_y { OverflowAxis::Scroll } else { OverflowAxis::Hidden };
-            content_node.overflow.x = if wants_scroll_x { OverflowAxis::Scroll } else { OverflowAxis::Hidden };
+            content_node.overflow.y = if wants_scroll_y {
+                OverflowAxis::Scroll
+            } else {
+                OverflowAxis::Hidden
+            };
+            content_node.overflow.x = if wants_scroll_x {
+                OverflowAxis::Scroll
+            } else {
+                OverflowAxis::Hidden
+            };
 
-            let mut classes: Vec<String> = wrapper_class_opt
-                .map(|c| c.0.clone())
-                .unwrap_or_default();
+            let mut classes: Vec<String> =
+                wrapper_class_opt.map(|c| c.0.clone()).unwrap_or_default();
             classes.push("div-scroll-content".to_string());
 
             let content_entity = commands
@@ -201,11 +209,15 @@ fn ensure_div_scroll_structure(
             }
 
             commands.entity(div_entity).add_child(content_entity);
-            commands.entity(div_entity).insert(DivContentRoot(content_entity));
+            commands
+                .entity(div_entity)
+                .insert(DivContentRoot(content_entity));
 
             content_entity
         };
-        commands.entity(content_entity).insert(BindToID(ui_id.get()));
+        commands
+            .entity(content_entity)
+            .insert(BindToID(ui_id.get()));
 
         let mut sb_y_entity = sb_y_opt.map(|s| **s);
         let mut sb_x_entity = sb_x_opt.map(|s| **s);
@@ -227,7 +239,10 @@ fn ensure_div_scroll_structure(
                     Name::new(format!("Div-Scrollbar-{}", div.0)),
                     sb_node,
                     css_source.clone(),
-                    CssClass(vec!["scrollbar".to_string(), "scrollbar-vertical".to_string()]),
+                    CssClass(vec![
+                        "scrollbar".to_string(),
+                        "scrollbar-vertical".to_string(),
+                    ]),
                     TagName("scroll".to_string()),
                     DivScrollbarOwner(div_entity),
                     Scrollbar {
@@ -338,7 +353,11 @@ fn ensure_div_scroll_structure(
             let mut rest: Vec<Entity> = children
                 .iter()
                 .clone()
-                .filter(|c| *c != content_entity && Some(*c) != sb_y_opt.map(|s| **s) && Some(*c) != sb_x_opt.map(|s| **s))
+                .filter(|c| {
+                    *c != content_entity
+                        && Some(*c) != sb_y_opt.map(|s| **s)
+                        && Some(*c) != sb_x_opt.map(|s| **s)
+                })
                 .collect();
 
             let mut desired = Vec::with_capacity(children.len());
@@ -362,24 +381,32 @@ fn ensure_div_scroll_structure(
 
         // Ensure content scroll flags stay aligned
         if let Ok(mut node) = content_node_q.get_mut(content_entity) {
-            node.overflow.y = if wants_scroll_y { OverflowAxis::Scroll } else { OverflowAxis::Hidden };
-            node.overflow.x = if wants_scroll_x { OverflowAxis::Scroll } else { OverflowAxis::Hidden };
+            node.overflow.y = if wants_scroll_y {
+                OverflowAxis::Scroll
+            } else {
+                OverflowAxis::Hidden
+            };
+            node.overflow.x = if wants_scroll_x {
+                OverflowAxis::Scroll
+            } else {
+                OverflowAxis::Hidden
+            };
             node.width = Val::Percent(100.0);
             node.height = Val::Percent(100.0);
         }
 
         if has_scroll_pos_q.get(content_entity).is_err() {
-            commands.entity(content_entity).insert(ScrollPosition::default());
+            commands
+                .entity(content_entity)
+                .insert(ScrollPosition::default());
         }
 
-        commands
-            .entity(content_entity)
-            .insert((
-                Transform::default(),
-                GlobalTransform::default(),
-                Visibility::Inherited,
-                InheritedVisibility::default(),
-            ));
+        commands.entity(content_entity).insert((
+            Transform::default(),
+            GlobalTransform::default(),
+            Visibility::Inherited,
+            InheritedVisibility::default(),
+        ));
     }
 }
 
@@ -518,23 +545,16 @@ fn handle_div_scroll_wheel(
     }
 }
 
-fn wheel_delta_y(event: &MouseWheel, inv_scale_factor: f32) -> f32 {
-    match event.unit {
-        MouseScrollUnit::Line => {
-            let line_delta = event.y;
-            if line_delta.abs() > 10.0 {
-                line_delta * inv_scale_factor
-            } else {
-                line_delta * 25.0
-            }
-        }
-        MouseScrollUnit::Pixel => event.y * inv_scale_factor,
-    }
-}
-
 /// Synchronizes scrollbar values from scrollable content.
 fn sync_scrollbar_from_content(
-    div_q: Query<(Option<&DivContentRoot>, Option<&DivScrollbar>, Option<&DivScrollbarH>), With<Div>>,
+    div_q: Query<
+        (
+            Option<&DivContentRoot>,
+            Option<&DivScrollbar>,
+            Option<&DivScrollbarH>,
+        ),
+        With<Div>,
+    >,
     content_q: Query<&ComputedNode, With<DivScrollContent>>,
     mut scroll_q: Query<&mut Scrollbar>,
     target_pos_q: Query<&ScrollPosition, With<DivScrollContent>>,
@@ -542,10 +562,16 @@ fn sync_scrollbar_from_content(
     mut sb_vis_q: Query<&mut Visibility, With<Scrollbar>>,
 ) {
     for (root_opt, sb_y_opt, sb_x_opt) in div_q.iter() {
-        let Some(root) = root_opt else { continue; };
+        let Some(root) = root_opt else {
+            continue;
+        };
 
-        let Ok(content_comp) = content_q.get(**root) else { continue; };
-        let Ok(scroll_pos) = target_pos_q.get(**root) else { continue; };
+        let Ok(content_comp) = content_q.get(**root) else {
+            continue;
+        };
+        let Ok(scroll_pos) = target_pos_q.get(**root) else {
+            continue;
+        };
 
         let inv_sf = content_comp.inverse_scale_factor.max(f32::EPSILON);
         let viewport = content_comp.size() * inv_sf;
@@ -606,16 +632,17 @@ fn check_scroll_bar_state<T>(
 
     if let Ok(mut vis) = sb_vis_q.get_mut(**sb) {
         let want_visible = max_scroll > 0.5;
-        let new_vis = if want_visible { Visibility::Visible } else { Visibility::Hidden };
+        let new_vis = if want_visible {
+            Visibility::Visible
+        } else {
+            Visibility::Hidden
+        };
         if *vis != new_vis {
             *vis = new_vis;
         }
     }
 }
 // -------------------- Events --------------------
-
-
-
 
 /// Sets focus on div click and updates the current widget state.
 fn on_div_click(

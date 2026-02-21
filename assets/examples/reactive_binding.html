@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta name="reactive-binding">
+  <meta charset="UTF-8">
+  <title>Reactive Binding</title>
+  <link rel="stylesheet" href="base.css">
+</head>
+
+<body>
+  <div class="display-container">
+    <h2>Welcome {{user.name}}</h2>
+    <p>User level: {{user.level}}</p>
+    <p>Clicks: {{stats.clicks}}</p>
+    <button onclick="rb_click">Click me ({{stats.clicks}})</button>
+    <button onclick="rb_rename">Rename user</button>
+  </div>
+</body>
+
+</html>

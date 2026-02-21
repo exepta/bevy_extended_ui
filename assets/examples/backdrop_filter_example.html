@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta name="backdrop-filter-example">
+    <link rel="stylesheet" href="backdrop_filter_example.css">
+</head>
+<body>
+    <div class="scene">
+        <div id="test" class="glass-card glass-basic">
+            <h2>Backdrop Blur</h2>
+            <p>background: rgba(..., 0.45)</p>
+            <p>backdrop-filter: blur(10px)</p>
+        </div>
+
+        <div class="glass-card glass-gradient">
+            <h2>Gradient + Backdrop Blur</h2>
+            <p>background-image: linear-gradient(...)</p>
+            <p>backdrop-filter: blur(14px)</p>
+        </div>
+        
+        <tool-tip for="test" variant="point" prio="bottom" alignment="vertical" trigger="hover">
+            I'm i long text to test your tooltip length and if it stable i break sometimes.
+            This line needs more space for testing the tool-tip.
+        </tool-tip>
+    </div>
+</body>
+</html>

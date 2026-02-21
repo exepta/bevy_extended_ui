@@ -1,6 +1,9 @@
 use bevy::prelude::*;
 
-use crate::html::{HtmlAllWidgetsSpawned, HtmlAllWidgetsVisible, HtmlDirty, HtmlEventBindings, HtmlID, HtmlMeta, HtmlStates, HtmlStructureMap, HtmlSystemSet, HtmlWidgetNode, NeedHidden, ShowWidgetsTimer};
+use crate::html::{
+    HtmlAllWidgetsSpawned, HtmlAllWidgetsVisible, HtmlDirty, HtmlEventBindings, HtmlID, HtmlMeta,
+    HtmlStates, HtmlStructureMap, HtmlSystemSet, HtmlWidgetNode, NeedHidden, ShowWidgetsTimer,
+};
 use crate::styles::{CssClass, CssID, CssSource};
 use crate::widgets::{Body, UIWidgetState, Widget};
 
@@ -162,21 +165,28 @@ fn collect_html_ids(nodes: &Vec<HtmlWidgetNode>, ids: &mut Vec<HtmlID>) {
             }
             HtmlWidgetNode::Button(_, _, _, _, _, id)
             | HtmlWidgetNode::CheckBox(_, _, _, _, _, id)
+            | HtmlWidgetNode::ColorPicker(_, _, _, _, _, id)
             | HtmlWidgetNode::ChoiceBox(_, _, _, _, _, id)
+            | HtmlWidgetNode::DatePicker(_, _, _, _, _, id)
             | HtmlWidgetNode::Divider(_, _, _, _, _, id)
             | HtmlWidgetNode::Headline(_, _, _, _, _, id)
             | HtmlWidgetNode::Img(_, _, _, _, _, id)
             | HtmlWidgetNode::Input(_, _, _, _, _, id)
             | HtmlWidgetNode::Paragraph(_, _, _, _, _, id)
+            | HtmlWidgetNode::ToolTip(_, _, _, _, _, id)
             | HtmlWidgetNode::ProgressBar(_, _, _, _, _, id)
             | HtmlWidgetNode::RadioButton(_, _, _, _, _, id)
             | HtmlWidgetNode::Scrollbar(_, _, _, _, _, id)
             | HtmlWidgetNode::Slider(_, _, _, _, _, id)
             | HtmlWidgetNode::SwitchButton(_, _, _, _, _, id)
-            | HtmlWidgetNode::ToggleButton(_, _, _, _, _, id)=> {
+            | HtmlWidgetNode::ToggleButton(_, _, _, _, _, id) => {
                 ids.push(id.clone());
             }
             HtmlWidgetNode::Div(_, _, _, children, _, _, id) => {
+                ids.push(id.clone());
+                collect_html_ids(children, ids);
+            }
+            HtmlWidgetNode::Form(_, _, _, children, _, _, id) => {
                 ids.push(id.clone());
                 collect_html_ids(children, ids);
             }
@@ -223,18 +233,51 @@ fn spawn_widget_node(
             widget,
             id,
         ),
-        HtmlWidgetNode::ChoiceBox(choice_box, meta, states, functions, widget, id) => spawn_with_meta(
-            commands,
-            choice_box.clone(),
-            meta,
-            states,
-            functions,
-            widget,
-            id,
-        ),
+        HtmlWidgetNode::ColorPicker(color_picker, meta, states, functions, widget, id) => {
+            spawn_with_meta(
+                commands,
+                color_picker.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+            )
+        }
+        HtmlWidgetNode::ChoiceBox(choice_box, meta, states, functions, widget, id) => {
+            spawn_with_meta(
+                commands,
+                choice_box.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+            )
+        }
+        HtmlWidgetNode::DatePicker(date_picker, meta, states, functions, widget, id) => {
+            spawn_with_meta(
+                commands,
+                date_picker.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+            )
+        }
         HtmlWidgetNode::Div(div, meta, states, children, functions, widget, id) => {
             let entity =
                 spawn_with_meta(commands, div.clone(), meta, states, functions, widget, id);
+            for child in children {
+                let child_entity = spawn_widget_node(commands, child, asset_server, Some(entity));
+                commands.entity(entity).add_child(child_entity);
+            }
+            entity
+        }
+        HtmlWidgetNode::Form(form, meta, states, children, functions, widget, id) => {
+            let entity =
+                spawn_with_meta(commands, form.clone(), meta, states, functions, widget, id);
             for child in children {
                 let child_entity = spawn_widget_node(commands, child, asset_server, Some(entity));
                 commands.entity(entity).add_child(child_entity);
@@ -275,60 +318,65 @@ fn spawn_widget_node(
             widget,
             id,
         ),
-        HtmlWidgetNode::Img(img, meta, states, functions, widget, id) => spawn_with_meta(
+        HtmlWidgetNode::Img(img, meta, states, functions, widget, id) => {
+            spawn_with_meta(commands, img.clone(), meta, states, functions, widget, id)
+        }
+        HtmlWidgetNode::Input(input, meta, states, functions, widget, id) => {
+            spawn_with_meta(commands, input.clone(), meta, states, functions, widget, id)
+        }
+        HtmlWidgetNode::Paragraph(paragraph, meta, states, functions, widget, id) => {
+            spawn_with_meta(
+                commands,
+                paragraph.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+            )
+        }
+        HtmlWidgetNode::ToolTip(tooltip, meta, states, functions, widget, id) => spawn_with_meta(
             commands,
-            img.clone(),
-            meta,
-            states,
-            functions,
-            widget,
-            id
-        ),
-        HtmlWidgetNode::Input(input, meta, states, functions, widget, id) => spawn_with_meta(
-            commands,
-            input.clone(),
-            meta,
-            states,
-            functions,
-            widget,
-            id
-        ),
-        HtmlWidgetNode::Paragraph(paragraph, meta, states, functions, widget, id) => spawn_with_meta(
-            commands,
-            paragraph.clone(),
-            meta,
-            states,
-            functions,
-            widget,
-            id,
-        ),
-        HtmlWidgetNode::ProgressBar(progress_bar, meta, states, functions, widget, id) => spawn_with_meta(
-            commands,
-            progress_bar.clone(),
+            tooltip.clone(),
             meta,
             states,
             functions,
             widget,
             id,
         ),
-        HtmlWidgetNode::RadioButton(radio_button, meta, states, functions, widget, id) => spawn_with_meta(
-            commands,
-            radio_button.clone(),
-            meta,
-            states,
-            functions,
-            widget,
-            id,
-        ),
-        HtmlWidgetNode::Scrollbar(scroll_bar, meta, states, functions, widget, id) => spawn_with_meta(
-            commands,
-            scroll_bar.clone(),
-            meta,
-            states,
-            functions,
-            widget,
-            id,
-        ),
+        HtmlWidgetNode::ProgressBar(progress_bar, meta, states, functions, widget, id) => {
+            spawn_with_meta(
+                commands,
+                progress_bar.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+            )
+        }
+        HtmlWidgetNode::RadioButton(radio_button, meta, states, functions, widget, id) => {
+            spawn_with_meta(
+                commands,
+                radio_button.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+            )
+        }
+        HtmlWidgetNode::Scrollbar(scroll_bar, meta, states, functions, widget, id) => {
+            spawn_with_meta(
+                commands,
+                scroll_bar.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+            )
+        }
         HtmlWidgetNode::Slider(slider, meta, states, functions, widget, id) => spawn_with_meta(
             commands,
             slider.clone(),
@@ -338,24 +386,28 @@ fn spawn_widget_node(
             widget,
             id,
         ),
-        HtmlWidgetNode::SwitchButton(switch_button, meta, states, functions, widget, id) => spawn_with_meta(
-            commands,
-            switch_button.clone(),
-            meta,
-            states,
-            functions,
-            widget,
-            id,
-        ),
-        HtmlWidgetNode::ToggleButton(toggle_button, meta, states, functions, widget, id) => spawn_with_meta(
-            commands,
-            toggle_button.clone(),
-            meta,
-            states,
-            functions,
-            widget,
-            id,
-        ),
+        HtmlWidgetNode::SwitchButton(switch_button, meta, states, functions, widget, id) => {
+            spawn_with_meta(
+                commands,
+                switch_button.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+            )
+        }
+        HtmlWidgetNode::ToggleButton(toggle_button, meta, states, functions, widget, id) => {
+            spawn_with_meta(
+                commands,
+                toggle_button.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+            )
+        }
     };
 
     if let Some(parent) = parent {
@@ -385,6 +437,7 @@ fn spawn_with_meta<T: Component>(
             functions.clone(),
             widget.clone(),
             id.clone(),
+            meta.inner_content.clone(),
             Node::default(),
             CssSource(meta.css.clone()),
             CssClass(meta.class.clone().unwrap_or_default()),
@@ -401,7 +454,7 @@ fn spawn_with_meta<T: Component>(
     if let Some(validation) = &meta.validation {
         commands.entity(entity).insert(validation.clone());
     }
-    
+
     if states.hidden {
         commands.entity(entity).insert(NeedHidden);
     }

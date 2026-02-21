@@ -2,6 +2,7 @@ use crate::services::image_service::{DEFAULT_CHOICE_BOX_KEY, get_or_load_image};
 use crate::styles::components::UiStyle;
 use crate::styles::paint::Colored;
 use crate::styles::{CssClass, CssSource, FontVal, TagName};
+use crate::widgets::widget_util::wheel_delta_y;
 use crate::widgets::{
     BindToID, ChoiceBox, ChoiceOption, IgnoreParentState, UIGenID, UIWidgetState, WidgetId,
     WidgetKind,
@@ -9,7 +10,7 @@ use crate::widgets::{
 use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
 use bevy::camera::visibility::RenderLayers;
 use bevy::ecs::relationship::RelatedSpawnerCommands;
-use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
+use bevy::input::mouse::MouseWheel;
 use bevy::prelude::*;
 
 /// Marker component for initialized choice box widgets.
@@ -462,20 +463,6 @@ fn handle_scroll_events(
             let smoothed = scroll.y + (target - scroll.y) * smooth_factor * time.delta_secs();
             scroll.y = smoothed.clamp(0.0, max_scroll);
         }
-    }
-}
-
-fn wheel_delta_y(event: &MouseWheel, inv_scale_factor: f32) -> f32 {
-    match event.unit {
-        MouseScrollUnit::Line => {
-            let line_delta = event.y;
-            if line_delta.abs() > 10.0 {
-                line_delta * inv_scale_factor
-            } else {
-                line_delta * 25.0
-            }
-        }
-        MouseScrollUnit::Pixel => event.y * inv_scale_factor,
     }
 }
 

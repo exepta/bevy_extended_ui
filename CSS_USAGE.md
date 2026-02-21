@@ -6,8 +6,15 @@ properties or values are ignored silently.
 ## Variables
 
 - Define CSS variables only in `:root` using `--name: value`.
-- Use them as `var(--name)` with no fallback support.
-- The parser only resolves the exact `var(...)` form; nested or chained vars are not resolved.
+- Use them as `var(--name)` or with fallback `var(--name, #000)`.
+- Fallbacks may be another variable, e.g. `var(--primary, var(--default))`.
+- The parser only resolves the exact `var(...)` form; var() inside other functions is not resolved.
+
+## Selectors
+
+- Descendant selectors use whitespace (`parent child`).
+- Direct child selectors use `>` (`parent > child`).
+- Nested rules are supported with `&` for the parent selector (e.g. `button { &:hover { ... } }`).
 
 ## Supported Properties
 
@@ -28,6 +35,7 @@ properties or values are ignored silently.
 - `position` (`relative`, `absolute`; defaults to `relative`)
 - `left`, `right`, `top`, `bottom`
 - `gap`
+- `row-gap`, `column-gap`
 - `overflow`, `overflow-x`, `overflow-y`
 
 ### Flex
@@ -46,6 +54,8 @@ properties or values are ignored silently.
 - `grid-auto-flow`
 - `grid-template-rows`, `grid-template-columns`
 - `grid-auto-rows`, `grid-auto-columns`
+- `minmax()` is supported for grid tracks; its min/max arguments can use `calc`, `min`, `max`, and `sin`
+- Grid track sizes accept `px`, `%`, `fr`, and viewport units (`vw`, `vh`, `vmin`, `vmax`)
 
 ### Typography
 
@@ -60,6 +70,7 @@ properties or values are ignored silently.
 - `background-color`
 - `background`
 - `background-image`
+- `backdrop-filter` (`blur(<px>)`, `none`)
 - `border-color`
 - `box-shadow`
 
@@ -91,14 +102,19 @@ properties or values are ignored silently.
 
 Used by width/height, padding/margin, border widths, translation, etc.
 
-- Supported units: `px`, `%`
+- Supported units: `px`, `%`, `vw`, `vh`, `vmin`, `vmax`
 - Also supports `0` / `0.0` (treated as `0px`)
 - Anything else is ignored
+- Math functions: `calc`, `min`, `max`, `sin` (unitless radians), and nested usage
+- Mixed units in `calc` (e.g. `calc(100% - 10px)`) are resolved at runtime using the parent size (or window if no parent)
+
+Note: `gap` sets both row and column gaps. `row-gap` and `column-gap` override their respective axis.
 
 ### Font Size (`font-size`)
 
 - `px` -> `FontVal::Px`
 - `rem` -> `FontVal::Rem`
+- Math functions: `calc`, `min`, `max`, `sin` (unitless radians)
 
 ### Colors
 
@@ -110,9 +126,14 @@ Used by width/height, padding/margin, border widths, translation, etc.
 
 ### Background
 
-- `background`: supports `url("...")` or a color
-- `background-image`: supports only `url("...")`
+- `background`: supports `url("...")`, a color, or `linear-gradient(...)` (also when combined with extra shorthand tokens like `no-repeat` / `center`)
+- `background-image`: supports `url("...")` or `linear-gradient(...)`
 - `background-color`: color only
+- `background-color` and `background-image` are merged on the same internal background object (setting one does not drop the other)
+- `background-position`: supports keywords (`left`, `right`, `top`, `bottom`, `center`) and `%`/`px`
+- `background-size`: supports `auto`, `cover`, `contain`, or `%`/`px` values
+- `background-attachment`: supports `scroll`, `fixed`, `local`
+- `backdrop-filter`: supports `blur(<px>)` and `none` (also `-webkit-backdrop-filter`)
 
 ### Border
 
@@ -279,9 +300,27 @@ Tracks support:
 
 - `auto`, `min-content`, `max-content`
 - `minmax(min, max)`
-- `px`, `%`, `fr`
+- `px`, `%`, `fr`, `vw`, `vh`, `vmin`, `vmax`
 
 `grid-auto-rows` / `grid-auto-columns` accept a list of tracks (space-separated).
+
+## Media Queries (Breakpoints)
+
+`@media` rules are supported and are re-evaluated automatically when the configured viewport changes.
+
+Supported media-query parts:
+
+- media type: `all`, `screen`
+- width: `min-width`, `max-width`, `width`, and range syntax (`width >= 900px`, `600px < width < 900px`)
+- height: `min-height`, `max-height`, `height`, and range syntax
+- orientation: `orientation: portrait` / `orientation: landscape`
+- boolean combinations: `and`, `or`, `not`
+
+Notes:
+
+- Unsupported media features currently evaluate as non-matching.
+- `css-breakpoints` (default) evaluates against Bevy `PrimaryWindow` width/height in logical pixels.
+- `wasm-breakpoints` evaluates against browser viewport (`window.innerWidth/innerHeight`) and overrides `css-breakpoints` when enabled.
 
 ## Limitations
 

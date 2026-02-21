@@ -1,16 +1,16 @@
 :root {
-    --primary: #ff7037;
-    --primary-hover: #ef7545;
-    --primary-disabled: #754e44;
-    --primary-transparent-layer: rgba(239, 117, 69, 0.35);
+    --primary: #5656ff;
+    --primary-hover: #4848da;
+    --primary-disabled: #33336f;
+    --primary-transparent-layer: rgba(86, 86, 255, 0.35);
     --headline: #b9b9c6;
     --headline-sec: #aaaabc;
     --text-color: #e8e8fd;
     --text-color-dark: #b4b4c1;
-    --disabled-text: #707070;
-    --disabled-text-darker: #4e4e4e;
-    --gray-background: #323436;
-    --gray-background-disabled: #3f4246;
+    --disabled-text: #262d39;
+    --disabled-text-darker: #1f2630;
+    --gray-background: #1f2630;
+    --gray-background-disabled: #262d39;
 }
 
 /* Button */
@@ -29,15 +29,15 @@ button {
     padding: 0 15px;
     color: var(--text-color);
     font-size: 15px;
-}
 
-button:hover {
-    background: var(--primary-hover);
-}
+    &:hover {
+        background: var(--primary-hover);
+    }
 
-button:disabled {
-    background: var(--primary-disabled);
-    color: var(--text-color-dark);
+    &:disabled {
+        background: var(--primary-disabled);
+        color: var(--text-color-dark);
+    }
 }
 
 /* CheckBox */
@@ -50,57 +50,58 @@ checkbox {
     align-items: center;
     flex-direction: row;
     gap: 10px;
-    transition: all 0.3s;
     color: var(--text-color);
     font-size: 13px;
-}
 
-checkbox .mark-box {
-    width: 25px;
-    height: 25px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    border-radius: 4px;
-    border: 2px;
-    border-color: var(--text-color);
-}
+    > .mark-box {
+        width: 25px;
+        height: 25px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        border-radius: 4px;
+        border: 2px;
+        border-color: var(--text-color);
 
-checkbox .mark-box .mark {
-    width: 16px;
-    height: 16px;
-    transition: all 0.3s;
-}
+        > .mark {
+            width: 16px;
+            height: 16px;
+            transition: all 0.3s;
+        }
+    }
 
-checkbox:checked .mark-box {
-    border-color: var(--primary);
-    background: var(--primary);
-}
+    &:checked > .mark-box {
+        border-color: var(--primary);
+        background: var(--primary);
+    }
 
-checkbox .check-text {
-    transition: all 0.3s;
-}
+    > .check-text {
+        transition: all 0.3s;
+    }
 
-checkbox:disabled {
-    color: var(--disabled-text);
-}
+    &:disabled {
+        color: var(--disabled-text);
+    }
 
-checkbox:disabled .mark-box {
-    color: var(--disabled-text);
-    border-color: var(--primary-disabled);
-    background: var(--primary-disabled);
+    &:disabled > .mark-box {
+        color: var(--disabled-text);
+        border-color: var(--primary-disabled);
+        background: var(--primary-disabled);
+    }
 }
 
 /* Div */
 
-div scroll {
-    position: absolute;
-    right: 0;
-}
+div {
+    > scroll {
+        position: absolute;
+        right: 0;
+    }
 
-div .scroll-horizontal {
-    bottom: 0;
-    left: 0;
+    > .scroll-horizontal {
+        bottom: 0;
+        left: 0;
+    }
 }
 
 /* Divider */
@@ -197,99 +198,575 @@ input {
     color: var(--text-color);
     font-size: 15px;
     cursor: text;
+
+    &:disabled {
+        border-color: var(--disabled-text);
+        color: var(--disabled-text);
+    }
+
+    &::selection {
+        background: var(--primary-transparent-layer);
+        color: var(--text-color);
+    }
+
+    &:hover {
+        border-color: var(--primary-hover);
+        color: var(--primary-hover);
+    }
+
+    &:focus {
+        border-color: var(--primary);
+        color: var(--text-color);
+        z-index: 30000;
+    }
+
+    &:focus > .input-label {
+        color: var(--primary);
+    }
+
+    > .input-label {
+        position: absolute;
+        left: 10px;
+        top: 19px;
+        transition: all 0.3s;
+    }
+
+    > .in-icon-container {
+        width: 50px;
+        height: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        transition: all 0.3s;
+
+        > .in-icon {
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+    }
+
+    > .in-text-container {
+        height: 100%;
+        width: 95%;
+        display: flex;
+        justify-content: flex-start;
+        align-items: center;
+        overflow-y: hidden;
+        overflow-x: scroll;
+        padding-left: 10px;
+        transition: all 0.3s;
+
+        > .input-text {
+            width: 100%;
+            text-wrap: nowrap;
+            transition: all 0.3s;
+        }
+
+        > .input-cursor {
+            width: 2px;
+            height: 20px;
+            background: var(--text-color);
+            transition: all 0.3s;
+        }
+    }
+
+    &:disabled > .in-text-container > .input-cursor {
+        background: var(--disabled-text);
+    }
 }
 
-input:disabled {
-    border-color: var(--disabled-text);
-    color: var(--disabled-text);
+/* Date Picker */
+
+date-picker {
+    width: 320px;
+    height: 56px;
+    position: relative;
+    border-radius: 6px;
+    border: 2px;
+    border-color: #8d93af;
+    background: var(--gray-background);
+    color: #f4f6ff;
+    cursor: pointer;
+    overflow: visible;
+    transition: all 0.2s;
+
+    &:hover {
+        border-color: #b3b9d4;
+    }
+
+    &:focus {
+        border-color: #90caf9;
+        z-index: 30000;
+    }
+
+    &:checked {
+        z-index: 30000;
+    }
+
+    > .date-picker-field {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        justify-content: flex-start;
+        align-items: flex-end;
+        padding-left: 14px;
+        padding-right: 42px;
+        padding-bottom: 8px;
+    }
+
+    > .date-picker-field > .date-picker-label {
+        position: absolute;
+        left: 14px;
+        top: 19px;
+        color: #9ca2bd;
+        font-size: 16px;
+        transition: all 0.2s;
+    }
+
+    > .date-picker-field > .date-picker-value {
+        color: #f4f6ff;
+        font-size: 16px;
+    }
+
+    > .date-picker-field > .date-picker-icon {
+        position: absolute;
+        right: 12px;
+        top: 19px;
+        width: 20px;
+        height: 20px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        color: #cad0e6;
+        font-size: 13px;
+        transition: all 0.2s;
+    }
+
+    &:checked > .date-picker-field > .date-picker-icon {
+        color: var(--primary);
+    }
+
+    > .date-picker-popover {
+        position: absolute;
+        left: 0;
+        top: 62px;
+        width: 320px;
+        padding: 12px;
+        border-radius: 12px;
+        border: 1px #3a3f58;
+        background: var(--gray-background);
+        display: flex;
+        justify-content: flex-start;
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 10px;
+        z-index: 30001;
+
+        > .date-picker-header {
+            position: relative;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 32px;
+            gap: 8px;
+
+            > .date-picker-header-center {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                gap: 8px;
+            }
+
+            > .date-picker-nav {
+                position: absolute;
+                top: 0;
+                width: 32px;
+                height: 32px;
+                border-radius: 16px;
+                border: 1px transparent;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                transition: all 0.2s;
+
+                &:hover {
+                    background: rgba(135, 142, 176, 0.22);
+                }
+
+                &:disabled > .date-picker-nav-text {
+                    color: #555a70;
+                }
+
+                > .date-picker-nav-text {
+                    color: #c8cee3;
+                    font-size: 15px;
+                }
+            }
+
+            > .date-picker-prev {
+                left: 0;
+            }
+
+            > .date-picker-next {
+                right: 0;
+            }
+
+            > .date-picker-header-center > .date-picker-month-button {
+                min-width: 88px;
+                height: 30px;
+                border-radius: 15px;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                transition: background-color 0.08s linear;
+
+                &:hover {
+                    background: rgba(135, 142, 176, 0.22);
+                }
+
+                > .date-picker-month-label {
+                    color: #e7ebff;
+                    font-size: 16px;
+                }
+
+                &:checked {
+                    background: var(--primary-disabled);
+                    > .date-picker-month-label {
+                        color: #ffffff;
+                    }
+                }
+            }
+
+            > .date-picker-header-center > .date-picker-year-button {
+                width: 58px;
+                height: 30px;
+                border-radius: 15px;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                transition: background-color 0.08s linear;
+
+                &:hover {
+                    background: rgba(135, 142, 176, 0.22);
+                }
+
+                > .date-picker-year-text {
+                    color: #cdd3eb;
+                    font-size: 15px;
+                }
+
+                &:checked {
+                    background: var(--primary-disabled);
+                    > .date-picker-year-text {
+                        color: #ffffff;
+                    }
+                }
+            }
+        }
+
+        > .date-picker-weekdays {
+            width: 100%;
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+            flex-direction: row;
+            flex-wrap: wrap;
+            gap: 0;
+
+            > .date-picker-weekday {
+                width: calc(100% / 7);
+                height: 24px;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+
+                > .date-picker-weekday-text {
+                    color: #8890af;
+                    font-size: 12px;
+                }
+            }
+        }
+
+        > .date-picker-grid {
+            width: 100%;
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+            flex-direction: row;
+            flex-wrap: wrap;
+            column-gap: 0;
+            row-gap: 2px;
+            overflow: hidden;
+
+            > .date-picker-day {
+                width: calc(100% / 7);
+                height: 36px;
+                border-radius: 18px;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                transition: background-color 0.08s linear;
+
+                > .date-picker-day-text {
+                    color: #d6dcf5;
+                    font-size: 14px;
+                }
+
+                &:read-only {
+                    > .date-picker-day-text {
+                        color: #4a5068;
+                    }
+                }
+
+                &:read-only:hover {
+                    background: transparent;
+                }
+
+                &:not(:read-only):not(:disabled):hover {
+                    background: rgba(120, 135, 176, 0.28);
+                }
+
+                &:focus:not(:checked) {
+                    background: var(--primary-transparent-layer);
+                    border-radius: 0;
+                }
+
+                &:checked {
+                    background: var(--primary);
+                    > .date-picker-day-text {
+                        color: #ffffff;
+                    }
+                }
+
+                &:checked:invalid {
+                    border-radius: 6px 0 0 6px;
+                }
+
+                &:checked:focus:not(:invalid) {
+                    border-radius: 0 6px 6px 0;
+                }
+
+                &:disabled {
+                    background: transparent;
+                    > .date-picker-day-text {
+                        color: #4f5468;
+                    }
+                }
+            }
+        }
+
+        > .date-picker-years {
+            width: 100%;
+            height: 276px;
+            min-height: 0;
+            display: flex;
+            justify-content: flex-start;
+            align-items: stretch;
+            flex-direction: column;
+            gap: 2px;
+            overflow-y: scroll;
+
+            > .date-picker-year-option {
+                width: 100%;
+                min-height: 34px;
+                border-radius: 17px;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                transition: background-color 0.08s linear;
+
+                > .date-picker-year-option-text {
+                    color: #d6dcf5;
+                    font-size: 14px;
+                }
+
+                &:hover {
+                    background: rgba(120, 135, 176, 0.28);
+                }
+
+                &:checked {
+                    background: var(--primary);
+                    > .date-picker-year-option-text {
+                        color: #ffffff;
+                    }
+                }
+
+                &:disabled {
+                    background: transparent;
+                    > .date-picker-year-option-text {
+                        color: #4f5468;
+                    }
+                }
+            }
+        }
+
+        > .date-picker-months {
+            width: 100%;
+            height: 260px;
+            min-height: 0;
+            display: flex;
+            justify-content: flex-start;
+            align-items: flex-start;
+            flex-direction: row;
+            flex-wrap: wrap;
+            row-gap: 20px;
+            column-gap: 8px;
+            overflow: hidden;
+
+            > .date-picker-month-option {
+                width: calc((100% - 16px) / 3);
+                min-height: 48px;
+                border-radius: 24px;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                transition: background-color 0.08s linear;
+
+                > .date-picker-month-option-text {
+                    color: #d6dcf5;
+                    font-size: 16px;
+                }
+
+                &:hover {
+                    background: rgba(120, 135, 176, 0.28);
+                }
+
+                &:checked {
+                    background: var(--primary);
+                    > .date-picker-month-option-text {
+                        color: var(--text-color);
+                    }
+                }
+
+                &:disabled {
+                    background: transparent;
+                    > .date-picker-month-option-text {
+                        color: var(--text-color);
+                    }
+                }
+            }
+        }
+    }
 }
 
-input:hover {
-    border-color: var(--primary-hover);
-    color: var(--primary-hover);
-}
-
-input:focus {
-    border-color: var(--primary);
-    color: var(--text-color);
-}
-
-input:focus .input-label {
-    color: var(--primary);
-}
-
-input .input-label {
+.date-picker-bound {
     position: absolute;
-    left: 10px;
-    top: 19px;
-    transition: all 0.3s;
-}
+    left: 50%;
+    top: 0;
+    width: 0;
+    height: 0;
+    min-width: 0;
+    min-height: 0;
+    border: 0px;
+    border-radius: 0px;
+    background: transparent;
+    cursor: default;
+    z-index: 30000;
 
-input .in-icon-container {
-    width: 50px;
-    height: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    transition: all 0.3s;
-}
-
-.in-icon-container .in-icon {
-    font-size: 16px;
-    transition: all 0.3s;
-}
-
-input .in-text-container {
-    height: 100%;
-    width: 95%;
-    display: flex;
-    justify-content: flex-start;
-    align-items: center;
-    overflow-y: hidden;
-    overflow-x: scroll;
-    padding-left: 10px;
-    transition: all 0.3s;
-}
-
-input .in-text-container .input-text {
-    width: 100%;
-    text-wrap: nowrap;
-    transition: all 0.3s;
-}
-
-input .in-text-container .input-cursor {
-    width: 2px;
-    height: 20px;
-    background: var(--text-color);
-    transition: all 0.3s;
-}
-
-input:disabled .in-text-container .input-cursor {
-    background: var(--disabled-text);
+    > .date-picker-popover {
+        top: 58px;
+        left: -160px;
+    }
 }
 
 /* Paragraph */
+
 p {
     margin: 8px;
     font-size: 12px;
     color: var(--text-color);
 }
 
+/* ToolTip */
+
+.tooltip-nose {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    z-index: 9999;
+    background: rgba(24, 24, 30, 0.92);
+    border-width: 0px;
+    border-color: rgba(192, 198, 210, 0.95);
+    transform: rotate(45deg);
+    pointer-events: none;
+}
+
+tool-tip {
+    position: absolute;
+    width: auto;
+    max-width: 300px;
+    min-height: 26px;
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    border-radius: 6px;
+    background: var(--gray-background);
+    backdrop-filter: blur(10px);
+    border-width: 2px;
+    border-color: var(--primary-hover);
+    color: var(--text-color);
+    font-size: 13px;
+    z-index: 10000;
+    pointer-events: none;
+
+    > .tooltip-nose {
+        background: var(--gray-background);
+        border-color: var(--primary-hover);
+    }
+
+    > .tooltip-text {
+        color: var(--text-color);
+        min-width: 0;
+        max-width: 284px;
+        text-wrap: wrap;
+    }
+
+    > .tooltip-nose-side-top {
+        border-width: 0px;
+        border-right: 2px;
+        border-bottom: 2px;
+        transform: rotate(45deg) translateY(-3px);
+    }
+
+    > .tooltip-nose-side-right {
+        border-width: 0px;
+        border-bottom: 2px;
+        border-left: 2px;
+        transform: rotate(45deg) translateX(-1px);
+    }
+
+    > .tooltip-nose-side-bottom {
+        border-width: 0px;
+        border-left: 2px;
+        border-top: 2px;
+        transform: rotate(45deg) translateY(-2px);
+    }
+
+    > .tooltip-nose-side-left {
+        border-width: 0px;
+        border-top: 2px;
+        border-right: 2px;
+        transform: rotate(45deg) translateX(-3px);
+    }
+}
+
 /* Progress Bar */
+
 progressbar {
     min-width: 220px;
     min-height: 10px;
     border-radius: 5px;
     background: var(--primary-transparent-layer);
     transition: all 0.3s;
-}
 
-progressbar .progress {
-    width: 0;
-    height: 100%;
-    background: var(--primary-hover);
-    border-radius: 5px;
-    transition: all 0.3s;
+    > .progress {
+        width: 0;
+        height: 100%;
+        background: var(--primary-hover);
+        border-radius: 5px;
+        transition: all 0.3s;
+    }
 }
 
 /* Radio Button */
@@ -306,50 +783,51 @@ radio {
     transition: all 0.3s;
     font-size: 13px;
     color: var(--text-color);
-}
 
-radio .radio-dot {
-    width: 25px;
-    height: 25px;
-    border-radius: 50%;
-    border: 2px;
-    border-color: var(--text-color);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    background: transparent;
-    transition: all 0.3s;
-}
+    > .radio-dot {
+        width: 25px;
+        height: 25px;
+        border-radius: 50%;
+        border: 2px;
+        border-color: var(--text-color);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background: transparent;
+        transition: all 0.3s;
 
-radio:hover .radio-dot {
-    border-color: var(--primary-hover);
-}
+        > .checked-dot {
+            width: 17px;
+            height: 17px;
+            background: var(--primary);
+            border-radius: 50%;
+            transition: all 0.3s;
+        }
+    }
 
-radio:disabled .radio-dot {
-    border-color: var(--primary-disabled);
-}
+    &:hover > .radio-dot {
+        border-color: var(--primary-hover);
+    }
 
-radio:checked .radio-dot {
-    border-color: var(--primary);
-}
+    &:disabled > .radio-dot {
+        border-color: var(--primary-disabled);
+    }
 
-radio .radio-dot .checked-dot {
-    width: 17px;
-    height: 17px;
-    background: var(--primary);
-    border-radius: 50%;
-    transition: all 0.3s;
-}
+    &:checked > .radio-dot {
+        border-color: var(--primary);
+    }
 
-radio:disabled .radio-dot .checked-dot {
-    background: var(--primary-disabled);
-}
+    &:disabled > .radio-dot > .checked-dot {
+        background: var(--primary-disabled);
+    }
 
-radio:disabled .radio-text {
-    color: var(--disabled-text);
+    &:disabled > .radio-text {
+        color: var(--disabled-text);
+    }
 }
 
 /* Scrollbar */
+
 scroll {
     width: 10px;
     height: 95%;
@@ -357,6 +835,20 @@ scroll {
     border-radius: 5px;
     position: relative;
     transition: all 0.3s;
+
+    > .scroll-track {
+        width: 100%;
+        height: 100%;
+        transition: all 0.3s;
+
+        > .scroll-thumb {
+            position: absolute;
+            width: 100%;
+            background: var(--primary);
+            border-radius: 5px;
+            transition: all 0.3s;
+        }
+    }
 }
 
 .scroll-horizontal {
@@ -364,21 +856,7 @@ scroll {
     height: 10px;
 }
 
-scroll .scroll-track {
-    width: 100%;
-    height: 100%;
-    transition: all 0.3s;
-}
-
-scroll .scroll-track .scroll-thumb {
-    position: absolute;
-    width: 100%;
-    background: var(--primary);
-    border-radius: 5px;
-    transition: all 0.3s;
-}
-
-.scroll-horizontal .scroll-track .scroll-thumb {
+.scroll-horizontal > .scroll-track > .scroll-thumb {
     height: 100%;
 }
 
@@ -394,142 +872,140 @@ select {
     font-size: 14px;
     z-index: 1;
     transition: all 0.3s;
-}
 
-select:disabled {
-    border-color: var(--disabled-text);
-    color: var(--disabled-text);
-}
+    &:disabled {
+        border-color: var(--disabled-text);
+        color: var(--disabled-text);
+    }
 
-select:hover {
-    border-color: var(--primary-hover);
-}
+    &:hover {
+        border-color: var(--primary-hover);
+    }
 
-select:focus {
-    border-color: var(--primary);
-}
+    &:focus {
+        border-color: var(--primary);
+    }
 
-select .select-label {
-    position: absolute;
-    left: 10px;
-    top: 19px;
-    font-size: 14px;
-    transition: all 0.3s;
-}
+    > .select-label {
+        position: absolute;
+        left: 10px;
+        top: 19px;
+        font-size: 14px;
+        transition: all 0.3s;
+    }
 
-select:disabled .select-label {
-    color: var(--disabled-text);
-}
+    &:disabled > .select-label {
+        color: var(--disabled-text);
+    }
 
-select:hover .select-label {
-    color: var(--primary-hover);
-}
+    &:hover > .select-label {
+        color: var(--primary-hover);
+    }
 
-select:focus .select-label {
-    color: var(--primary);
-}
+    &:focus > .select-label {
+        color: var(--primary);
+    }
 
+    > .option-drop-box {
+        width: 50px;
+        min-width: 25px;
+        height: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        transition: all 0.3s;
 
-select .option-drop-box {
-    width: 50px;
-    min-width: 25px;
-    height: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    transition: all 0.3s;
-}
+        > .option-drop-icon {
+            transition: all 0.3s;
 
-select .option-drop-box .option-drop-icon {
-    transition: all 0.3s;
-}
+            &:hover {
+                color: var(--primary-hover);
+            }
 
-.option-drop-box .option-drop-icon:hover {
-    color: var(--primary-hover);
-}
+            &:focus {
+                color: var(--primary);
+            }
+        }
+    }
 
-.option-drop-box .option-drop-icon:focus {
-    color: var(--primary);
-}
+    > .option-selected {
+        width: 80%;
+        display: flex;
+        justify-content: flex-start;
+        align-items: center;
+        flex-direction: row;
+        gap: 10px;
+        padding-left: 15px;
+        flex-grow: 1;
+        border-radius: 5px 0;
+        transition: all 0.3s;
 
-select .option-selected {
-    width: 80%;
-    display: flex;
-    justify-content: flex-start;
-    align-items: center;
-    flex-direction: row;
-    gap: 10px;
-    padding-left: 15px;
-    flex-grow: 1;
-    border-radius: 5px 0;
-    transition: all 0.3s;
-}
+        > .option-sel-text {
+            transition: all 0.3s;
+        }
 
-select .option-selected .option-sel-text {
-    transition: all 0.3s;
-}
+        &:disabled > .option-sel-text {
+            color: var(--disabled-text);
+        }
+    }
 
-.option-selected:disabled .option-sel-text {
-    color: var(--disabled-text);
-}
+    > .choice-content-box {
+        position: absolute;
+        width: 100%;
+        min-height: 50px;
+        max-height: 150px;
+        top: 55px;
+        box-shadow: 0 0 3px 3px #303033;
+        border-radius: 0 5px;
+        display: flex;
+        justify-content: flex-start;
+        align-items: flex-start;
+        flex-direction: column;
+        background: var(--gray-background);
+        overflow-x: hidden;
+        overflow-y: scroll;
+        transition: all 0.3s;
 
-select .choice-content-box {
-    position: absolute;
-    width: 100%;
-    min-height: 50px;
-    max-height: 150px;
-    top: 55px;
-    box-shadow: 0 0 3px 3px #303033;
-    border-radius: 0 5px;
-    display: flex;
-    justify-content: flex-start;
-    align-items: flex-start;
-    flex-direction: column;
-    background: var(--gray-background);
-    overflow-x: hidden;
-    overflow-y: scroll;
-    transition: all 0.3s;
-}
+        > .choice-option {
+            width: 100%;
+            height: 50px;
+            min-height: 50px;
+            max-height: 50px;
+            padding-left: 15px;
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+            flex-direction: row;
+            gap: 10px;
+            flex-grow: 1;
+            background: var(--gray-background);
+            transition: all 0.3s;
 
-select .choice-content-box .choice-option {
-    width: 100%;
-    height: 50px;
-    min-height: 50px;
-    max-height: 50px;
-    padding-left: 15px;
-    display: flex;
-    justify-content: flex-start;
-    align-items: center;
-    flex-direction: row;
-    gap: 10px;
-    flex-grow: 1;
-    background: var(--gray-background);
-    transition: all 0.3s;
-}
+            > .option-text {
+                transition: all 0.3s;
 
-select .choice-content-box .choice-option .option-text {
-    transition: all 0.3s;
-}
+                &:hover {
+                    color: var(--text-color);
+                }
 
+                &:checked {
+                    color: var(--text-color);
+                }
+            }
 
-select .choice-content-box .choice-option:hover {
-    background: var(--primary-hover);
-}
+            &:hover {
+                background: var(--primary-hover);
+            }
 
-
-select .choice-content-box .choice-option .option-text:hover {
-    color: var(--text-color);
-}
-
-select .choice-content-box .choice-option:checked {
-    background: var(--primary);
-}
-
-select .choice-content-box .choice-option .option-text:checked {
-    color: var(--text-color);
+            &:checked {
+                background: var(--primary);
+            }
+        }
+    }
 }
 
 /* Slider */
+
 slider {
     width: 250px;
     height: 26px;
@@ -537,52 +1013,167 @@ slider {
     justify-content: center;
     align-items: center;
     transition: all 0.3s;
+
+    > .slider-track {
+        width: 100%;
+        height: 10px;
+        background: var(--primary-transparent-layer);
+        border-radius: 5px;
+        position: relative;
+        overflow: visible;
+        display: flex;
+        justify-content: start;
+        align-items: center;
+        transition: all 0.3s;
+
+        > .track-fill {
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: 0;
+            background: var(--primary);
+            border-radius: 5px;
+            transition: all 0.3s;
+        }
+
+        > .thumb {
+            width: 16px;
+            height: 16px;
+            background: var(--primary);
+            border-radius: 50%;
+            position: absolute;
+            box-shadow: 0 0 1px 1px #303033;
+            transition: all 0.3s;
+        }
+    }
+
+    &:disabled > .slider-track {
+        background: var(--disabled-text-darker);
+    }
+
+    &:disabled > .slider-track > .track-fill {
+        background: var(--disabled-text);
+    }
+
+    &:disabled > .slider-track > .thumb {
+        background: var(--disabled-text);
+    }
 }
 
-slider .slider-track {
-    width: 100%;
-    height: 10px;
-    background: var(--primary-transparent-layer);
-    border-radius: 5px;
+/* Color Picker */
+
+colorpicker {
+    width: auto;
+    min-height: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    flex-direction: column;
     position: relative;
     overflow: visible;
+}
+
+colorpicker > .color-picker-trigger {
+    min-width: 220px;
+    height: 42px;
+    padding: 0 12px;
     display: flex;
-    justify-content: start;
+    justify-content: center;
     align-items: center;
-    transition: all 0.3s;
+    flex-direction: row;
+    gap: 6px;
+    border: 2px #a0a0a0;
+    border-radius: 12px;
+    box-shadow: 0 1px 2px rgba(60, 64, 67, 0.25);
+    transition: all 0.2s;
+    cursor: pointer;
 }
 
-slider:disabled .slider-track {
-    background: var(--disabled-text-darker);
+colorpicker > .color-picker-trigger > .color-value-hex {
+    font-size: 14px;
+    font-weight: 600;
 }
 
-slider .slider-track .track-fill {
+colorpicker > .color-picker-modal {
+    width: 340px;
+    min-height: 294px;
+    padding: 14px;
+    display: flex;
+    justify-content: flex-start;
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
     position: absolute;
-    left: 0;
-    top: 0;
-    height: 100%;
-    width: 0;
-    background: var(--primary);
-    border-radius: 5px;
-    transition: all 0.3s;
+    border: 1px #a0a0a0;
+    border-radius: 16px;
+    background: var(--gray-background);
+    box-shadow: 0 10px 30px rgba(60, 64, 67, 0.32);
+    z-index: 20;
 }
 
-slider:disabled .slider-track .track-fill {
-    background: var(--disabled-text);
+colorpicker > .color-picker-modal > .color-canvas {
+    width: 100%;
+    height: 192px;
+    min-height: 192px;
+    border-radius: 12px;
+    border: 1px #a0a0a0;
+    overflow: hidden;
+    position: relative;
 }
 
-slider .slider-track .thumb {
-    width: 16px;
-    height: 16px;
-    background: var(--primary);
+colorpicker > .color-picker-modal > .color-canvas > .color-canvas-thumb {
+    width: 14px;
+    height: 14px;
+    min-width: 14px;
+    min-height: 14px;
     border-radius: 50%;
-    position: absolute;
-    box-shadow: 0 0 1px 1px #303033;
-    transition: all 0.3s;
+    border: 2px #ffffff;
+    box-shadow: 0 0 0 1px rgba(32, 33, 36, 0.55);
 }
 
-slider:disabled .slider-track .thumb {
-    background: var(--disabled-text);
+colorpicker > .color-picker-modal > .color-hue-track,
+colorpicker > .color-picker-modal > .color-alpha-track {
+    width: 100%;
+    height: 14px;
+    min-height: 14px;
+    border-radius: 999px;
+    border: 1px #a0a0a0;
+    overflow: hidden;
+    position: relative;
+}
+
+colorpicker > .color-picker-modal > .color-hue-track > .color-track-thumb,
+colorpicker > .color-picker-modal > .color-alpha-track > .color-track-thumb {
+    width: 14px;
+    height: 14px;
+    min-width: 14px;
+    min-height: 14px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: 2px #a0a0a0;
+    box-shadow: 0 0 0 1px rgba(32, 33, 36, 0.35);
+}
+
+colorpicker > .color-picker-modal > .color-values {
+    width: 100%;
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
+}
+
+colorpicker .color-value {
+    color: var(--text-color-dark);
+    font-size: 13px;
+    font-weight: 400;
+}
+
+colorpicker > .color-picker-modal > .color-values > .color-value-rgba {
+    color: var(--text-color-dark);
+    font-weight: 600;
 }
 
 /* Switch Button */
@@ -599,57 +1190,58 @@ switch {
     font-size: 11px;
     font-weight: 200;
     color: var(--text-color);
-}
 
-switch:disabled .switch-text {
-    color: var(--disabled-text);
-}
+    &:disabled > .switch-text {
+        color: var(--disabled-text);
+    }
 
-switch .switch-track {
-    width: 50px;
-    height: 24px;
-    border-radius: 13px;
-    background: var(--gray-background);
-    position: relative;
-    display: flex;
-    justify-content: start;
-    align-items: center;
-    transition: all 0.3s;
-}
+    > .switch-track {
+        width: 50px;
+        height: 24px;
+        border-radius: 13px;
+        background: var(--gray-background);
+        position: relative;
+        display: flex;
+        justify-content: start;
+        align-items: center;
+        transition: all 0.3s;
 
-switch:checked .switch-track {
-    background: var(--primary-hover);
-    justify-content: end;
-}
+        > .switch-dot {
+            position: absolute;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 5px;
+            background: var(--primary);
+            transition: all 0.3s;
 
-switch:disabled .switch-track {
-    background: var(--disabled-text-darker);
-}
+            > .icon-dot {
+                width: 80%;
+                height: 80%;
+                transition: all 0.3s;
+            }
+        }
+    }
 
-switch .switch-track .switch-dot {
-    position: absolute;
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 5px;
-    background: var(--primary);
-    transition: all 0.3s;
-}
+    &:checked > .switch-track {
+        background: var(--primary-hover);
+        justify-content: end;
+    }
 
-switch .switch-track .switch-dot .icon-dot {
-    width: 80%;
-    height: 80%;
-    transition: all 0.3s;
-}
+    &:disabled > .switch-track {
+        background: var(--disabled-text-darker);
+    }
 
-switch:disabled .switch-track .switch-dot {
-    background: var(--disabled-text);
+    &:disabled > .switch-track > .switch-dot {
+        background: var(--disabled-text);
+    }
 }
 
 /* Toggle Button */
+
 toggle {
     background: var(--gray-background);
     min-width: 45px;
@@ -662,22 +1254,22 @@ toggle {
     transition: all 0.3s;
     color: var(--text-color);
     font-size: 15px;
-}
 
-toggle:disabled {
-    background: var(--gray-background-disabled);
-}
+    &:disabled {
+        background: var(--gray-background-disabled);
+    }
 
-toggle:hover {
-    background: var(--primary-hover);
-}
+    &:hover {
+        background: var(--primary-hover);
+    }
 
-toggle:checked {
-    background: var(--primary-hover);
-}
+    &:checked {
+        background: var(--primary-hover);
+    }
 
-toggle:disabled .button-text {
-    color: var(--disabled-text);
+    &:disabled > .button-text {
+        color: var(--disabled-text);
+    }
 }
 
 /**********************************
@@ -693,7 +1285,6 @@ toggle:disabled .button-text {
         transform: scale(1.05);
     }
 }
-
 
 @keyframes default-shake {
     0% {

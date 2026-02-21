@@ -1,11 +1,11 @@
-use bevy::asset::LoadState;
-use bevy::camera::visibility::RenderLayers;
-use bevy::prelude::*;
 use crate::services::image_service::get_or_load_image;
 use crate::styles::paint::Colored;
 use crate::styles::{CssSource, TagName};
 use crate::widgets::{Img, UIGenID, UIWidgetState, WidgetId, WidgetKind};
 use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
+use bevy::asset::LoadState;
+use bevy::camera::visibility::RenderLayers;
+use bevy::prelude::*;
 
 /// Marker component for initialized image widgets.
 #[derive(Component)]

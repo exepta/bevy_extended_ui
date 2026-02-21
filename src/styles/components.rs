@@ -84,31 +84,37 @@ impl UiStyle {
         let pseudo_classes = ["hover", "focus", "read-only", "disabled", "invalid"];
 
         let mut insert_with_pseudo = |base: &str, prio: u8| {
-            for (selector, style) in self.styles.iter() {
+            for (key, style) in self.styles.iter() {
+                let selector = if style.selector.is_empty() {
+                    key.as_str()
+                } else {
+                    style.selector.as_str()
+                };
+
                 if selector == base
                     || selector.starts_with(&format!("{base}:"))
                     || selector.ends_with(base)
                     || selector.contains(&format!("{base} "))
                     || selector.contains(&format!(" {base}"))
                 {
-                    let current = priority_map.get(selector).copied().unwrap_or(u8::MAX);
+                    let current = priority_map.get(key).copied().unwrap_or(u8::MAX);
                     if prio <= current {
-                        filtered.insert(selector.clone(), style.clone());
-                        priority_map.insert(selector.clone(), prio);
+                        filtered.insert(key.clone(), style.clone());
+                        priority_map.insert(key.clone(), prio);
                     }
                 }
 
                 for pseudo in &pseudo_classes {
                     let full = format!("{base}:{pseudo}");
-                    if selector == &full
+                    if selector == full.as_str()
                         || selector.ends_with(&full)
                         || selector.contains(&format!("{full} "))
                         || selector.contains(&format!(" {full}"))
                     {
-                        let current = priority_map.get(selector).copied().unwrap_or(u8::MAX);
+                        let current = priority_map.get(key).copied().unwrap_or(u8::MAX);
                         if prio <= current {
-                            filtered.insert(selector.clone(), style.clone());
-                            priority_map.insert(selector.clone(), prio);
+                            filtered.insert(key.clone(), style.clone());
+                            priority_map.insert(key.clone(), prio);
                         }
                     }
                 }

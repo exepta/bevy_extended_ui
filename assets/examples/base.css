@@ -11,6 +11,7 @@ body {
     align-items: center;
     flex-direction: column;
     gap: 10px;
+    position: relative;
 }
 
 .display-container {
@@ -27,9 +28,9 @@ body {
 }
 
 .display-center {
-    background: rgba(255, 215, 196, 0.07);
-    width: 250px;
-    height: 125px;
+    background: #1f2630;
+    width: 500px;
+    height: 275px;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -63,7 +64,7 @@ body {
 
 #fn_q_key:hover {
     z-index: 2;
-    animation: default-pulse 1.4s ease-in-out infinite alternate;
+    animation: default-pulse 0.8s ease-in-out infinite alternate;
 }
 
 input:invalid {

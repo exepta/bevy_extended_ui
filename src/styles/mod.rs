@@ -1,6 +1,7 @@
 pub mod components;
 pub mod paint;
 pub mod parser;
+mod unit_tests;
 
 use crate::io::CssAsset;
 use crate::styles::components::UiStyle;
@@ -83,11 +84,12 @@ impl Radius {
     }
 }
 
-/// Defines the background style including color and optional image.
+/// Defines the background style including color, optional image, and optional gradient.
 #[derive(Reflect, Debug, Clone, PartialEq)]
 pub struct Background {
     pub color: Color,
     pub image: Option<String>,
+    pub gradient: Option<LinearGradient>,
 }
 
 impl Default for Background {
@@ -96,8 +98,96 @@ impl Default for Background {
         Self {
             color: Color::NONE,
             image: None,
+            gradient: None,
         }
     }
+}
+
+/// Defines how a background image is positioned.
+#[derive(Reflect, Debug, Clone, PartialEq)]
+pub struct BackgroundPosition {
+    pub x: BackgroundPositionValue,
+    pub y: BackgroundPositionValue,
+}
+
+impl Default for BackgroundPosition {
+    fn default() -> Self {
+        Self {
+            x: BackgroundPositionValue::Percent(0.0),
+            y: BackgroundPositionValue::Percent(0.0),
+        }
+    }
+}
+
+/// Represents a single background position axis value.
+#[derive(Reflect, Debug, Clone, PartialEq)]
+pub enum BackgroundPositionValue {
+    Percent(f32),
+    Px(f32),
+}
+
+/// Defines how a background image is sized.
+#[derive(Reflect, Debug, Clone, PartialEq)]
+pub enum BackgroundSize {
+    Auto,
+    Cover,
+    Contain,
+    Explicit(BackgroundSizeValue, BackgroundSizeValue),
+}
+
+impl Default for BackgroundSize {
+    fn default() -> Self {
+        Self::Auto
+    }
+}
+
+/// Represents a single background size axis value.
+#[derive(Reflect, Debug, Clone, PartialEq)]
+pub enum BackgroundSizeValue {
+    Auto,
+    Percent(f32),
+    Px(f32),
+}
+
+/// Defines how the background image is attached.
+#[derive(Reflect, Debug, Clone, PartialEq)]
+pub enum BackgroundAttachment {
+    Scroll,
+    Fixed,
+    Local,
+}
+
+impl Default for BackgroundAttachment {
+    fn default() -> Self {
+        Self::Scroll
+    }
+}
+
+/// Defines supported backdrop-filter effects.
+#[derive(Reflect, Debug, Clone, PartialEq)]
+pub enum BackdropFilter {
+    Blur(f32),
+}
+
+/// Represents a parsed CSS `linear-gradient(...)` definition.
+#[derive(Reflect, Debug, Clone, PartialEq)]
+pub struct LinearGradient {
+    pub angle: f32,
+    pub stops: Vec<GradientStop>,
+}
+
+/// Represents a single color stop in a linear gradient.
+#[derive(Reflect, Debug, Clone, PartialEq)]
+pub struct GradientStop {
+    pub color: Color,
+    pub position: Option<GradientStopPosition>,
+}
+
+/// Represents a gradient stop position.
+#[derive(Reflect, Debug, Clone, PartialEq)]
+pub enum GradientStopPosition {
+    Percent(f32),
+    Px(f32),
 }
 
 /// Constants for common font weight values.
@@ -199,6 +289,230 @@ impl FontVal {
         match self {
             FontVal::Px(x) => x.clone(),
             FontVal::Rem(x) => x * base.unwrap_or(1.0),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CalcUnit {
+    None,
+    Px,
+    Percent,
+    Rem,
+    Vw,
+    Vh,
+    VMin,
+    VMax,
+    Deg,
+    Rad,
+    Turn,
+    Fr,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct CalcValue {
+    pub value: f32,
+    pub unit: CalcUnit,
+}
+
+impl CalcValue {
+    pub fn new(value: f32, unit: CalcUnit) -> Self {
+        Self { value, unit }
+    }
+
+    fn to_length_px(self, ctx: CalcContext) -> Option<f32> {
+        match self.unit {
+            CalcUnit::Px => Some(self.value),
+            CalcUnit::Percent => Some(ctx.base * self.value / 100.0),
+            CalcUnit::Vw => Some(ctx.viewport.x * self.value / 100.0),
+            CalcUnit::Vh => Some(ctx.viewport.y * self.value / 100.0),
+            CalcUnit::VMin => Some(ctx.viewport.x.min(ctx.viewport.y) * self.value / 100.0),
+            CalcUnit::VMax => Some(ctx.viewport.x.max(ctx.viewport.y) * self.value / 100.0),
+            CalcUnit::None if self.value == 0.0 => Some(0.0),
+            _ => None,
+        }
+    }
+
+    fn to_angle_radians(self) -> Option<f32> {
+        match self.unit {
+            CalcUnit::None => Some(self.value),
+            CalcUnit::Deg => Some(self.value.to_radians()),
+            CalcUnit::Rad => Some(self.value),
+            CalcUnit::Turn => Some(self.value * std::f32::consts::TAU),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum CalcExpr {
+    Value(CalcValue),
+    Add(Box<CalcExpr>, Box<CalcExpr>),
+    Sub(Box<CalcExpr>, Box<CalcExpr>),
+    Mul(Box<CalcExpr>, Box<CalcExpr>),
+    Div(Box<CalcExpr>, Box<CalcExpr>),
+    Min(Vec<CalcExpr>),
+    Max(Vec<CalcExpr>),
+    Sin(Box<CalcExpr>),
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct CalcContext {
+    pub base: f32,
+    pub viewport: Vec2,
+}
+
+impl CalcExpr {
+    pub fn eval_length(&self, ctx: CalcContext) -> Option<f32> {
+        match self {
+            CalcExpr::Value(value) => value.to_length_px(ctx),
+            CalcExpr::Add(a, b) => Some(a.eval_length(ctx)? + b.eval_length(ctx)?),
+            CalcExpr::Sub(a, b) => Some(a.eval_length(ctx)? - b.eval_length(ctx)?),
+            CalcExpr::Mul(a, b) => {
+                let left_len = a.eval_length(ctx);
+                let right_len = b.eval_length(ctx);
+                let left_num = a.eval_unitless();
+                let right_num = b.eval_unitless();
+
+                if let (Some(len), Some(num)) = (left_len, right_num) {
+                    return Some(len * num);
+                }
+                if let (Some(num), Some(len)) = (left_num, right_len) {
+                    return Some(len * num);
+                }
+                None
+            }
+            CalcExpr::Div(a, b) => {
+                let denom = b.eval_unitless()?;
+                if denom == 0.0 {
+                    return None;
+                }
+                Some(a.eval_length(ctx)? / denom)
+            }
+            CalcExpr::Min(values) => {
+                let mut best: Option<f32> = None;
+                for value in values {
+                    let resolved = value.eval_length(ctx)?;
+                    best = Some(match best {
+                        Some(current) => current.min(resolved),
+                        None => resolved,
+                    });
+                }
+                best
+            }
+            CalcExpr::Max(values) => {
+                let mut best: Option<f32> = None;
+                for value in values {
+                    let resolved = value.eval_length(ctx)?;
+                    best = Some(match best {
+                        Some(current) => current.max(resolved),
+                        None => resolved,
+                    });
+                }
+                best
+            }
+            CalcExpr::Sin(inner) => {
+                let angle = inner.eval_angle_radians()?;
+                Some(angle.sin())
+            }
+        }
+    }
+
+    pub fn eval_unitless(&self) -> Option<f32> {
+        match self {
+            CalcExpr::Value(value) if value.unit == CalcUnit::None => Some(value.value),
+            CalcExpr::Add(a, b) => Some(a.eval_unitless()? + b.eval_unitless()?),
+            CalcExpr::Sub(a, b) => Some(a.eval_unitless()? - b.eval_unitless()?),
+            CalcExpr::Mul(a, b) => Some(a.eval_unitless()? * b.eval_unitless()?),
+            CalcExpr::Div(a, b) => {
+                let denom = b.eval_unitless()?;
+                if denom == 0.0 {
+                    return None;
+                }
+                Some(a.eval_unitless()? / denom)
+            }
+            CalcExpr::Min(values) => {
+                let mut best: Option<f32> = None;
+                for value in values {
+                    let resolved = value.eval_unitless()?;
+                    best = Some(match best {
+                        Some(current) => current.min(resolved),
+                        None => resolved,
+                    });
+                }
+                best
+            }
+            CalcExpr::Max(values) => {
+                let mut best: Option<f32> = None;
+                for value in values {
+                    let resolved = value.eval_unitless()?;
+                    best = Some(match best {
+                        Some(current) => current.max(resolved),
+                        None => resolved,
+                    });
+                }
+                best
+            }
+            CalcExpr::Sin(inner) => {
+                let angle = inner.eval_angle_radians()?;
+                Some(angle.sin())
+            }
+            _ => None,
+        }
+    }
+
+    fn eval_angle_radians(&self) -> Option<f32> {
+        match self {
+            CalcExpr::Value(value) => value.to_angle_radians(),
+            CalcExpr::Add(a, b) => Some(a.eval_angle_radians()? + b.eval_angle_radians()?),
+            CalcExpr::Sub(a, b) => Some(a.eval_angle_radians()? - b.eval_angle_radians()?),
+            CalcExpr::Mul(a, b) => {
+                let left = a.eval_angle_radians();
+                let right = b.eval_angle_radians();
+                let left_num = a.eval_unitless();
+                let right_num = b.eval_unitless();
+
+                if let (Some(angle), Some(num)) = (left, right_num) {
+                    return Some(angle * num);
+                }
+                if let (Some(num), Some(angle)) = (left_num, right) {
+                    return Some(angle * num);
+                }
+                None
+            }
+            CalcExpr::Div(a, b) => {
+                let denom = b.eval_unitless()?;
+                if denom == 0.0 {
+                    return None;
+                }
+                Some(a.eval_angle_radians()? / denom)
+            }
+            CalcExpr::Min(values) => {
+                let mut best: Option<f32> = None;
+                for value in values {
+                    let resolved = value.eval_angle_radians()?;
+                    best = Some(match best {
+                        Some(current) => current.min(resolved),
+                        None => resolved,
+                    });
+                }
+                best
+            }
+            CalcExpr::Max(values) => {
+                let mut best: Option<f32> = None;
+                for value in values {
+                    let resolved = value.eval_angle_radians()?;
+                    best = Some(match best {
+                        Some(current) => current.max(resolved),
+                        None => resolved,
+                    });
+                }
+                best
+            }
+            CalcExpr::Sin(inner) => {
+                let angle = inner.eval_angle_radians()?;
+                Some(angle.sin())
+            }
         }
     }
 }
@@ -360,12 +674,92 @@ pub struct ParsedCss {
     pub keyframes: HashMap<String, Vec<AnimationKeyframe>>,
 }
 
+/// Breakpoint/media condition expression used for CSS `@media` rules.
+#[derive(Debug, Clone, PartialEq)]
+pub enum MediaQueryCondition {
+    Always,
+    Never,
+    MinWidth(f32),
+    MaxWidth(f32),
+    Width(f32),
+    MinHeight(f32),
+    MaxHeight(f32),
+    Height(f32),
+    OrientationLandscape,
+    OrientationPortrait,
+    Not(Box<MediaQueryCondition>),
+    And(Vec<MediaQueryCondition>),
+    Or(Vec<MediaQueryCondition>),
+}
+
+impl MediaQueryCondition {
+    fn compound_cache_key(prefix: &str, parts: &[MediaQueryCondition]) -> String {
+        let mut key = String::from(prefix);
+        key.push('(');
+        for (idx, part) in parts.iter().enumerate() {
+            if idx > 0 {
+                key.push(',');
+            }
+            key.push_str(&part.cache_key());
+        }
+        key.push(')');
+        key
+    }
+
+    /// Returns true if the condition matches the given viewport size.
+    pub fn matches_viewport(&self, viewport: Vec2) -> bool {
+        const EPSILON: f32 = 0.5;
+
+        match self {
+            MediaQueryCondition::Always => true,
+            MediaQueryCondition::Never => false,
+            MediaQueryCondition::MinWidth(value) => viewport.x + EPSILON >= *value,
+            MediaQueryCondition::MaxWidth(value) => viewport.x - EPSILON <= *value,
+            MediaQueryCondition::Width(value) => (viewport.x - *value).abs() <= EPSILON,
+            MediaQueryCondition::MinHeight(value) => viewport.y + EPSILON >= *value,
+            MediaQueryCondition::MaxHeight(value) => viewport.y - EPSILON <= *value,
+            MediaQueryCondition::Height(value) => (viewport.y - *value).abs() <= EPSILON,
+            MediaQueryCondition::OrientationLandscape => viewport.x >= viewport.y,
+            MediaQueryCondition::OrientationPortrait => viewport.y > viewport.x,
+            MediaQueryCondition::Not(inner) => !inner.matches_viewport(viewport),
+            MediaQueryCondition::And(parts) => parts
+                .iter()
+                .all(|condition| condition.matches_viewport(viewport)),
+            MediaQueryCondition::Or(parts) => parts
+                .iter()
+                .any(|condition| condition.matches_viewport(viewport)),
+        }
+    }
+
+    /// Produces a deterministic key used to separate media-scoped selector entries.
+    pub fn cache_key(&self) -> String {
+        match self {
+            MediaQueryCondition::Always => "always".to_string(),
+            MediaQueryCondition::Never => "never".to_string(),
+            MediaQueryCondition::MinWidth(value) => format!("minw:{value:.3}"),
+            MediaQueryCondition::MaxWidth(value) => format!("maxw:{value:.3}"),
+            MediaQueryCondition::Width(value) => format!("w:{value:.3}"),
+            MediaQueryCondition::MinHeight(value) => format!("minh:{value:.3}"),
+            MediaQueryCondition::MaxHeight(value) => format!("maxh:{value:.3}"),
+            MediaQueryCondition::Height(value) => format!("h:{value:.3}"),
+            MediaQueryCondition::OrientationLandscape => "orientation:landscape".to_string(),
+            MediaQueryCondition::OrientationPortrait => "orientation:portrait".to_string(),
+            MediaQueryCondition::Not(inner) => format!("not({})", inner.cache_key()),
+            MediaQueryCondition::And(parts) => Self::compound_cache_key("and", parts),
+            MediaQueryCondition::Or(parts) => Self::compound_cache_key("or", parts),
+        }
+    }
+}
+
 /// Pair of normal and !important styles with origin tracking.
 #[derive(Reflect, Default, Debug, Clone, PartialEq)]
 pub struct StylePair {
     pub important: Style,
     pub normal: Style,
     pub origin: usize,
+    pub selector: String,
+    #[reflect(ignore)]
+    pub media: Option<MediaQueryCondition>,
 }
 
 /// Transforms parsed from CSS transform properties.
@@ -407,21 +801,45 @@ pub struct Style {
     pub box_sizing: Option<BoxSizing>,
     pub position_type: Option<PositionType>,
     pub width: Option<Val>,
+    #[reflect(ignore)]
+    pub width_calc: Option<CalcExpr>,
     pub min_width: Option<Val>,
+    #[reflect(ignore)]
+    pub min_width_calc: Option<CalcExpr>,
     pub max_width: Option<Val>,
+    #[reflect(ignore)]
+    pub max_width_calc: Option<CalcExpr>,
     pub height: Option<Val>,
+    #[reflect(ignore)]
+    pub height_calc: Option<CalcExpr>,
     pub min_height: Option<Val>,
+    #[reflect(ignore)]
+    pub min_height_calc: Option<CalcExpr>,
     pub max_height: Option<Val>,
+    #[reflect(ignore)]
+    pub max_height_calc: Option<CalcExpr>,
     pub left: Option<Val>,
+    #[reflect(ignore)]
+    pub left_calc: Option<CalcExpr>,
     pub top: Option<Val>,
+    #[reflect(ignore)]
+    pub top_calc: Option<CalcExpr>,
     pub right: Option<Val>,
+    #[reflect(ignore)]
+    pub right_calc: Option<CalcExpr>,
     pub bottom: Option<Val>,
+    #[reflect(ignore)]
+    pub bottom_calc: Option<CalcExpr>,
     pub padding: Option<UiRect>,
     pub margin: Option<UiRect>,
     pub border: Option<UiRect>,
     pub overflow: Option<Overflow>,
     pub color: Option<Color>,
     pub background: Option<Background>,
+    pub backdrop_filter: Option<BackdropFilter>,
+    pub background_position: Option<BackgroundPosition>,
+    pub background_size: Option<BackgroundSize>,
+    pub background_attachment: Option<BackgroundAttachment>,
     pub border_color: Option<Color>,
     pub border_width: Option<Val>,
     pub border_radius: Option<Radius>,
@@ -439,6 +857,8 @@ pub struct Style {
     pub flex_grow: Option<f32>,
     pub flex_shrink: Option<f32>,
     pub flex_basis: Option<Val>,
+    #[reflect(ignore)]
+    pub flex_basis_calc: Option<CalcExpr>,
     pub flex_wrap: Option<FlexWrap>,
     pub grid_row: Option<GridPlacement>,
     pub grid_column: Option<GridPlacement>,
@@ -448,6 +868,14 @@ pub struct Style {
     pub grid_auto_rows: Option<Vec<GridTrack>>,
     pub grid_auto_columns: Option<Vec<GridTrack>>,
     pub gap: Option<Val>,
+    #[reflect(ignore)]
+    pub gap_calc: Option<CalcExpr>,
+    pub row_gap: Option<Val>,
+    #[reflect(ignore)]
+    pub row_gap_calc: Option<CalcExpr>,
+    pub column_gap: Option<Val>,
+    #[reflect(ignore)]
+    pub column_gap_calc: Option<CalcExpr>,
     pub text_wrap: Option<LineBreak>,
     pub z_index: Option<i32>,
     pub cursor: Option<CursorStyle>,
@@ -465,18 +893,68 @@ impl Style {
         merge_opt(&mut self.box_sizing, &other.box_sizing);
         merge_opt(&mut self.position_type, &other.position_type);
 
-        merge_opt(&mut self.width, &other.width);
-        merge_opt(&mut self.min_width, &other.min_width);
-        merge_opt(&mut self.max_width, &other.max_width);
+        merge_val_with_calc(
+            &mut self.width,
+            &mut self.width_calc,
+            &other.width,
+            &other.width_calc,
+        );
+        merge_val_with_calc(
+            &mut self.min_width,
+            &mut self.min_width_calc,
+            &other.min_width,
+            &other.min_width_calc,
+        );
+        merge_val_with_calc(
+            &mut self.max_width,
+            &mut self.max_width_calc,
+            &other.max_width,
+            &other.max_width_calc,
+        );
 
-        merge_opt(&mut self.height, &other.height);
-        merge_opt(&mut self.min_height, &other.min_height);
-        merge_opt(&mut self.max_height, &other.max_height);
+        merge_val_with_calc(
+            &mut self.height,
+            &mut self.height_calc,
+            &other.height,
+            &other.height_calc,
+        );
+        merge_val_with_calc(
+            &mut self.min_height,
+            &mut self.min_height_calc,
+            &other.min_height,
+            &other.min_height_calc,
+        );
+        merge_val_with_calc(
+            &mut self.max_height,
+            &mut self.max_height_calc,
+            &other.max_height,
+            &other.max_height_calc,
+        );
 
-        merge_opt(&mut self.left, &other.left);
-        merge_opt(&mut self.top, &other.top);
-        merge_opt(&mut self.right, &other.right);
-        merge_opt(&mut self.bottom, &other.bottom);
+        merge_val_with_calc(
+            &mut self.left,
+            &mut self.left_calc,
+            &other.left,
+            &other.left_calc,
+        );
+        merge_val_with_calc(
+            &mut self.top,
+            &mut self.top_calc,
+            &other.top,
+            &other.top_calc,
+        );
+        merge_val_with_calc(
+            &mut self.right,
+            &mut self.right_calc,
+            &other.right,
+            &other.right_calc,
+        );
+        merge_val_with_calc(
+            &mut self.bottom,
+            &mut self.bottom_calc,
+            &other.bottom,
+            &other.bottom_calc,
+        );
 
         merge_opt(&mut self.padding, &other.padding);
         merge_opt(&mut self.margin, &other.margin);
@@ -486,6 +964,13 @@ impl Style {
 
         merge_opt(&mut self.color, &other.color);
         merge_opt(&mut self.background, &other.background);
+        merge_opt(&mut self.backdrop_filter, &other.backdrop_filter);
+        merge_opt(&mut self.background_position, &other.background_position);
+        merge_opt(&mut self.background_size, &other.background_size);
+        merge_opt(
+            &mut self.background_attachment,
+            &other.background_attachment,
+        );
 
         merge_opt(&mut self.border_color, &other.border_color);
         merge_opt(&mut self.border_width, &other.border_width);
@@ -508,7 +993,12 @@ impl Style {
         merge_opt(&mut self.flex_wrap, &other.flex_wrap);
         merge_opt(&mut self.flex_grow, &other.flex_grow);
         merge_opt(&mut self.flex_shrink, &other.flex_shrink);
-        merge_opt(&mut self.flex_basis, &other.flex_basis);
+        merge_val_with_calc(
+            &mut self.flex_basis,
+            &mut self.flex_basis_calc,
+            &other.flex_basis,
+            &other.flex_basis_calc,
+        );
 
         merge_opt(&mut self.grid_row, &other.grid_row);
         merge_opt(&mut self.grid_column, &other.grid_column);
@@ -522,7 +1012,24 @@ impl Style {
         merge_opt(&mut self.grid_auto_rows, &other.grid_auto_rows);
         merge_opt(&mut self.grid_auto_columns, &other.grid_auto_columns);
 
-        merge_opt(&mut self.gap, &other.gap);
+        merge_val_with_calc(
+            &mut self.gap,
+            &mut self.gap_calc,
+            &other.gap,
+            &other.gap_calc,
+        );
+        merge_val_with_calc(
+            &mut self.row_gap,
+            &mut self.row_gap_calc,
+            &other.row_gap,
+            &other.row_gap_calc,
+        );
+        merge_val_with_calc(
+            &mut self.column_gap,
+            &mut self.column_gap_calc,
+            &other.column_gap,
+            &other.column_gap_calc,
+        );
 
         merge_opt(&mut self.text_wrap, &other.text_wrap);
 
@@ -559,6 +1066,22 @@ impl Style {
 fn merge_opt<T: Clone>(dst: &mut Option<T>, src: &Option<T>) {
     if let Some(v) = src.as_ref() {
         *dst = Some(v.clone());
+    }
+}
+
+#[inline]
+fn merge_val_with_calc<T: Clone>(
+    dst_val: &mut Option<T>,
+    dst_calc: &mut Option<CalcExpr>,
+    src_val: &Option<T>,
+    src_calc: &Option<CalcExpr>,
+) {
+    if let Some(calc) = src_calc.as_ref() {
+        *dst_calc = Some(calc.clone());
+        *dst_val = None;
+    } else if let Some(val) = src_val.as_ref() {
+        *dst_val = Some(val.clone());
+        *dst_calc = None;
     }
 }
 

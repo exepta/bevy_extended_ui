@@ -1,22 +1,28 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use bevy::asset::AssetEvent;
 use bevy::prelude::*;
-use kuchiki::{traits::TendrilSink, Attributes, NodeRef};
+use kuchiki::{Attributes, NodeRef, traits::TendrilSink};
+use once_cell::sync::Lazy;
+use regex::Regex;
 
+use crate::ExtendedUiConfiguration;
 use crate::html::{
-    HtmlDirty, HtmlEventBindings, HtmlID, HtmlMeta, HtmlSource, HtmlStates, HtmlStructureMap,
-    HtmlStyle, HtmlSystemSet, HtmlWidgetNode,
+    HtmlDirty, HtmlEventBindings, HtmlID, HtmlInnerContent, HtmlMeta, HtmlSource, HtmlStates,
+    HtmlStructureMap, HtmlStyle, HtmlSystemSet, HtmlWidgetNode,
 };
 use crate::io::{CssAsset, DefaultCssHandle, HtmlAsset};
-use crate::lang::{localize_html, vars_fingerprint, UiLangState, UiLangVariables, UILang};
+use crate::lang::{UILang, UiLangState, UiLangVariables, localize_html, vars_fingerprint};
 use crate::styles::IconPlace;
+use crate::styles::parser::convert_to_color;
 use crate::widgets::Button;
 use crate::widgets::*;
-use crate::ExtendedUiConfiguration;
 
 /// Default CSS asset path applied to every HTML UI.
 pub const DEFAULT_UI_CSS: &str = "default/extended_ui.css";
+
+static INNER_BINDING_RE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?s)\{\{\s*([^{}]+?)\s*\}\}").unwrap());
 
 /// Plugin that parses HTML assets into widget trees.
 pub struct HtmlConverterSystem;
@@ -83,9 +89,9 @@ fn update_html_ui(
     // If an HtmlAsset changed OR was added later (async), find all entities referencing it.
     for ev in html_asset_events.read() {
         let id = match ev {
-            AssetEvent::Added { id }
-            | AssetEvent::Modified { id }
-            | AssetEvent::Removed { id } => *id,
+            AssetEvent::Added { id } | AssetEvent::Modified { id } | AssetEvent::Removed { id } => {
+                *id
+            }
             _ => continue,
         };
 
@@ -219,13 +225,9 @@ fn update_html_ui(
 
         let label_map = collect_labels_by_for(body_node.as_node());
 
-        if let Some(body_widget) = parse_html_node(
-            body_node.as_node(),
-            &css_handles,
-            &label_map,
-            &ui_key,
-            html,
-        ) {
+        if let Some(body_widget) =
+            parse_html_node(body_node.as_node(), &css_handles, &label_map, &ui_key, html)
+        {
             structure_map.html_map.insert(ui_key, vec![body_widget]);
 
             // IMPORTANT: Explicitly mark UI as dirty so the builder rebuilds.
@@ -256,6 +258,7 @@ fn parse_html_node(
             .map(|s| s.split_whitespace().map(str::to_string).collect()),
         style: attributes.get("style").map(HtmlStyle::from_str),
         validation: parse_validation_attributes(&attributes),
+        inner_content: parse_inner_content(node),
     };
 
     let states = HtmlStates {
@@ -292,11 +295,16 @@ fn parse_html_node(
         "button" => {
             let (icon_path, icon_place) = parse_icon_and_text(node);
             let text = node.text_contents().trim().to_string();
+            let button_type = attributes
+                .get("type")
+                .and_then(ButtonType::from_str)
+                .unwrap_or_default();
             Some(HtmlWidgetNode::Button(
                 Button {
                     text,
                     icon_path,
                     icon_place,
+                    button_type,
                     ..default()
                 },
                 meta,
@@ -325,6 +333,43 @@ fn parse_html_node(
             ))
         }
 
+        "colorpicker" => {
+            let value = attributes
+                .get("value")
+                .and_then(|v| convert_to_color(v.to_string()))
+                .unwrap_or_else(|| Color::srgb_u8(0x42, 0x85, 0xF4));
+
+            let srgba = value.to_srgba();
+            let mut alpha = (srgba.alpha * 255.0).round() as u8;
+
+            if let Some(alpha_attr) = attributes.get("alpha") {
+                let parsed = alpha_attr.trim().parse::<f32>().ok().map(|value| {
+                    if value <= 1.0 {
+                        (value * 255.0).round().clamp(0.0, 255.0) as u8
+                    } else {
+                        value.round().clamp(0.0, 255.0) as u8
+                    }
+                });
+                if let Some(parsed) = parsed {
+                    alpha = parsed;
+                }
+            }
+
+            Some(HtmlWidgetNode::ColorPicker(
+                ColorPicker::from_rgba_u8(
+                    (srgba.red * 255.0).round() as u8,
+                    (srgba.green * 255.0).round() as u8,
+                    (srgba.blue * 255.0).round() as u8,
+                    alpha,
+                ),
+                meta,
+                states,
+                functions,
+                widget.clone(),
+                HtmlID::default(),
+            ))
+        }
+
         "div" => {
             let mut children = Vec::new();
             for child in node.children() {
@@ -335,6 +380,40 @@ fn parse_html_node(
 
             Some(HtmlWidgetNode::Div(
                 Div::default(),
+                meta,
+                states,
+                children,
+                functions,
+                widget.clone(),
+                HtmlID::default(),
+            ))
+        }
+
+        "form" => {
+            let mut children = Vec::new();
+            for child in node.children() {
+                if let Some(parsed) = parse_html_node(&child, css_sources, label_map, key, html) {
+                    children.push(parsed);
+                }
+            }
+
+            let action = attributes
+                .get("action")
+                .or_else(|| attributes.get("onsubmit"))
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string);
+            let validate_mode = attributes
+                .get("validate")
+                .and_then(FormValidationMode::from_str)
+                .unwrap_or_default();
+
+            Some(HtmlWidgetNode::Form(
+                Form {
+                    action,
+                    validate_mode,
+                    ..default()
+                },
                 meta,
                 states,
                 children,
@@ -414,6 +493,7 @@ fn parse_html_node(
                         .map(|s| s.split_whitespace().map(str::to_string).collect()),
                     style: attrs.get("style").map(HtmlStyle::from_str),
                     validation: parse_validation_attributes(&attrs),
+                    inner_content: parse_inner_content(&radio_node),
                 };
 
                 let child_states = HtmlStates {
@@ -488,7 +568,10 @@ fn parse_html_node(
             let src_resolved = if src_raw.trim().is_empty() {
                 None
             } else {
-                Some(resolve_relative_asset_path(&html.get_source_path(), &src_raw))
+                Some(resolve_relative_asset_path(
+                    &html.get_source_path(),
+                    &src_raw,
+                ))
             };
 
             Some(HtmlWidgetNode::Img(
@@ -507,6 +590,11 @@ fn parse_html_node(
 
         "input" => {
             let id = attributes.get("id").map(|s| s.to_string());
+            let name = attributes
+                .get("name")
+                .map(str::to_string)
+                .or_else(|| id.clone())
+                .unwrap_or_default();
             let label = id
                 .as_ref()
                 .and_then(|id| label_map.get(id))
@@ -516,6 +604,11 @@ fn parse_html_node(
             let text = attributes.get("value").unwrap_or("").to_string();
             let placeholder = attributes.get("placeholder").unwrap_or("").to_string();
             let input_type = attributes.get("type").unwrap_or("text").to_string();
+            let date_format = attributes
+                .get("format")
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string);
             let icon_path = attributes.get("icon").unwrap_or("");
             let icon: Option<String> = if !icon_path.is_empty() {
                 Some(String::from(icon_path))
@@ -535,12 +628,73 @@ fn parse_html_node(
 
             Some(HtmlWidgetNode::Input(
                 InputField {
+                    name,
                     label,
                     placeholder,
                     text,
                     input_type: InputType::from_str(&input_type).unwrap_or_default(),
+                    date_format,
                     icon_path: icon,
                     cap_text_at: cap,
+                    ..default()
+                },
+                meta,
+                states,
+                functions,
+                widget.clone(),
+                HtmlID::default(),
+            ))
+        }
+
+        "date-picker" => {
+            let for_id = attributes
+                .get("for")
+                .map(str::trim)
+                .map(|value| value.trim_start_matches('#').to_string())
+                .filter(|value| !value.is_empty());
+            let id = attributes.get("id").map(|s| s.to_string());
+            let name = attributes
+                .get("name")
+                .map(str::to_string)
+                .or_else(|| id.clone())
+                .unwrap_or_default();
+            let label = attributes
+                .get("label")
+                .map(str::to_string)
+                .or_else(|| id.as_ref().and_then(|id| label_map.get(id)).cloned())
+                .unwrap_or_else(|| "Date".to_string());
+            let placeholder = attributes.get("placeholder").unwrap_or("").to_string();
+            let value = attributes.get("value").unwrap_or("").to_string();
+            let min = attributes.get("min").map(str::to_string);
+            let max = attributes.get("max").map(str::to_string);
+            let format_pattern = attributes
+                .get("format")
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string);
+            let format = format_pattern
+                .as_deref()
+                .and_then(DateFormat::from_str)
+                .unwrap_or_default();
+            let mut meta = meta;
+            if for_id.is_some() {
+                let classes = meta.class.get_or_insert_with(Vec::new);
+                if !classes.iter().any(|class| class == "date-picker-bound") {
+                    classes.push("date-picker-bound".to_string());
+                }
+            }
+
+            Some(HtmlWidgetNode::DatePicker(
+                DatePicker {
+                    for_id,
+                    name,
+                    label,
+                    placeholder,
+                    value,
+                    min,
+                    max,
+                    format_pattern,
+                    format,
                     ..default()
                 },
                 meta,
@@ -555,6 +709,52 @@ fn parse_html_node(
             let text = node.text_contents().trim().to_string();
             Some(HtmlWidgetNode::Paragraph(
                 Paragraph { text, ..default() },
+                meta,
+                states,
+                functions,
+                widget.clone(),
+                HtmlID::default(),
+            ))
+        }
+
+        "tool-tip" => {
+            let text = node
+                .text_contents()
+                .split_whitespace()
+                .collect::<Vec<_>>()
+                .join(" ");
+            let for_id = attributes
+                .get("for")
+                .map(str::trim)
+                .map(|value| value.trim_start_matches('#').to_string())
+                .filter(|value| !value.is_empty());
+            let variant = attributes
+                .get("variant")
+                .and_then(ToolTipVariant::from_str)
+                .unwrap_or_default();
+            let prio = attributes
+                .get("prio")
+                .and_then(ToolTipPriority::from_str)
+                .unwrap_or_default();
+            let alignment = attributes
+                .get("alignment")
+                .and_then(ToolTipAlignment::from_str)
+                .unwrap_or_default();
+            let trigger = attributes
+                .get("trigger")
+                .map(parse_tooltip_triggers)
+                .unwrap_or_else(|| vec![ToolTipTrigger::Hover]);
+
+            Some(HtmlWidgetNode::ToolTip(
+                ToolTip {
+                    text,
+                    for_id,
+                    variant,
+                    prio,
+                    alignment,
+                    trigger,
+                    ..default()
+                },
                 meta,
                 states,
                 functions,
@@ -621,7 +821,10 @@ fn parse_html_node(
                 vertical = false;
             }
             Some(HtmlWidgetNode::Scrollbar(
-                Scrollbar { vertical, ..default() },
+                Scrollbar {
+                    vertical,
+                    ..default()
+                },
                 meta,
                 states,
                 functions,
@@ -663,7 +866,8 @@ fn parse_html_node(
                 }
             }
 
-            let value = selected_value.unwrap_or_else(|| options.first().cloned().unwrap_or_default());
+            let value =
+                selected_value.unwrap_or_else(|| options.first().cloned().unwrap_or_default());
 
             Some(HtmlWidgetNode::ChoiceBox(
                 ChoiceBox {
@@ -880,4 +1084,90 @@ fn parse_icon_and_text(node: &NodeRef) -> (Option<String>, IconPlace) {
     }
 
     (icon_path, icon_place)
+}
+
+/// Builds the per-widget inner content payload.
+fn parse_inner_content(node: &NodeRef) -> HtmlInnerContent {
+    let inner_text = node.text_contents();
+    let inner_html = node
+        .children()
+        .map(|child| child.to_string())
+        .collect::<String>();
+    let inner_bindings = extract_inner_bindings(&inner_html);
+
+    HtmlInnerContent::new(inner_text, inner_html, inner_bindings)
+}
+
+/// Parses tooltip trigger attribute values like `"hover | click"`.
+fn parse_tooltip_triggers(value: &str) -> Vec<ToolTipTrigger> {
+    let mut out = Vec::new();
+
+    for token in value.split(['|', ',', ' ']) {
+        let trimmed = token.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        if let Some(trigger) = ToolTipTrigger::from_str(trimmed) {
+            if !out.contains(&trigger) {
+                out.push(trigger);
+            }
+        }
+    }
+
+    if out.is_empty() {
+        out.push(ToolTipTrigger::Hover);
+    }
+
+    out
+}
+
+/// Extracts unique `{{...}}` placeholders from serialized content.
+fn extract_inner_bindings(content: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut seen = HashSet::new();
+
+    for caps in INNER_BINDING_RE.captures_iter(content) {
+        let Some(raw) = caps.get(0).map(|m| m.as_str()) else {
+            continue;
+        };
+
+        let key = raw.trim().to_string();
+        if seen.insert(key.clone()) {
+            out.push(key);
+        }
+    }
+
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn extract_inner_bindings_returns_unique_placeholders() {
+        let src = "<p>{{user.name}} {{ user.name }} {{ user.name }} {{user.id}}</p>";
+        let bindings = extract_inner_bindings(src);
+
+        assert_eq!(
+            bindings,
+            vec![
+                "{{user.name}}".to_string(),
+                "{{ user.name }}".to_string(),
+                "{{user.id}}".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn parse_inner_content_collects_text_html_and_bindings() {
+        let doc = kuchiki::parse_html().one("<p>Hello <b>{{ user.name }}</b>!</p>");
+        let node = doc.select_first("p").unwrap();
+        let content = parse_inner_content(node.as_node());
+
+        assert!(content.inner_text().contains("Hello"));
+        assert!(content.inner_html().contains("<b>{{ user.name }}</b>"));
+        assert_eq!(content.inner_bindings(), &["{{ user.name }}".to_string()]);
+    }
 }

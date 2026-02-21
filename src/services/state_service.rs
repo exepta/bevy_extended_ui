@@ -15,7 +15,7 @@ impl Plugin for StateService {
             (
                 internal_state_check.run_if(resource_changed::<CurrentWidgetState>),
                 handle_tab_focus,
-                unfocus_disabled
+                unfocus_disabled,
             ),
         );
     }
