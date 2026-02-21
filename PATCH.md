@@ -7,6 +7,11 @@
 - CSS functions support `calc`, `var`, `sin`, `max`, `min` and `minmax`
 - Clipboard Support
 - Better Background handling
+- DatePicker Widget
+- ColorPicker Widget
+- Form Widget
+- Tooltip Widget
+- CSS `backdrop-filter` support
 
 ### Fixes
 

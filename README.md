@@ -278,6 +278,8 @@ If anyone has any ideas, I'd be happy to hear them.
 | 0.17.0         | 1.0.0 - 1.1.0              |
 | 0.16.0         | 0.1.0 - 0.2.2              |
 
+> _Note:_ WASM is not correctly supported in version 1.4.0 there is a layout bug. I'm working on this bug, but this needs time!
+
 > _Note:_ Version 0.1.0–0.3.0 are deprecated and will not be supported. If you’re interested in a version for bevy 0.16, then create an issue!
 
 ### Important Links

@@ -382,15 +382,7 @@ fn apply_css_to_entities_legacy(
     mut css_events: MessageReader<AssetEvent<CssAsset>>,
     css_users: Res<CssUsers>,
     query_changed_source: Query<
-        (
-            Entity,
-            &CssSource,
-            Option<&CssID>,
-            Option<&CssClass>,
-            Option<&TagName>,
-            Option<&ChildOf>,
-            Option<&CssDirty>,
-        ),
+        (Entity, Option<&CssDirty>),
         Or<(
             Changed<CssSource>,
             Added<CssSource>,
@@ -400,6 +392,18 @@ fn apply_css_to_entities_legacy(
             Changed<TagName>,
             Changed<ChildOf>,
         )>,
+    >,
+    query_all_source: Query<
+        (
+            Entity,
+            &CssSource,
+            Option<&CssID>,
+            Option<&CssClass>,
+            Option<&TagName>,
+            Option<&ChildOf>,
+            Option<&CssDirty>,
+        ),
+        With<CssSource>,
     >,
     parent_query: Query<(
         Option<&CssID>,
@@ -411,7 +415,7 @@ fn apply_css_to_entities_legacy(
 ) {
     let mut dirty: HashSet<Entity> = HashSet::new();
 
-    for (e, _, _, _, _, _, _) in query_changed_source.iter() {
+    for (e, _) in query_changed_source.iter() {
         dirty.insert(e);
     }
 
@@ -432,8 +436,8 @@ fn apply_css_to_entities_legacy(
     }
 
     for entity in dirty {
-        let Ok((_, css_source, id, class, tag, parent, _dirty_marker)) =
-            query_changed_source.get(entity)
+        let Ok((_, css_source, id, class, tag, parent, dirty_marker)) =
+            query_all_source.get(entity)
         else {
             continue;
         };
@@ -457,7 +461,10 @@ fn apply_css_to_entities_legacy(
         };
 
         match style_query.get(entity) {
-            Ok(Some(existing)) if existing.styles != final_style.styles => {
+            Ok(Some(existing))
+                if existing.styles != final_style.styles
+                    || existing.keyframes != final_style.keyframes =>
+            {
                 commands
                     .entity(entity)
                     .queue_silenced(move |mut ew: EntityWorldMut| {
@@ -473,7 +480,15 @@ fn apply_css_to_entities_legacy(
                         ew.remove::<CssDirty>();
                     });
             }
-            _ => {}
+            _ => {
+                if dirty_marker.is_some() {
+                    commands
+                        .entity(entity)
+                        .queue_silenced(|mut ew: EntityWorldMut| {
+                            ew.remove::<CssDirty>();
+                        });
+                }
+            }
         }
     }
 }
