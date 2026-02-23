@@ -87,7 +87,7 @@ version = "1.21.3"
 version = "1.12.3"
 
 [dependencies.inventory]
-version = "0.3.21"
+version = "0.3.22"
 
 [dependencies.i18n]
 package = "i18n-rizzen-yazston"
