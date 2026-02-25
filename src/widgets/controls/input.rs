@@ -15,8 +15,7 @@ use arboard::Clipboard;
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
 use bevy::text::{TextBackgroundColor, TextLayoutInfo, TextSpan};
-use bevy::ui::{RelativeCursorPosition, ScrollPosition, UiScale};
-use bevy::window::PrimaryWindow;
+use bevy::ui::{RelativeCursorPosition, ScrollPosition};
 #[cfg(all(target_arch = "wasm32", feature = "clipboard-wasm"))]
 use std::sync::{Arc, Mutex};
 #[cfg(all(target_arch = "wasm32", feature = "clipboard-wasm"))]
@@ -1629,16 +1628,10 @@ fn cursor_position_from_pointer(
     >,
     text_query: &Query<(&TextFont, &BindToID), With<InputFieldText>>,
     layout_query: &Query<(&TextLayoutInfo, &BindToID), With<InputFieldText>>,
-    window_q: &Query<&Window, With<PrimaryWindow>>,
-    ui_scale: &UiScale,
 ) -> Option<usize> {
     if text_len == 0 {
         return Some(0);
     }
-    let Ok(window) = window_q.single() else {
-        return None;
-    };
-    let sf = window.scale_factor() * ui_scale.0;
 
     let mut cursor_x = None;
     let mut padding_left = 0.0;
@@ -1653,7 +1646,9 @@ fn cursor_position_from_pointer(
             return None;
         };
 
-        let width = (node.size().x / sf).max(1.0);
+        // Use the node-local inverse scale instead of recomputing from the window scale.
+        // This avoids platform-specific mismatches (notably on Windows DPI scaling).
+        let width = (node.size().x * node.inverse_scale_factor).max(1.0);
         let clamped = (normalized.x + 0.5).clamp(0.0, 1.0);
         cursor_x = Some(clamped * width);
 
@@ -1779,8 +1774,6 @@ fn on_internal_press(
     >,
     text_query: Query<(&TextFont, &BindToID), With<InputFieldText>>,
     layout_query: Query<(&TextLayoutInfo, &BindToID), With<InputFieldText>>,
-    window_q: Query<&Window, With<PrimaryWindow>>,
-    ui_scale: Res<UiScale>,
     mut current_widget_state: ResMut<CurrentWidgetState>,
 ) {
     if trigger.button != PointerButton::Primary {
@@ -1807,8 +1800,6 @@ fn on_internal_press(
             &container_query,
             &text_query,
             &layout_query,
-            &window_q,
-            &ui_scale,
         ) {
             field.cursor_position = pos;
             selection.anchor = pos;
@@ -1855,8 +1846,6 @@ fn on_internal_drag(
     >,
     text_query: Query<(&TextFont, &BindToID), With<InputFieldText>>,
     layout_query: Query<(&TextLayoutInfo, &BindToID), With<InputFieldText>>,
-    window_q: Query<&Window, With<PrimaryWindow>>,
-    ui_scale: Res<UiScale>,
 ) {
     if event.button != PointerButton::Primary {
         return;
@@ -1879,8 +1868,6 @@ fn on_internal_drag(
             &container_query,
             &text_query,
             &layout_query,
-            &window_q,
-            &ui_scale,
         ) {
             field.cursor_position = pos;
             selection.focus = pos;
