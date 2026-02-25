@@ -87,7 +87,7 @@ version = "1.21.3"
 version = "1.12.3"
 
 [dependencies.inventory]
-version = "0.3.21"
+version = "0.3.22"
 
 [dependencies.i18n]
 package = "i18n-rizzen-yazston"
@@ -113,5 +113,5 @@ arboard = "3.5.0"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen = { version = "0.2.92", optional = true }
-wasm-bindgen-futures = { version = "0.4.42", optional = true }
+wasm-bindgen-futures = { version = "0.4.63", optional = true }
 web-sys = { version = "0.3.69", features = ["Navigator", "Clipboard", "Window"], optional = true }
