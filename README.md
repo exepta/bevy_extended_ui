@@ -238,6 +238,18 @@ Basic `@keyframes` usage example:
 }
 ```
 
+### Template data (reactive bindings)
+
+There is no built-in loop/templating engine. Instead, the HTML parser collects `{{...}}` placeholders
+into `HtmlInnerContent`, and you replace them in Rust based on your own model.
+
+See:
+- `examples/reactive_binding.rs`
+- `examples/template_iteration.rs`
+
+The iteration example renders a list by joining items into a single string (with `\n` line breaks)
+and substituting `{{inventory.list}}` at runtime.
+
 You can now use `@keyframes` in your CSS. There is now a limit tested; this means that you can use any CSS property.
 
 ### Breakpoint support

@@ -1,4 +1,7 @@
+#[cfg(not(target_arch = "wasm32"))]
 use std::time::{SystemTime, UNIX_EPOCH};
+#[cfg(target_arch = "wasm32")]
+use js_sys::Date;
 
 use crate::styles::components::UiStyle;
 use crate::styles::paint::Colored;
@@ -3436,6 +3439,7 @@ fn resolve_year_range(
     (start, end)
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn today_utc_date() -> SimpleDate {
     let Ok(duration) = SystemTime::now().duration_since(UNIX_EPOCH) else {
         return SimpleDate {
@@ -3446,6 +3450,23 @@ fn today_utc_date() -> SimpleDate {
     };
 
     let days_since_epoch = (duration.as_secs() / 86_400) as i64;
+    let (year, month, day) = civil_from_days(days_since_epoch);
+    SimpleDate { year, month, day }
+}
+
+#[cfg(target_arch = "wasm32")]
+fn today_utc_date() -> SimpleDate {
+    let ms = Date::now();
+    if !ms.is_finite() {
+        return SimpleDate {
+            year: 1970,
+            month: 1,
+            day: 1,
+        };
+    }
+
+    let secs = (ms / 1000.0).floor() as i64;
+    let days_since_epoch = secs / 86_400;
     let (year, month, day) = civil_from_days(days_since_epoch);
     SimpleDate { year, month, day }
 }
