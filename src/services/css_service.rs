@@ -77,7 +77,9 @@ impl Plugin for CssService {
 fn invalidate_css_cache_on_asset_change(mut ev: MessageReader<AssetEvent<CssAsset>>) {
     for e in ev.read() {
         match e {
-            AssetEvent::Modified { id } | AssetEvent::Removed { id } => {
+            AssetEvent::Added { id }
+            | AssetEvent::Modified { id }
+            | AssetEvent::Removed { id } => {
                 if let Ok(mut cache) = PARSED_CSS_CACHE.write() {
                     cache.remove(id);
                 }
@@ -296,7 +298,9 @@ fn apply_css_to_entities(
     // Entities affected by CssAsset events (via CssUsers index)
     for ev in css_events.read() {
         let id = match ev {
-            AssetEvent::Modified { id } | AssetEvent::Removed { id } => Some(*id),
+            AssetEvent::Added { id } | AssetEvent::Modified { id } | AssetEvent::Removed { id } => {
+                Some(*id)
+            }
             _ => None,
         };
         let Some(id) = id else { continue };
@@ -421,7 +425,9 @@ fn apply_css_to_entities_legacy(
 
     for ev in css_events.read() {
         let id = match ev {
-            AssetEvent::Modified { id } | AssetEvent::Removed { id } => Some(*id),
+            AssetEvent::Added { id } | AssetEvent::Modified { id } | AssetEvent::Removed { id } => {
+                Some(*id)
+            }
             _ => None,
         };
         let Some(id) = id else { continue };
