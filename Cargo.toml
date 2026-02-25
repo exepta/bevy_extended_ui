@@ -115,3 +115,4 @@ arboard = "3.5.0"
 wasm-bindgen = { version = "0.2.92", optional = true }
 wasm-bindgen-futures = { version = "0.4.63", optional = true }
 web-sys = { version = "0.3.69", features = ["Navigator", "Clipboard", "Window"], optional = true }
+js-sys = "0.3.69"

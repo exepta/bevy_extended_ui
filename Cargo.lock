@@ -578,6 +578,7 @@ dependencies = [
  "fluent",
  "i18n-rizzen-yazston",
  "inventory",
+ "js-sys",
  "kuchiki",
  "lightningcss",
  "once_cell",
