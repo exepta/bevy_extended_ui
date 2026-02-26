@@ -824,8 +824,9 @@ fn resolve_layout_viewport(_window_q: &Query<&Window, With<PrimaryWindow>>) -> O
 }
 
 #[cfg(all(feature = "wasm-breakpoints", not(target_arch = "wasm32")))]
-fn resolve_layout_viewport(_window_q: &Query<&Window, With<PrimaryWindow>>) -> Option<Vec2> {
-    None
+fn resolve_layout_viewport(window_q: &Query<&Window, With<PrimaryWindow>>) -> Option<Vec2> {
+    let window = window_q.single().ok()?;
+    Some(window.resolution.size())
 }
 
 #[cfg(all(not(feature = "wasm-breakpoints"), feature = "css-breakpoints"))]

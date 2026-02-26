@@ -973,8 +973,14 @@ fn parse_html_node(
 fn bind_html_func(attributes: &Attributes) -> HtmlEventBindings {
     HtmlEventBindings {
         onclick: attributes.get("onclick").map(|s| s.to_string()),
-        onmouseover: attributes.get("onmouseenter").map(|s| s.to_string()),
-        onmouseout: attributes.get("onmouseleave").map(|s| s.to_string()),
+        onmouseover: attributes
+            .get("onmouseover")
+            .or_else(|| attributes.get("onmouseenter"))
+            .map(|s| s.to_string()),
+        onmouseout: attributes
+            .get("onmouseout")
+            .or_else(|| attributes.get("onmouseleave"))
+            .map(|s| s.to_string()),
         onchange: attributes.get("onchange").map(|s| s.to_string()),
         oninit: attributes.get("oninit").map(|s| s.to_string()),
         onfoucs: attributes
