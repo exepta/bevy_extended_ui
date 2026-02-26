@@ -16,7 +16,11 @@ struct InventoryModel {
 impl Default for InventoryModel {
     fn default() -> Self {
         Self {
-            items: vec!["Rope".to_string(), "Torch".to_string(), "Potion".to_string()],
+            items: vec![
+                "Rope".to_string(),
+                "Torch".to_string(),
+                "Potion".to_string(),
+            ],
             next_id: 4,
         }
     }

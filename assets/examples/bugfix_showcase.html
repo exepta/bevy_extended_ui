@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="bugfix-showcase">
+  <title>Bugfix Showcase</title>
+  <link rel="stylesheet" href="bugfix_showcase.css">
+</head>
+<body>
+  <div id="page-root">
+    <div class="hero">
+      <h2>Bugfix Showcase: Before -> After</h2>
+      <p>This page shows the previously broken cases as a live demo after the fixes.</p>
+      <p id="window-size-live">Window: -</p>
+    </div>
+
+    <div class="grid">
+      <div class="panel">
+        <h3>1) CSS border-left shorthand</h3>
+        <p>Previously: `border-left: 12px solid red` was often interpreted as 0px.</p>
+        <div id="border-demo"
+             style="width: 100%; min-height: 80px; padding: 12px; border-left: 12px solid #ff5f5f; background: rgba(255,255,255,0.04); color: #eef6ff;">
+          Visible now: left red border bar (inline style uses border-left shorthand).
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>2) HTML Converter Alias</h3>
+        <p>The button below intentionally uses `onmouseover` / `onmouseout` (not `onmouseenter`).</p>
+        <p id="hover-status">Hover the button using onmouseover/onmouseout</p>
+        <button id="hover-alias-btn" onmouseover="hover_std_over" onmouseout="hover_std_out">
+          Hover (standard onmouseover)
+        </button>
+      </div>
+
+      <div class="panel">
+        <h3>3) Base System: Shift+Tab</h3>
+        <p>Tab forward, Shift+Tab backward. Focus status updates via onfocus.</p>
+        <p id="focus-status">Focus: none yet</p>
+        <div id="focus-row">
+          <button id="focus-a" onfocus="focus_probe">A</button>
+          <button id="focus-b" onfocus="focus_probe">B</button>
+          <button id="focus-c" onfocus="focus_probe">C</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>4) Widget: disabled standalone toggle</h3>
+        <p>Previously, a disabled standalone toggle could still change state when clicked.</p>
+        <p id="disabled-toggle-status">Locked Toggle: -</p>
+        <p id="free-toggle-status">Free Toggle: -</p>
+        <div id="toggle-row">
+          <toggle id="locked-toggle" disabled selected>Locked</toggle>
+          <toggle id="free-toggle">Free</toggle>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel wide">
+      <h3>5) Feature Fix: native fallback with `--features wasm-breakpoints`</h3>
+      <p>Resize the window. Cards should disappear at smaller widths (also on native builds with extra `wasm-breakpoints`).</p>
+      <div class="bp-grid">
+        <div class="bp-card">
+          <h4>Always visible</h4>
+          <p>Reference card.</p>
+        </div>
+        <div class="bp-card bp-980">
+          <h4>Hide <= 980px</h4>
+          <p>Previously stopped reacting on native builds with `wasm-breakpoints`.</p>
+        </div>
+        <div class="bp-card bp-760">
+          <h4>Hide <= 760px</h4>
+          <p>Mobile/tablet breakpoint demo.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

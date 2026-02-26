@@ -724,10 +724,30 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
                 style.border_color = Some(color);
             }
         }
-        "border-left" => apply_border_side(value, RectSide::Left, &mut style.border),
-        "border-right" => apply_border_side(value, RectSide::Right, &mut style.border),
-        "border-top" => apply_border_side(value, RectSide::Top, &mut style.border),
-        "border-bottom" => apply_border_side(value, RectSide::Bottom, &mut style.border),
+        "border-left" => apply_border_side(
+            value,
+            RectSide::Left,
+            &mut style.border,
+            &mut style.border_color,
+        ),
+        "border-right" => apply_border_side(
+            value,
+            RectSide::Right,
+            &mut style.border,
+            &mut style.border_color,
+        ),
+        "border-top" => apply_border_side(
+            value,
+            RectSide::Top,
+            &mut style.border,
+            &mut style.border_color,
+        ),
+        "border-bottom" => apply_border_side(
+            value,
+            RectSide::Bottom,
+            &mut style.border,
+            &mut style.border_color,
+        ),
         "border-radius" => style.border_radius = convert_to_radius(value.to_string()),
         "border-color" => style.border_color = convert_to_color(value.to_string()),
         "border-width" => style.border = convert_to_ui_rect(value.to_string()),
@@ -765,11 +785,29 @@ fn apply_rect_side(value: &str, side: RectSide, target: &mut Option<UiRect>) {
     *target = rect_from_side(value, side);
 }
 
-fn apply_border_side(value: &str, side: RectSide, target: &mut Option<UiRect>) {
-    let val = convert_to_val(value.to_string()).unwrap_or(Val::Px(0.0));
+fn apply_border_side(
+    value: &str,
+    side: RectSide,
+    target: &mut Option<UiRect>,
+    color_target: &mut Option<Color>,
+) {
+    let parts: Vec<&str> = value.split_whitespace().collect();
+
+    let val = parts
+        .iter()
+        .find_map(|token| convert_to_val((*token).to_string()))
+        .unwrap_or(Val::Px(0.0));
     let mut rect = target.unwrap_or_default();
     set_rect_side(&mut rect, side, val);
     *target = Some(rect);
+
+    for index in 0..parts.len() {
+        let color_candidate = parts[index..].join(" ");
+        if let Some(parsed_color) = convert_to_color(color_candidate) {
+            *color_target = Some(parsed_color);
+            break;
+        }
+    }
 }
 
 fn apply_overflow_axis(style: &mut Style, value: &str, axis: OverflowAxisSelector) {

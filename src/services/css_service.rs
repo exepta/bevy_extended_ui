@@ -77,9 +77,7 @@ impl Plugin for CssService {
 fn invalidate_css_cache_on_asset_change(mut ev: MessageReader<AssetEvent<CssAsset>>) {
     for e in ev.read() {
         match e {
-            AssetEvent::Added { id }
-            | AssetEvent::Modified { id }
-            | AssetEvent::Removed { id } => {
+            AssetEvent::Added { id } | AssetEvent::Modified { id } | AssetEvent::Removed { id } => {
                 if let Ok(mut cache) = PARSED_CSS_CACHE.write() {
                     cache.remove(id);
                 }
@@ -185,10 +183,12 @@ fn resolve_breakpoint_viewport(
 }
 
 #[cfg(all(feature = "wasm-breakpoints", not(target_arch = "wasm32")))]
-fn resolve_breakpoint_viewport(
-    _window_query: &Query<&Window, With<PrimaryWindow>>,
-) -> Option<Vec2> {
-    None
+fn resolve_breakpoint_viewport(window_query: &Query<&Window, With<PrimaryWindow>>) -> Option<Vec2> {
+    let window = window_query.single().ok()?;
+    Some(Vec2::new(
+        window.resolution.width(),
+        window.resolution.height(),
+    ))
 }
 
 #[cfg(all(not(feature = "wasm-breakpoints"), feature = "css-breakpoints"))]
