@@ -529,9 +529,57 @@ fn resolve_var_inner(value: &str, css_vars: &HashMap<String, String>, depth: u8)
         return value.to_string();
     }
 
-    let trimmed = value.trim();
+    let mut resolved = value.to_string();
+
+    while let Some((start, end)) = find_var_call_bounds(&resolved) {
+        let call = &resolved[start..end];
+        let replacement = resolve_single_var_call(call, css_vars, depth + 1);
+
+        let mut next = String::with_capacity(resolved.len() - (end - start) + replacement.len());
+        next.push_str(&resolved[..start]);
+        next.push_str(&replacement);
+        next.push_str(&resolved[end..]);
+
+        if next == resolved {
+            break;
+        }
+        resolved = next;
+    }
+
+    resolved
+}
+
+fn find_var_call_bounds(value: &str) -> Option<(usize, usize)> {
+    let lower = value.to_ascii_lowercase();
+    let start = lower.find("var(")?;
+    let mut depth = 0i32;
+    let mut end = None;
+
+    for (idx, ch) in value[start..].char_indices() {
+        match ch {
+            '(' => depth += 1,
+            ')' => {
+                depth -= 1;
+                if depth == 0 {
+                    end = Some(start + idx + 1);
+                    break;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    end.map(|end_idx| (start, end_idx))
+}
+
+fn resolve_single_var_call(var_call: &str, css_vars: &HashMap<String, String>, depth: u8) -> String {
+    if depth >= 8 {
+        return var_call.to_string();
+    }
+
+    let trimmed = var_call.trim();
     if !trimmed.starts_with("var(") || !trimmed.ends_with(')') {
-        return value.to_string();
+        return var_call.to_string();
     }
 
     let inner = &trimmed[4..trimmed.len() - 1];
@@ -546,7 +594,7 @@ fn resolve_var_inner(value: &str, css_vars: &HashMap<String, String>, depth: u8)
         return resolve_var_inner(fallback.trim(), css_vars, depth + 1);
     }
 
-    value.to_string()
+    var_call.to_string()
 }
 
 fn split_var_args(input: &str) -> (&str, Option<&str>) {
@@ -3334,6 +3382,27 @@ mod tests {
         let background = style.background.expect("missing background");
         assert!(background.gradient.is_some());
         assert_ne!(background.color, Color::NONE);
+    }
+
+    #[test]
+    fn background_gradient_resolves_nested_css_var_tokens() {
+        let parsed = load_css(
+            r#"
+            :root { --btn-bg: #ffd700; }
+            .btn-login {
+                background: linear-gradient(180deg, var(--btn-bg) 0%, #f0b90b 100%) center;
+            }
+        "#,
+        );
+
+        let pair = parsed
+            .styles
+            .values()
+            .find(|pair| pair.selector == ".btn-login")
+            .expect("missing parsed .btn-login style");
+
+        let background = pair.normal.background.as_ref().expect("missing background");
+        assert!(background.gradient.is_some());
     }
 
     #[test]

@@ -163,6 +163,14 @@ struct CssCursorState {
 #[derive(Component)]
 pub(crate) struct StyleRefreshOnNodeAdded;
 
+/// Marks image handles generated from CSS linear-gradient backgrounds.
+#[derive(Component)]
+struct BackgroundGradientApplied;
+
+/// Marks image handles generated from CSS background-image rendering.
+#[derive(Component)]
+struct BackgroundImageApplied;
+
 #[derive(ShaderType, Clone, Copy, Debug)]
 struct BackdropBlurUniform {
     blur_radius_px: f32,
@@ -843,6 +851,7 @@ fn resolve_layout_viewport(_window_q: &Query<&Window, With<PrimaryWindow>>) -> O
 }
 
 fn apply_background_gradients_system(
+    mut commands: Commands,
     mut query: Query<(
         Entity,
         &UiStyle,
@@ -850,6 +859,8 @@ fn apply_background_gradients_system(
         Option<&StyleAnimation>,
         &ComputedNode,
         Option<&mut ImageNode>,
+        Option<&BackgroundGradientApplied>,
+        Option<&BackgroundImageApplied>,
     )>,
     mut resize_events: MessageReader<WindowResized>,
     mut image_cache: ResMut<ImageCache>,
@@ -857,8 +868,16 @@ fn apply_background_gradients_system(
 ) {
     let viewport_is_resizing = resize_events.read().next().is_some();
 
-    for (_entity, ui_style, transition_opt, animation_opt, computed, img_node_opt) in
-        query.iter_mut()
+    for (
+        entity,
+        ui_style,
+        transition_opt,
+        animation_opt,
+        computed,
+        img_node_opt,
+        gradient_applied,
+        image_applied,
+    ) in query.iter_mut()
     {
         let Some(mut img_node) = img_node_opt else {
             continue;
@@ -869,18 +888,44 @@ fn apply_background_gradients_system(
         } else if let Some(animation) = animation_opt {
             animation.current_style.as_ref().unwrap_or(&animation.base)
         } else {
-            let Some(active) = ui_style.active_style.as_ref() else {
-                continue;
-            };
-            active
+            match ui_style.active_style.as_ref() {
+                Some(active) => active,
+                None => {
+                    if gradient_applied.is_some() {
+                        if image_applied.is_none()
+                            && img_node.image != Handle::<Image>::default()
+                        {
+                            img_node.image = Handle::default();
+                        }
+                        commands.entity(entity).remove::<BackgroundGradientApplied>();
+                    }
+                    continue;
+                }
+            }
         };
 
         let Some(background) = style.background.as_ref() else {
+            if gradient_applied.is_some() {
+                if image_applied.is_none() && img_node.image != Handle::<Image>::default() {
+                    img_node.image = Handle::default();
+                }
+                commands.entity(entity).remove::<BackgroundGradientApplied>();
+            }
             continue;
         };
         let Some(gradient) = background.gradient.as_ref() else {
+            if gradient_applied.is_some() {
+                if background.image.is_none() && img_node.image != Handle::<Image>::default() {
+                    img_node.image = Handle::default();
+                }
+                commands.entity(entity).remove::<BackgroundGradientApplied>();
+            }
             continue;
         };
+
+        if image_applied.is_some() {
+            commands.entity(entity).remove::<BackgroundImageApplied>();
+        }
 
         if img_node.color != Color::WHITE {
             img_node.color = Color::WHITE;
@@ -914,10 +959,15 @@ fn apply_background_gradients_system(
         if img_node.image != handle {
             img_node.image = handle;
         }
+
+        if gradient_applied.is_none() {
+            commands.entity(entity).insert(BackgroundGradientApplied);
+        }
     }
 }
 
 fn apply_background_images_system(
+    mut commands: Commands,
     mut query: Query<(
         Entity,
         &UiStyle,
@@ -927,6 +977,8 @@ fn apply_background_images_system(
         &ComputedUiRenderTargetInfo,
         Option<&UiGlobalTransform>,
         Option<&mut ImageNode>,
+        Option<&BackgroundImageApplied>,
+        Option<&BackgroundGradientApplied>,
     )>,
     mut resize_events: MessageReader<WindowResized>,
     asset_server: Res<AssetServer>,
@@ -936,7 +988,7 @@ fn apply_background_images_system(
     let viewport_is_resizing = resize_events.read().next().is_some();
 
     for (
-        _entity,
+        entity,
         ui_style,
         transition_opt,
         animation_opt,
@@ -944,6 +996,8 @@ fn apply_background_images_system(
         render_target,
         global_transform,
         img_node_opt,
+        image_applied,
+        gradient_applied,
     ) in query.iter_mut()
     {
         let Some(mut img_node) = img_node_opt else {
@@ -955,21 +1009,50 @@ fn apply_background_images_system(
         } else if let Some(animation) = animation_opt {
             animation.current_style.as_ref().unwrap_or(&animation.base)
         } else {
-            let Some(active) = ui_style.active_style.as_ref() else {
-                continue;
-            };
-            active
+            match ui_style.active_style.as_ref() {
+                Some(active) => active,
+                None => {
+                    if image_applied.is_some() {
+                        if gradient_applied.is_none()
+                            && img_node.image != Handle::<Image>::default()
+                        {
+                            img_node.image = Handle::default();
+                        }
+                        commands.entity(entity).remove::<BackgroundImageApplied>();
+                    }
+                    continue;
+                }
+            }
         };
 
         let Some(background) = style.background.as_ref() else {
+            if image_applied.is_some() {
+                if gradient_applied.is_none() && img_node.image != Handle::<Image>::default() {
+                    img_node.image = Handle::default();
+                }
+                commands.entity(entity).remove::<BackgroundImageApplied>();
+            }
             continue;
         };
         if background.gradient.is_some() {
+            if image_applied.is_some() {
+                commands.entity(entity).remove::<BackgroundImageApplied>();
+            }
             continue;
         }
         let Some(image_path) = background.image.as_ref() else {
+            if image_applied.is_some() {
+                if img_node.image != Handle::<Image>::default() {
+                    img_node.image = Handle::default();
+                }
+                commands.entity(entity).remove::<BackgroundImageApplied>();
+            }
             continue;
         };
+
+        if gradient_applied.is_some() {
+            commands.entity(entity).remove::<BackgroundGradientApplied>();
+        }
 
         if img_node.color != Color::WHITE {
             img_node.color = Color::WHITE;
@@ -1062,6 +1145,10 @@ fn apply_background_images_system(
 
         if img_node.image != handle {
             img_node.image = handle;
+        }
+
+        if image_applied.is_none() {
+            commands.entity(entity).insert(BackgroundImageApplied);
         }
     }
 }
@@ -1616,13 +1703,11 @@ fn render_background_image(
     offset: Vec2,
 ) -> Option<Image> {
     let source_format = source.texture_descriptor.format;
-    let supported = matches!(
-        source_format,
-        TextureFormat::Rgba8Unorm | TextureFormat::Rgba8UnormSrgb
-    );
-    if !supported {
-        return None;
-    }
+    let source_pixel_bytes = match source_format {
+        TextureFormat::Rgba8Unorm | TextureFormat::Rgba8UnormSrgb => 4usize,
+        TextureFormat::Rgba16Unorm => 8usize,
+        _ => return None,
+    };
 
     let data = source.data.as_ref()?;
     let source_size = source.size();
@@ -1686,9 +1771,17 @@ fn render_background_image(
             let dst_row = &mut out[dst_row_start..dst_row_end];
 
             for (col_index, src_x) in x_map.iter().copied().enumerate() {
-                let src_idx = (src_y * src_w + src_x) * 4;
+                let src_idx = (src_y * src_w + src_x) * source_pixel_bytes;
                 let dst_idx = col_index * 4;
-                dst_row[dst_idx..dst_idx + 4].copy_from_slice(&data[src_idx..src_idx + 4]);
+                if source_pixel_bytes == 4 {
+                    dst_row[dst_idx..dst_idx + 4].copy_from_slice(&data[src_idx..src_idx + 4]);
+                } else {
+                    for channel in 0..4 {
+                        let base = src_idx + channel * 2;
+                        let value = u16::from_le_bytes([data[base], data[base + 1]]);
+                        dst_row[dst_idx + channel] = (value >> 8) as u8;
+                    }
+                }
             }
         }
     }
@@ -1914,8 +2007,8 @@ fn apply_style_components(
     style: &Style,
     components: &mut UiStyleComponents,
     asset_server: &AssetServer,
-    image_cache: &mut ImageCache,
-    images: &mut Assets<Image>,
+    _image_cache: &mut ImageCache,
+    _images: &mut Assets<Image>,
 ) {
     // Node
     if let Some(node) = components.0.as_mut() {
@@ -1978,18 +2071,6 @@ fn apply_style_components(
     if let Some(tl) = components.6.as_mut() {
         if let Some(text_wrap) = style.text_wrap {
             tl.linebreak = text_wrap;
-        }
-    }
-
-    // ImageNode
-    if let Some(img_node) = components.7.as_mut() {
-        img_node.color = style.color.unwrap_or(Color::WHITE);
-
-        if let Some(bg) = style.background.as_ref() {
-            if let Some(path) = bg.image.as_ref() {
-                let handle = get_or_load_image(path.as_str(), image_cache, images, asset_server);
-                img_node.image = handle;
-            }
         }
     }
 

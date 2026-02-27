@@ -6,6 +6,7 @@
 [![Downloads](https://img.shields.io/crates/d/bevy_extended_ui.svg)](https://crates.io/crates/bevy_extended_ui)
 [![license](https://img.shields.io/badge/license-Apache-blue.svg)](./LICENSE)
 [![Build](https://github.com/exepta/bevy_extended_ui/actions/workflows/build.yml/badge.svg)](https://github.com/exepta/bevy_extended_ui/actions/workflows/build.yml)
+[![codecov](https://codecov.io/gh/exepta/bevy_extended_ui/graph/badge.svg?token=WZ4KSN111U)](https://codecov.io/gh/exepta/bevy_extended_ui)
 
 Since I've been writing a game in the [_Bevy_](https://bevyengine.org/) engine lately,
 I created this crate. In my game,
