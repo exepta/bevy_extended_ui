@@ -43,7 +43,9 @@ use bevy::ui::{
 };
 use bevy::ui_render::graph::NodeUi;
 use bevy::ui_render::{DrawUiMaterial, TransparentUi, UiCameraView};
-use bevy::window::{CursorIcon, CustomCursor, CustomCursorImage, PrimaryWindow, SystemCursorIcon};
+use bevy::window::{
+    CursorIcon, CustomCursor, CustomCursorImage, PrimaryWindow, SystemCursorIcon, WindowResized,
+};
 
 const BACKDROP_BLUR_SHADER_HANDLE: Handle<Shader> =
     uuid_handle!("9d04a8bb-b6cf-4758-bca8-30706480973f");
@@ -849,9 +851,12 @@ fn apply_background_gradients_system(
         &ComputedNode,
         Option<&mut ImageNode>,
     )>,
+    mut resize_events: MessageReader<WindowResized>,
     mut image_cache: ResMut<ImageCache>,
     mut images: ResMut<Assets<Image>>,
 ) {
+    let viewport_is_resizing = resize_events.read().next().is_some();
+
     for (_entity, ui_style, transition_opt, animation_opt, computed, img_node_opt) in
         query.iter_mut()
     {
@@ -896,6 +901,10 @@ fn apply_background_gradients_system(
         let handle = if let Some(handle) = image_cache.map.get(&key) {
             handle.clone()
         } else {
+            // Avoid generating many transient textures while the window size is still changing.
+            if viewport_is_resizing {
+                continue;
+            }
             let image = render_linear_gradient_image(gradient, size, scale_factor);
             let handle = images.add(image);
             image_cache.map.insert(key, handle.clone());
@@ -919,10 +928,13 @@ fn apply_background_images_system(
         Option<&UiGlobalTransform>,
         Option<&mut ImageNode>,
     )>,
+    mut resize_events: MessageReader<WindowResized>,
     asset_server: Res<AssetServer>,
     mut image_cache: ResMut<ImageCache>,
     mut images: ResMut<Assets<Image>>,
 ) {
+    let viewport_is_resizing = resize_events.read().next().is_some();
+
     for (
         _entity,
         ui_style,
@@ -1034,6 +1046,10 @@ fn apply_background_images_system(
         let handle = if let Some(handle) = image_cache.map.get(&cache_key) {
             handle.clone()
         } else {
+            // Avoid generating many transient textures while the window size is still changing.
+            if viewport_is_resizing {
+                continue;
+            }
             let Some(image) =
                 render_background_image(source_image, container_size, draw_size, offset)
             else {
@@ -1618,38 +1634,62 @@ fn render_background_image(
 
     let out_w = container_size.x as usize;
     let out_h = container_size.y as usize;
-    let mut out = vec![0u8; out_w * out_h * 4];
+    if out_w == 0 || out_h == 0 {
+        return None;
+    }
+    let out_len = out_w.checked_mul(out_h)?.checked_mul(4)?;
+    let mut out = vec![0u8; out_len];
 
-    let draw_w = draw_size.x as usize;
-    let draw_h = draw_size.y as usize;
-    if draw_w == 0 || draw_h == 0 {
+    let draw_w = draw_size.x as i32;
+    let draw_h = draw_size.y as i32;
+    if draw_w <= 0 || draw_h <= 0 {
         return None;
     }
 
     let offset_x = offset.x.round() as i32;
     let offset_y = offset.y.round() as i32;
+    let out_w_i32 = out_w as i32;
+    let out_h_i32 = out_h as i32;
 
-    for y in 0..draw_h {
-        let dest_y = offset_y + y as i32;
-        if dest_y < 0 || dest_y >= out_h as i32 {
-            continue;
-        }
-        let src_y = ((y as f32 + 0.5) * src_h as f32 / draw_h as f32)
-            .floor()
-            .clamp(0.0, (src_h - 1) as f32) as usize;
+    let start_x = offset_x.max(0).min(out_w_i32);
+    let start_y = offset_y.max(0).min(out_h_i32);
+    let end_x = (offset_x + draw_w).max(0).min(out_w_i32);
+    let end_y = (offset_y + draw_h).max(0).min(out_h_i32);
 
-        for x in 0..draw_w {
-            let dest_x = offset_x + x as i32;
-            if dest_x < 0 || dest_x >= out_w as i32 {
-                continue;
+    if start_x < end_x && start_y < end_y {
+        let visible_w = (end_x - start_x) as usize;
+        let visible_h = (end_y - start_y) as usize;
+        let draw_w_usize = draw_w as usize;
+        let draw_h_usize = draw_h as usize;
+        let start_draw_x = (start_x - offset_x) as usize;
+        let start_draw_y = (start_y - offset_y) as usize;
+        let start_x_usize = start_x as usize;
+        let start_y_usize = start_y as usize;
+
+        let x_map: Vec<usize> = (0..visible_w)
+            .map(|i| {
+                let draw_x = start_draw_x + i;
+                (((draw_x * 2 + 1) * src_w) / (draw_w_usize * 2)).min(src_w - 1)
+            })
+            .collect();
+        let y_map: Vec<usize> = (0..visible_h)
+            .map(|i| {
+                let draw_y = start_draw_y + i;
+                (((draw_y * 2 + 1) * src_h) / (draw_h_usize * 2)).min(src_h - 1)
+            })
+            .collect();
+
+        for (row_index, src_y) in y_map.iter().copied().enumerate() {
+            let dest_y = start_y_usize + row_index;
+            let dst_row_start = (dest_y * out_w + start_x_usize) * 4;
+            let dst_row_end = dst_row_start + visible_w * 4;
+            let dst_row = &mut out[dst_row_start..dst_row_end];
+
+            for (col_index, src_x) in x_map.iter().copied().enumerate() {
+                let src_idx = (src_y * src_w + src_x) * 4;
+                let dst_idx = col_index * 4;
+                dst_row[dst_idx..dst_idx + 4].copy_from_slice(&data[src_idx..src_idx + 4]);
             }
-            let src_x = ((x as f32 + 0.5) * src_w as f32 / draw_w as f32)
-                .floor()
-                .clamp(0.0, (src_w - 1) as f32) as usize;
-
-            let src_idx = (src_y * src_w + src_x) * 4;
-            let dst_idx = (dest_y as usize * out_w + dest_x as usize) * 4;
-            out[dst_idx..dst_idx + 4].copy_from_slice(&data[src_idx..src_idx + 4]);
         }
     }
 
