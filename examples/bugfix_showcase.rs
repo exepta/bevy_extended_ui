@@ -60,8 +60,7 @@ fn focus_probe(
 
     for (id, mut p) in &mut labels {
         if id.0 == "focus-status" {
-            p.text =
-                format!("Focus: {focused_label} (Test Tab + Shift+Tab for forward/backward)");
+            p.text = format!("Focus: {focused_label} (Test Tab + Shift+Tab for forward/backward)");
         }
     }
 }
