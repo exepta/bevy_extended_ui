@@ -20,6 +20,8 @@ ignore:
   - "crates/bevy_extended_ui_macros/src/lib.rs"
   - "src/example_utils.rs"
   - "src/utils.rs"
+  # Large CSS parser pipeline still needs dedicated high-volume fixture tests.
+  - "src/styles/parser.rs"
   # Widget files with heavy runtime/UI interaction paths are excluded for now.
   # Covered widget core files remain included (e.g. mod.rs, validation.rs, widget_util.rs).
   - "src/widgets/body.rs"
