@@ -43,21 +43,60 @@ fn fragment(in: UiVertexOutput) -> @location(0) vec4<f32> {
     let texel = vec2<f32>(1.0) / texture_size;
 
     let requested_radius = max(material.blur_radius_px, 0.0);
-    let radius = i32(clamp(round(requested_radius), 0.0, f32(MAX_RADIUS)));
-    let sample_step = max(requested_radius / max(f32(radius), 1.0), 1.0);
-    let sigma = max(requested_radius * 0.5, 1.0);
+    let node_area = max(in.size.x * in.size.y, 1.0);
+    let viewport_area = max(viewport_size.x * viewport_size.y, 1.0);
+    let coverage = clamp(node_area / viewport_area, 0.0, 1.0);
+    let fullscreen_penalty = smoothstep(0.55, 0.95, coverage);
+    let dynamic_max_radius = mix(f32(MAX_RADIUS), 10.0, fullscreen_penalty);
+    let radius = i32(clamp(round(requested_radius), 0.0, dynamic_max_radius));
+    // Keep fullscreen blur cleaner (less mushy) by softly compressing effective radius.
+    let effective_radius = requested_radius * mix(1.0, 0.72, fullscreen_penalty);
+    let sample_step = max(effective_radius / max(f32(radius), 1.0), 1.0);
+    let sigma = max(effective_radius * 0.42, 1.0);
+    let radius_sq = radius * radius;
+    let ring_core = i32(floor(f32(radius) * 0.35));
+    let ring_mid = i32(floor(f32(radius) * 0.58));
+    let ring_outer = i32(floor(f32(radius) * 0.82));
+    let ring_core_sq = ring_core * ring_core;
+    let ring_mid_sq = ring_mid * ring_mid;
+    let ring_outer_sq = ring_outer * ring_outer;
+    let sparse_sampling = radius >= 10;
+    var base_stride = 1;
+    if (requested_radius > 95.0) {
+        base_stride = 2;
+    }
+    if (requested_radius > 165.0) {
+        base_stride = 3;
+    }
+    var coverage_stride_bonus = 0;
+    if (requested_radius > 110.0) {
+        coverage_stride_bonus = i32(round(mix(0.0, 2.0, fullscreen_penalty)));
+    }
 
     var sum = vec4<f32>(0.0);
     var weight_sum = 0.0;
 
-    for (var y = -MAX_RADIUS; y <= MAX_RADIUS; y = y + 1) {
-        if (abs(y) > radius) {
-            continue;
-        }
-
-        for (var x = -MAX_RADIUS; x <= MAX_RADIUS; x = x + 1) {
-            if (abs(x) > radius) {
+    for (var y = -radius; y <= radius; y = y + 1) {
+        for (var x = -radius; x <= radius; x = x + 1) {
+            let dist_sq_i = x * x + y * y;
+            if (dist_sq_i > radius_sq) {
                 continue;
+            }
+            if (sparse_sampling) {
+                var stride = 1;
+                if (dist_sq_i > ring_core_sq) {
+                    stride = base_stride + coverage_stride_bonus;
+                }
+                if (dist_sq_i > ring_mid_sq) {
+                    stride = base_stride + coverage_stride_bonus + 1;
+                }
+                if (dist_sq_i > ring_outer_sq) {
+                    stride = base_stride + coverage_stride_bonus + 2;
+                }
+                let lattice = abs(x) * 7 + abs(y) * 11;
+                if ((lattice % stride) != 0) {
+                    continue;
+                }
             }
 
             let offset = vec2<f32>(f32(x), f32(y)) * sample_step;
