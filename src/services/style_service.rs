@@ -17,7 +17,7 @@ use bevy::asset::RenderAssetUsages;
 use bevy::asset::{load_internal_asset, uuid_handle};
 use bevy::color::Srgba;
 use bevy::core_pipeline::core_2d::graph::{Core2d, Node2d};
-use bevy::image::ImageSampler;
+use bevy::image::{ImageSampler, TRANSPARENT_IMAGE_HANDLE};
 use bevy::math::Rot2;
 use bevy::prelude::*;
 use bevy::reflect::TypePath;
@@ -851,6 +851,13 @@ fn resolve_layout_viewport(_window_q: &Query<&Window, With<PrimaryWindow>>) -> O
     None
 }
 
+#[inline]
+fn clear_image_node_texture(img_node: &mut ImageNode) {
+    if img_node.image.id() != TRANSPARENT_IMAGE_HANDLE.id() {
+        img_node.image = TRANSPARENT_IMAGE_HANDLE;
+    }
+}
+
 fn apply_background_gradients_system(
     mut commands: Commands,
     mut query: Query<(
@@ -893,10 +900,8 @@ fn apply_background_gradients_system(
                 Some(active) => active,
                 None => {
                     if gradient_applied.is_some() {
-                        if image_applied.is_none()
-                            && img_node.image != Handle::<Image>::default()
-                        {
-                            img_node.image = Handle::default();
+                        if image_applied.is_none() {
+                            clear_image_node_texture(&mut img_node);
                         }
                         commands.entity(entity).remove::<BackgroundGradientApplied>();
                     }
@@ -907,8 +912,8 @@ fn apply_background_gradients_system(
 
         let Some(background) = style.background.as_ref() else {
             if gradient_applied.is_some() {
-                if image_applied.is_none() && img_node.image != Handle::<Image>::default() {
-                    img_node.image = Handle::default();
+                if image_applied.is_none() {
+                    clear_image_node_texture(&mut img_node);
                 }
                 commands.entity(entity).remove::<BackgroundGradientApplied>();
             }
@@ -916,8 +921,8 @@ fn apply_background_gradients_system(
         };
         let Some(gradient) = background.gradient.as_ref() else {
             if gradient_applied.is_some() {
-                if background.image.is_none() && img_node.image != Handle::<Image>::default() {
-                    img_node.image = Handle::default();
+                if background.image.is_none() {
+                    clear_image_node_texture(&mut img_node);
                 }
                 commands.entity(entity).remove::<BackgroundGradientApplied>();
             }
@@ -1014,10 +1019,8 @@ fn apply_background_images_system(
                 Some(active) => active,
                 None => {
                     if image_applied.is_some() {
-                        if gradient_applied.is_none()
-                            && img_node.image != Handle::<Image>::default()
-                        {
-                            img_node.image = Handle::default();
+                        if gradient_applied.is_none() {
+                            clear_image_node_texture(&mut img_node);
                         }
                         commands.entity(entity).remove::<BackgroundImageApplied>();
                     }
@@ -1028,8 +1031,8 @@ fn apply_background_images_system(
 
         let Some(background) = style.background.as_ref() else {
             if image_applied.is_some() {
-                if gradient_applied.is_none() && img_node.image != Handle::<Image>::default() {
-                    img_node.image = Handle::default();
+                if gradient_applied.is_none() {
+                    clear_image_node_texture(&mut img_node);
                 }
                 commands.entity(entity).remove::<BackgroundImageApplied>();
             }
@@ -1043,9 +1046,7 @@ fn apply_background_images_system(
         }
         let Some(image_path) = background.image.as_ref() else {
             if image_applied.is_some() {
-                if img_node.image != Handle::<Image>::default() {
-                    img_node.image = Handle::default();
-                }
+                clear_image_node_texture(&mut img_node);
                 commands.entity(entity).remove::<BackgroundImageApplied>();
             }
             continue;
