@@ -49,6 +49,7 @@ use bevy::window::{
 
 const BACKDROP_BLUR_SHADER_HANDLE: Handle<Shader> =
     uuid_handle!("9d04a8bb-b6cf-4758-bca8-30706480973f");
+const MAX_BACKDROP_BLUR_PX: f32 = 80.0;
 
 /// Plugin that applies CSS styles, transitions, and animations to UI nodes.
 pub struct StyleService;
@@ -1112,7 +1113,9 @@ fn sync_backdrop_blur_materials_system(
         };
 
         let blur_radius = match style.backdrop_filter.as_ref() {
-            Some(BackdropFilter::Blur(radius)) if *radius > 0.0 => *radius,
+            Some(BackdropFilter::Blur(radius)) if *radius > 0.0 => {
+                radius.min(MAX_BACKDROP_BLUR_PX)
+            }
             _ => {
                 if material_node_opt.is_some() {
                     commands
