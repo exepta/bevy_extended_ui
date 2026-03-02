@@ -647,11 +647,7 @@ fn parse_html_node(
         }
 
         "date-picker" => {
-            let for_id = attributes
-                .get("for")
-                .map(str::trim)
-                .map(|value| value.trim_start_matches('#').to_string())
-                .filter(|value| !value.is_empty());
+            let for_id = parse_for_attribute_id(&attributes);
             let id = attributes.get("id").map(|s| s.to_string());
             let name = attributes
                 .get("name")
@@ -723,11 +719,7 @@ fn parse_html_node(
                 .split_whitespace()
                 .collect::<Vec<_>>()
                 .join(" ");
-            let for_id = attributes
-                .get("for")
-                .map(str::trim)
-                .map(|value| value.trim_start_matches('#').to_string())
-                .filter(|value| !value.is_empty());
+            let for_id = parse_for_attribute_id(&attributes);
             let variant = attributes
                 .get("variant")
                 .and_then(ToolTipVariant::from_str)
@@ -1012,6 +1004,15 @@ fn parse_validation_attributes(attributes: &Attributes) -> Option<ValidationRule
     }
 
     rules
+}
+
+/// Parses a `for` attribute into a normalized optional id (`#foo` => `foo`).
+fn parse_for_attribute_id(attributes: &Attributes) -> Option<String> {
+    attributes
+        .get("for")
+        .map(str::trim)
+        .map(|value| value.trim_start_matches('#').to_string())
+        .filter(|value| !value.is_empty())
 }
 
 /// Collects mappings from <label for="..."> to its label text.

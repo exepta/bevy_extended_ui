@@ -2405,7 +2405,7 @@ fn update_style_animation_state(
     commands: &mut Commands,
     entity: Entity,
     final_style: &Style,
-    keyframes: &std::collections::HashMap<String, Vec<AnimationKeyframe>>,
+    keyframes: &HashMap<String, Vec<AnimationKeyframe>>,
     now: f32,
     animation_query: &mut Query<Option<&mut StyleAnimation>>,
 ) {
