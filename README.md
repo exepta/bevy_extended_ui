@@ -52,8 +52,8 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-bevy_extended_ui = "1.4.0"
-bevy_extended_ui_macros = "1.4.0"
+bevy_extended_ui = "1.4.2"
+bevy_extended_ui_macros = "1.4.2"
 ```
 
 #### Features
@@ -287,11 +287,12 @@ If anyone has any ideas, I'd be happy to hear them.
 
 | `Bevy` version | `bevy_extended_ui` version |
 |----------------|----------------------------|
-| 0.18.0         | 1.2.0 - 1.4.0              |
+| 0.18.0         | 1.2.0 - 1.4.2              |
 | 0.17.0         | 1.0.0 - 1.1.0              |
 | 0.16.0         | 0.1.0 - 0.2.2              |
 
 > _Note:_ WASM is not correctly supported in version 1.4.0 there is a layout bug. I'm working on this bug, but this needs time!
+> Version 1.4.1 and above ar fixed for WASM.
 
 > _Note:_ Version 0.1.0–0.3.0 are deprecated and will not be supported. If you’re interested in a version for bevy 0.16, then create an issue!
 

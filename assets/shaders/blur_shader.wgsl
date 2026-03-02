@@ -129,10 +129,10 @@ fn fragment(in: UiVertexOutput) -> @location(0) vec4<f32> {
     let overlay_alpha = clamp(overlay_sample.a * material.overlay_alpha, 0.0, 1.0);
     let glass_color = mix(tinted_glass, overlay_sample.rgb, overlay_alpha);
 
-    let point = in.uv * in.size - 0.5 * in.size;
+    let point_dot = in.uv * in.size - 0.5 * in.size;
     return draw_uinode_background(
         vec4<f32>(glass_color, 1.0),
-        point,
+        point_dot,
         in.size,
         in.border_radius,
         in.border_widths,

@@ -221,12 +221,12 @@ mod tests {
             assets_path: "assets/extended_ui/".to_string(),
             language_path: "assets/lang".to_string(),
         });
-        app.add_systems(Update, super::super::load_ui_camera_system);
+        app.add_systems(Update, load_ui_camera_system);
         app.update();
 
         let mut query = app.world_mut().query_filtered::<
             (&Camera, &RenderLayers, Has<Hdr>, Has<IsDefaultUiCamera>),
-            With<super::super::UiCamera>,
+            With<UiCamera>,
         >();
 
         let rows: Vec<_> = query.iter(app.world()).collect();
@@ -244,7 +244,7 @@ mod tests {
         let mut app = App::new();
         app.add_plugins(MinimalPlugins);
         app.insert_resource(ExtendedUiConfiguration::default());
-        app.add_systems(Update, super::super::load_ui_camera_system);
+        app.add_systems(Update, load_ui_camera_system);
 
         app.update();
 
@@ -258,7 +258,7 @@ mod tests {
 
         let mut query = app
             .world_mut()
-            .query_filtered::<(&Camera, &RenderLayers, Has<Hdr>), With<super::super::UiCamera>>();
+            .query_filtered::<(&Camera, &RenderLayers, Has<Hdr>), With<UiCamera>>();
         let rows: Vec<_> = query.iter(app.world()).collect();
         assert_eq!(rows.len(), 1);
         let (camera, layers, has_hdr) = rows[0];
@@ -274,7 +274,7 @@ mod tests {
 
         let mut query = app
             .world_mut()
-            .query_filtered::<Has<Hdr>, With<super::super::UiCamera>>();
+            .query_filtered::<Has<Hdr>, With<UiCamera>>();
         let rows: Vec<_> = query.iter(app.world()).collect();
         assert_eq!(rows, vec![false]);
     }
@@ -284,7 +284,7 @@ mod tests {
         let mut app = App::new();
         app.add_plugins(MinimalPlugins);
         app.insert_resource(ExtendedUiConfiguration::default());
-        app.add_systems(Update, super::super::load_ui_camera_system);
+        app.add_systems(Update, load_ui_camera_system);
 
         app.update();
 
@@ -297,7 +297,7 @@ mod tests {
 
         let mut query = app
             .world_mut()
-            .query_filtered::<(&Camera, Has<IsDefaultUiCamera>), With<super::super::UiCamera>>();
+            .query_filtered::<(&Camera, Has<IsDefaultUiCamera>), With<UiCamera>>();
         let rows: Vec<_> = query.iter(app.world()).collect();
         assert_eq!(rows.len(), 1);
         let (camera, has_default_marker) = rows[0];
@@ -310,7 +310,7 @@ mod tests {
         let mut app = App::new();
         app.add_plugins(MinimalPlugins);
         app.insert_resource(ExtendedUiConfiguration::default());
-        app.add_systems(Update, super::super::load_ui_camera_system);
+        app.add_systems(Update, load_ui_camera_system);
 
         app.update();
 
@@ -322,7 +322,7 @@ mod tests {
 
         let mut query = app
             .world_mut()
-            .query_filtered::<Entity, With<super::super::UiCamera>>();
+            .query_filtered::<Entity, With<UiCamera>>();
         let count = query.iter(app.world()).count();
         assert_eq!(count, 0);
     }

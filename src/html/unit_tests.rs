@@ -61,19 +61,19 @@ mod tests {
         world.register_system(|In(_event): In<HtmlDragStop>| {})
     }
 
-    crate::html::inventory::submit! {
+    inventory::submit! {
         HtmlFnRegistration::HtmlEvent {
             name: "__unit_html_event",
             build: build_test_html_event,
         }
     }
-    crate::html::inventory::submit! {
+    inventory::submit! {
         HtmlFnRegistration::HtmlClick {
             name: "__unit_html_click",
             build: build_test_html_click,
         }
     }
-    crate::html::inventory::submit! {
+    inventory::submit! {
         HtmlFnRegistration::HtmlChange {
             name: "__unit_html_change",
             build: build_test_html_change,
@@ -91,55 +91,55 @@ mod tests {
             build: build_test_html_init,
         }
     }
-    crate::html::inventory::submit! {
+    inventory::submit! {
         HtmlFnRegistration::HtmlMouseOut {
             name: "__unit_html_out",
             build: build_test_html_out,
         }
     }
-    crate::html::inventory::submit! {
+    inventory::submit! {
         HtmlFnRegistration::HtmlMouseOver {
             name: "__unit_html_over",
             build: build_test_html_over,
         }
     }
-    crate::html::inventory::submit! {
+    inventory::submit! {
         HtmlFnRegistration::HtmlFocus {
             name: "__unit_html_focus",
             build: build_test_html_focus,
         }
     }
-    crate::html::inventory::submit! {
+    inventory::submit! {
         HtmlFnRegistration::HtmlScroll {
             name: "__unit_html_scroll",
             build: build_test_html_scroll,
         }
     }
-    crate::html::inventory::submit! {
+    inventory::submit! {
         HtmlFnRegistration::HtmlKeyDown {
             name: "__unit_html_keydown",
             build: build_test_html_keydown,
         }
     }
-    crate::html::inventory::submit! {
+    inventory::submit! {
         HtmlFnRegistration::HtmlKeyUp {
             name: "__unit_html_keyup",
             build: build_test_html_keyup,
         }
     }
-    crate::html::inventory::submit! {
+    inventory::submit! {
         HtmlFnRegistration::HtmlDragStart {
             name: "__unit_html_dragstart",
             build: build_test_html_dragstart,
         }
     }
-    crate::html::inventory::submit! {
+    inventory::submit! {
         HtmlFnRegistration::HtmlDrag {
             name: "__unit_html_drag",
             build: build_test_html_drag,
         }
     }
-    crate::html::inventory::submit! {
+    inventory::submit! {
         HtmlFnRegistration::HtmlDragStop {
             name: "__unit_html_dragstop",
             build: build_test_html_dragstop,
@@ -771,7 +771,7 @@ mod tests {
         app.add_plugins((MinimalPlugins, AssetPlugin::default()));
         app.init_resource::<HtmlStructureMap>();
         app.init_resource::<HtmlDirty>();
-        app.add_plugins(builder::HtmlBuilderSystem);
+        app.add_plugins(HtmlBuilderSystem);
 
         let mk_meta = || HtmlMeta {
             css: vec![],
@@ -782,7 +782,7 @@ mod tests {
             inner_content: HtmlInnerContent::default(),
         };
         let mk_bindings = || HtmlEventBindings::default();
-        let mk_widget = || crate::widgets::Widget(None);
+        let mk_widget = || Widget(None);
 
         let tree = HtmlWidgetNode::Body(
             Body {

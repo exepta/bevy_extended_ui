@@ -431,7 +431,7 @@ fn internal_node_creation_system(
                                             TextColor::default(),
                                             TextFont::default(),
                                             TextLayout::new_with_justify(
-                                                bevy::text::Justify::Center,
+                                                Justify::Center,
                                             )
                                             .with_no_wrap(),
                                             UIWidgetState::default(),
@@ -533,7 +533,7 @@ fn internal_node_creation_system(
                                                     TextColor::default(),
                                                     TextFont::default(),
                                                     TextLayout::new_with_justify(
-                                                        bevy::text::Justify::Center,
+                                                        Justify::Center,
                                                     )
                                                     .with_no_wrap(),
                                                     UIWidgetState::default(),
@@ -578,7 +578,7 @@ fn internal_node_creation_system(
                                             TextColor::default(),
                                             TextFont::default(),
                                             TextLayout::new_with_justify(
-                                                bevy::text::Justify::Center,
+                                                Justify::Center,
                                             )
                                             .with_no_wrap(),
                                             UIWidgetState::default(),
@@ -632,7 +632,7 @@ fn internal_node_creation_system(
                                                 TextColor::default(),
                                                 TextFont::default(),
                                                 TextLayout::new_with_justify(
-                                                    bevy::text::Justify::Center,
+                                                    Justify::Center,
                                                 )
                                                 .with_no_wrap(),
                                                 UIWidgetState::default(),
@@ -687,7 +687,7 @@ fn internal_node_creation_system(
                                             TextColor::default(),
                                             TextFont::default(),
                                             TextLayout::new_with_justify(
-                                                bevy::text::Justify::Center,
+                                                Justify::Center,
                                             )
                                             .with_no_wrap(),
                                             UIWidgetState::default(),
@@ -749,7 +749,7 @@ fn internal_node_creation_system(
                                                 TextColor::default(),
                                                 TextFont::default(),
                                                 TextLayout::new_with_justify(
-                                                    bevy::text::Justify::Center,
+                                                    Justify::Center,
                                                 )
                                                 .with_no_wrap(),
                                                 UIWidgetState::default(),
@@ -812,7 +812,7 @@ fn internal_node_creation_system(
                                                 TextColor::default(),
                                                 TextFont::default(),
                                                 TextLayout::new_with_justify(
-                                                    bevy::text::Justify::Center,
+                                                    Justify::Center,
                                                 )
                                                 .with_no_wrap(),
                                                 UIWidgetState::default(),
