@@ -1268,7 +1268,7 @@ toggle {
     }
 
     &:disabled > .button-text {
-        color: var(--disabled-text);
+        color: var(--text-color-dark);
     }
 }
 

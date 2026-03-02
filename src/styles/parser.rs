@@ -529,9 +529,57 @@ fn resolve_var_inner(value: &str, css_vars: &HashMap<String, String>, depth: u8)
         return value.to_string();
     }
 
-    let trimmed = value.trim();
+    let mut resolved = value.to_string();
+
+    while let Some((start, end)) = find_var_call_bounds(&resolved) {
+        let call = &resolved[start..end];
+        let replacement = resolve_single_var_call(call, css_vars, depth + 1);
+
+        let mut next = String::with_capacity(resolved.len() - (end - start) + replacement.len());
+        next.push_str(&resolved[..start]);
+        next.push_str(&replacement);
+        next.push_str(&resolved[end..]);
+
+        if next == resolved {
+            break;
+        }
+        resolved = next;
+    }
+
+    resolved
+}
+
+fn find_var_call_bounds(value: &str) -> Option<(usize, usize)> {
+    let lower = value.to_ascii_lowercase();
+    let start = lower.find("var(")?;
+    let mut depth = 0i32;
+    let mut end = None;
+
+    for (idx, ch) in value[start..].char_indices() {
+        match ch {
+            '(' => depth += 1,
+            ')' => {
+                depth -= 1;
+                if depth == 0 {
+                    end = Some(start + idx + 1);
+                    break;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    end.map(|end_idx| (start, end_idx))
+}
+
+fn resolve_single_var_call(var_call: &str, css_vars: &HashMap<String, String>, depth: u8) -> String {
+    if depth >= 8 {
+        return var_call.to_string();
+    }
+
+    let trimmed = var_call.trim();
     if !trimmed.starts_with("var(") || !trimmed.ends_with(')') {
-        return value.to_string();
+        return var_call.to_string();
     }
 
     let inner = &trimmed[4..trimmed.len() - 1];
@@ -546,7 +594,7 @@ fn resolve_var_inner(value: &str, css_vars: &HashMap<String, String>, depth: u8)
         return resolve_var_inner(fallback.trim(), css_vars, depth + 1);
     }
 
-    value.to_string()
+    var_call.to_string()
 }
 
 fn split_var_args(input: &str) -> (&str, Option<&str>) {
@@ -724,10 +772,30 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
                 style.border_color = Some(color);
             }
         }
-        "border-left" => apply_border_side(value, RectSide::Left, &mut style.border),
-        "border-right" => apply_border_side(value, RectSide::Right, &mut style.border),
-        "border-top" => apply_border_side(value, RectSide::Top, &mut style.border),
-        "border-bottom" => apply_border_side(value, RectSide::Bottom, &mut style.border),
+        "border-left" => apply_border_side(
+            value,
+            RectSide::Left,
+            &mut style.border,
+            &mut style.border_color,
+        ),
+        "border-right" => apply_border_side(
+            value,
+            RectSide::Right,
+            &mut style.border,
+            &mut style.border_color,
+        ),
+        "border-top" => apply_border_side(
+            value,
+            RectSide::Top,
+            &mut style.border,
+            &mut style.border_color,
+        ),
+        "border-bottom" => apply_border_side(
+            value,
+            RectSide::Bottom,
+            &mut style.border,
+            &mut style.border_color,
+        ),
         "border-radius" => style.border_radius = convert_to_radius(value.to_string()),
         "border-color" => style.border_color = convert_to_color(value.to_string()),
         "border-width" => style.border = convert_to_ui_rect(value.to_string()),
@@ -765,11 +833,29 @@ fn apply_rect_side(value: &str, side: RectSide, target: &mut Option<UiRect>) {
     *target = rect_from_side(value, side);
 }
 
-fn apply_border_side(value: &str, side: RectSide, target: &mut Option<UiRect>) {
-    let val = convert_to_val(value.to_string()).unwrap_or(Val::Px(0.0));
+fn apply_border_side(
+    value: &str,
+    side: RectSide,
+    target: &mut Option<UiRect>,
+    color_target: &mut Option<Color>,
+) {
+    let parts: Vec<&str> = value.split_whitespace().collect();
+
+    let val = parts
+        .iter()
+        .find_map(|token| convert_to_val((*token).to_string()))
+        .unwrap_or(Val::Px(0.0));
     let mut rect = target.unwrap_or_default();
     set_rect_side(&mut rect, side, val);
     *target = Some(rect);
+
+    for index in 0..parts.len() {
+        let color_candidate = parts[index..].join(" ");
+        if let Some(parsed_color) = convert_to_color(color_candidate) {
+            *color_target = Some(parsed_color);
+            break;
+        }
+    }
 }
 
 fn apply_overflow_axis(style: &mut Style, value: &str, axis: OverflowAxisSelector) {
@@ -2667,7 +2753,7 @@ pub fn convert_to_bevy_justify_content(value: String) -> Option<JustifyContent> 
         "start" => Some(JustifyContent::Start),
         "flex-start" => Some(JustifyContent::FlexStart),
         "end" => Some(JustifyContent::End),
-        "flex-end" => Some(JustifyContent::FlexStart),
+        "flex-end" => Some(JustifyContent::FlexEnd),
         "center" => Some(JustifyContent::Center),
         "space-between" => Some(JustifyContent::SpaceBetween),
         "space-around" => Some(JustifyContent::SpaceAround),
@@ -2693,7 +2779,7 @@ pub fn convert_to_bevy_align_items(value: String) -> Option<AlignItems> {
         "start" => Some(AlignItems::Start),
         "flex-start" => Some(AlignItems::FlexStart),
         "end" => Some(AlignItems::End),
-        "flex-end" => Some(AlignItems::FlexStart),
+        "flex-end" => Some(AlignItems::FlexEnd),
         "center" => Some(AlignItems::Center),
         "baseline" => Some(AlignItems::Baseline),
         "stretch" => Some(AlignItems::Stretch),
@@ -3296,6 +3382,27 @@ mod tests {
         let background = style.background.expect("missing background");
         assert!(background.gradient.is_some());
         assert_ne!(background.color, Color::NONE);
+    }
+
+    #[test]
+    fn background_gradient_resolves_nested_css_var_tokens() {
+        let parsed = load_css(
+            r#"
+            :root { --btn-bg: #ffd700; }
+            .btn-login {
+                background: linear-gradient(180deg, var(--btn-bg) 0%, #f0b90b 100%) center;
+            }
+        "#,
+        );
+
+        let pair = parsed
+            .styles
+            .values()
+            .find(|pair| pair.selector == ".btn-login")
+            .expect("missing parsed .btn-login style");
+
+        let background = pair.normal.background.as_ref().expect("missing background");
+        assert!(background.gradient.is_some());
     }
 
     #[test]

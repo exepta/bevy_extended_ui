@@ -5,10 +5,11 @@ mod tests {
     use super::super::state_service::{StateService, update_widget_states};
     use super::super::style_service::{
         LastUiTransform, StyleTransition, propagate_style_inheritance, sync_last_ui_transform,
+        update_widget_styles_system,
     };
     use crate::io::CssAsset;
     use crate::styles::components::UiStyle;
-    use crate::styles::{CssSource, FontVal, Style, TransitionSpec};
+    use crate::styles::{CssSource, FontVal, Style, StylePair, TransitionSpec};
     use crate::widgets::{BindToID, UIGenID, UIWidgetState};
     use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
     use bevy::asset::AssetPlugin;
@@ -556,5 +557,59 @@ mod tests {
             .get::<TextColor>(child)
             .expect("missing TextColor");
         assert_eq!(child_text.0, Color::srgb(0.0, 1.0, 0.0));
+    }
+
+    #[test]
+    fn update_widget_styles_system_does_not_tint_image_nodes_from_color() {
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, AssetPlugin::default()));
+        app.init_asset::<Image>();
+        app.insert_resource(ImageCache::default());
+        app.add_systems(Update, update_widget_styles_system);
+
+        let mut style = Style::default();
+        style.color = Some(Color::srgb(1.0, 0.0, 0.0));
+
+        let mut styles = HashMap::new();
+        styles.insert(
+            "*".to_string(),
+            StylePair {
+                normal: style,
+                selector: "*".to_string(),
+                ..default()
+            },
+        );
+
+        let entity = app
+            .world_mut()
+            .spawn((
+                UiStyle {
+                    css: Handle::default(),
+                    styles,
+                    keyframes: HashMap::new(),
+                    active_style: None,
+                },
+                Node::default(),
+                TextColor(Color::NONE),
+                ImageNode {
+                    color: Color::srgb(0.2, 0.3, 0.4),
+                    ..default()
+                },
+            ))
+            .id();
+
+        app.update();
+
+        let text_color = app
+            .world()
+            .get::<TextColor>(entity)
+            .expect("missing TextColor");
+        let image_node = app
+            .world()
+            .get::<ImageNode>(entity)
+            .expect("missing ImageNode");
+
+        assert_eq!(text_color.0, Color::srgb(1.0, 0.0, 0.0));
+        assert_eq!(image_node.color, Color::srgb(0.2, 0.3, 0.4));
     }
 }

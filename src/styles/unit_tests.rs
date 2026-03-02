@@ -379,4 +379,351 @@ mod tests {
         assert_eq!(Colored::named("darkgrey"), Some(Colored::DARK_GRAY));
         assert_eq!(Colored::named("missing-color"), None);
     }
+
+    #[test]
+    fn style_defaults_cover_mod_defaults() {
+        let background = Background::default();
+        assert_eq!(background.color, Color::NONE);
+        assert!(background.image.is_none());
+        assert!(background.gradient.is_none());
+
+        let position = BackgroundPosition::default();
+        assert_eq!(position.x, BackgroundPositionValue::Percent(0.0));
+        assert_eq!(position.y, BackgroundPositionValue::Percent(0.0));
+        assert_eq!(BackgroundSize::default(), BackgroundSize::Auto);
+        assert_eq!(BackgroundAttachment::default(), BackgroundAttachment::Scroll);
+        assert_eq!(IconPlace::default(), IconPlace::Right);
+        assert_eq!(FontVal::default(), FontVal::Px(12.0));
+        assert_eq!(TransitionTiming::default(), TransitionTiming::EaseInOut);
+        assert_eq!(TransitionProperty::default(), TransitionProperty::All);
+
+        let animation = AnimationSpec::default();
+        assert_eq!(animation.name, "");
+        assert_eq!(animation.duration, 0.0);
+        assert_eq!(animation.delay, 0.0);
+        assert_eq!(animation.timing, TransitionTiming::Ease);
+        assert_eq!(animation.iterations, Some(1.0));
+        assert_eq!(animation.direction, AnimationDirection::Normal);
+
+        let parsed = ParsedCss::default();
+        assert!(parsed.styles.is_empty());
+        assert!(parsed.keyframes.is_empty());
+
+        let pair = StylePair::default();
+        assert!(pair.media.is_none());
+    }
+
+    #[test]
+    fn font_and_transition_parsers_cover_all_named_branches() {
+        assert_eq!(
+            super::super::FontWeight::from_name("thin"),
+            Some(super::super::FontWeight::Thin)
+        );
+        assert_eq!(
+            super::super::FontWeight::from_name("extra-light"),
+            Some(super::super::FontWeight::ExtraLight)
+        );
+        assert_eq!(
+            super::super::FontWeight::from_name("light"),
+            Some(super::super::FontWeight::Light)
+        );
+        assert_eq!(
+            super::super::FontWeight::from_name("normal"),
+            Some(super::super::FontWeight::Normal)
+        );
+        assert_eq!(
+            super::super::FontWeight::from_name("medium"),
+            Some(super::super::FontWeight::Medium)
+        );
+        assert_eq!(
+            super::super::FontWeight::from_name("semibold"),
+            Some(super::super::FontWeight::SemiBold)
+        );
+        assert_eq!(
+            super::super::FontWeight::from_name("bold"),
+            Some(super::super::FontWeight::Bold)
+        );
+        assert_eq!(
+            super::super::FontWeight::from_name("extra-bold"),
+            Some(super::super::FontWeight::ExtraBold)
+        );
+        assert_eq!(
+            super::super::FontWeight::from_name("black"),
+            Some(super::super::FontWeight::Black)
+        );
+
+        assert_eq!(
+            super::super::FontWeight::from_number(100),
+            Some(super::super::FontWeight::Thin)
+        );
+        assert_eq!(
+            super::super::FontWeight::from_number(200),
+            Some(super::super::FontWeight::ExtraLight)
+        );
+        assert_eq!(
+            super::super::FontWeight::from_number(300),
+            Some(super::super::FontWeight::Light)
+        );
+        assert_eq!(
+            super::super::FontWeight::from_number(400),
+            Some(super::super::FontWeight::Normal)
+        );
+        assert_eq!(
+            super::super::FontWeight::from_number(500),
+            Some(super::super::FontWeight::Medium)
+        );
+        assert_eq!(
+            super::super::FontWeight::from_number(600),
+            Some(super::super::FontWeight::SemiBold)
+        );
+        assert_eq!(
+            super::super::FontWeight::from_number(700),
+            Some(super::super::FontWeight::Bold)
+        );
+        assert_eq!(
+            super::super::FontWeight::from_number(800),
+            Some(super::super::FontWeight::ExtraBold)
+        );
+        assert_eq!(
+            super::super::FontWeight::from_number(900),
+            Some(super::super::FontWeight::Black)
+        );
+        assert_eq!(
+            super::super::FontWeight::from_number(901),
+            Some(super::super::FontWeight::Normal)
+        );
+
+        assert_eq!(
+            TransitionTiming::from_name("linear"),
+            Some(TransitionTiming::Linear)
+        );
+        assert_eq!(
+            TransitionTiming::from_name("ease"),
+            Some(TransitionTiming::Ease)
+        );
+        assert_eq!(
+            TransitionTiming::from_name("ease-in"),
+            Some(TransitionTiming::EaseIn)
+        );
+        assert_eq!(
+            TransitionTiming::from_name("ease-out"),
+            Some(TransitionTiming::EaseOut)
+        );
+        assert_eq!(
+            TransitionTiming::from_name("ease-in-out"),
+            Some(TransitionTiming::EaseInOut)
+        );
+
+        let ease = TransitionTiming::Ease.apply(0.25);
+        assert!((ease - 0.15625).abs() < 0.0001);
+
+        let ease_in_out_left = TransitionTiming::EaseInOut.apply(0.25);
+        let ease_in_out_right = TransitionTiming::EaseInOut.apply(0.75);
+        assert!((ease_in_out_left - 0.125).abs() < 0.0001);
+        assert!((ease_in_out_right - 0.875).abs() < 0.0001);
+
+        assert_eq!(
+            AnimationDirection::from_name("normal"),
+            Some(AnimationDirection::Normal)
+        );
+        assert_eq!(
+            AnimationDirection::from_name("reverse"),
+            Some(AnimationDirection::Reverse)
+        );
+        assert_eq!(
+            AnimationDirection::from_name("alternate"),
+            Some(AnimationDirection::Alternate)
+        );
+        assert_eq!(
+            AnimationDirection::from_name("alternate-reverse"),
+            Some(AnimationDirection::AlternateReverse)
+        );
+    }
+
+    #[test]
+    fn calc_expr_covers_remaining_math_paths() {
+        let ctx = CalcContext {
+            base: 200.0,
+            viewport: Vec2::new(1000.0, 500.0),
+        };
+
+        assert_eq!(
+            CalcExpr::Value(CalcValue::new(10.0, CalcUnit::Vw)).eval_length(ctx),
+            Some(100.0)
+        );
+        assert_eq!(
+            CalcExpr::Value(CalcValue::new(10.0, CalcUnit::Vh)).eval_length(ctx),
+            Some(50.0)
+        );
+        assert_eq!(
+            CalcExpr::Value(CalcValue::new(0.0, CalcUnit::None)).eval_length(ctx),
+            Some(0.0)
+        );
+        assert_eq!(
+            CalcExpr::Value(CalcValue::new(5.0, CalcUnit::None)).eval_length(ctx),
+            None
+        );
+
+        let sub = CalcExpr::Sub(
+            Box::new(CalcExpr::Value(CalcValue::new(40.0, CalcUnit::Px))),
+            Box::new(CalcExpr::Value(CalcValue::new(10.0, CalcUnit::Px))),
+        );
+        assert_eq!(sub.eval_length(ctx), Some(30.0));
+
+        let mul_reverse = CalcExpr::Mul(
+            Box::new(CalcExpr::Value(CalcValue::new(3.0, CalcUnit::None))),
+            Box::new(CalcExpr::Value(CalcValue::new(10.0, CalcUnit::Px))),
+        );
+        assert_eq!(mul_reverse.eval_length(ctx), Some(30.0));
+
+        let mul_invalid = CalcExpr::Mul(
+            Box::new(CalcExpr::Value(CalcValue::new(2.0, CalcUnit::Px))),
+            Box::new(CalcExpr::Value(CalcValue::new(5.0, CalcUnit::Px))),
+        );
+        assert_eq!(mul_invalid.eval_length(ctx), None);
+
+        let div = CalcExpr::Div(
+            Box::new(CalcExpr::Value(CalcValue::new(80.0, CalcUnit::Px))),
+            Box::new(CalcExpr::Value(CalcValue::new(4.0, CalcUnit::None))),
+        );
+        assert_eq!(div.eval_length(ctx), Some(20.0));
+
+        let min = CalcExpr::Min(vec![
+            CalcExpr::Value(CalcValue::new(20.0, CalcUnit::Px)),
+            CalcExpr::Value(CalcValue::new(8.0, CalcUnit::Px)),
+        ]);
+        assert_eq!(min.eval_length(ctx), Some(8.0));
+
+        let max = CalcExpr::Max(vec![
+            CalcExpr::Value(CalcValue::new(20.0, CalcUnit::Px)),
+            CalcExpr::Value(CalcValue::new(8.0, CalcUnit::Px)),
+        ]);
+        assert_eq!(max.eval_length(ctx), Some(20.0));
+
+        let add_unitless = CalcExpr::Add(
+            Box::new(CalcExpr::Value(CalcValue::new(1.0, CalcUnit::None))),
+            Box::new(CalcExpr::Value(CalcValue::new(2.0, CalcUnit::None))),
+        );
+        assert_eq!(add_unitless.eval_unitless(), Some(3.0));
+
+        let sub_unitless = CalcExpr::Sub(
+            Box::new(CalcExpr::Value(CalcValue::new(10.0, CalcUnit::None))),
+            Box::new(CalcExpr::Value(CalcValue::new(4.0, CalcUnit::None))),
+        );
+        assert_eq!(sub_unitless.eval_unitless(), Some(6.0));
+
+        let mul_unitless = CalcExpr::Mul(
+            Box::new(CalcExpr::Value(CalcValue::new(3.0, CalcUnit::None))),
+            Box::new(CalcExpr::Value(CalcValue::new(4.0, CalcUnit::None))),
+        );
+        assert_eq!(mul_unitless.eval_unitless(), Some(12.0));
+
+        let div_unitless = CalcExpr::Div(
+            Box::new(CalcExpr::Value(CalcValue::new(8.0, CalcUnit::None))),
+            Box::new(CalcExpr::Value(CalcValue::new(2.0, CalcUnit::None))),
+        );
+        assert_eq!(div_unitless.eval_unitless(), Some(4.0));
+
+        let min_unitless = CalcExpr::Min(vec![
+            CalcExpr::Value(CalcValue::new(3.0, CalcUnit::None)),
+            CalcExpr::Value(CalcValue::new(7.0, CalcUnit::None)),
+        ]);
+        assert_eq!(min_unitless.eval_unitless(), Some(3.0));
+
+        let max_unitless = CalcExpr::Max(vec![
+            CalcExpr::Value(CalcValue::new(3.0, CalcUnit::None)),
+            CalcExpr::Value(CalcValue::new(7.0, CalcUnit::None)),
+        ]);
+        assert_eq!(max_unitless.eval_unitless(), Some(7.0));
+
+        let sin_none = CalcExpr::Sin(Box::new(CalcExpr::Value(CalcValue::new(
+            1.0,
+            CalcUnit::None,
+        ))));
+        assert!((sin_none.eval_unitless().expect("sin none") - 1.0_f32.sin()).abs() < 0.0001);
+
+        let sin_rad = CalcExpr::Sin(Box::new(CalcExpr::Value(CalcValue::new(
+            std::f32::consts::FRAC_PI_2,
+            CalcUnit::Rad,
+        ))));
+        assert!((sin_rad.eval_unitless().expect("sin rad") - 1.0).abs() < 0.0001);
+
+        let sin_add = CalcExpr::Sin(Box::new(CalcExpr::Add(
+            Box::new(CalcExpr::Value(CalcValue::new(30.0, CalcUnit::Deg))),
+            Box::new(CalcExpr::Value(CalcValue::new(30.0, CalcUnit::Deg))),
+        )));
+        assert!((sin_add.eval_unitless().expect("sin add") - 0.8660254).abs() < 0.0002);
+
+        let sin_sub = CalcExpr::Sin(Box::new(CalcExpr::Sub(
+            Box::new(CalcExpr::Value(CalcValue::new(90.0, CalcUnit::Deg))),
+            Box::new(CalcExpr::Value(CalcValue::new(30.0, CalcUnit::Deg))),
+        )));
+        assert!((sin_sub.eval_unitless().expect("sin sub") - 0.8660254).abs() < 0.0002);
+
+        let sin_mul_left = CalcExpr::Sin(Box::new(CalcExpr::Mul(
+            Box::new(CalcExpr::Value(CalcValue::new(45.0, CalcUnit::Deg))),
+            Box::new(CalcExpr::Value(CalcValue::new(2.0, CalcUnit::None))),
+        )));
+        assert!((sin_mul_left.eval_unitless().expect("sin mul left") - 1.0).abs() < 0.0001);
+
+        let sin_mul_right = CalcExpr::Sin(Box::new(CalcExpr::Mul(
+            Box::new(CalcExpr::Value(CalcValue::new(2.0, CalcUnit::None))),
+            Box::new(CalcExpr::Value(CalcValue::new(std::f32::consts::FRAC_PI_4, CalcUnit::Rad))),
+        )));
+        assert!((sin_mul_right.eval_unitless().expect("sin mul right") - 1.0).abs() < 0.0001);
+
+        let sin_div = CalcExpr::Sin(Box::new(CalcExpr::Div(
+            Box::new(CalcExpr::Value(CalcValue::new(180.0, CalcUnit::Deg))),
+            Box::new(CalcExpr::Value(CalcValue::new(2.0, CalcUnit::None))),
+        )));
+        assert!((sin_div.eval_unitless().expect("sin div") - 1.0).abs() < 0.0001);
+
+        let sin_min = CalcExpr::Sin(Box::new(CalcExpr::Min(vec![
+            CalcExpr::Value(CalcValue::new(90.0, CalcUnit::Deg)),
+            CalcExpr::Value(CalcValue::new(180.0, CalcUnit::Deg)),
+        ])));
+        assert!((sin_min.eval_unitless().expect("sin min") - 1.0).abs() < 0.0001);
+
+        let sin_max = CalcExpr::Sin(Box::new(CalcExpr::Max(vec![
+            CalcExpr::Value(CalcValue::new(90.0, CalcUnit::Deg)),
+            CalcExpr::Value(CalcValue::new(180.0, CalcUnit::Deg)),
+        ])));
+        assert!((sin_max.eval_unitless().expect("sin max") - 0.0).abs() < 0.0001);
+
+        let sin_invalid_unit = CalcExpr::Sin(Box::new(CalcExpr::Value(CalcValue::new(
+            10.0,
+            CalcUnit::Px,
+        ))));
+        assert_eq!(sin_invalid_unit.eval_unitless(), None);
+    }
+
+    #[test]
+    fn media_query_condition_covers_remaining_variants_and_keys() {
+        assert!(MediaQueryCondition::Always.matches_viewport(Vec2::new(1.0, 1.0)));
+        assert!(!MediaQueryCondition::Never.matches_viewport(Vec2::new(1.0, 1.0)));
+
+        assert!(MediaQueryCondition::MinHeight(720.0).matches_viewport(Vec2::new(1000.0, 720.0)));
+        assert!(!MediaQueryCondition::MaxHeight(300.0).matches_viewport(Vec2::new(1000.0, 400.0)));
+        assert!(MediaQueryCondition::OrientationLandscape.matches_viewport(Vec2::new(1200.0, 800.0)));
+
+        assert_eq!(MediaQueryCondition::Always.cache_key(), "always");
+        assert_eq!(MediaQueryCondition::Never.cache_key(), "never");
+        assert_eq!(MediaQueryCondition::Width(300.0).cache_key(), "w:300.000");
+        assert_eq!(MediaQueryCondition::MinHeight(300.0).cache_key(), "minh:300.000");
+        assert_eq!(MediaQueryCondition::MaxHeight(300.0).cache_key(), "maxh:300.000");
+        assert_eq!(MediaQueryCondition::Height(300.0).cache_key(), "h:300.000");
+        assert_eq!(
+            MediaQueryCondition::OrientationLandscape.cache_key(),
+            "orientation:landscape"
+        );
+
+        let or_key = MediaQueryCondition::Or(vec![
+            MediaQueryCondition::MinWidth(500.0),
+            MediaQueryCondition::MaxHeight(400.0),
+        ])
+        .cache_key();
+        assert!(or_key.starts_with("or("));
+        assert!(or_key.contains("minw:500.000"));
+        assert!(or_key.contains("maxh:400.000"));
+    }
 }
