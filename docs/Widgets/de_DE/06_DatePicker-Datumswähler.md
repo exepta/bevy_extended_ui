@@ -19,12 +19,13 @@ Kalender-Widget, das alleine oder über das Attribut for an ein Input gebunden w
 - Praktisch mit onchange-Handlern für datumsabhängige UIs.
 
 ## HTML-Beispiel
-
+```rust
     <input id="birthday" type="date" />
     <date-picker for="birthday" min="1990-01-01" max="2030-12-31" format="dmy" onchange="log_datepicker"></date-picker>
+```
 
 ## Bevy-Beispiel
-
+```rust
     use bevy::prelude::*;
     use bevy_extended_ui::ExtendedUiPlugin;
     use bevy_extended_ui::html::{HtmlEvent, HtmlSource};
@@ -52,6 +53,7 @@ Kalender-Widget, das alleine oder über das Attribut for an ein Input gebunden w
             info!("DatePicker event entity={:?} data={:?}", event.entity, widget);
         }
     }
+```
 
 ## Bevy-WASM-Vorschau (Platzhalter)
 
