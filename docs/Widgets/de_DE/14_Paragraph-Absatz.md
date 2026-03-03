@@ -20,49 +20,54 @@ Einfaches Textabsatz-Widget für beschreibende Inhalte und Platzhalter.
 
 ## HTML-Beispiel
 
-    <p oninit="log_paragraph">Welcome {{player.name}}</p>
+```html
+<p oninit="log_paragraph">Welcome {{player.name}}</p>
+```
 
 ## Bevy-Beispiel
 
-    use bevy::prelude::*;
-    use bevy_extended_ui::ExtendedUiPlugin;
-    use bevy_extended_ui::html::{HtmlEvent, HtmlSource};
-    use bevy_extended_ui::io::HtmlAsset;
-    use bevy_extended_ui::registry::UiRegistry;
-    use bevy_extended_ui::widgets::Paragraph;
-    use bevy_extended_ui_macros::html_fn;
-    
-    fn main() {
-        App::new()
-            .add_plugins(DefaultPlugins)
-            .add_plugins(ExtendedUiPlugin)
-            .add_systems(Startup, load_ui)
-            .run();
-    }
-    
-    fn load_ui(mut reg: ResMut<UiRegistry>, asset_server: Res<AssetServer>) {
-        let handle: Handle<HtmlAsset> = asset_server.load("ui/paragraph.html");
-        reg.add_and_use("paragraph-demo".to_string(), HtmlSource::from_handle(handle));
-    }
-    
-    #[html_fn("log_paragraph")]
-    fn log_paragraph(In(event): In<HtmlEvent>, query: Query<&Paragraph>) {
-        if let Ok(widget) = query.get(event.entity) {
-            info!("Paragraph event entity={:?} data={:?}", event.entity, widget);
-        }
-    }
+```rust
+use bevy::prelude::*;
+use bevy_extended_ui::ExtendedUiPlugin;
+use bevy_extended_ui::html::{HtmlEvent, HtmlSource};
+use bevy_extended_ui::io::HtmlAsset;
+use bevy_extended_ui::registry::UiRegistry;
+use bevy_extended_ui::widgets::Paragraph;
+use bevy_extended_ui_macros::html_fn;
 
-## Bevy-WASM-Vorschau (Platzhalter)
+fn main() {
+    App::new()
+        .add_plugins(DefaultPlugins)
+        .add_plugins(ExtendedUiPlugin)
+        .add_systems(Startup, load_ui)
+        .run();
+}
+
+fn load_ui(mut reg: ResMut<UiRegistry>, asset_server: Res<AssetServer>) {
+    let handle: Handle<HtmlAsset> = asset_server.load("ui/paragraph.html");
+    reg.add_and_use("paragraph-demo".to_string(), HtmlSource::from_handle(handle));
+}
+
+#[html_fn("log_paragraph")]
+fn log_paragraph(In(event): In<HtmlEvent>, query: Query<&Paragraph>) {
+    if let Ok(widget) = query.get(event.entity) {
+        info!("Paragraph event entity={:?} data={:?}", event.entity, widget);
+    }
+}
+```
+
+## Beispiel
 
 <iframe
   title="Bevy WASM Vorschau - Paragraph"
-  src="https://example.com/bevy-extended-ui/wasm/paragraph"
+  src="{base.url}/examples/paragraph"
   width="100%"
   height="420"
   loading="lazy"
 ></iframe>
 
 Ersetze die src-URL durch deinen deployten WASM-Preview-Endpunkt.
+
 
 ## Hinweise
 
