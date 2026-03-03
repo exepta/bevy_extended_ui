@@ -39,6 +39,6 @@ Damit lassen sich komplexe Benutzeroberflächen deutlich schneller aufbauen und 
 
 ## Nächster Schritt
 
-Weiter mit der Installationsanleitung: [Installation](./Installation.md).
+Weiter mit der Installationsanleitung: [Installation](02_Installation.md).
 
 Zusätzlicher Hinweis zu ÄÖÜ: Diese deutsche Dokumentation nutzt bewusst Umlaute wie Ä, Ö und Ü.
