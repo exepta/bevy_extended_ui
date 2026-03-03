@@ -63,11 +63,8 @@ fn log_colorpicker(In(event): In<HtmlEvent>, query: Query<&ColorPicker>) {
   src="{base.url}/examples/colorpicker"
   width="100%"
   height="420"
-  loading="lazy"
-></iframe>
-
-Ersetze die src-URL durch deinen deployten WASM-Preview-Endpunkt.
-
+  loading="lazy">
+</iframe>
 
 ## Hinweise
 

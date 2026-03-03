@@ -58,19 +58,6 @@ fn log_body(In(event): In<HtmlEvent>, query: Query<&Body>) {
 }
 ```
 
-## Beispiel
-
-<iframe
-  title="Bevy WASM Vorschau - Body"
-  src="{base.url}/examples/body"
-  width="100%"
-  height="420"
-  loading="lazy"
-></iframe>
-
-Ersetze die src-URL durch deinen deployten WASM-Preview-Endpunkt.
-
-
 ## Hinweise
 
 - Schreibe den HTML-Tag exakt (body), damit der Converter korrekt mappt.

@@ -66,11 +66,8 @@ fn log_choicebox(In(event): In<HtmlEvent>, query: Query<&ChoiceBox>) {
   src="{base.url}/examples/choicebox"
   width="100%"
   height="420"
-  loading="lazy"
-></iframe>
-
-Replace the src URL with your deployed WASM preview endpoint.
-
+  loading="lazy">
+</iframe>
 
 ## Notes
 

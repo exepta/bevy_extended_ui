@@ -63,11 +63,8 @@ fn log_progressbar(In(event): In<HtmlEvent>, query: Query<&ProgressBar>) {
   src="{base.url}/examples/progressbar"
   width="100%"
   height="420"
-  loading="lazy"
-></iframe>
-
-Ersetze die src-URL durch deinen deployten WASM-Preview-Endpunkt.
-
+  loading="lazy">
+</iframe>
 
 ## Hinweise
 
