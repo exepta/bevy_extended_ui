@@ -63,11 +63,8 @@ fn log_scrollbar(In(event): In<HtmlEvent>, query: Query<&Scrollbar>) {
   src="{base.url}/examples/scrollbar"
   width="100%"
   height="420"
-  loading="lazy"
-></iframe>
-
-Replace the src URL with your deployed WASM preview endpoint.
-
+  loading="lazy">
+</iframe>
 
 ## Notes
 

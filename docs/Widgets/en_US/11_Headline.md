@@ -63,11 +63,8 @@ fn log_headline(In(event): In<HtmlEvent>, query: Query<&Headline>) {
   src="{base.url}/examples/headline"
   width="100%"
   height="420"
-  loading="lazy"
-></iframe>
-
-Replace the src URL with your deployed WASM preview endpoint.
-
+  loading="lazy">
+</iframe>
 
 ## Notes
 

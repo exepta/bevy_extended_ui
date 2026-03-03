@@ -63,11 +63,8 @@ fn log_inputfield(In(event): In<HtmlEvent>, query: Query<&InputField>) {
   src="{base.url}/examples/inputfield"
   width="100%"
   height="420"
-  loading="lazy"
-></iframe>
-
-Ersetze die src-URL durch deinen deployten WASM-Preview-Endpunkt.
-
+  loading="lazy">
+</iframe>
 
 ## Hinweise
 

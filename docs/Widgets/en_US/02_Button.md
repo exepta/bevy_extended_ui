@@ -66,11 +66,8 @@ fn log_button(In(event): In<HtmlEvent>, query: Query<&Button>) {
   src="{base.url}/examples/button"
   width="100%"
   height="420"
-  loading="lazy"
-></iframe>
-
-Replace the src URL with your deployed WASM preview endpoint.
-
+  loading="lazy">
+</iframe>
 
 ## Notes
 

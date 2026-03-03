@@ -63,11 +63,8 @@ fn log_slider(In(event): In<HtmlEvent>, query: Query<&Slider>) {
   src="{base.url}/examples/slider"
   width="100%"
   height="420"
-  loading="lazy"
-></iframe>
-
-Replace the src URL with your deployed WASM preview endpoint.
-
+  loading="lazy">
+</iframe>
 
 ## Notes
 

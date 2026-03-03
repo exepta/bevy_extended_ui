@@ -63,11 +63,8 @@ fn log_divider(In(event): In<HtmlEvent>, query: Query<&Divider>) {
   src="{base.url}/examples/divider"
   width="100%"
   height="420"
-  loading="lazy"
-></iframe>
-
-Replace the src URL with your deployed WASM preview endpoint.
-
+  loading="lazy">
+</iframe>
 
 ## Notes
 

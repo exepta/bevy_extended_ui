@@ -63,11 +63,8 @@ fn log_paragraph(In(event): In<HtmlEvent>, query: Query<&Paragraph>) {
   src="{base.url}/examples/paragraph"
   width="100%"
   height="420"
-  loading="lazy"
-></iframe>
-
-Replace the src URL with your deployed WASM preview endpoint.
-
+  loading="lazy">
+</iframe>
 
 ## Notes
 

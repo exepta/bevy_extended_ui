@@ -58,19 +58,6 @@ fn log_div(In(event): In<HtmlEvent>, query: Query<&Div>) {
 }
 ```
 
-## Beispiel
-
-<iframe
-  title="Bevy WASM Vorschau - Div"
-  src="{base.url}/examples/div"
-  width="100%"
-  height="420"
-  loading="lazy"
-></iframe>
-
-Ersetze die src-URL durch deinen deployten WASM-Preview-Endpunkt.
-
-
 ## Hinweise
 
 - Schreibe den HTML-Tag exakt (div), damit der Converter korrekt mappt.

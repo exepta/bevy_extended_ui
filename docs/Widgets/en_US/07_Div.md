@@ -58,19 +58,6 @@ fn log_div(In(event): In<HtmlEvent>, query: Query<&Div>) {
 }
 ```
 
-## Example
-
-<iframe
-  title="Bevy WASM Preview - Div"
-  src="{base.url}/examples/div"
-  width="100%"
-  height="420"
-  loading="lazy"
-></iframe>
-
-Replace the src URL with your deployed WASM preview endpoint.
-
-
 ## Notes
 
 - Keep the HTML tag spelling exact (div) so the converter maps to the correct widget.

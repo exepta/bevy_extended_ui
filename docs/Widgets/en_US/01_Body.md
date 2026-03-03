@@ -58,19 +58,6 @@ fn log_body(In(event): In<HtmlEvent>, query: Query<&Body>) {
 }
 ```
 
-## Example
-
-<iframe
-  title="Bevy WASM Preview - Body"
-  src="{base.url}/examples/body"
-  width="100%"
-  height="420"
-  loading="lazy"
-></iframe>
-
-Replace the src URL with your deployed WASM preview endpoint.
-
-
 ## Notes
 
 - Keep the HTML tag spelling exact (body) so the converter maps to the correct widget.
