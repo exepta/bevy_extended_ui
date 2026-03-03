@@ -39,4 +39,4 @@ This is especially useful when you need form-like or app-like interfaces with ma
 
 ## Next step
 
-Continue with the installation guide: [Install](./Install.md).
+Continue with the installation guide: [Install](02_Install.md).
