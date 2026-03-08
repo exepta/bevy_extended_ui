@@ -17,7 +17,7 @@ Damit lassen sich komplexe Benutzeroberflächen deutlich schneller aufbauen und 
 
 - HTML-basierte UI-Quellen als Bevy-Assets
 - CSS-Unterstützung inklusive Breakpoints und `@keyframes`
-- Viele Widgets wie Slider, Checkboxen, Choice-Boxen und Date-Picker
+- Viele Widgets wie Slider, Checkboxen, Choice-Boxen, Date-Picker, ToolTips und Badges als Child-Widgets fuer kleine Labels oder Zaehler
 - Event-Bindings von HTML-Attributen nach Rust (`onclick`, `onchange`, `action`, Tastatur- und Drag-Events)
 - Hot Reload für schnellere Entwicklung
 - Optionale Sprach-Backends (`fluent`, `properties-lang`)

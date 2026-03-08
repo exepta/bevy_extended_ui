@@ -17,7 +17,7 @@ This is especially useful when you need form-like or app-like interfaces with ma
 
 - HTML-based UI sources loaded through Bevy assets
 - CSS styling support, including breakpoints and animations
-- Built-in widgets (for example sliders, checkboxes, choice boxes, date pickers)
+- Built-in widgets (for example sliders, checkboxes, choice boxes, date pickers, tooltips, and badges as child widgets for small labels or counters)
 - Event bindings from HTML attributes to Rust (`onclick`, `onchange`, `action`, keyboard and drag events)
 - Hot reload support for faster UI iteration
 - Optional localization backends (`fluent`, `properties-lang`)
