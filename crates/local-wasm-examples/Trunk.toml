@@ -1,0 +1,9 @@
+[build]
+dist = "dist"
+
+[[copy]]
+source = "assets"
+dest = "assets"
+
+[serve]
+no_spa = true

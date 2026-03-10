@@ -20,8 +20,8 @@ use crate::io::{CssAsset, HtmlAsset};
 use crate::styles::Style;
 use crate::styles::parser::apply_property_to_style;
 use crate::widgets::{
-    Body, Button, CheckBox, ChoiceBox, ColorPicker, DatePicker, Div, Divider, FieldSet, Form,
-    Headline, Img, InputField, Paragraph, ProgressBar, RadioButton, Scrollbar, Slider,
+    Badge, Body, Button, CheckBox, ChoiceBox, ColorPicker, DatePicker, Div, Divider, FieldSet,
+    Form, Headline, Img, InputField, Paragraph, ProgressBar, RadioButton, Scrollbar, Slider,
     SwitchButton, ToggleButton, ToolTip, ValidationRules, Widget,
 };
 
@@ -344,6 +344,15 @@ pub enum HtmlWidgetNode {
     /// A tooltip `<tool-tip>`.
     ToolTip(
         ToolTip,
+        HtmlMeta,
+        HtmlStates,
+        HtmlEventBindings,
+        Widget,
+        HtmlID,
+    ),
+    /// A badge `<badge>`.
+    Badge(
+        Badge,
         HtmlMeta,
         HtmlStates,
         HtmlEventBindings,

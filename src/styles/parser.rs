@@ -628,7 +628,7 @@ fn split_var_args(input: &str) -> (&str, Option<&str>) {
 /// - Colors: `color`, `background-color`, `border-color`
 /// - Flex/grid layout: `display`, `position`, `flex-grow`, `flex-direction`, `grid-template-columns`, etc.
 /// - Visuals: `background`, `background-image`, `box-shadow`, `z-index`, `overflow`, etc.
-/// - Typography: `font-size`, `text-wrap`
+/// - Typography: `font-size`, `text-wrap`, `text-align`
 ///
 /// # Behavior
 /// - If a property or value is unsupported or invalid, it is silently ignored.
@@ -807,6 +807,7 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
         "overflow-x" => apply_overflow_axis(style, value, OverflowAxisSelector::X),
 
         "text-wrap" => style.text_wrap = convert_to_bevy_line_break(value.to_string()),
+        "text-align" => style.text_align = convert_to_bevy_text_align(value.to_string()),
         "z-index" => style.z_index = convert_to_i32(value.to_string()),
         "pointer-events" => style.pointer_events = convert_to_bevy_pick_able(value.to_string()),
         "cursor" => style.cursor = convert_to_cursor_style(value.to_string()),
@@ -2826,6 +2827,17 @@ pub fn convert_to_bevy_flex_wrap(value: String) -> Option<FlexWrap> {
     }
 }
 
+/// Converts a string into a text alignment value for Bevy [`TextLayout`].
+pub fn convert_to_bevy_text_align(value: String) -> Option<Justify> {
+    let trimmed = value.trim();
+    match trimmed {
+        "left" | "start" | "flex-start" => Some(Justify::Left),
+        "center" => Some(Justify::Center),
+        "right" | "end" | "flex-end" => Some(Justify::Right),
+        _ => Some(Justify::default()),
+    }
+}
+
 /**
  * Converts a string into a `LineBreak` enum value.
  *
@@ -3457,5 +3469,15 @@ mod tests {
             parsed.1,
             convert_to_color("rgba(192, 198, 210, 0.95)".to_string()).expect("color")
         );
+    }
+
+    #[test]
+    fn text_align_property_maps_to_text_layout_justify() {
+        let mut style = Style::default();
+        apply_property_to_style(&mut style, "text-align", "center");
+        assert_eq!(style.text_align, Some(Justify::Center));
+
+        apply_property_to_style(&mut style, "text-align", "right");
+        assert_eq!(style.text_align, Some(Justify::Right));
     }
 }

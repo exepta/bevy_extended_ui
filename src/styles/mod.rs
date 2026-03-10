@@ -876,6 +876,7 @@ pub struct Style {
     pub column_gap: Option<Val>,
     #[reflect(ignore)]
     pub column_gap_calc: Option<CalcExpr>,
+    pub text_align: Option<Justify>,
     pub text_wrap: Option<LineBreak>,
     pub z_index: Option<i32>,
     pub cursor: Option<CursorStyle>,
@@ -1031,6 +1032,7 @@ impl Style {
             &other.column_gap_calc,
         );
 
+        merge_opt(&mut self.text_align, &other.text_align);
         merge_opt(&mut self.text_wrap, &other.text_wrap);
 
         merge_opt(&mut self.z_index, &other.z_index);

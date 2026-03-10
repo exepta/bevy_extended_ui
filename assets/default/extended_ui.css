@@ -678,6 +678,34 @@ p {
     color: var(--text-color);
 }
 
+/* Badge */
+
+badge {
+    position: absolute;
+    min-width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    padding-left: 5px;
+    padding-right: 5px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: var(--primary);
+    border: 1px var(--primary);
+    color: #ffffff;
+    font-size: 11px;
+    z-index: 20000;
+    pointer-events: none;
+
+    > .badge-text {
+        text-align: center;
+        transform: translateX(1px);
+        color: #ffffff;
+        font-size: 11px;
+        text-wrap: nowrap;
+    }
+}
+
 /* ToolTip */
 
 .tooltip-nose {
