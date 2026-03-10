@@ -2073,6 +2073,9 @@ fn apply_style_components(
 
     // TextLayout
     if let Some(tl) = components.6.as_mut() {
+        if let Some(text_align) = style.text_align {
+            tl.justify = text_align;
+        }
         if let Some(text_wrap) = style.text_wrap {
             tl.linebreak = text_wrap;
         }

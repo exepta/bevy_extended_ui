@@ -9,8 +9,8 @@ mod tests {
     use crate::lang::{UILang, UiLangState, UiLangVariables};
     use crate::styles::{CssClass, CssID, CssSource, IconPlace};
     use crate::widgets::{
-        Body, Button, ButtonType, DateFormat, FieldMode, FormValidationMode, InputCap, InputField,
-        InputType, Paragraph, RadioButton, Scrollbar, ToggleButton, ToolTipAlignment,
+        BadgeAnchor, Body, Button, ButtonType, DateFormat, FieldMode, FormValidationMode, InputCap,
+        InputField, InputType, Paragraph, RadioButton, Scrollbar, ToggleButton, ToolTipAlignment,
         ToolTipPriority, ToolTipTrigger, ToolTipVariant, UIWidgetState,
     };
     use bevy::asset::{AssetEvent, AssetPlugin};
@@ -238,6 +238,7 @@ mod tests {
               <input id="empty-cap" type="text" maxlength="" />
               <date-picker id="birthday" for="#email" placeholder="Datum" value="2026-02-20" min="2025-01-01" max="2027-01-01" format="yyyy-mm-dd"></date-picker>
               <tool-tip for="#email" variant="point" prio="top" alignment="vertical" trigger="hover | click, drag">  Tip text  </tool-tip>
+              <badge for="#email" value="143" max="99" anchor="top right"></badge>
               <p>{{ user.name }}</p>
               <img src="./images/avatar.png" alt="avatar" />
               <divider alignment="horizontal"></divider>
@@ -522,6 +523,15 @@ mod tests {
                     && tool_tip.prio == ToolTipPriority::Top
                     && tool_tip.alignment == ToolTipAlignment::Vertical
                     && tool_tip.trigger == vec![ToolTipTrigger::Hover, ToolTipTrigger::Click, ToolTipTrigger::Drag]
+        )));
+
+        assert!(all.iter().any(|node| matches!(
+            node,
+            HtmlWidgetNode::Badge(badge, _, _, _, _, _)
+                if badge.for_id.as_deref() == Some("email")
+                    && badge.value == 143
+                    && badge.max == 99
+                    && badge.anchor == BadgeAnchor::TopRight
         )));
 
         assert!(all.iter().any(|node| matches!(

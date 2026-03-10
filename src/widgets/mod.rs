@@ -202,6 +202,7 @@ pub enum WidgetKind {
     InputField,
     Paragraph,
     ToolTip,
+    Badge,
     ProgressBar,
     RadioButton,
     Scrollbar,
@@ -876,6 +877,88 @@ impl Default for Paragraph {
         Self {
             entry,
             text: String::from(""),
+        }
+    }
+}
+
+// ===============================================
+//                       Badge
+// ===============================================
+
+/// Corner anchor used to place a badge relative to its target widget.
+#[derive(Reflect, Default, Debug, Clone, Copy, Eq, PartialEq)]
+pub enum BadgeAnchor {
+    TopLeft,
+    #[default]
+    TopRight,
+    BottomLeft,
+    BottomRight,
+}
+
+impl BadgeAnchor {
+    /// Parses a badge anchor from values like `"top right"` or `"bottom-left"`.
+    pub fn from_str(value: &str) -> Option<Self> {
+        let normalized = value.to_ascii_lowercase().replace(['-', '_'], " ");
+
+        let mut vertical = None;
+        let mut horizontal = None;
+
+        for token in normalized.split([' ', ',', '|', '/']) {
+            let token = token.trim();
+            if token.is_empty() {
+                continue;
+            }
+
+            match token {
+                "top" => vertical = Some("top"),
+                "bottom" => vertical = Some("bottom"),
+                "left" => horizontal = Some("left"),
+                "right" => horizontal = Some("right"),
+                _ => {}
+            }
+        }
+
+        if vertical.is_none() && horizontal.is_none() {
+            return None;
+        }
+
+        Some(match (vertical, horizontal) {
+            (Some("top"), Some("left")) => Self::TopLeft,
+            (Some("top"), Some("right")) => Self::TopRight,
+            (Some("bottom"), Some("left")) => Self::BottomLeft,
+            (Some("bottom"), Some("right")) => Self::BottomRight,
+            (Some("top"), None) => Self::TopRight,
+            (Some("bottom"), None) => Self::BottomRight,
+            (None, Some("left")) => Self::TopLeft,
+            (None, Some("right")) => Self::TopRight,
+            _ => Self::TopRight,
+        })
+    }
+}
+
+/// Notification badge widget bound to a target via `for` or parent relationship.
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+#[require(UIGenID, UIWidgetState, Widget)]
+pub struct Badge {
+    pub entry: usize,
+    pub value: u32,
+    pub max: u32,
+    pub for_id: Option<String>,
+    pub anchor: BadgeAnchor,
+}
+
+impl Default for Badge {
+    /// Creates a default badge widget.
+    fn default() -> Self {
+        let entry = BADGE_ID_POOL.lock().unwrap().acquire();
+
+        Self {
+            entry,
+            value: 0,
+            max: 99,
+            for_id: None,
+            anchor: BadgeAnchor::default(),
         }
     }
 }

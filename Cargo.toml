@@ -14,6 +14,8 @@ exclude = [
     "assets/examples/**",
     "assets/images/**",
     "assets/lang/**",
+    "crates/local-examples/**",
+    "crates/local-wasm-examples/**",
 ]
 
 [lib]
@@ -78,7 +80,7 @@ version = "0.8.1"
 
 # Css3 Converter
 [dependencies.lightningcss]
-version = "1.0.0-alpha.70"
+version = "1.0.0-alpha.71"
 
 [dependencies.once_cell]
 version = "1.21.3"
@@ -116,3 +118,5 @@ wasm-bindgen = { version = "0.2.92", optional = true }
 wasm-bindgen-futures = { version = "0.4.64", optional = true }
 web-sys = { version = "0.3.69", features = ["Navigator", "Clipboard", "Window"], optional = true }
 js-sys = "0.3.69"
+# `lightningcss -> ahash` pulls `getrandom` on wasm; opt into JS backend for wasm32-unknown-unknown.
+getrandom = { version = "0.3.4", features = ["wasm_js"] }

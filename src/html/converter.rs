@@ -755,6 +755,39 @@ fn parse_html_node(
             ))
         }
 
+        "badge" => {
+            let for_id = parse_for_attribute_id(&attributes);
+            let max = attributes
+                .get("max")
+                .and_then(|raw| raw.trim().parse::<u32>().ok())
+                .unwrap_or(99);
+            let value = attributes
+                .get("value")
+                .or_else(|| attributes.get("count"))
+                .and_then(|raw| raw.trim().parse::<u32>().ok())
+                .or_else(|| node.text_contents().trim().parse::<u32>().ok())
+                .unwrap_or(0);
+            let anchor = attributes
+                .get("anchor")
+                .and_then(BadgeAnchor::from_str)
+                .unwrap_or_default();
+
+            Some(HtmlWidgetNode::Badge(
+                Badge {
+                    value,
+                    max,
+                    for_id,
+                    anchor,
+                    ..default()
+                },
+                meta,
+                states,
+                functions,
+                widget.clone(),
+                HtmlID::default(),
+            ))
+        }
+
         "progressbar" => {
             let min = attributes
                 .get("min")

@@ -189,6 +189,16 @@ mod tests {
             Some(ToolTipTrigger::Hover)
         );
         assert_eq!(ToolTipTrigger::from_str("x"), None);
+
+        assert_eq!(
+            BadgeAnchor::from_str("top right"),
+            Some(BadgeAnchor::TopRight)
+        );
+        assert_eq!(
+            BadgeAnchor::from_str("bottom-left"),
+            Some(BadgeAnchor::BottomLeft)
+        );
+        assert_eq!(BadgeAnchor::from_str("x"), None);
     }
 
     #[test]
