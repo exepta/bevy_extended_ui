@@ -1,4 +1,4 @@
-:root {
+pub const DEFAULT_STYLE_CSS: &str = r####":root {
     --primary: #5656ff;
     --primary-hover: #4848da;
     --primary-disabled: #33336f;
@@ -296,11 +296,11 @@ date-picker {
 
     &:focus {
         border-color: #90caf9;
-        z-index: 30000;
+        z-index: 40000;
     }
 
     &:checked {
-        z-index: 30000;
+        z-index: 40000;
     }
 
     > .date-picker-field {
@@ -360,7 +360,7 @@ date-picker {
         align-items: flex-start;
         flex-direction: column;
         gap: 10px;
-        z-index: 30001;
+        z-index: 40001;
 
         > .date-picker-header {
             position: relative;
@@ -662,7 +662,7 @@ date-picker {
     border-radius: 0px;
     background: transparent;
     cursor: default;
-    z-index: 30000;
+    z-index: 40000;
 
     > .date-picker-popover {
         top: 58px;
@@ -712,7 +712,7 @@ badge {
     position: absolute;
     width: 10px;
     height: 10px;
-    z-index: 9999;
+    z-index: 59999;
     background: rgba(24, 24, 30, 0.92);
     border-width: 0px;
     border-color: rgba(192, 198, 210, 0.95);
@@ -735,7 +735,7 @@ tool-tip {
     border-color: var(--primary-hover);
     color: var(--text-color);
     font-size: 13px;
-    z-index: 10000;
+    z-index: 60000;
     pointer-events: none;
 
     > .tooltip-nose {
@@ -1138,7 +1138,7 @@ colorpicker > .color-picker-modal {
     border-radius: 16px;
     background: var(--gray-background);
     box-shadow: 0 10px 30px rgba(60, 64, 67, 0.32);
-    z-index: 20;
+    z-index: 40001;
 }
 
 colorpicker > .color-picker-modal > .color-canvas {
@@ -1359,3 +1359,4 @@ toggle {
         transform: translateX(0);
     }
 }
+"####;

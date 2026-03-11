@@ -22,7 +22,7 @@ pub fn run() {
             DefaultPlugins
                 .set(WindowPlugin {
                     primary_window: Some(Window {
-                        title: "Bevy Extended UI WASM Badge".into(),
+                        title: "Bevy Extended UI WASM Widget Gallery".into(),
                         canvas: Some("#bevy".into()),
                         fit_canvas_to_parent: true,
                         prevent_default_event_handling: true,
@@ -43,7 +43,7 @@ pub fn run() {
             DefaultPlugins
                 .set(WindowPlugin {
                     primary_window: Some(Window {
-                        title: "Bevy Extended UI WASM Badge (Native Fallback)".into(),
+                        title: "Bevy Extended UI WASM Widget Gallery (Native Fallback)".into(),
                         ..default()
                     }),
                     ..default()
@@ -70,8 +70,8 @@ fn configure_ui(mut config: ResMut<ExtendedUiConfiguration>) {
 }
 
 fn load_ui(mut reg: ResMut<UiRegistry>, asset_server: Res<AssetServer>) {
-    let handle: Handle<HtmlAsset> = asset_server.load("examples/badge.html");
-    reg.add_and_use("badge-demo".to_string(), HtmlSource::from_handle(handle));
+    let handle: Handle<HtmlAsset> = asset_server.load("examples/widgets_overview.html");
+    reg.add_and_use("widgets-demo".to_string(), HtmlSource::from_handle(handle));
 }
 
 fn animate_badges(

@@ -1,0 +1,174 @@
+body {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 18px;
+    padding: 24px;
+    background: #141723;
+    overflow-y: scroll;
+    overflow-x: hidden;
+}
+
+.page-head {
+    width: 100%;
+    min-height: 60px;
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.page-head > h3 {
+    margin: 0;
+    color: #f5f7ff;
+}
+
+.page-head > p {
+    margin: 0;
+    color: #b8bfd6;
+    font-size: 13px;
+}
+
+.widget-grid {
+    width: 100%;
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 14px;
+}
+
+.widget-card {
+    position: relative;
+    width: 320px;
+    min-height: 180px;
+    padding: 14px;
+    border-radius: 12px;
+    border: 2px #2f3750;
+    background: #1f2636;
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.widget-card > h5 {
+    margin: 0;
+    color: #f2f4ff;
+}
+
+.widget-card > p {
+    margin: 0;
+}
+
+.widget-card > button,
+.widget-card > select,
+.widget-card > input,
+.widget-card > slider,
+.widget-card > switch,
+.widget-card > toggle,
+.widget-card > progressbar,
+.widget-card > date-picker,
+.widget-card > fieldset,
+.widget-card > colorpicker,
+.widget-card > form {
+    width: 100%;
+}
+
+.widget-card > form {
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.widget-card > form > input,
+.widget-card > form > button {
+    width: 100%;
+}
+
+.widget-card > scroll {
+    width: 100%;
+}
+
+.scroll-div {
+    width: 100%;
+    height: 100px;
+    overflow: scroll;
+    display: flex;
+    flex-direction: column;
+}
+
+.scroll-hori-div {
+    width: 100%;
+    height: 100px;
+    overflow: scroll;
+    display: flex;
+    flex-direction: row;
+}
+
+.notification-target {
+    position: relative;
+    width: 100%;
+    min-height: 64px;
+    border-radius: 12px;
+    background: #1f2636;
+    border: 2px #2f3750;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.notification-target > button {
+    width: 100%;
+    min-height: 44px;
+}
+
+badge {
+    background: #8940ff;
+    border-color: #6f32d3;
+    min-width: 22px;
+    height: 22px;
+    font-size: 12px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+badge > .badge-text {
+    text-align: center;
+    transform: translateX(1px);
+}
+
+.demo-image {
+    width: 64px;
+    height: 64px;
+    border: 1px #3a435c;
+    border-radius: 8px;
+    background: #22293a;
+}
+
+.full-divider {
+    width: 100%;
+}
+
+.demo-div {
+    width: 100%;
+    min-height: 96px;
+    border-radius: 8px;
+    border: 1px #39415a;
+    background: #1a2130;
+    padding: 8px;
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+}

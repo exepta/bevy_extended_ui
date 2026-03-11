@@ -18,8 +18,8 @@ use crate::styles::parser::convert_to_color;
 use crate::widgets::Button;
 use crate::widgets::*;
 
-/// Default CSS asset path applied to every HTML UI.
-pub const DEFAULT_UI_CSS: &str = "default/extended_ui.css";
+/// Legacy identifier for the built-in embedded default stylesheet.
+pub const DEFAULT_UI_CSS: &str = "embedded/default_style";
 
 static INNER_BINDING_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?s)\{\{\s*([^{}]+?)\s*\}\}").unwrap());

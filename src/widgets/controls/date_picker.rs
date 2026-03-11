@@ -101,7 +101,7 @@ struct DatePickerDayText {
     index: usize,
 }
 
-const DATE_PICKER_OVERLAY_Z: i32 = 30_000;
+const DATE_PICKER_OVERLAY_Z: i32 = 40_000;
 
 /// Stores the previous z-index of a bound input while its date picker is open.
 #[derive(Component, Clone, Copy, Debug)]
@@ -299,6 +299,7 @@ fn internal_node_creation_system(
                     }
                 }),
             ))
+            .insert(GlobalZIndex::default())
             .observe(on_internal_cursor_entered)
             .observe(on_internal_cursor_leave)
             .with_children(|builder| {
@@ -392,6 +393,7 @@ fn internal_node_creation_system(
                         DatePickerPopover,
                         BindToID(id.get()),
                     ))
+                    .insert(GlobalZIndex::default())
                     .with_children(|popover| {
                         popover
                             .spawn((
@@ -850,6 +852,7 @@ fn sync_bound_date_picker_targets(
         ),
         (
             With<DatePickerBase>,
+            Without<DatePickerPopover>,
             Without<DatePickerDayButton>,
             Without<DatePickerDayText>,
             Without<InputField>,
@@ -1125,6 +1128,7 @@ fn sync_date_picker_visuals(
             &mut InputValue,
             &mut UIWidgetState,
             &mut ZIndex,
+            &mut GlobalZIndex,
             &UIGenID,
         ),
         (
@@ -1147,7 +1151,10 @@ fn sync_date_picker_visuals(
             With<DatePickerLabel>,
         >,
         Query<(&mut Text, &mut TextColor, &BindToID), With<DatePickerValueText>>,
-        Query<(&mut Visibility, &BindToID), With<DatePickerPopover>>,
+        Query<
+            (&mut Visibility, &mut GlobalZIndex, &BindToID),
+            (With<DatePickerPopover>, Without<DatePickerBase>),
+        >,
         Query<(&mut Text, &BindToID), With<DatePickerHeaderLabel>>,
         Query<
             (
@@ -1182,14 +1189,24 @@ fn sync_date_picker_visuals(
         >,
     )>,
 ) {
-    for (mut picker, mut state, mut input_value, ui_state, mut root_z, ui_id) in
+    for (
+        mut picker,
+        mut state,
+        mut input_value,
+        ui_state,
+        mut root_z,
+        mut root_global_z,
+        ui_id,
+    ) in
         picker_query.iter_mut()
     {
-        root_z.0 = if ui_state.open && !ui_state.disabled {
-            DATE_PICKER_OVERLAY_Z
+        if ui_state.open && !ui_state.disabled {
+            root_z.0 = DATE_PICKER_OVERLAY_Z;
+            root_global_z.0 = DATE_PICKER_OVERLAY_Z;
         } else {
-            0
-        };
+            root_z.0 = 0;
+            root_global_z.0 = 0;
+        }
 
         let bound_input = picker.for_id.as_ref().and_then(|for_id| {
             input_targets
@@ -1325,23 +1342,28 @@ fn sync_date_picker_visuals(
                         ),
                     };
                     value_color.0 = Color::srgb(0.96, 0.97, 1.0);
-                } else {
+                } else if float_label {
                     value_text.0 = placeholder.clone();
                     value_color.0 = Color::srgba(0.69, 0.72, 0.82, 0.98);
+                } else {
+                    // Keep placeholder hidden while the label is not floated to avoid overlap.
+                    value_text.0.clear();
                 }
             }
         }
 
         {
             let mut popover_query = params.p2();
-            for (mut visibility, bind_id) in popover_query.iter_mut() {
+            for (mut visibility, mut popover_global_z, bind_id) in popover_query.iter_mut() {
                 if bind_id.0 != ui_id.get() {
                     continue;
                 }
                 if ui_state.open && !ui_state.disabled {
                     *visibility = Visibility::Inherited;
+                    popover_global_z.0 = DATE_PICKER_OVERLAY_Z + 1;
                 } else {
                     *visibility = Visibility::Hidden;
+                    popover_global_z.0 = 0;
                 }
             }
         }
