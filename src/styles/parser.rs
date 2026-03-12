@@ -21,24 +21,57 @@ use regex::Regex;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 
-/// Loads a CSS file and parses it into a [`ParsedCss`] with selectors and keyframes.
-///
-/// This function reads a `.css` file from the disk, parses its rules, and converts each supported
-/// CSS property into a Bevy-compatible [`Style`] representation. These styles can later be applied
-/// to UI nodes.
-///
-/// # Parameters
-/// - `path`: A path to the CSS file. If empty, it falls back to the default path `"assets/internal.css"`.
-///
-/// # Returns
-/// - `ParsedCss` on success, containing styles and keyframes.
-/// - Empty maps if the file cannot be parsed, but no panic occurs.
-///
-/// # Notes
-/// - This uses [`grass_compiler::StyleSheet`] to parse the file.
-/// - Supports standard properties like `width`, `height`, `padding`, `color`, `background`, `font-size`, `z-index`, etc.
-/// - Ignores unsupported or malformed declarations silently.
 pub fn load_css(css: &str) -> ParsedCss {
+    parse_css(css, HashMap::new(), true)
+}
+
+/// Loads a CSS file and resolves `var(...)` values against the provided global `:root` variables.
+///
+/// This is used when multiple CSS assets should share one theme-token scope (e.g. ThemeProvider),
+/// so files can consume variables defined in other files.
+pub fn load_css_with_root_vars(css: &str, root_vars: &HashMap<String, String>) -> ParsedCss {
+    parse_css(css, root_vars.clone(), false)
+}
+
+/// Extracts top-level `:root` custom properties from a CSS source.
+pub fn collect_root_css_vars(css: &str) -> HashMap<String, String> {
+    let mut options = ParserOptions::default();
+    options.flags.insert(ParserFlags::NESTING);
+
+    let stylesheet = match StyleSheet::parse(css, options) {
+        Ok(sheet) => sheet,
+        Err(_) => {
+            return HashMap::new();
+        }
+    };
+
+    let mut css_vars = HashMap::new();
+    for rule in &stylesheet.rules.0 {
+        match rule {
+            CssRule::Style(style_rule) => {
+                let selectors = selector_list_to_strings(&style_rule.selectors);
+                if selectors.len() == 1 && selectors[0].trim() == ":root" {
+                    collect_css_vars(&style_rule.declarations, &mut css_vars);
+                }
+            }
+            CssRule::Nesting(nesting_rule) => {
+                let selectors = selector_list_to_strings(&nesting_rule.style.selectors);
+                if selectors.len() == 1 && selectors[0].trim() == ":root" {
+                    collect_css_vars(&nesting_rule.style.declarations, &mut css_vars);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    css_vars
+}
+
+fn parse_css(
+    css: &str,
+    mut css_vars: HashMap<String, String>,
+    allow_root_var_collection: bool,
+) -> ParsedCss {
     let mut options = ParserOptions::default();
     options.flags.insert(ParserFlags::NESTING);
 
@@ -50,7 +83,6 @@ pub fn load_css(css: &str) -> ParsedCss {
         }
     };
 
-    let mut css_vars = HashMap::new();
     let mut style_map = HashMap::new();
     let mut keyframes_map: HashMap<String, Vec<AnimationKeyframe>> = HashMap::new();
 
@@ -61,6 +93,7 @@ pub fn load_css(css: &str) -> ParsedCss {
         &mut style_map,
         &mut keyframes_map,
         None,
+        allow_root_var_collection,
     );
 
     for keyframes in keyframes_map.values_mut() {
@@ -84,6 +117,7 @@ fn collect_css_rules(
     style_map: &mut HashMap<String, StylePair>,
     keyframes_map: &mut HashMap<String, Vec<AnimationKeyframe>>,
     media_condition: Option<MediaQueryCondition>,
+    allow_root_var_collection: bool,
 ) {
     for rule in &rules.0 {
         match rule {
@@ -94,6 +128,7 @@ fn collect_css_rules(
                 style_map,
                 keyframes_map,
                 media_condition.clone(),
+                allow_root_var_collection,
             ),
             CssRule::Nesting(nesting_rule) => collect_style_rule(
                 &nesting_rule.style,
@@ -102,6 +137,7 @@ fn collect_css_rules(
                 style_map,
                 keyframes_map,
                 media_condition.clone(),
+                allow_root_var_collection,
             ),
             CssRule::NestedDeclarations(nested_rule) => {
                 if let Some(parent_selectors) = parent_selectors {
@@ -135,6 +171,7 @@ fn collect_css_rules(
                     style_map,
                     keyframes_map,
                     combined_media,
+                    allow_root_var_collection,
                 );
             }
             CssRule::Keyframes(keyframes_rule) => {
@@ -152,6 +189,7 @@ fn collect_style_rule(
     style_map: &mut HashMap<String, StylePair>,
     keyframes_map: &mut HashMap<String, Vec<AnimationKeyframe>>,
     media_condition: Option<MediaQueryCondition>,
+    allow_root_var_collection: bool,
 ) {
     let selectors = selector_list_to_strings(&style_rule.selectors);
     if parent_selectors.is_none()
@@ -159,7 +197,9 @@ fn collect_style_rule(
         && selectors.len() == 1
         && selectors[0].trim() == ":root"
     {
-        collect_css_vars(&style_rule.declarations, css_vars);
+        if allow_root_var_collection {
+            collect_css_vars(&style_rule.declarations, css_vars);
+        }
         return;
     }
 
@@ -190,6 +230,7 @@ fn collect_style_rule(
         style_map,
         keyframes_map,
         media_condition,
+        allow_root_var_collection,
     );
 }
 
@@ -572,7 +613,11 @@ fn find_var_call_bounds(value: &str) -> Option<(usize, usize)> {
     end.map(|end_idx| (start, end_idx))
 }
 
-fn resolve_single_var_call(var_call: &str, css_vars: &HashMap<String, String>, depth: u8) -> String {
+fn resolve_single_var_call(
+    var_call: &str,
+    css_vars: &HashMap<String, String>,
+    depth: u8,
+) -> String {
     if depth >= 8 {
         return var_call.to_string();
     }
@@ -3415,6 +3460,45 @@ mod tests {
 
         let background = pair.normal.background.as_ref().expect("missing background");
         assert!(background.gradient.is_some());
+    }
+
+    #[test]
+    fn collects_root_css_vars_from_stylesheet() {
+        let vars = collect_root_css_vars(
+            r#"
+            :root {
+                --brand: #102030;
+                --accent: #445566;
+            }
+            .panel { color: var(--brand); }
+        "#,
+        );
+
+        assert_eq!(vars.get("--brand"), Some(&"#102030".to_string()));
+        assert_eq!(vars.get("--accent"), Some(&"#456".to_string()));
+    }
+
+    #[test]
+    fn resolves_vars_from_external_root_scope() {
+        let mut root_vars = HashMap::new();
+        root_vars.insert("--brand".to_string(), "#112233".to_string());
+
+        let parsed = load_css_with_root_vars(
+            r#"
+            :root { --brand: #ffeeaa; }
+            .panel { background: var(--brand); }
+        "#,
+            &root_vars,
+        );
+
+        let pair = parsed
+            .styles
+            .values()
+            .find(|pair| pair.selector == ".panel")
+            .expect("missing parsed .panel style");
+
+        let background = pair.normal.background.as_ref().expect("missing background");
+        assert_eq!(background.color, Color::srgb_u8(0x11, 0x22, 0x33));
     }
 
     #[test]

@@ -1,12 +1,14 @@
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use once_cell::sync::Lazy;
+use std::collections::hash_map::DefaultHasher;
 use std::collections::{HashMap, HashSet};
+use std::hash::{Hash, Hasher};
 use std::sync::RwLock;
 
 use crate::io::CssAsset;
 use crate::styles::components::UiStyle;
-use crate::styles::parser::load_css;
+use crate::styles::parser::{collect_root_css_vars, load_css, load_css_with_root_vars};
 use crate::styles::{
     AnimationKeyframe, CssClass, CssID, CssSource, ExistingCssIDs, ParsedCss, StylePair, TagName,
 };
@@ -16,6 +18,16 @@ use crate::html::reload::CssDirty;
 
 static PARSED_CSS_CACHE: Lazy<RwLock<HashMap<AssetId<CssAsset>, ParsedCss>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
+static ROOT_CSS_VARS_CACHE: Lazy<RwLock<HashMap<AssetId<CssAsset>, HashMap<String, String>>>> =
+    Lazy::new(|| RwLock::new(HashMap::new()));
+static PARSED_CSS_WITH_VARS_CACHE: Lazy<RwLock<HashMap<ParsedCssWithVarsKey, ParsedCss>>> =
+    Lazy::new(|| RwLock::new(HashMap::new()));
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+struct ParsedCssWithVarsKey {
+    asset_id: AssetId<CssAsset>,
+    vars_hash: u64,
+}
 
 /// Tracks which entities reference which CSS assets.
 #[derive(Resource, Default)]
@@ -81,6 +93,12 @@ fn invalidate_css_cache_on_asset_change(mut ev: MessageReader<AssetEvent<CssAsse
                 if let Ok(mut cache) = PARSED_CSS_CACHE.write() {
                     cache.remove(id);
                 }
+                if let Ok(mut cache) = ROOT_CSS_VARS_CACHE.write() {
+                    cache.remove(id);
+                }
+                if let Ok(mut cache) = PARSED_CSS_WITH_VARS_CACHE.write() {
+                    cache.retain(|key, _| key.asset_id != *id);
+                }
             }
             _ => {}
         }
@@ -104,6 +122,93 @@ fn get_or_parse_css(handle: &Handle<CssAsset>, css_assets: &Assets<CssAsset>) ->
         cache.insert(asset_id, parsed.clone());
     }
     Some(parsed)
+}
+
+fn hash_root_vars(root_vars: &HashMap<String, String>) -> u64 {
+    let mut entries: Vec<(&String, &String)> = root_vars.iter().collect();
+    entries.sort_unstable_by(|(left_key, _), (right_key, _)| left_key.cmp(right_key));
+
+    let mut hasher = DefaultHasher::new();
+    for (key, value) in entries {
+        key.hash(&mut hasher);
+        value.hash(&mut hasher);
+    }
+    hasher.finish()
+}
+
+fn get_or_collect_root_vars(
+    handle: &Handle<CssAsset>,
+    css_assets: &Assets<CssAsset>,
+) -> Option<HashMap<String, String>> {
+    let asset_id = handle.id();
+
+    if let Some(cached) = ROOT_CSS_VARS_CACHE
+        .read()
+        .ok()
+        .and_then(|cache| cache.get(&asset_id).cloned())
+    {
+        return Some(cached);
+    }
+
+    let css_asset = css_assets.get(handle)?;
+    let vars = collect_root_css_vars(&css_asset.text);
+
+    if let Ok(mut cache) = ROOT_CSS_VARS_CACHE.write() {
+        cache.insert(asset_id, vars.clone());
+    }
+
+    Some(vars)
+}
+
+fn get_or_parse_css_with_root_vars(
+    handle: &Handle<CssAsset>,
+    css_assets: &Assets<CssAsset>,
+    root_vars: &HashMap<String, String>,
+) -> Option<ParsedCss> {
+    if root_vars.is_empty() {
+        return get_or_parse_css(handle, css_assets);
+    }
+
+    let vars_hash = hash_root_vars(root_vars);
+    let cache_key = ParsedCssWithVarsKey {
+        asset_id: handle.id(),
+        vars_hash,
+    };
+
+    if let Some(cached) = PARSED_CSS_WITH_VARS_CACHE
+        .read()
+        .ok()
+        .and_then(|cache| cache.get(&cache_key).cloned())
+    {
+        return Some(cached);
+    }
+
+    let css_asset = css_assets.get(handle)?;
+    let parsed = load_css_with_root_vars(&css_asset.text, root_vars);
+
+    if let Ok(mut cache) = PARSED_CSS_WITH_VARS_CACHE.write() {
+        cache.insert(cache_key, parsed.clone());
+    }
+
+    Some(parsed)
+}
+
+fn collect_global_root_vars_for_sources(
+    sources: &[Handle<CssAsset>],
+    css_assets: &Assets<CssAsset>,
+) -> HashMap<String, String> {
+    let mut vars = HashMap::new();
+
+    for handle in sources {
+        let Some(extracted) = get_or_collect_root_vars(handle, css_assets) else {
+            continue;
+        };
+        for (name, value) in extracted {
+            vars.insert(name, value);
+        }
+    }
+
+    vars
 }
 
 /// Updates the reverse index of entities using each CSS asset.
@@ -517,9 +622,11 @@ fn load_and_merge_styles_from_assets(
 ) -> ParsedCss {
     let mut merged_styles: HashMap<String, StylePair> = HashMap::new();
     let mut merged_keyframes: HashMap<String, Vec<AnimationKeyframe>> = HashMap::new();
+    let global_root_vars = collect_global_root_vars_for_sources(sources, css_assets);
 
     for (index, handle) in sources.iter().enumerate() {
-        let Some(parsed_map) = get_or_parse_css(handle, css_assets) else {
+        let Some(parsed_map) = get_or_parse_css_with_root_vars(handle, css_assets, &global_root_vars)
+        else {
             continue;
         };
 
@@ -581,9 +688,11 @@ fn load_and_merge_styles_from_assets_legacy(
 ) -> ParsedCss {
     let mut merged_styles: HashMap<String, StylePair> = HashMap::new();
     let mut merged_keyframes: HashMap<String, Vec<AnimationKeyframe>> = HashMap::new();
+    let global_root_vars = collect_global_root_vars_for_sources(sources, css_assets);
 
     for (index, handle) in sources.iter().enumerate() {
-        let Some(parsed_map) = get_or_parse_css(handle, css_assets) else {
+        let Some(parsed_map) = get_or_parse_css_with_root_vars(handle, css_assets, &global_root_vars)
+        else {
             continue;
         };
 

@@ -432,10 +432,8 @@ fn internal_node_creation_system(
                                             Text::new("<"),
                                             TextColor::default(),
                                             TextFont::default(),
-                                            TextLayout::new_with_justify(
-                                                Justify::Center,
-                                            )
-                                            .with_no_wrap(),
+                                            TextLayout::new_with_justify(Justify::Center)
+                                                .with_no_wrap(),
                                             UIWidgetState::default(),
                                             css_source.clone(),
                                             CssClass(vec!["date-picker-nav-text".to_string()]),
@@ -534,10 +532,8 @@ fn internal_node_creation_system(
                                                     Text::new(""),
                                                     TextColor::default(),
                                                     TextFont::default(),
-                                                    TextLayout::new_with_justify(
-                                                        Justify::Center,
-                                                    )
-                                                    .with_no_wrap(),
+                                                    TextLayout::new_with_justify(Justify::Center)
+                                                        .with_no_wrap(),
                                                     UIWidgetState::default(),
                                                     css_source.clone(),
                                                     CssClass(vec![
@@ -579,10 +575,8 @@ fn internal_node_creation_system(
                                             Text::new(">"),
                                             TextColor::default(),
                                             TextFont::default(),
-                                            TextLayout::new_with_justify(
-                                                Justify::Center,
-                                            )
-                                            .with_no_wrap(),
+                                            TextLayout::new_with_justify(Justify::Center)
+                                                .with_no_wrap(),
                                             UIWidgetState::default(),
                                             css_source.clone(),
                                             CssClass(vec!["date-picker-nav-text".to_string()]),
@@ -633,10 +627,8 @@ fn internal_node_creation_system(
                                                 Text::new(day),
                                                 TextColor::default(),
                                                 TextFont::default(),
-                                                TextLayout::new_with_justify(
-                                                    Justify::Center,
-                                                )
-                                                .with_no_wrap(),
+                                                TextLayout::new_with_justify(Justify::Center)
+                                                    .with_no_wrap(),
                                                 UIWidgetState::default(),
                                                 css_source.clone(),
                                                 CssClass(vec![
@@ -688,10 +680,8 @@ fn internal_node_creation_system(
                                             Text::new(""),
                                             TextColor::default(),
                                             TextFont::default(),
-                                            TextLayout::new_with_justify(
-                                                Justify::Center,
-                                            )
-                                            .with_no_wrap(),
+                                            TextLayout::new_with_justify(Justify::Center)
+                                                .with_no_wrap(),
                                             UIWidgetState::default(),
                                             css_source.clone(),
                                             CssClass(vec!["date-picker-day-text".to_string()]),
@@ -750,10 +740,8 @@ fn internal_node_creation_system(
                                                 Text::new(year.to_string()),
                                                 TextColor::default(),
                                                 TextFont::default(),
-                                                TextLayout::new_with_justify(
-                                                    Justify::Center,
-                                                )
-                                                .with_no_wrap(),
+                                                TextLayout::new_with_justify(Justify::Center)
+                                                    .with_no_wrap(),
                                                 UIWidgetState::default(),
                                                 css_source.clone(),
                                                 CssClass(vec![
@@ -813,10 +801,8 @@ fn internal_node_creation_system(
                                                 Text::new(month_short_name(month).to_string()),
                                                 TextColor::default(),
                                                 TextFont::default(),
-                                                TextLayout::new_with_justify(
-                                                    Justify::Center,
-                                                )
-                                                .with_no_wrap(),
+                                                TextLayout::new_with_justify(Justify::Center)
+                                                    .with_no_wrap(),
                                                 UIWidgetState::default(),
                                                 css_source.clone(),
                                                 CssClass(vec![
@@ -1189,15 +1175,7 @@ fn sync_date_picker_visuals(
         >,
     )>,
 ) {
-    for (
-        mut picker,
-        mut state,
-        mut input_value,
-        ui_state,
-        mut root_z,
-        mut root_global_z,
-        ui_id,
-    ) in
+    for (mut picker, mut state, mut input_value, ui_state, mut root_z, mut root_global_z, ui_id) in
         picker_query.iter_mut()
     {
         if ui_state.open && !ui_state.disabled {

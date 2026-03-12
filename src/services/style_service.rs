@@ -903,7 +903,9 @@ fn apply_background_gradients_system(
                         if image_applied.is_none() {
                             clear_image_node_texture(&mut img_node);
                         }
-                        commands.entity(entity).remove::<BackgroundGradientApplied>();
+                        commands
+                            .entity(entity)
+                            .remove::<BackgroundGradientApplied>();
                     }
                     continue;
                 }
@@ -915,7 +917,9 @@ fn apply_background_gradients_system(
                 if image_applied.is_none() {
                     clear_image_node_texture(&mut img_node);
                 }
-                commands.entity(entity).remove::<BackgroundGradientApplied>();
+                commands
+                    .entity(entity)
+                    .remove::<BackgroundGradientApplied>();
             }
             continue;
         };
@@ -924,7 +928,9 @@ fn apply_background_gradients_system(
                 if background.image.is_none() {
                     clear_image_node_texture(&mut img_node);
                 }
-                commands.entity(entity).remove::<BackgroundGradientApplied>();
+                commands
+                    .entity(entity)
+                    .remove::<BackgroundGradientApplied>();
             }
             continue;
         };
@@ -1053,7 +1059,9 @@ fn apply_background_images_system(
         };
 
         if gradient_applied.is_some() {
-            commands.entity(entity).remove::<BackgroundGradientApplied>();
+            commands
+                .entity(entity)
+                .remove::<BackgroundGradientApplied>();
         }
 
         if img_node.color != Color::WHITE {
@@ -1201,9 +1209,7 @@ fn sync_backdrop_blur_materials_system(
         };
 
         let blur_radius = match style.backdrop_filter.as_ref() {
-            Some(BackdropFilter::Blur(radius)) if *radius > 0.0 => {
-                radius.min(MAX_BACKDROP_BLUR_PX)
-            }
+            Some(BackdropFilter::Blur(radius)) if *radius > 0.0 => radius.min(MAX_BACKDROP_BLUR_PX),
             _ => {
                 if material_node_opt.is_some() {
                     commands

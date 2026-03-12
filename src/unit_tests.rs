@@ -220,6 +220,7 @@ mod tests {
             render_layers: vec![1, 3],
             assets_path: "assets/extended_ui/".to_string(),
             language_path: "assets/lang".to_string(),
+            themes_path: "assets/themes".to_string(),
         });
         app.add_systems(Update, load_ui_camera_system);
         app.update();
@@ -272,9 +273,7 @@ mod tests {
         }
         app.update();
 
-        let mut query = app
-            .world_mut()
-            .query_filtered::<Has<Hdr>, With<UiCamera>>();
+        let mut query = app.world_mut().query_filtered::<Has<Hdr>, With<UiCamera>>();
         let rows: Vec<_> = query.iter(app.world()).collect();
         assert_eq!(rows, vec![false]);
     }
@@ -320,9 +319,7 @@ mod tests {
         }
         app.update();
 
-        let mut query = app
-            .world_mut()
-            .query_filtered::<Entity, With<UiCamera>>();
+        let mut query = app.world_mut().query_filtered::<Entity, With<UiCamera>>();
         let count = query.iter(app.world()).count();
         assert_eq!(count, 0);
     }

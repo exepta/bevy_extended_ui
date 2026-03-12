@@ -158,24 +158,25 @@ fn internal_node_creation_system(
 
                 let nose_classes = vec!["tooltip-nose".to_string()];
 
-                builder.spawn((
-                    Name::new(format!("ToolTip-Nose-{}", tooltip.entry)),
-                    nose_node,
-                    BackgroundColor::default(),
-                    BorderColor::default(),
-                    UiTransform::default(),
-                    ZIndex(TOOLTIP_NOSE_Z_INDEX),
-                    Pickable::IGNORE,
-                    css_source.clone(),
-                    CssClass(nose_classes.clone()),
-                    ToolTipNoseClassBase(nose_classes),
-                    BindToID(ui_id.get()),
-                    UIWidgetState::default(),
-                    RenderLayers::layer(*layer),
-                    Visibility::Hidden,
-                    ToolTipNose,
-                ))
-                .insert(GlobalZIndex(TOOLTIP_NOSE_Z_INDEX));
+                builder
+                    .spawn((
+                        Name::new(format!("ToolTip-Nose-{}", tooltip.entry)),
+                        nose_node,
+                        BackgroundColor::default(),
+                        BorderColor::default(),
+                        UiTransform::default(),
+                        ZIndex(TOOLTIP_NOSE_Z_INDEX),
+                        Pickable::IGNORE,
+                        css_source.clone(),
+                        CssClass(nose_classes.clone()),
+                        ToolTipNoseClassBase(nose_classes),
+                        BindToID(ui_id.get()),
+                        UIWidgetState::default(),
+                        RenderLayers::layer(*layer),
+                        Visibility::Hidden,
+                        ToolTipNose,
+                    ))
+                    .insert(GlobalZIndex(TOOLTIP_NOSE_Z_INDEX));
             });
     }
 }
