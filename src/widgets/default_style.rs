@@ -304,6 +304,7 @@ date-picker {
     }
 
     > .date-picker-field {
+        position: relative;
         width: 100%;
         height: 100%;
         display: flex;
@@ -324,8 +325,13 @@ date-picker {
     }
 
     > .date-picker-field > .date-picker-value {
+        position: absolute;
+        left: 14px;
+        right: 42px;
+        bottom: 8px;
         color: #f4f6ff;
         font-size: 16px;
+        text-wrap: nowrap;
     }
 
     > .date-picker-field > .date-picker-icon {
@@ -963,7 +969,7 @@ select {
         align-items: center;
         flex-direction: row;
         gap: 10px;
-        padding-left: 15px;
+        padding-left: 10px;
         flex-grow: 1;
         border-radius: 5px 0;
         transition: all 0.3s;
@@ -999,7 +1005,7 @@ select {
             height: 50px;
             min-height: 50px;
             max-height: 50px;
-            padding-left: 15px;
+            padding-left: 10px;
             display: flex;
             justify-content: flex-start;
             align-items: center;
