@@ -320,12 +320,8 @@ fn internal_node_creation_system(
                     .map(str::trim)
                     .filter(|path| !path.is_empty());
                 if let Some(icon_path) = icon_path {
-                    let handle = get_or_load_image(
-                        icon_path,
-                        &mut image_cache,
-                        &mut images,
-                        &asset_server,
-                    );
+                    let handle =
+                        get_or_load_image(icon_path, &mut image_cache, &mut images, &asset_server);
 
                     // Icon left
                     builder.spawn((
@@ -517,12 +513,7 @@ fn sync_input_field_updates(
             .map(str::trim)
             .filter(|path| !path.is_empty());
         if let Some(icon_path) = icon_path {
-            let handle = get_or_load_image(
-                icon_path,
-                &mut image_cache,
-                &mut images,
-                &asset_server,
-            );
+            let handle = get_or_load_image(icon_path, &mut image_cache, &mut images, &asset_server);
 
             if let Some(icon_entity) = icon_entities.get(&ui_id.0).copied() {
                 for (mut image_node, bind_id) in icon_image_query.iter_mut() {

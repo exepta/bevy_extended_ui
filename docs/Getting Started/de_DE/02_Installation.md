@@ -65,6 +65,7 @@ Nützliche Features:
 - `fluent`: Fluent-Sprachbackend
 - `properties-lang`: Java-Properties-Sprachbackend
 - `clipboard-wasm`: Clipboard-Unterstützung im Browser
+- `svg`: Optionaler SVG-Support für UI-Bilder/Icons (nicht standardmäßig aktiv)
 
 Beispiel:
 

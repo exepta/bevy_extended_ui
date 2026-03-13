@@ -625,7 +625,8 @@ fn load_and_merge_styles_from_assets(
     let global_root_vars = collect_global_root_vars_for_sources(sources, css_assets);
 
     for (index, handle) in sources.iter().enumerate() {
-        let Some(parsed_map) = get_or_parse_css_with_root_vars(handle, css_assets, &global_root_vars)
+        let Some(parsed_map) =
+            get_or_parse_css_with_root_vars(handle, css_assets, &global_root_vars)
         else {
             continue;
         };
@@ -691,7 +692,8 @@ fn load_and_merge_styles_from_assets_legacy(
     let global_root_vars = collect_global_root_vars_for_sources(sources, css_assets);
 
     for (index, handle) in sources.iter().enumerate() {
-        let Some(parsed_map) = get_or_parse_css_with_root_vars(handle, css_assets, &global_root_vars)
+        let Some(parsed_map) =
+            get_or_parse_css_with_root_vars(handle, css_assets, &global_root_vars)
         else {
             continue;
         };

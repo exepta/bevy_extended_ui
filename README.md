@@ -66,6 +66,7 @@ bevy_extended_ui_macros = "1.4.2"
 | `fluent`           | Enables Fluent Language support.                                                                     |
 | `properties-lang`  | Enables Java Properties Language support.                                                            |
 | `clipboard-wasm`   | Enables WASM clipboard support web.                                                                  |
+| `svg`              | Optional SVG image support for UI images/icons (rasterized to Bevy `Image`); not enabled by default. |
 
 Then, you add the plugin to your `main.rs` or on any point at a build function:
 

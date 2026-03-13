@@ -3,10 +3,10 @@ use crate::styles::{CssClass, CssID, CssSource, TagName};
 use crate::widgets::{
     Badge, BadgeAnchor, BindToID, Body, UIGenID, UIWidgetState, WidgetId, WidgetKind,
 };
-use bevy::window::PrimaryWindow;
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
 use bevy::ui::{ComputedNode, UiGlobalTransform, UiScale};
+use bevy::window::PrimaryWindow;
 use std::collections::HashMap;
 
 /// Marker component for initialized badge widgets.
@@ -147,10 +147,9 @@ fn resolve_badge_targets(
     for (badge, parent_opt, mut runtime) in badge_q.iter_mut() {
         let target = if let Some(for_id) = badge.for_id.as_deref() {
             let normalized = for_id.trim().trim_start_matches('#');
-            by_id
-                .get(normalized)
-                .copied()
-                .or_else(|| resolve_parent_widget_target(parent_opt, &parents_q, &widget_q, &body_q))
+            by_id.get(normalized).copied().or_else(|| {
+                resolve_parent_widget_target(parent_opt, &parents_q, &widget_q, &body_q)
+            })
         } else {
             resolve_parent_widget_target(parent_opt, &parents_q, &widget_q, &body_q)
         };
@@ -281,9 +280,10 @@ fn update_badge_visuals(
             continue;
         };
 
-        let target_geometry = target_geometry_q.get(target).ok().or_else(|| {
-            parent_opt.and_then(|parent| target_geometry_q.get(parent.parent()).ok())
-        });
+        let target_geometry = target_geometry_q
+            .get(target)
+            .ok()
+            .or_else(|| parent_opt.and_then(|parent| target_geometry_q.get(parent.parent()).ok()));
 
         let Some((target_node, target_transform)) = target_geometry else {
             *visibility = Visibility::Hidden;

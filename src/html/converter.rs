@@ -1191,11 +1191,9 @@ fn resolve_provider_css_handles(
             }
 
             let direct_children = extract_direct_child_tags(&provider_match.inner_html);
-            if let Err(reason) = validate_provider_rules(
-                provider.as_ref(),
-                &direct_children,
-                provider_match.in_head,
-            ) {
+            if let Err(reason) =
+                validate_provider_rules(provider.as_ref(), &direct_children, provider_match.in_head)
+            {
                 warn!(
                     "Provider <{}> ignored due to rule mismatch: {}",
                     provider.tag(),

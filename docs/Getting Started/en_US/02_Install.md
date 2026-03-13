@@ -67,6 +67,7 @@ You can enable additional behavior via Cargo features:
 - `fluent`: Fluent language backend
 - `properties-lang`: Java properties language backend
 - `clipboard-wasm`: clipboard support in WASM
+- `svg`: optional SVG support for UI images/icons (not enabled by default)
 
 Example:
 

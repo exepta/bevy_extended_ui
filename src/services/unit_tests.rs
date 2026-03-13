@@ -261,6 +261,49 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "svg")]
+    #[test]
+    fn get_or_load_image_rasterizes_svg_into_image_asset() {
+        let folder = unique_assets_folder("service_svg_image");
+        fs::create_dir_all(&folder).expect("failed to create svg test folder");
+
+        let svg_file = folder.join("icon.svg");
+        fs::write(
+            &svg_file,
+            r#"<svg xmlns="http://www.w3.org/2000/svg" width="4" height="5"><rect width="4" height="5" fill="red"/></svg>"#,
+        )
+        .expect("failed to write svg");
+
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, AssetPlugin::default()));
+        app.init_asset::<Image>();
+        app.insert_resource(ImageCache::default());
+
+        let asset_server = app.world().resource::<AssetServer>().clone();
+        let asset_path = svg_file
+            .strip_prefix("assets")
+            .expect("svg path not in assets")
+            .to_string_lossy()
+            .trim_start_matches('/')
+            .to_string();
+
+        let handle = app
+            .world_mut()
+            .resource_scope(|world, mut cache: Mut<ImageCache>| {
+                let mut images = world.resource_mut::<Assets<Image>>();
+                get_or_load_image(asset_path.as_str(), &mut cache, &mut images, &asset_server)
+            });
+
+        let images = app.world().resource::<Assets<Image>>();
+        let image = images
+            .get(handle.id())
+            .expect("svg image handle was not inserted");
+        assert_eq!(image.texture_descriptor.size.width, 4);
+        assert_eq!(image.texture_descriptor.size.height, 5);
+
+        fs::remove_dir_all(&folder).expect("failed to clean up svg test folder");
+    }
+
     #[test]
     fn pre_load_assets_does_nothing_for_missing_folder() {
         let mut app = App::new();
@@ -286,6 +329,13 @@ mod tests {
         fs::write(folder.join("a.png"), []).expect("failed to write png");
         fs::write(folder.join("b.jpg"), []).expect("failed to write jpg");
         fs::write(folder.join("c.jpeg"), []).expect("failed to write jpeg");
+        fs::write(folder.join("d.webp"), []).expect("failed to write webp");
+        #[cfg(feature = "svg")]
+        fs::write(
+            folder.join("e.svg"),
+            r#"<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2"><rect width="2" height="2" fill="black"/></svg>"#,
+        )
+        .expect("failed to write svg");
         fs::write(folder.join("ignore.txt"), []).expect("failed to write txt");
 
         let mut app = App::new();
@@ -310,6 +360,9 @@ mod tests {
         assert!(keys.iter().any(|k| k.ends_with("a.png")));
         assert!(keys.iter().any(|k| k.ends_with("b.jpg")));
         assert!(keys.iter().any(|k| k.ends_with("c.jpeg")));
+        assert!(keys.iter().any(|k| k.ends_with("d.webp")));
+        #[cfg(feature = "svg")]
+        assert!(keys.iter().any(|k| k.ends_with("e.svg")));
         assert!(!keys.iter().any(|k| k.ends_with("ignore.txt")));
 
         fs::remove_dir_all(&folder).expect("failed to clean up test assets folder");

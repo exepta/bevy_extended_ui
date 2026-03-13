@@ -2,9 +2,13 @@ use crate::{ExtendedUiConfiguration, ImageCache};
 use bevy::asset::RenderAssetUsages;
 use bevy::image::{CompressedImageFormats, ImageSampler, ImageType};
 use bevy::prelude::*;
+#[cfg(all(feature = "svg", not(target_arch = "wasm32")))]
+use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
+#[cfg(all(feature = "svg", not(target_arch = "wasm32")))]
+use resvg::{tiny_skia::Pixmap, usvg::Options};
 use std::borrow::Cow;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 pub const DEFAULT_CHECK_MARK_KEY: &str = "extended_ui/icons/check-mark.png";
 pub const DEFAULT_CHOICE_BOX_KEY: &str = "extended_ui/icons/drop-arrow.png";
 pub const DEFAULT_COLOR_KEY: &str = "extended_ui/icons/color.png";
@@ -80,6 +84,19 @@ pub fn get_or_load_image(
         return handle.clone();
     }
 
+    #[cfg(all(feature = "svg", not(target_arch = "wasm32")))]
+    if path_is_svg(path) {
+        if let Some(handle) = load_svg_image_from_project(path, images) {
+            image_cache.map.insert(path.to_string(), handle.clone());
+            return handle;
+        }
+
+        warn!(
+            "Failed to rasterize SVG at '{}', falling back to AssetServer load.",
+            path
+        );
+    }
+
     if let Some(embedded_png) = embedded_icon_bytes(path) {
         if !asset_exists_in_project(path) {
             warn!("Image not found at '{}', using embedded fallback.", path);
@@ -119,12 +136,66 @@ fn embedded_icon_bytes(path: &str) -> Option<&'static [u8]> {
 }
 
 fn asset_exists_in_project(path: &str) -> bool {
-    let path = Path::new(path);
-    if path.is_absolute() {
-        return path.exists();
+    resolve_asset_fs_path(path).exists()
+}
+
+fn resolve_asset_fs_path(path: &str) -> PathBuf {
+    let raw = Path::new(path);
+    if raw.is_absolute() || raw.starts_with("assets") {
+        return raw.to_path_buf();
     }
 
-    Path::new("assets").join(path).exists()
+    Path::new("assets").join(raw)
+}
+
+#[cfg(all(feature = "svg", not(target_arch = "wasm32")))]
+fn path_is_svg(path: &str) -> bool {
+    Path::new(path)
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("svg"))
+}
+
+#[cfg(all(feature = "svg", not(target_arch = "wasm32")))]
+fn load_svg_image_from_project(path: &str, images: &mut Assets<Image>) -> Option<Handle<Image>> {
+    let fs_path = resolve_asset_fs_path(path);
+    let bytes = fs::read(&fs_path).ok()?;
+
+    let tree = resvg::usvg::Tree::from_data(&bytes, &Options::default()).ok()?;
+    let size = tree.size().to_int_size();
+
+    let mut pixmap = Pixmap::new(size.width(), size.height())?;
+    resvg::render(
+        &tree,
+        resvg::tiny_skia::Transform::default(),
+        &mut pixmap.as_mut(),
+    );
+
+    let mut image = Image::new(
+        Extent3d {
+            width: size.width(),
+            height: size.height(),
+            depth_or_array_layers: 1,
+        },
+        TextureDimension::D2,
+        pixmap.take(),
+        TextureFormat::Rgba8UnormSrgb,
+        RenderAssetUsages::default(),
+    );
+    image.sampler = ImageSampler::linear();
+    Some(images.add(image))
+}
+
+fn supported_image_extensions() -> Vec<&'static str> {
+    #[cfg(feature = "svg")]
+    {
+        vec!["png", "jpg", "jpeg", "webp", "svg"]
+    }
+
+    #[cfg(not(feature = "svg"))]
+    {
+        vec!["png", "jpg", "jpeg", "webp"]
+    }
 }
 
 fn normalize_asset_path(path: &str) -> Cow<'_, str> {
@@ -150,6 +221,7 @@ pub fn pre_load_assets(
     extended_ui_configuration: Res<ExtendedUiConfiguration>,
     asset_server: Res<AssetServer>,
     mut image_cache: ResMut<ImageCache>,
+    #[cfg(all(feature = "svg", not(target_arch = "wasm32")))] mut images: ResMut<Assets<Image>>,
 ) {
     let folder = extended_ui_configuration.assets_path.clone();
     let folder = Path::new(&folder);
@@ -161,7 +233,7 @@ pub fn pre_load_assets(
         return;
     }
 
-    let supported_extensions = ["png", "jpg", "jpeg"];
+    let supported_extensions = supported_image_extensions();
 
     for entry in fs::read_dir(folder).expect("Failed to read asset folder") {
         if let Ok(entry) = entry {
@@ -169,10 +241,28 @@ pub fn pre_load_assets(
 
             if path.is_file() {
                 if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
-                    if supported_extensions.contains(&ext.to_lowercase().as_str()) {
+                    let ext_lower = ext.to_lowercase();
+                    if supported_extensions.contains(&ext_lower.as_str()) {
                         if let Some(asset_path) = path.strip_prefix("assets").ok() {
                             if let Some(asset_str) = asset_path.to_str() {
-                                let owned_path = asset_str.to_string();
+                                let owned_path = normalize_asset_path(asset_str).into_owned();
+
+                                #[cfg(all(feature = "svg", not(target_arch = "wasm32")))]
+                                if ext_lower == "svg" {
+                                    if let Some(handle) = load_svg_image_from_project(
+                                        owned_path.as_str(),
+                                        &mut images,
+                                    ) {
+                                        image_cache.map.insert(owned_path.clone(), handle);
+                                        debug!("Preloaded svg image: {}", owned_path);
+                                    } else {
+                                        warn!(
+                                            "Failed to preload SVG image '{}': rasterization failed",
+                                            owned_path
+                                        );
+                                    }
+                                    continue;
+                                }
 
                                 let handle: Handle<Image> = asset_server.load(owned_path.clone());
                                 image_cache.map.insert(owned_path.clone(), handle.clone());
