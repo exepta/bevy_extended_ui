@@ -59,6 +59,7 @@ fn internal_node_creation_system(
     config: Res<ExtendedUiConfiguration>,
     asset_server: Res<AssetServer>,
     mut image_cache: ResMut<ImageCache>,
+    mut images: ResMut<Assets<Image>>,
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
     for (entity, id, button, source_opt) in query.iter() {
@@ -102,6 +103,7 @@ fn internal_node_creation_system(
                     css_source.clone(),
                     &asset_server,
                     &mut image_cache,
+                    &mut images,
                 );
             })
             .observe(on_internal_click)
@@ -128,6 +130,7 @@ fn update_button_system(
     config: Res<ExtendedUiConfiguration>,
     asset_server: Res<AssetServer>,
     mut image_cache: ResMut<ImageCache>,
+    mut images: ResMut<Assets<Image>>,
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
     for (entity, id, button, source_opt, children_opt) in query.iter() {
@@ -155,6 +158,7 @@ fn update_button_system(
                 css_source.clone(),
                 &asset_server,
                 &mut image_cache,
+                &mut images,
             );
         });
     }
@@ -169,6 +173,7 @@ fn spawn_button_children(
     css_source: CssSource,
     asset_server: &Res<AssetServer>,
     image_cache: &mut ResMut<ImageCache>,
+    images: &mut ResMut<Assets<Image>>,
 ) {
     place_icon_if(
         builder,
@@ -178,6 +183,7 @@ fn spawn_button_children(
         button.entry,
         asset_server,
         image_cache,
+        images,
         vec!["button-text".to_string()],
         id.0,
         layer,
@@ -208,6 +214,7 @@ fn spawn_button_children(
         button.entry,
         asset_server,
         image_cache,
+        images,
         vec!["button-text".to_string()],
         id.0,
         layer,

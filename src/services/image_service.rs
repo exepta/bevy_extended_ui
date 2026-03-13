@@ -2,12 +2,15 @@ use crate::{ExtendedUiConfiguration, ImageCache};
 use bevy::asset::RenderAssetUsages;
 use bevy::image::{CompressedImageFormats, ImageSampler, ImageType};
 use bevy::prelude::*;
+use std::borrow::Cow;
 use std::fs;
 use std::path::Path;
 pub const DEFAULT_CHECK_MARK_KEY: &str = "extended_ui/icons/check-mark.png";
 pub const DEFAULT_CHOICE_BOX_KEY: &str = "extended_ui/icons/drop-arrow.png";
+pub const DEFAULT_COLOR_KEY: &str = "extended_ui/icons/color.png";
 const EMBEDDED_CHECK_MARK: &[u8] = include_bytes!("../../assets/extended_ui/icons/check-mark.png");
 const EMBEDDED_DROP_ARROW: &[u8] = include_bytes!("../../assets/extended_ui/icons/drop-arrow.png");
+const EMBEDDED_COLOR: &[u8] = include_bytes!("../../assets/extended_ui/icons/color.png");
 
 /// Plugin that manages image caching and preload.
 pub struct ImageCacheService;
@@ -66,6 +69,13 @@ pub fn get_or_load_image(
     images: &mut Assets<Image>,
     asset_server: &AssetServer,
 ) -> Handle<Image> {
+    let path = normalize_asset_path(path);
+    let path = path.as_ref();
+
+    if path.is_empty() {
+        return Handle::default();
+    }
+
     if let Some(handle) = image_cache.map.get(path) {
         return handle.clone();
     }
@@ -103,6 +113,7 @@ fn embedded_icon_bytes(path: &str) -> Option<&'static [u8]> {
     match path {
         DEFAULT_CHECK_MARK_KEY => Some(EMBEDDED_CHECK_MARK),
         DEFAULT_CHOICE_BOX_KEY => Some(EMBEDDED_DROP_ARROW),
+        DEFAULT_COLOR_KEY => Some(EMBEDDED_COLOR),
         _ => None,
     }
 }
@@ -114,6 +125,24 @@ fn asset_exists_in_project(path: &str) -> bool {
     }
 
     Path::new("assets").join(path).exists()
+}
+
+fn normalize_asset_path(path: &str) -> Cow<'_, str> {
+    let trimmed = path.trim();
+    if trimmed.is_empty() {
+        return Cow::Borrowed(trimmed);
+    }
+
+    let absolute = Path::new(trimmed);
+    if absolute.is_absolute() && absolute.exists() {
+        return Cow::Borrowed(trimmed);
+    }
+
+    if let Some(stripped) = trimmed.strip_prefix('/') {
+        return Cow::Owned(stripped.to_string());
+    }
+
+    Cow::Borrowed(trimmed)
 }
 
 /// Preloads images from the configured assets folder into the cache.

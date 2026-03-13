@@ -48,6 +48,7 @@ fn internal_node_creation_system(
     config: Res<ExtendedUiConfiguration>,
     asset_server: Res<AssetServer>,
     mut image_cache: ResMut<ImageCache>,
+    mut images: ResMut<Assets<Image>>,
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
     for (entity, id, mut toggle_button, source_opt, ui_state_opt) in query.iter_mut() {
@@ -126,6 +127,7 @@ fn internal_node_creation_system(
                     toggle_button.entry,
                     &asset_server,
                     &mut image_cache,
+                    &mut images,
                     vec!["button-text".to_string()],
                     id.0,
                     *layer,
@@ -156,6 +158,7 @@ fn internal_node_creation_system(
                     toggle_button.entry,
                     &asset_server,
                     &mut image_cache,
+                    &mut images,
                     vec!["button-text".to_string()],
                     id.0,
                     *layer,

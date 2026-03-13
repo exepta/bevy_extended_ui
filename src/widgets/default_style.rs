@@ -288,8 +288,6 @@ date-picker {
     color: #f4f6ff;
     cursor: pointer;
     overflow: visible;
-    transition: all 0.2s;
-
     &:hover {
         border-color: #b3b9d4;
     }
@@ -321,7 +319,6 @@ date-picker {
         top: 19px;
         color: #9ca2bd;
         font-size: 16px;
-        transition: all 0.2s;
     }
 
     > .date-picker-field > .date-picker-value {
@@ -345,7 +342,6 @@ date-picker {
         align-items: center;
         color: #cad0e6;
         font-size: 13px;
-        transition: all 0.2s;
     }
 
     &:checked > .date-picker-field > .date-picker-icon {
@@ -394,8 +390,6 @@ date-picker {
                 display: flex;
                 justify-content: center;
                 align-items: center;
-                transition: all 0.2s;
-
                 &:hover {
                     background: rgba(135, 142, 176, 0.22);
                 }
@@ -425,8 +419,6 @@ date-picker {
                 display: flex;
                 justify-content: center;
                 align-items: center;
-                transition: background-color 0.08s linear;
-
                 &:hover {
                     background: rgba(135, 142, 176, 0.22);
                 }
@@ -451,8 +443,6 @@ date-picker {
                 display: flex;
                 justify-content: center;
                 align-items: center;
-                transition: background-color 0.08s linear;
-
                 &:hover {
                     background: rgba(135, 142, 176, 0.22);
                 }
@@ -512,8 +502,6 @@ date-picker {
                 display: flex;
                 justify-content: center;
                 align-items: center;
-                transition: background-color 0.08s linear;
-
                 > .date-picker-day-text {
                     color: #d6dcf5;
                     font-size: 14px;
@@ -580,8 +568,6 @@ date-picker {
                 display: flex;
                 justify-content: center;
                 align-items: center;
-                transition: background-color 0.08s linear;
-
                 > .date-picker-year-option-text {
                     color: #d6dcf5;
                     font-size: 14px;
@@ -627,8 +613,6 @@ date-picker {
                 display: flex;
                 justify-content: center;
                 align-items: center;
-                transition: background-color 0.08s linear;
-
                 > .date-picker-month-option-text {
                     color: #d6dcf5;
                     font-size: 16px;
@@ -1233,6 +1217,7 @@ switch {
         width: 50px;
         height: 24px;
         border-radius: 13px;
+        border: 2px solid var(--disabled-text);
         background: var(--gray-background);
         position: relative;
         display: flex;
@@ -1242,8 +1227,8 @@ switch {
 
         > .switch-dot {
             position: absolute;
-            width: 28px;
-            height: 28px;
+            width: 23px;
+            height: 23px;
             border-radius: 50%;
             display: flex;
             justify-content: center;

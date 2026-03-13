@@ -1,4 +1,5 @@
 use crate::ImageCache;
+use crate::services::image_service::get_or_load_image;
 use crate::styles::{CssClass, CssSource, IconPlace};
 use crate::widgets::controls::button::ButtonWidget;
 use crate::widgets::controls::check_box::CheckBoxWidget;
@@ -69,6 +70,7 @@ pub fn place_icon_if(
     entry: usize,
     asset_server: &Res<AssetServer>,
     image_cache: &mut ResMut<ImageCache>,
+    images: &mut ResMut<Assets<Image>>,
     css_class: Vec<String>,
     id: usize,
     layer: usize,
@@ -81,6 +83,7 @@ pub fn place_icon_if(
             entry,
             asset_server,
             image_cache,
+            images,
             css_class,
             id,
             layer,
@@ -96,18 +99,15 @@ fn place_icon(
     entry: usize,
     asset_server: &Res<AssetServer>,
     image_cache: &mut ResMut<ImageCache>,
+    images: &mut ResMut<Assets<Image>>,
     css_class: Vec<String>,
     id: usize,
     layer: usize,
     css_source: CssSource,
 ) {
     if let Some(icon) = icon_path.clone() {
-        let owned_icon = icon.to_string();
-        let handle = image_cache
-            .map
-            .entry(icon.clone())
-            .or_insert_with(|| asset_server.load(owned_icon.clone()))
-            .clone();
+        let handle =
+            get_or_load_image(icon.as_str(), &mut **image_cache, &mut **images, asset_server);
 
         builder.spawn((
             Name::new(format!("Button-Icon-{}", entry)),

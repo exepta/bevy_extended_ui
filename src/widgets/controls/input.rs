@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
+use crate::services::image_service::get_or_load_image;
 use crate::styles::components::UiStyle;
 use crate::styles::paint::Colored;
 use crate::styles::{Background, CssClass, CssSource, FontVal, Style, TagName};
@@ -269,6 +270,7 @@ fn internal_node_creation_system(
     config: Res<ExtendedUiConfiguration>,
     asset_server: Res<AssetServer>,
     mut image_cache: ResMut<ImageCache>,
+    mut images: ResMut<Assets<Image>>,
 ) {
     let layer = *config.render_layers.first().unwrap_or(&1);
 
@@ -318,12 +320,12 @@ fn internal_node_creation_system(
                     .map(str::trim)
                     .filter(|path| !path.is_empty());
                 if let Some(icon_path) = icon_path {
-                    let owned_icon = icon_path.to_string();
-                    let handle = image_cache
-                        .map
-                        .entry(owned_icon.clone())
-                        .or_insert_with(|| asset_server.load(owned_icon))
-                        .clone();
+                    let handle = get_or_load_image(
+                        icon_path,
+                        &mut image_cache,
+                        &mut images,
+                        &asset_server,
+                    );
 
                     // Icon left
                     builder.spawn((
@@ -466,6 +468,7 @@ fn sync_input_field_updates(
     config: Res<ExtendedUiConfiguration>,
     asset_server: Res<AssetServer>,
     mut image_cache: ResMut<ImageCache>,
+    mut images: ResMut<Assets<Image>>,
     mut query: Query<
         (
             Entity,
@@ -514,12 +517,12 @@ fn sync_input_field_updates(
             .map(str::trim)
             .filter(|path| !path.is_empty());
         if let Some(icon_path) = icon_path {
-            let owned_icon = icon_path.to_string();
-            let handle = image_cache
-                .map
-                .entry(owned_icon.clone())
-                .or_insert_with(|| asset_server.load(owned_icon))
-                .clone();
+            let handle = get_or_load_image(
+                icon_path,
+                &mut image_cache,
+                &mut images,
+                &asset_server,
+            );
 
             if let Some(icon_entity) = icon_entities.get(&ui_id.0).copied() {
                 for (mut image_node, bind_id) in icon_image_query.iter_mut() {

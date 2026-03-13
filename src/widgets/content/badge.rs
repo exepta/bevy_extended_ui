@@ -3,6 +3,7 @@ use crate::styles::{CssClass, CssID, CssSource, TagName};
 use crate::widgets::{
     Badge, BadgeAnchor, BindToID, Body, UIGenID, UIWidgetState, WidgetId, WidgetKind,
 };
+use bevy::window::PrimaryWindow;
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
 use bevy::ui::{ComputedNode, UiGlobalTransform, UiScale};
@@ -128,44 +129,62 @@ fn resolve_badge_targets(
     widget_q: Query<(), With<WidgetId>>,
     body_q: Query<(), With<Body>>,
 ) {
-    let mut by_id: HashMap<&str, Entity> = HashMap::new();
+    let mut by_id: HashMap<String, Entity> = HashMap::new();
     for (entity, css_id) in id_q.iter() {
-        if !css_id.0.is_empty() {
-            by_id.entry(css_id.0.as_str()).or_insert(entity);
+        let raw = css_id.0.trim();
+        if raw.is_empty() {
+            continue;
+        }
+
+        by_id.entry(raw.to_string()).or_insert(entity);
+
+        let normalized = raw.trim_start_matches('#');
+        if !normalized.is_empty() {
+            by_id.entry(normalized.to_string()).or_insert(entity);
         }
     }
 
     for (badge, parent_opt, mut runtime) in badge_q.iter_mut() {
         let target = if let Some(for_id) = badge.for_id.as_deref() {
             let normalized = for_id.trim().trim_start_matches('#');
-            by_id.get(normalized).copied()
-        } else if let Some(parent) = parent_opt {
-            let mut current = parent.parent();
-            let mut resolved = None;
-
-            loop {
-                if body_q.get(current).is_ok() {
-                    break;
-                }
-
-                if widget_q.get(current).is_ok() {
-                    resolved = Some(current);
-                    break;
-                }
-
-                if let Ok(next) = parents_q.get(current) {
-                    current = next.parent();
-                } else {
-                    break;
-                }
-            }
-
-            resolved
+            by_id
+                .get(normalized)
+                .copied()
+                .or_else(|| resolve_parent_widget_target(parent_opt, &parents_q, &widget_q, &body_q))
         } else {
-            None
+            resolve_parent_widget_target(parent_opt, &parents_q, &widget_q, &body_q)
         };
 
         runtime.target = target;
+    }
+}
+
+fn resolve_parent_widget_target(
+    parent_opt: Option<&ChildOf>,
+    parents_q: &Query<&ChildOf>,
+    widget_q: &Query<(), With<WidgetId>>,
+    body_q: &Query<(), With<Body>>,
+) -> Option<Entity> {
+    let Some(parent) = parent_opt else {
+        return None;
+    };
+
+    let mut current = parent.parent();
+
+    loop {
+        if body_q.get(current).is_ok() {
+            return None;
+        }
+
+        if widget_q.get(current).is_ok() {
+            return Some(current);
+        }
+
+        if let Ok(next) = parents_q.get(current) {
+            current = next.parent();
+        } else {
+            return None;
+        }
     }
 }
 
@@ -178,7 +197,9 @@ fn update_badge_text(
         let label = format_badge_label(badge.value, badge.max);
         for child in children.iter() {
             if let Ok(mut text) = text_q.get_mut(child) {
-                text.0 = label.clone();
+                if text.0 != label {
+                    text.0 = label.clone();
+                }
             }
         }
     }
@@ -214,8 +235,13 @@ fn set_css_classes(classes: &mut CssClass, base: &[String], dynamic: &[&str]) {
     }
 }
 
+fn snap_to_pixel(value: f32, scale: f32) -> f32 {
+    (value * scale).round() / scale
+}
+
 /// Positions badges and updates state classes.
 fn update_badge_visuals(
+    window_q: Query<&Window, With<PrimaryWindow>>,
     ui_scale: Res<UiScale>,
     target_geometry_q: Query<(&ComputedNode, &UiGlobalTransform)>,
     parent_q: Query<(&ComputedNode, &UiGlobalTransform)>,
@@ -233,7 +259,10 @@ fn update_badge_visuals(
         (With<Badge>, With<BadgeBase>, Without<BadgeText>),
     >,
 ) {
-    let sf = ui_scale.0.max(f32::EPSILON);
+    let Ok(window) = window_q.single() else {
+        return;
+    };
+    let sf = (window.scale_factor() * ui_scale.0).max(f32::EPSILON);
 
     for (
         badge,
@@ -252,7 +281,11 @@ fn update_badge_visuals(
             continue;
         };
 
-        let Ok((target_node, target_transform)) = target_geometry_q.get(target) else {
+        let target_geometry = target_geometry_q.get(target).ok().or_else(|| {
+            parent_opt.and_then(|parent| target_geometry_q.get(parent.parent()).ok())
+        });
+
+        let Some((target_node, target_transform)) = target_geometry else {
             *visibility = Visibility::Hidden;
             set_css_classes(&mut css_class, &class_base.0, &["badge-closed"]);
             continue;
@@ -294,8 +327,8 @@ fn update_badge_visuals(
         let y = anchor_point.y - badge_h * 0.5;
 
         node.position_type = PositionType::Absolute;
-        node.left = Val::Px(x - parent_top_left.x);
-        node.top = Val::Px(y - parent_top_left.y);
+        node.left = Val::Px(snap_to_pixel(x - parent_top_left.x, sf));
+        node.top = Val::Px(snap_to_pixel(y - parent_top_left.y, sf));
 
         set_css_classes(
             &mut css_class,

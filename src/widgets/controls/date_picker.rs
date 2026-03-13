@@ -3,6 +3,7 @@ use js_sys::Date;
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use crate::services::image_service::{DEFAULT_CHOICE_BOX_KEY, get_or_load_image};
 use crate::styles::components::UiStyle;
 use crate::styles::paint::Colored;
 use crate::styles::{CssClass, CssID, CssSource, FontVal, TagName};
@@ -11,7 +12,7 @@ use crate::widgets::{
     BindToID, DateFormat, DatePicker, IgnoreParentState, InputField, InputType, InputValue,
     UIGenID, UIWidgetState, WidgetId, WidgetKind,
 };
-use crate::{CurrentWidgetState, ExtendedUiConfiguration};
+use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
 use bevy::camera::visibility::RenderLayers;
 use bevy::input::mouse::MouseWheel;
 use bevy::prelude::*;
@@ -178,6 +179,9 @@ impl Plugin for DatePickerWidget {
             )
                 .chain(),
         );
+        // Run a late visual sync after click observers to avoid one-frame stale day states
+        // (e.g. off-month cells briefly using current-month colors).
+        app.add_systems(Last, (sync_date_picker_visuals, sync_year_picker_panel).chain());
     }
 }
 
@@ -190,6 +194,9 @@ fn internal_node_creation_system(
     >,
     input_targets: Query<(&CssID, &InputField), With<InputField>>,
     config: Res<ExtendedUiConfiguration>,
+    asset_server: Res<AssetServer>,
+    mut image_cache: ResMut<ImageCache>,
+    mut images: ResMut<Assets<Image>>,
 ) {
     let layer = config.render_layers.first().copied().unwrap_or(1);
 
@@ -249,6 +256,16 @@ fn internal_node_creation_system(
         let today = today_utc_date();
         let start = selected.unwrap_or(today);
         let (year_start, year_end) = resolve_year_range(min, max, start.year);
+        let drop_icon = if picker.for_id.is_none() {
+            Some(get_or_load_image(
+                DEFAULT_CHOICE_BOX_KEY,
+                &mut image_cache,
+                &mut images,
+                &asset_server,
+            ))
+        } else {
+            None
+        };
 
         commands
             .entity(entity)
@@ -352,20 +369,19 @@ fn internal_node_creation_system(
                                 BindToID(id.get()),
                             ));
 
-                            field.spawn((
-                                Name::new(format!("DatePicker-Icon-{}", picker.entry)),
-                                Node::default(),
-                                Text::new("v"),
-                                TextColor::default(),
-                                TextFont::default(),
-                                TextLayout::default(),
-                                UIWidgetState::default(),
-                                css_source.clone(),
-                                CssClass(vec!["date-picker-icon".to_string()]),
-                                RenderLayers::layer(layer),
-                                Pickable::IGNORE,
-                                BindToID(id.get()),
-                            ));
+                            if let Some(drop_icon) = drop_icon.clone() {
+                                field.spawn((
+                                    Name::new(format!("DatePicker-Icon-{}", picker.entry)),
+                                    Node::default(),
+                                    ImageNode::new(drop_icon),
+                                    UIWidgetState::default(),
+                                    css_source.clone(),
+                                    CssClass(vec!["date-picker-icon".to_string()]),
+                                    RenderLayers::layer(layer),
+                                    Pickable::IGNORE,
+                                    BindToID(id.get()),
+                                ));
+                            }
                         });
                 }
 
@@ -678,7 +694,7 @@ fn internal_node_creation_system(
                                                 picker.entry, index
                                             )),
                                             Text::new(""),
-                                            TextColor::default(),
+                                            TextColor(Color::srgb(0.84, 0.86, 0.96)),
                                             TextFont::default(),
                                             TextLayout::new_with_justify(Justify::Center)
                                                 .with_no_wrap(),
@@ -1441,6 +1457,7 @@ fn sync_date_picker_visuals(
                 let hidden = text_info.index >= visible_cell_count;
                 if hidden {
                     text.0.clear();
+                    text_color.0 = Color::srgb(0.84, 0.86, 0.96);
                     *visibility = Visibility::Hidden;
                     text_state.checked = false;
                     text_state.readonly = true;
