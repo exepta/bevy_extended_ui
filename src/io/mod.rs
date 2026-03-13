@@ -1,8 +1,16 @@
 mod unit_tests;
 
+#[cfg(feature = "svg")]
+use bevy::asset::RenderAssetUsages;
 use bevy::asset::io::Reader;
 use bevy::asset::{AssetLoader, LoadContext};
+#[cfg(feature = "svg")]
+use bevy::image::ImageSampler;
 use bevy::prelude::*;
+#[cfg(feature = "svg")]
+use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
+#[cfg(feature = "svg")]
+use resvg::{tiny_skia::Pixmap, usvg::Options};
 use std::path::{Path, PathBuf};
 
 use crate::widgets::default_style::DEFAULT_STYLE_CSS;
@@ -34,6 +42,11 @@ pub struct CssLoader;
 /// Asset loader for `.html` and `.htm` files.
 #[derive(Default, TypePath)]
 pub struct HtmlLoader;
+
+/// Asset loader for `.svg` files that rasterizes into Bevy [`Image`] assets.
+#[cfg(feature = "svg")]
+#[derive(Default, TypePath)]
+pub struct SvgImageLoader;
 
 impl AssetLoader for CssLoader {
     /// The asset type produced by this loader.
@@ -107,6 +120,63 @@ impl AssetLoader for HtmlLoader {
     }
 }
 
+#[cfg(feature = "svg")]
+impl AssetLoader for SvgImageLoader {
+    /// The asset type produced by this loader.
+    type Asset = Image;
+    /// The settings type used by this loader.
+    type Settings = ();
+    /// The error type produced by this loader.
+    type Error = std::io::Error;
+
+    /// Loads and rasterizes an SVG into a Bevy `Image`.
+    async fn load(
+        &self,
+        reader: &mut dyn Reader,
+        _settings: &(),
+        _load_context: &mut LoadContext<'_>,
+    ) -> Result<Image, Self::Error> {
+        let mut bytes = Vec::new();
+        reader.read_to_end(&mut bytes).await?;
+
+        let tree = resvg::usvg::Tree::from_data(&bytes, &Options::default()).map_err(|err| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("failed to parse svg: {err}"),
+            )
+        })?;
+        let size = tree.size().to_int_size();
+        let mut pixmap = Pixmap::new(size.width(), size.height()).ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::InvalidData, "svg produced invalid size")
+        })?;
+
+        resvg::render(
+            &tree,
+            resvg::tiny_skia::Transform::default(),
+            &mut pixmap.as_mut(),
+        );
+
+        let mut image = Image::new(
+            Extent3d {
+                width: size.width(),
+                height: size.height(),
+                depth_or_array_layers: 1,
+            },
+            TextureDimension::D2,
+            pixmap.take(),
+            TextureFormat::Rgba8UnormSrgb,
+            RenderAssetUsages::default(),
+        );
+        image.sampler = ImageSampler::linear();
+        Ok(image)
+    }
+
+    /// Returns the file extensions this loader supports.
+    fn extensions(&self) -> &[&str] {
+        &["svg"]
+    }
+}
+
 /// Plugin registering HTML/CSS assets and loaders.
 pub struct ExtendedIoPlugin;
 
@@ -117,6 +187,8 @@ impl Plugin for ExtendedIoPlugin {
         app.init_asset_loader::<HtmlLoader>();
         app.init_asset::<CssAsset>();
         app.init_asset_loader::<CssLoader>();
+        #[cfg(feature = "svg")]
+        app.init_asset_loader::<SvgImageLoader>();
         app.add_systems(Startup, register_default_css_asset);
     }
 }

@@ -1,8 +1,8 @@
 mod theme_provider;
 
 use bevy::prelude::*;
-use std::collections::HashSet;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::sync::Arc;
 
 pub use theme_provider::{ThemeProvider, ThemeProviderState};

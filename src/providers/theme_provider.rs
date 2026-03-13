@@ -1,9 +1,9 @@
 use super::{
     ProviderChildPolicy, ProviderEffect, ProviderResolveContext, ProviderRules, UiProvider,
 };
+use crate::ExtendedUiConfiguration;
 use crate::io::CssAsset;
 use crate::styles::CssSource;
-use crate::ExtendedUiConfiguration;
 use bevy::asset::AssetId;
 use bevy::prelude::*;
 use once_cell::sync::Lazy;
@@ -390,7 +390,10 @@ fn discover_theme_names(folder: &str) -> Vec<String> {
 
 fn normalize_themes_asset_dir(path: &str) -> String {
     let normalized = path.replace('\\', "/");
-    let trimmed = normalized.trim().trim_end_matches('/').trim_start_matches("./");
+    let trimmed = normalized
+        .trim()
+        .trim_end_matches('/')
+        .trim_start_matches("./");
     let trimmed = trimmed.trim_start_matches('/');
 
     if let Some(rest) = trimmed.strip_prefix("assets/") {

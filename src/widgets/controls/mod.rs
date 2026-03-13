@@ -106,8 +106,12 @@ fn place_icon(
     css_source: CssSource,
 ) {
     if let Some(icon) = icon_path.clone() {
-        let handle =
-            get_or_load_image(icon.as_str(), &mut **image_cache, &mut **images, asset_server);
+        let handle = get_or_load_image(
+            icon.as_str(),
+            &mut **image_cache,
+            &mut **images,
+            asset_server,
+        );
 
         builder.spawn((
             Name::new(format!("Button-Icon-{}", entry)),

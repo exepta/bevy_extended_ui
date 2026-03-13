@@ -155,6 +155,11 @@ badge > .badge-text {
     background: #22293a;
 }
 
+.demo-svg-image {
+    background: #0f1d35;
+    border: 1px #4a6292;
+}
+
 .full-divider {
     width: 100%;
 }

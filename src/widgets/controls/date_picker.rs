@@ -181,7 +181,10 @@ impl Plugin for DatePickerWidget {
         );
         // Run a late visual sync after click observers to avoid one-frame stale day states
         // (e.g. off-month cells briefly using current-month colors).
-        app.add_systems(Last, (sync_date_picker_visuals, sync_year_picker_panel).chain());
+        app.add_systems(
+            Last,
+            (sync_date_picker_visuals, sync_year_picker_panel).chain(),
+        );
     }
 }
 
