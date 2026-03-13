@@ -1,3 +1,5 @@
+#[cfg(feature = "extended-dialog")]
+use crate::dialog::ExtendedDialogPlugin;
 use crate::html::ExtendedUiHtmlPlugin;
 use crate::io::ExtendedIoPlugin;
 #[cfg(feature = "providers")]
@@ -11,6 +13,8 @@ use bevy::prelude::*;
 use bevy::render::view::Hdr;
 use std::collections::HashMap;
 
+#[cfg(feature = "extended-dialog")]
+pub mod dialog;
 pub mod example_utils;
 pub mod html;
 pub mod io;
@@ -130,6 +134,8 @@ impl Plugin for ExtendedUiPlugin {
             ExtendedIoPlugin,
             ExtendedUiHtmlPlugin,
         ));
+        #[cfg(feature = "extended-dialog")]
+        app.add_plugins(ExtendedDialogPlugin);
         #[cfg(feature = "providers")]
         app.add_plugins(ExtendedUiProviderPlugin);
         app.add_systems(

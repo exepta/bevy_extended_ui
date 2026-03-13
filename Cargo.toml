@@ -23,15 +23,16 @@ name = "bevy_extended_ui"
 path = "src/lib.rs"
 
 [features]
-default = ["css-breakpoints", "fluent", "providers", "svg"]
+default = ["css-breakpoints", "fluent", "providers", "svg", "extended-dialog"]
 css-breakpoints = []
 wasm-breakpoints = ["dep:web-sys"]
 wasm-default = ["wasm-breakpoints", "clipboard-wasm", "svg"]
-fluent = ["dep:i18n", "dep:i18n-fluent", "dep:unic-langid"]
+fluent = ["dep:i18n", "dep:i18n-fluent", "dep:unic-langid", "dep:libsqlite3-sys"]
 properties-lang = ["dep:i18n", "dep:i18n-properties"]
 clipboard-wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:web-sys"]
 providers = []
 svg = ["dep:resvg"]
+extended-dialog = ["dep:rfd"]
 
 ############################################
 #                  Crates                  #
@@ -116,8 +117,14 @@ package = "properties"
 version = "0.1.1"
 optional = true
 
+[dependencies.libsqlite3-sys]
+version = "0.30.1"
+features = ["bundled"]
+optional = true
+
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 arboard = "3.5.0"
+rfd = { version = "0.15.4", optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen = { version = "0.2.92", optional = true }

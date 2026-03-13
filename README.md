@@ -34,6 +34,7 @@ Available features:
 - [x] CSS `*` support.
 - [x] Custom Cursor or system cursor support.
 - [x] Form Widget for validation and submission.
+- [x] Dialog system with Bevy modals and native system dialogs.
 - [ ] Customizable theme.
 
 There are many other things, but currently you can use the core (HTML / CSS) features.
@@ -59,7 +60,7 @@ bevy_extended_ui_macros = "1.4.2"
 #### Features
 | Feature            | Description                                                                                          |
 |--------------------|------------------------------------------------------------------------------------------------------|
-| `default`          | Enables `css-breakpoints`.                                                                           |
+| `default`          | Enables `css-breakpoints`, `fluent`, `providers`, `svg`, and `extended-dialog`.                     |
 | `wasm-default`     | Web preset: `wasm-breakpoints` + `clipboard-wasm` with legacy WASM CSS/style pipeline compatibility. |
 | `css-breakpoints`  | Desktop breakpoints via primary window.                                                              |
 | `wasm-breakpoints` | WASM breakpoints via browser viewport.                                                               |
@@ -67,6 +68,8 @@ bevy_extended_ui_macros = "1.4.2"
 | `properties-lang`  | Enables Java Properties Language support.                                                            |
 | `clipboard-wasm`   | Enables WASM clipboard support web.                                                                  |
 | `svg`              | Optional SVG image support for UI images/icons (rasterized to Bevy `Image`); not enabled by default. |
+| `providers`        | Enables custom HTML providers (e.g. theme-provider).                                                 |
+| `extended-dialog`  | Enables the dialog system with `BevyApp` and desktop `System` providers.                            |
 
 Then, you add the plugin to your `main.rs` or on any point at a build function:
 
@@ -126,6 +129,38 @@ Note that currently you can use this binding:
 - `ondragstart`
 - `ondrag`
 - `ondragstop`
+
+### Dialog system
+
+`extended-dialog` is enabled by default. It provides:
+
+- `DialogProvider::BevyApp` for in-window modals (floating panel or bottom sheet)
+- `DialogProvider::System` for native desktop dialogs (Linux/macOS/Windows)
+- Modal types: `Default`, `Failure`, `Question`, `Blank`
+
+HTML dialog widget usage:
+
+```html
+<button id="open-system-dialog">Open System Dialog</button>
+<button id="open-bevy-dialog">Open Bevy Dialog</button>
+
+<dialog trigger="open-system-dialog" renderer="system" type="error">
+  Error message text for system dialog.
+</dialog>
+
+<dialog trigger="open-bevy-dialog" renderer="bevy-app" type="info">
+  <div>
+    <p>Hello World</p>
+    <img src="/extended_ui/icons/color.png" />
+  </div>
+</dialog>
+```
+
+Supported dialog attributes:
+
+- `renderer`: `bevy-app | system`
+- `type`: `warn | error | info | blank`
+- `trigger` (alias: `triggger`): id of the widget that opens the dialog
 
 ### WASM support
 

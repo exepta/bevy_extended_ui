@@ -187,6 +187,11 @@ fn collect_html_ids(nodes: &Vec<HtmlWidgetNode>, ids: &mut Vec<HtmlID>) {
                 ids.push(id.clone());
                 collect_html_ids(children, ids);
             }
+            #[cfg(feature = "extended-dialog")]
+            HtmlWidgetNode::Dialog(_, _, _, children, _, _, id) => {
+                ids.push(id.clone());
+                collect_html_ids(children, ids);
+            }
             HtmlWidgetNode::Form(_, _, _, children, _, _, id) => {
                 ids.push(id.clone());
                 collect_html_ids(children, ids);
@@ -279,6 +284,23 @@ fn spawn_widget_node(
         HtmlWidgetNode::Form(form, meta, states, children, functions, widget, id) => {
             let entity =
                 spawn_with_meta(commands, form.clone(), meta, states, functions, widget, id);
+            for child in children {
+                let child_entity = spawn_widget_node(commands, child, asset_server, Some(entity));
+                commands.entity(entity).add_child(child_entity);
+            }
+            entity
+        }
+        #[cfg(feature = "extended-dialog")]
+        HtmlWidgetNode::Dialog(dialog, meta, states, children, functions, widget, id) => {
+            let entity = spawn_with_meta(
+                commands,
+                dialog.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+            );
             for child in children {
                 let child_entity = spawn_widget_node(commands, child, asset_server, Some(entity));
                 commands.entity(entity).add_child(child_entity);

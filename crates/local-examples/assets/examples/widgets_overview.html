@@ -16,6 +16,23 @@
   </div>
 
   <div class="widget-card">
+    <h5>Dialog</h5>
+    <button id="open-dialog-bevy">Open BevyApp Dialog</button>
+    <button id="open-dialog-system">Open System Dialog</button>
+
+    <dialog trigger="open-dialog-system" renderer="system">
+      Content Text by system type.
+    </dialog>
+
+    <dialog trigger="open-dialog-bevy" renderer="bevy-app">
+      <div class="dialog-demo-content">
+        <p>Hello World from HTML dialog content.</p>
+        <img src="/extended_ui/icons/color.png" class="demo-image" alt="dialog icon" />
+      </div>
+    </dialog>
+  </div>
+
+  <div class="widget-card">
     <h5>CheckBox</h5>
     <checkbox>Newsletter subscription</checkbox>
   </div>

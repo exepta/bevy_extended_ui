@@ -7,6 +7,8 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 
 use crate::ExtendedUiConfiguration;
+#[cfg(feature = "extended-dialog")]
+use crate::dialog::{DialogProvider, DialogWidget, DialogWidgetType};
 use crate::html::{
     HtmlDirty, HtmlEventBindings, HtmlID, HtmlInnerContent, HtmlMeta, HtmlSource, HtmlStates,
     HtmlStructureMap, HtmlStyle, HtmlSystemSet, HtmlWidgetNode,
@@ -439,6 +441,120 @@ fn parse_html_node(
                     validate_mode,
                     ..default()
                 },
+                meta,
+                states,
+                children,
+                functions,
+                widget.clone(),
+                HtmlID::default(),
+            ))
+        }
+
+        #[cfg(feature = "extended-dialog")]
+        "dialog" => {
+            let mut children = Vec::new();
+            for child in node.children() {
+                if let Some(parsed) = parse_html_node(&child, css_sources, label_map, key, html) {
+                    children.push(parsed);
+                }
+            }
+
+            let trigger = attributes
+                .get("trigger")
+                .or_else(|| attributes.get("triggger"))
+                .map(|raw| raw.trim().trim_start_matches('#').to_string())
+                .filter(|value| !value.is_empty());
+            let renderer = attributes
+                .get("renderer")
+                .and_then(DialogProvider::from_attr)
+                .unwrap_or(DialogProvider::BevyApp);
+            let dialog_type = attributes
+                .get("type")
+                .and_then(DialogWidgetType::from_attr)
+                .unwrap_or(DialogWidgetType::Info);
+            let content_text = node
+                .text_contents()
+                .split_whitespace()
+                .collect::<Vec<_>>()
+                .join(" ");
+
+            Some(HtmlWidgetNode::Dialog(
+                DialogWidget {
+                    trigger,
+                    renderer,
+                    dialog_type,
+                    content_text,
+                    open: false,
+                },
+                meta,
+                states,
+                children,
+                functions,
+                widget.clone(),
+                HtmlID::default(),
+            ))
+        }
+
+        #[cfg(feature = "extended-dialog")]
+        "dialog-header" => {
+            let mut children = Vec::new();
+            for child in node.children() {
+                if let Some(parsed) = parse_html_node(&child, css_sources, label_map, key, html) {
+                    children.push(parsed);
+                }
+            }
+
+            let mut meta = meta;
+            ensure_meta_class(&mut meta, "dialog-header");
+
+            Some(HtmlWidgetNode::Div(
+                Div::default(),
+                meta,
+                states,
+                children,
+                functions,
+                widget.clone(),
+                HtmlID::default(),
+            ))
+        }
+
+        #[cfg(feature = "extended-dialog")]
+        "dialog-body" => {
+            let mut children = Vec::new();
+            for child in node.children() {
+                if let Some(parsed) = parse_html_node(&child, css_sources, label_map, key, html) {
+                    children.push(parsed);
+                }
+            }
+
+            let mut meta = meta;
+            ensure_meta_class(&mut meta, "dialog-body");
+
+            Some(HtmlWidgetNode::Div(
+                Div::default(),
+                meta,
+                states,
+                children,
+                functions,
+                widget.clone(),
+                HtmlID::default(),
+            ))
+        }
+
+        #[cfg(feature = "extended-dialog")]
+        "dialog-footer" => {
+            let mut children = Vec::new();
+            for child in node.children() {
+                if let Some(parsed) = parse_html_node(&child, css_sources, label_map, key, html) {
+                    children.push(parsed);
+                }
+            }
+
+            let mut meta = meta;
+            ensure_meta_class(&mut meta, "dialog-footer");
+
+            Some(HtmlWidgetNode::Div(
+                Div::default(),
                 meta,
                 states,
                 children,
@@ -1062,6 +1178,14 @@ fn parse_validation_attributes(attributes: &Attributes) -> Option<ValidationRule
     }
 
     rules
+}
+
+#[cfg(feature = "extended-dialog")]
+fn ensure_meta_class(meta: &mut HtmlMeta, class_name: &str) {
+    let classes = meta.class.get_or_insert_with(Vec::new);
+    if !classes.iter().any(|class| class == class_name) {
+        classes.push(class_name.to_string());
+    }
 }
 
 /// Parses a `for` attribute into a normalized optional id (`#foo` => `foo`).
