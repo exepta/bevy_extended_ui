@@ -46,6 +46,7 @@ pub struct ExtendedUiConfiguration {
     pub assets_path: String,
     pub language_path: String,
     pub themes_path: String,
+    pub theme_names: Vec<String>,
 }
 
 impl Default for ExtendedUiConfiguration {
@@ -57,6 +58,7 @@ impl Default for ExtendedUiConfiguration {
     /// - `assets_path`: for preload images. Default `assets/extended_ui/`
     /// - `language_path`: for translations. Default `assets/lang`
     /// - `themes_path`: folder used by ThemeProvider discovery. Default `assets/themes`
+    /// - `theme_names`: optional explicit theme names (useful on wasm where fs discovery is unavailable)
     fn default() -> Self {
         Self {
             order: 2,
@@ -66,6 +68,7 @@ impl Default for ExtendedUiConfiguration {
             assets_path: String::from("assets/extended_ui/"),
             language_path: String::from("assets/lang"),
             themes_path: String::from("assets/themes"),
+            theme_names: Vec::new(),
         }
     }
 }

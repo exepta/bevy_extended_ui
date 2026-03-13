@@ -221,6 +221,7 @@ mod tests {
             assets_path: "assets/extended_ui/".to_string(),
             language_path: "assets/lang".to_string(),
             themes_path: "assets/themes".to_string(),
+            theme_names: Vec::new(),
         });
         app.add_systems(Update, load_ui_camera_system);
         app.update();

@@ -241,7 +241,12 @@ pub(crate) fn refresh_theme_provider_state(
     };
     let themes_asset_dir = normalize_themes_asset_dir(&themes_fs_path);
 
-    let discovered = discover_theme_names(&themes_fs_path);
+    let configured = normalize_theme_names(&config.theme_names);
+    let discovered = if configured.is_empty() {
+        discover_theme_names(&themes_fs_path)
+    } else {
+        configured
+    };
 
     state.themes_fs_path = themes_fs_path.clone();
     state.themes_asset_dir = themes_asset_dir.clone();
@@ -325,6 +330,30 @@ pub(crate) fn apply_theme_switch_requests(
             }
         }
     }
+}
+
+fn normalize_theme_names(names: &[String]) -> Vec<String> {
+    let mut out = Vec::new();
+    for name in names {
+        let trimmed = name.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let is_valid_name = trimmed
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
+        if !is_valid_name {
+            warn!(
+                "ThemeProvider ignored invalid theme name '{}' from ExtendedUiConfiguration.theme_names",
+                trimmed
+            );
+            continue;
+        }
+        out.push(trimmed.to_string());
+    }
+    out.sort();
+    out.dedup();
+    out
 }
 
 fn discover_theme_names(folder: &str) -> Vec<String> {
