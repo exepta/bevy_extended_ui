@@ -5,6 +5,8 @@ use bevy::asset::{AssetLoader, LoadContext};
 use bevy::prelude::*;
 use std::path::{Path, PathBuf};
 
+use crate::widgets::default_style::DEFAULT_STYLE_CSS;
+
 /// Asset containing raw CSS text.
 #[derive(Asset, TypePath, Debug, Clone)]
 pub struct CssAsset {
@@ -12,7 +14,7 @@ pub struct CssAsset {
 }
 
 /// Built-in default stylesheet bundled with the crate.
-pub const DEFAULT_UI_CSS_TEXT: &str = include_str!("../../assets/default/extended_ui.css");
+pub const DEFAULT_UI_CSS_TEXT: &str = DEFAULT_STYLE_CSS;
 
 /// Resource holding the default CSS asset handle.
 #[derive(Resource, Clone)]

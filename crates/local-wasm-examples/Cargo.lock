@@ -776,6 +776,7 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "bevy_extended_ui",
+ "bevy_extended_ui_macros",
  "console_error_panic_hook",
 ]
 

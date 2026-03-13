@@ -7,6 +7,8 @@ mod tests {
     use crate::html::reload::{CssDirty, HtmlReloadPlugin};
     use crate::io::{CssAsset, DefaultCssHandle, HtmlAsset};
     use crate::lang::{UILang, UiLangState, UiLangVariables};
+    #[cfg(feature = "providers")]
+    use crate::providers::{ThemeProvider, UiProviderRegistry};
     use crate::styles::{CssClass, CssID, CssSource, IconPlace};
     use crate::widgets::{
         BadgeAnchor, Body, Button, ButtonType, DateFormat, FieldMode, FormValidationMode, InputCap,
@@ -865,6 +867,124 @@ mod tests {
 
         assert!(button_visible);
         assert!(hidden_paragraph_still_hidden);
+    }
+
+    #[test]
+    #[cfg(feature = "providers")]
+    fn converter_applies_theme_provider_css_to_body_scope() {
+        let mut app = setup_converter_app();
+        app.init_resource::<UiProviderRegistry>();
+        app.world_mut()
+            .resource_mut::<UiProviderRegistry>()
+            .register(ThemeProvider);
+
+        let html = r##"
+        <html>
+          <head>
+            <meta name="provider-key" />
+          </head>
+          <theme-provider theme="night">
+            <body id="root">
+              <button>Theme Test</button>
+            </body>
+          </theme-provider>
+        </html>
+        "##;
+
+        add_html_source(
+            &mut app,
+            "examples/provider_fixture.html",
+            html,
+            "provider-key",
+            None,
+        );
+
+        app.update();
+
+        let default_css_id = app.world().resource::<DefaultCssHandle>().0.id();
+        let structure_map = app.world().resource::<HtmlStructureMap>();
+        let nodes = structure_map
+            .html_map
+            .get("provider-key")
+            .expect("expected parsed html structure for provider-key");
+
+        let HtmlWidgetNode::Body(_, body_meta, _, body_children, _, _, _) = &nodes[0] else {
+            panic!("expected body as root node");
+        };
+
+        assert_eq!(body_meta.css[0].id(), default_css_id);
+        assert!(body_meta.css.len() >= 2);
+        assert!(
+            body_children
+                .iter()
+                .any(|node| matches!(node, HtmlWidgetNode::Button(..))),
+            "expected provider-wrapped body children to remain visible"
+        );
+
+        let has_theme_css = body_meta.css.iter().any(|handle| {
+            handle
+                .path()
+                .map(|path| path.path().to_string_lossy().replace('\\', "/"))
+                .as_deref()
+                == Some("themes/night.css")
+        });
+        assert!(has_theme_css, "expected themes/night.css to be applied");
+    }
+
+    #[test]
+    #[cfg(feature = "providers")]
+    fn converter_ignores_theme_provider_inside_head() {
+        let mut app = setup_converter_app();
+        app.init_resource::<UiProviderRegistry>();
+        app.world_mut()
+            .resource_mut::<UiProviderRegistry>()
+            .register(ThemeProvider);
+
+        let html = r##"
+        <html>
+          <head>
+            <meta name="provider-head-key" />
+            <theme-provider theme="night">
+              <body id="ignored-provider-body"></body>
+            </theme-provider>
+          </head>
+          <body id="root">
+            <button>Theme Test</button>
+          </body>
+        </html>
+        "##;
+
+        add_html_source(
+            &mut app,
+            "examples/provider_head_fixture.html",
+            html,
+            "provider-head-key",
+            None,
+        );
+
+        app.update();
+
+        let structure_map = app.world().resource::<HtmlStructureMap>();
+        let nodes = structure_map
+            .html_map
+            .get("provider-head-key")
+            .expect("expected parsed html structure for provider-head-key");
+
+        let HtmlWidgetNode::Body(_, body_meta, _, _, _, _, _) = &nodes[0] else {
+            panic!("expected body as root node");
+        };
+
+        let has_theme_css = body_meta.css.iter().any(|handle| {
+            handle
+                .path()
+                .map(|path| path.path().to_string_lossy().replace('\\', "/"))
+                .as_deref()
+                == Some("themes/night.css")
+        });
+        assert!(
+            !has_theme_css,
+            "did not expect themes/night.css when provider is placed in <head>"
+        );
     }
 
     #[test]

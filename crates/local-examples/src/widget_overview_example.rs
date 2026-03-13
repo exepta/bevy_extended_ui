@@ -26,7 +26,7 @@ fn configure_ui(mut config: ResMut<ExtendedUiConfiguration>) {
 }
 
 fn load_ui(mut reg: ResMut<UiRegistry>, asset_server: Res<AssetServer>) {
-    let handle: Handle<HtmlAsset> = asset_server.load("examples/badge.html");
+    let handle: Handle<HtmlAsset> = asset_server.load("examples/widgets_overview.html");
     reg.add_and_use("badge-demo".to_string(), HtmlSource::from_handle(handle));
 }
 

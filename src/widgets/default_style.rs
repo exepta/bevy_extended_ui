@@ -1,4 +1,4 @@
-:root {
+pub const DEFAULT_STYLE_CSS: &str = r####":root {
     --primary: #5656ff;
     --primary-hover: #4848da;
     --primary-disabled: #33336f;
@@ -288,22 +288,21 @@ date-picker {
     color: #f4f6ff;
     cursor: pointer;
     overflow: visible;
-    transition: all 0.2s;
-
     &:hover {
         border-color: #b3b9d4;
     }
 
     &:focus {
         border-color: #90caf9;
-        z-index: 30000;
+        z-index: 40000;
     }
 
     &:checked {
-        z-index: 30000;
+        z-index: 40000;
     }
 
     > .date-picker-field {
+        position: relative;
         width: 100%;
         height: 100%;
         display: flex;
@@ -320,12 +319,16 @@ date-picker {
         top: 19px;
         color: #9ca2bd;
         font-size: 16px;
-        transition: all 0.2s;
     }
 
     > .date-picker-field > .date-picker-value {
+        position: absolute;
+        left: 14px;
+        right: 42px;
+        bottom: 8px;
         color: #f4f6ff;
         font-size: 16px;
+        text-wrap: nowrap;
     }
 
     > .date-picker-field > .date-picker-icon {
@@ -339,7 +342,6 @@ date-picker {
         align-items: center;
         color: #cad0e6;
         font-size: 13px;
-        transition: all 0.2s;
     }
 
     &:checked > .date-picker-field > .date-picker-icon {
@@ -360,7 +362,7 @@ date-picker {
         align-items: flex-start;
         flex-direction: column;
         gap: 10px;
-        z-index: 30001;
+        z-index: 40001;
 
         > .date-picker-header {
             position: relative;
@@ -388,8 +390,6 @@ date-picker {
                 display: flex;
                 justify-content: center;
                 align-items: center;
-                transition: all 0.2s;
-
                 &:hover {
                     background: rgba(135, 142, 176, 0.22);
                 }
@@ -419,8 +419,6 @@ date-picker {
                 display: flex;
                 justify-content: center;
                 align-items: center;
-                transition: background-color 0.08s linear;
-
                 &:hover {
                     background: rgba(135, 142, 176, 0.22);
                 }
@@ -445,8 +443,6 @@ date-picker {
                 display: flex;
                 justify-content: center;
                 align-items: center;
-                transition: background-color 0.08s linear;
-
                 &:hover {
                     background: rgba(135, 142, 176, 0.22);
                 }
@@ -506,8 +502,6 @@ date-picker {
                 display: flex;
                 justify-content: center;
                 align-items: center;
-                transition: background-color 0.08s linear;
-
                 > .date-picker-day-text {
                     color: #d6dcf5;
                     font-size: 14px;
@@ -574,8 +568,6 @@ date-picker {
                 display: flex;
                 justify-content: center;
                 align-items: center;
-                transition: background-color 0.08s linear;
-
                 > .date-picker-year-option-text {
                     color: #d6dcf5;
                     font-size: 14px;
@@ -621,8 +613,6 @@ date-picker {
                 display: flex;
                 justify-content: center;
                 align-items: center;
-                transition: background-color 0.08s linear;
-
                 > .date-picker-month-option-text {
                     color: #d6dcf5;
                     font-size: 16px;
@@ -662,7 +652,7 @@ date-picker {
     border-radius: 0px;
     background: transparent;
     cursor: default;
-    z-index: 30000;
+    z-index: 40000;
 
     > .date-picker-popover {
         top: 58px;
@@ -712,7 +702,7 @@ badge {
     position: absolute;
     width: 10px;
     height: 10px;
-    z-index: 9999;
+    z-index: 59999;
     background: rgba(24, 24, 30, 0.92);
     border-width: 0px;
     border-color: rgba(192, 198, 210, 0.95);
@@ -735,7 +725,7 @@ tool-tip {
     border-color: var(--primary-hover);
     color: var(--text-color);
     font-size: 13px;
-    z-index: 10000;
+    z-index: 60000;
     pointer-events: none;
 
     > .tooltip-nose {
@@ -963,7 +953,7 @@ select {
         align-items: center;
         flex-direction: row;
         gap: 10px;
-        padding-left: 15px;
+        padding-left: 10px;
         flex-grow: 1;
         border-radius: 5px 0;
         transition: all 0.3s;
@@ -999,7 +989,7 @@ select {
             height: 50px;
             min-height: 50px;
             max-height: 50px;
-            padding-left: 15px;
+            padding-left: 10px;
             display: flex;
             justify-content: flex-start;
             align-items: center;
@@ -1138,7 +1128,7 @@ colorpicker > .color-picker-modal {
     border-radius: 16px;
     background: var(--gray-background);
     box-shadow: 0 10px 30px rgba(60, 64, 67, 0.32);
-    z-index: 20;
+    z-index: 40001;
 }
 
 colorpicker > .color-picker-modal > .color-canvas {
@@ -1227,6 +1217,7 @@ switch {
         width: 50px;
         height: 24px;
         border-radius: 13px;
+        border: 2px solid var(--disabled-text);
         background: var(--gray-background);
         position: relative;
         display: flex;
@@ -1236,8 +1227,8 @@ switch {
 
         > .switch-dot {
             position: absolute;
-            width: 28px;
-            height: 28px;
+            width: 23px;
+            height: 23px;
             border-radius: 50%;
             display: flex;
             justify-content: center;
@@ -1359,3 +1350,4 @@ toggle {
         transform: translateX(0);
     }
 }
+"####;

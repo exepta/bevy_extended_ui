@@ -1,0 +1,153 @@
+<html>
+<head>
+  <meta name="widgets-demo" />
+  <link rel="stylesheet" href="widget_overview.css" />
+</head>
+<body>
+<div class="page-head">
+  <h3>Extended UI Widget Gallery</h3>
+  <p>All widgets in a display flex row</p>
+</div>
+
+<div class="widget-grid">
+  <div class="widget-card">
+    <h5>Button</h5>
+    <button>Default Button</button>
+  </div>
+
+  <div class="widget-card">
+    <h5>CheckBox</h5>
+    <checkbox>Newsletter subscription</checkbox>
+  </div>
+
+  <div class="widget-card">
+    <h5>ChoiceBox</h5>
+    <select>
+      <option value="a">Option A</option>
+      <option value="b" selected>Option B</option>
+      <option value="c">Option C</option>
+      <option value="d">Option D</option>
+      <option value="e">Option E</option>
+    </select>
+  </div>
+
+  <div class="widget-card">
+    <h5>ColorPicker</h5>
+    <colorpicker value="#4b7cff"></colorpicker>
+  </div>
+
+  <div class="widget-card">
+    <h5>DatePicker</h5>
+    <label for="demo-date">Date</label>
+    <date-picker id="demo-date" format="dd.mm.yyyy"></date-picker>
+  </div>
+
+  <div class="widget-card">
+    <h5>InputField</h5>
+    <label for="demo-input">E-Mail</label>
+    <input id="demo-input" type="email" placeholder="name@example.com" />
+  </div>
+
+  <div class="widget-card">
+    <h5>ProgressBar</h5>
+    <progressbar value="68" min="0" max="100"></progressbar>
+  </div>
+
+  <div class="widget-card">
+    <h5>Slider</h5>
+    <slider value="35" min="0" max="100" step="1"></slider>
+  </div>
+
+  <div class="widget-card">
+    <h5>SwitchButton</h5>
+    <switch>Live Preview</switch>
+  </div>
+
+  <div class="widget-card">
+    <h5>ToggleButton</h5>
+    <toggle selected>Toggle</toggle>
+  </div>
+
+  <div class="widget-card">
+    <h5>RadioButtons / FieldSet</h5>
+    <fieldset mode="single">
+      <radio value="small" selected>Small</radio>
+      <radio value="medium">Medium</radio>
+      <radio value="large">Large</radio>
+    </fieldset>
+  </div>
+
+  <div class="widget-card">
+    <h5>Divider</h5>
+    <divider alignment="horizontal" class="full-divider"></divider>
+  </div>
+
+  <div class="widget-card">
+    <h5>Scrollbar Vert</h5>
+    <div class="scroll-div">
+      <h6>Entry 01</h6>
+      <h6>Entry 02</h6>
+      <h6>Entry 03</h6>
+      <h6>Entry 04</h6>
+      <h6>Entry 05</h6>
+      <h6>Entry 06</h6>
+    </div>
+  </div>
+
+  <div class="widget-card">
+    <h5>Scrollbar Hori</h5>
+    <div class="scroll-hori-div">
+      <h6>Entry 01</h6>
+      <h6>Entry 02</h6>
+      <h6>Entry 03</h6>
+      <h6>Entry 04</h6>
+      <h6>Entry 05</h6>
+      <h6>Entry 06</h6>
+    </div>
+  </div>
+
+  <div class="widget-card">
+    <h5>Image</h5>
+    <img src="/extended_ui/icons/color.png" class="demo-image" alt="color icon" />
+  </div>
+
+  <div class="widget-card">
+    <h5>ToolTip</h5>
+    <button id="tooltip-target">Hover me</button>
+    <tool-tip for="#tooltip-target" alignment="top">This is a tooltip</tool-tip>
+    <button>Over me</button>
+  </div>
+
+  <div class="widget-card">
+    <h5>Badge</h5>
+    <div class="notification-target">
+      <button id="inbox-button">Inbox</button>
+    </div>
+    <badge for="inbox-button" value="112" max="99" anchor="top right"></badge>
+  </div>
+
+  <div class="widget-card">
+    <h5>Form</h5>
+    <form validate="manual">
+      <label for="form-name">Name</label>
+      <input id="form-name" type="text" placeholder="Dein Name" />
+      <button type="submit">Submit</button>
+    </form>
+  </div>
+
+  <div class="widget-card">
+    <h5>Paragraph & Headline</h5>
+    <h6>Small Headline</h6>
+    <p>This is a paragraph rendered text.</p>
+  </div>
+
+  <div class="widget-card">
+    <h5>Div</h5>
+    <div class="demo-div">
+      <p>Block A</p>
+      <p>Block B</p>
+    </div>
+  </div>
+</div>
+</body>
+</html>

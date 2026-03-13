@@ -1,5 +1,7 @@
 use crate::html::ExtendedUiHtmlPlugin;
 use crate::io::ExtendedIoPlugin;
+#[cfg(feature = "providers")]
+use crate::providers::ExtendedUiProviderPlugin;
 use crate::registry::ExtendedRegistryPlugin;
 use crate::services::ExtendedServicePlugin;
 use crate::styles::ExtendedStylingPlugin;
@@ -13,6 +15,8 @@ pub mod example_utils;
 pub mod html;
 pub mod io;
 pub mod lang;
+#[cfg(feature = "providers")]
+pub mod providers;
 pub mod registry;
 pub mod services;
 pub mod styles;
@@ -41,6 +45,8 @@ pub struct ExtendedUiConfiguration {
     pub render_layers: Vec<usize>,
     pub assets_path: String,
     pub language_path: String,
+    pub themes_path: String,
+    pub theme_names: Vec<String>,
 }
 
 impl Default for ExtendedUiConfiguration {
@@ -51,6 +57,8 @@ impl Default for ExtendedUiConfiguration {
     /// - `render_layers` set to layers 1 and 2
     /// - `assets_path`: for preload images. Default `assets/extended_ui/`
     /// - `language_path`: for translations. Default `assets/lang`
+    /// - `themes_path`: folder used by ThemeProvider discovery. Default `assets/themes`
+    /// - `theme_names`: optional explicit theme names (useful on wasm where fs discovery is unavailable)
     fn default() -> Self {
         Self {
             order: 2,
@@ -59,6 +67,8 @@ impl Default for ExtendedUiConfiguration {
             render_layers: vec![1, 2],
             assets_path: String::from("assets/extended_ui/"),
             language_path: String::from("assets/lang"),
+            themes_path: String::from("assets/themes"),
+            theme_names: Vec::new(),
         }
     }
 }
@@ -120,6 +130,8 @@ impl Plugin for ExtendedUiPlugin {
             ExtendedIoPlugin,
             ExtendedUiHtmlPlugin,
         ));
+        #[cfg(feature = "providers")]
+        app.add_plugins(ExtendedUiProviderPlugin);
         app.add_systems(
             Update,
             load_ui_camera_system.run_if(resource_changed::<ExtendedUiConfiguration>),

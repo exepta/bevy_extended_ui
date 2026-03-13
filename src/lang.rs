@@ -556,9 +556,9 @@ pub use i18n_properties;
 
 #[cfg(all(test, any(feature = "fluent", feature = "properties-lang")))]
 mod tests {
-    use super::{UiLangVariables, resolve_placeholder};
     #[cfg(feature = "properties-lang")]
     use super::localize_html;
+    use super::{UiLangVariables, resolve_placeholder};
 
     #[test]
     fn unresolved_reactive_placeholder_stays_unchanged() {

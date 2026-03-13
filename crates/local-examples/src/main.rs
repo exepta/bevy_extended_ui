@@ -1,5 +1,6 @@
-mod badge_example;
+mod theming_provider_example;
+mod widget_overview_example;
 
 fn main() {
-    badge_example::run();
+    widget_overview_example::run();
 }

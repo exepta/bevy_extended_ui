@@ -3,6 +3,7 @@ use js_sys::Date;
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use crate::services::image_service::{DEFAULT_CHOICE_BOX_KEY, get_or_load_image};
 use crate::styles::components::UiStyle;
 use crate::styles::paint::Colored;
 use crate::styles::{CssClass, CssID, CssSource, FontVal, TagName};
@@ -11,7 +12,7 @@ use crate::widgets::{
     BindToID, DateFormat, DatePicker, IgnoreParentState, InputField, InputType, InputValue,
     UIGenID, UIWidgetState, WidgetId, WidgetKind,
 };
-use crate::{CurrentWidgetState, ExtendedUiConfiguration};
+use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
 use bevy::camera::visibility::RenderLayers;
 use bevy::input::mouse::MouseWheel;
 use bevy::prelude::*;
@@ -101,7 +102,7 @@ struct DatePickerDayText {
     index: usize,
 }
 
-const DATE_PICKER_OVERLAY_Z: i32 = 30_000;
+const DATE_PICKER_OVERLAY_Z: i32 = 40_000;
 
 /// Stores the previous z-index of a bound input while its date picker is open.
 #[derive(Component, Clone, Copy, Debug)]
@@ -178,6 +179,9 @@ impl Plugin for DatePickerWidget {
             )
                 .chain(),
         );
+        // Run a late visual sync after click observers to avoid one-frame stale day states
+        // (e.g. off-month cells briefly using current-month colors).
+        app.add_systems(Last, (sync_date_picker_visuals, sync_year_picker_panel).chain());
     }
 }
 
@@ -190,6 +194,9 @@ fn internal_node_creation_system(
     >,
     input_targets: Query<(&CssID, &InputField), With<InputField>>,
     config: Res<ExtendedUiConfiguration>,
+    asset_server: Res<AssetServer>,
+    mut image_cache: ResMut<ImageCache>,
+    mut images: ResMut<Assets<Image>>,
 ) {
     let layer = config.render_layers.first().copied().unwrap_or(1);
 
@@ -249,6 +256,16 @@ fn internal_node_creation_system(
         let today = today_utc_date();
         let start = selected.unwrap_or(today);
         let (year_start, year_end) = resolve_year_range(min, max, start.year);
+        let drop_icon = if picker.for_id.is_none() {
+            Some(get_or_load_image(
+                DEFAULT_CHOICE_BOX_KEY,
+                &mut image_cache,
+                &mut images,
+                &asset_server,
+            ))
+        } else {
+            None
+        };
 
         commands
             .entity(entity)
@@ -299,6 +316,7 @@ fn internal_node_creation_system(
                     }
                 }),
             ))
+            .insert(GlobalZIndex::default())
             .observe(on_internal_cursor_entered)
             .observe(on_internal_cursor_leave)
             .with_children(|builder| {
@@ -351,20 +369,19 @@ fn internal_node_creation_system(
                                 BindToID(id.get()),
                             ));
 
-                            field.spawn((
-                                Name::new(format!("DatePicker-Icon-{}", picker.entry)),
-                                Node::default(),
-                                Text::new("v"),
-                                TextColor::default(),
-                                TextFont::default(),
-                                TextLayout::default(),
-                                UIWidgetState::default(),
-                                css_source.clone(),
-                                CssClass(vec!["date-picker-icon".to_string()]),
-                                RenderLayers::layer(layer),
-                                Pickable::IGNORE,
-                                BindToID(id.get()),
-                            ));
+                            if let Some(drop_icon) = drop_icon.clone() {
+                                field.spawn((
+                                    Name::new(format!("DatePicker-Icon-{}", picker.entry)),
+                                    Node::default(),
+                                    ImageNode::new(drop_icon),
+                                    UIWidgetState::default(),
+                                    css_source.clone(),
+                                    CssClass(vec!["date-picker-icon".to_string()]),
+                                    RenderLayers::layer(layer),
+                                    Pickable::IGNORE,
+                                    BindToID(id.get()),
+                                ));
+                            }
                         });
                 }
 
@@ -392,6 +409,7 @@ fn internal_node_creation_system(
                         DatePickerPopover,
                         BindToID(id.get()),
                     ))
+                    .insert(GlobalZIndex::default())
                     .with_children(|popover| {
                         popover
                             .spawn((
@@ -430,10 +448,8 @@ fn internal_node_creation_system(
                                             Text::new("<"),
                                             TextColor::default(),
                                             TextFont::default(),
-                                            TextLayout::new_with_justify(
-                                                Justify::Center,
-                                            )
-                                            .with_no_wrap(),
+                                            TextLayout::new_with_justify(Justify::Center)
+                                                .with_no_wrap(),
                                             UIWidgetState::default(),
                                             css_source.clone(),
                                             CssClass(vec!["date-picker-nav-text".to_string()]),
@@ -532,10 +548,8 @@ fn internal_node_creation_system(
                                                     Text::new(""),
                                                     TextColor::default(),
                                                     TextFont::default(),
-                                                    TextLayout::new_with_justify(
-                                                        Justify::Center,
-                                                    )
-                                                    .with_no_wrap(),
+                                                    TextLayout::new_with_justify(Justify::Center)
+                                                        .with_no_wrap(),
                                                     UIWidgetState::default(),
                                                     css_source.clone(),
                                                     CssClass(vec![
@@ -577,10 +591,8 @@ fn internal_node_creation_system(
                                             Text::new(">"),
                                             TextColor::default(),
                                             TextFont::default(),
-                                            TextLayout::new_with_justify(
-                                                Justify::Center,
-                                            )
-                                            .with_no_wrap(),
+                                            TextLayout::new_with_justify(Justify::Center)
+                                                .with_no_wrap(),
                                             UIWidgetState::default(),
                                             css_source.clone(),
                                             CssClass(vec!["date-picker-nav-text".to_string()]),
@@ -631,10 +643,8 @@ fn internal_node_creation_system(
                                                 Text::new(day),
                                                 TextColor::default(),
                                                 TextFont::default(),
-                                                TextLayout::new_with_justify(
-                                                    Justify::Center,
-                                                )
-                                                .with_no_wrap(),
+                                                TextLayout::new_with_justify(Justify::Center)
+                                                    .with_no_wrap(),
                                                 UIWidgetState::default(),
                                                 css_source.clone(),
                                                 CssClass(vec![
@@ -684,12 +694,10 @@ fn internal_node_creation_system(
                                                 picker.entry, index
                                             )),
                                             Text::new(""),
-                                            TextColor::default(),
+                                            TextColor(Color::srgb(0.84, 0.86, 0.96)),
                                             TextFont::default(),
-                                            TextLayout::new_with_justify(
-                                                Justify::Center,
-                                            )
-                                            .with_no_wrap(),
+                                            TextLayout::new_with_justify(Justify::Center)
+                                                .with_no_wrap(),
                                             UIWidgetState::default(),
                                             css_source.clone(),
                                             CssClass(vec!["date-picker-day-text".to_string()]),
@@ -748,10 +756,8 @@ fn internal_node_creation_system(
                                                 Text::new(year.to_string()),
                                                 TextColor::default(),
                                                 TextFont::default(),
-                                                TextLayout::new_with_justify(
-                                                    Justify::Center,
-                                                )
-                                                .with_no_wrap(),
+                                                TextLayout::new_with_justify(Justify::Center)
+                                                    .with_no_wrap(),
                                                 UIWidgetState::default(),
                                                 css_source.clone(),
                                                 CssClass(vec![
@@ -811,10 +817,8 @@ fn internal_node_creation_system(
                                                 Text::new(month_short_name(month).to_string()),
                                                 TextColor::default(),
                                                 TextFont::default(),
-                                                TextLayout::new_with_justify(
-                                                    Justify::Center,
-                                                )
-                                                .with_no_wrap(),
+                                                TextLayout::new_with_justify(Justify::Center)
+                                                    .with_no_wrap(),
                                                 UIWidgetState::default(),
                                                 css_source.clone(),
                                                 CssClass(vec![
@@ -850,6 +854,7 @@ fn sync_bound_date_picker_targets(
         ),
         (
             With<DatePickerBase>,
+            Without<DatePickerPopover>,
             Without<DatePickerDayButton>,
             Without<DatePickerDayText>,
             Without<InputField>,
@@ -1125,6 +1130,7 @@ fn sync_date_picker_visuals(
             &mut InputValue,
             &mut UIWidgetState,
             &mut ZIndex,
+            &mut GlobalZIndex,
             &UIGenID,
         ),
         (
@@ -1147,7 +1153,10 @@ fn sync_date_picker_visuals(
             With<DatePickerLabel>,
         >,
         Query<(&mut Text, &mut TextColor, &BindToID), With<DatePickerValueText>>,
-        Query<(&mut Visibility, &BindToID), With<DatePickerPopover>>,
+        Query<
+            (&mut Visibility, &mut GlobalZIndex, &BindToID),
+            (With<DatePickerPopover>, Without<DatePickerBase>),
+        >,
         Query<(&mut Text, &BindToID), With<DatePickerHeaderLabel>>,
         Query<
             (
@@ -1182,14 +1191,16 @@ fn sync_date_picker_visuals(
         >,
     )>,
 ) {
-    for (mut picker, mut state, mut input_value, ui_state, mut root_z, ui_id) in
+    for (mut picker, mut state, mut input_value, ui_state, mut root_z, mut root_global_z, ui_id) in
         picker_query.iter_mut()
     {
-        root_z.0 = if ui_state.open && !ui_state.disabled {
-            DATE_PICKER_OVERLAY_Z
+        if ui_state.open && !ui_state.disabled {
+            root_z.0 = DATE_PICKER_OVERLAY_Z;
+            root_global_z.0 = DATE_PICKER_OVERLAY_Z;
         } else {
-            0
-        };
+            root_z.0 = 0;
+            root_global_z.0 = 0;
+        }
 
         let bound_input = picker.for_id.as_ref().and_then(|for_id| {
             input_targets
@@ -1325,23 +1336,28 @@ fn sync_date_picker_visuals(
                         ),
                     };
                     value_color.0 = Color::srgb(0.96, 0.97, 1.0);
-                } else {
+                } else if float_label {
                     value_text.0 = placeholder.clone();
                     value_color.0 = Color::srgba(0.69, 0.72, 0.82, 0.98);
+                } else {
+                    // Keep placeholder hidden while the label is not floated to avoid overlap.
+                    value_text.0.clear();
                 }
             }
         }
 
         {
             let mut popover_query = params.p2();
-            for (mut visibility, bind_id) in popover_query.iter_mut() {
+            for (mut visibility, mut popover_global_z, bind_id) in popover_query.iter_mut() {
                 if bind_id.0 != ui_id.get() {
                     continue;
                 }
                 if ui_state.open && !ui_state.disabled {
                     *visibility = Visibility::Inherited;
+                    popover_global_z.0 = DATE_PICKER_OVERLAY_Z + 1;
                 } else {
                     *visibility = Visibility::Hidden;
+                    popover_global_z.0 = 0;
                 }
             }
         }
@@ -1441,6 +1457,7 @@ fn sync_date_picker_visuals(
                 let hidden = text_info.index >= visible_cell_count;
                 if hidden {
                     text.0.clear();
+                    text_color.0 = Color::srgb(0.84, 0.86, 0.96);
                     *visibility = Visibility::Hidden;
                     text_state.checked = false;
                     text_state.readonly = true;
