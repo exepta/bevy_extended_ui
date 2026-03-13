@@ -160,6 +160,13 @@ badge > .badge-text {
     border: 1px #4a6292;
 }
 
+.input-preview-image {
+    width: 56px;
+    height: 56px;
+    object-fit: contain;
+    background: #171e2d;
+}
+
 .full-divider {
     width: 100%;
 }

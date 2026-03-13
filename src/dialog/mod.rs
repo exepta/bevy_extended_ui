@@ -6,7 +6,7 @@ use once_cell::sync::Lazy;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::ExtendedUiConfiguration;
-use crate::html::HtmlStyle;
+use crate::html::{HtmlStyle, NeedHidden};
 use crate::styles::{BackdropFilter, Background};
 use crate::styles::{CssClass, CssID, TagName};
 use crate::widgets::{Body, UIWidgetState};
@@ -528,6 +528,7 @@ fn initialize_dialog_widgets(
             TagName("dialog".to_string()),
             CssClass(classes),
             DialogWidgetBase,
+            NeedHidden,
             Visibility::Hidden,
             HtmlStyle(overlay_style),
         ));

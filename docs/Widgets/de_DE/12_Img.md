@@ -16,12 +16,18 @@ Bild-Widget für eine Asset-Quelle inklusive Alternativtext.
 
 - src wird relativ zum HTML-Asset-Pfad aufgelöst.
 - alt speichert Fallback-/Metadaten-Text.
+- preview kann die Bildquelle an die id eines `input type="file"` binden (z. B. `preview="avatar-file"`).
 - Leichtgewichtiges Bild-Widget für Inhalte.
 
 ## HTML-Beispiel
 
 ```html
 <img src="ui/logo.png" alt="Project logo" oninit="log_img" />
+```
+
+```html
+<input id="avatar-file" type="file" extensions="[jpg, jpeg, png]" show-size="true" />
+<img preview="avatar-file" alt="Avatar Vorschau" />
 ```
 
 ## Bevy-Beispiel

@@ -6,7 +6,7 @@ title: InputField
 
 ## Overview
 
-Text-like input widget for text, email, date, number and password workflows.
+Text-like input widget for text, email, date, number, password and file workflows.
 
 - Rust component: InputField
 - HTML tag: input
@@ -14,8 +14,13 @@ Text-like input widget for text, email, date, number and password workflows.
 
 ## Important Attributes and Behavior
 
-- Supports id, name, type, value, placeholder, icon, maxlength, format.
-- Input types include text/email/date/password/number.
+- Supports id, name, type, value, placeholder, icon, maxlength, format, folder, extensions, show-size, max-size.
+- Input types include text/email/date/password/number/file.
+- File type notes:
+  - `folder="true|false"` (default `false`)
+  - `extensions="json"` or `extensions="[json, css, yaml, png]"` (ignored when `folder="true"`)
+  - `show-size="true|false"` (default `false`)
+  - `max-size="1KB|1MB|1GB"` to reject files larger than the configured limit
 - Validation attributes required and validation are supported.
 
 ## HTML Example

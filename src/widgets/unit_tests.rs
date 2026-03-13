@@ -156,7 +156,9 @@ mod tests {
         assert!(InputType::Date.is_valid_char('-'));
         assert!(!InputType::Date.is_valid_char('@'));
         assert!(InputType::Range.is_valid_char(' '));
+        assert!(!InputType::File.is_valid_char('a'));
         assert_eq!(InputType::from_str("password"), Some(InputType::Password));
+        assert_eq!(InputType::from_str("file"), Some(InputType::File));
         assert_eq!(InputType::from_str("bad"), None);
     }
 

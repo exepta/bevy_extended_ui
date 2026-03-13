@@ -60,9 +60,28 @@
   </div>
 
   <div class="widget-card">
-    <h5>InputField</h5>
-    <label for="demo-input">E-Mail</label>
-    <input id="demo-input" type="email" placeholder="name@example.com" />
+    <h5>InputField (File)</h5>
+    <label for="demo-file-basic">File</label>
+    <input id="demo-file-basic" type="file" extensions="[json, js, png]" />
+  </div>
+
+  <div class="widget-card">
+    <h5>InputField Preview</h5>
+    <label for="demo-preview-file">Image File</label>
+    <input
+      id="demo-preview-file"
+      type="file"
+      max-size="2MB"
+      extensions="[jpg, jpeg, png]"
+      show-size="true"
+    />
+    <img
+      id="demo-preview-image"
+      src="/extended_ui/icons/color.png"
+      preview="demo-preview-file"
+      class="demo-image input-preview-image"
+      alt="selected image preview"
+    />
   </div>
 
   <div class="widget-card">

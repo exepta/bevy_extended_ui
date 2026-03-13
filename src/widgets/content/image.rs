@@ -1,7 +1,9 @@
 use crate::services::image_service::get_or_load_image;
 use crate::styles::paint::Colored;
-use crate::styles::{CssSource, TagName};
-use crate::widgets::{Img, UIGenID, UIWidgetState, WidgetId, WidgetKind};
+use crate::styles::{CssID, CssSource, TagName};
+use crate::widgets::{
+    Img, InputField, InputType, InputValue, UIGenID, UIWidgetState, WidgetId, WidgetKind,
+};
 use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
 use bevy::asset::LoadState;
 use bevy::camera::visibility::RenderLayers;
@@ -41,10 +43,42 @@ impl Plugin for ImageWidget {
             Update,
             (
                 internal_node_creation_system,
+                sync_preview_source_from_file_input,
                 update_src,
                 sync_alt_text_with_image_state, // needed for "missing file => alt text"
-            ),
+            )
+                .chain(),
         );
+    }
+}
+
+/// Syncs `<img preview="input-id">` sources from changed file inputs.
+fn sync_preview_source_from_file_input(
+    input_query: Query<(&CssID, &InputField, &InputValue), (With<InputField>, Changed<InputValue>)>,
+    mut img_query: Query<&mut Img, With<Img>>,
+) {
+    for (input_id, input, input_value) in input_query.iter() {
+        if input.input_type != InputType::File || input.folder {
+            continue;
+        }
+
+        if !input_allows_image_preview(input) {
+            continue;
+        }
+
+        let value = input_value.0.trim();
+        if value.is_empty() || !is_supported_preview_source(value) {
+            continue;
+        }
+
+        let normalized = value.replace('\\', "/");
+        for mut img in img_query.iter_mut() {
+            if img.preview.as_deref() == Some(input_id.0.as_str())
+                && img.src.as_deref() != Some(normalized.as_str())
+            {
+                img.src = Some(normalized.clone());
+            }
+        }
     }
 }
 
@@ -316,6 +350,25 @@ fn assign_image_from_src(
         let handle = get_or_load_image(path.as_str(), image_cache, images, asset_server);
         image_node.image = handle;
     }
+}
+
+fn input_allows_image_preview(input: &InputField) -> bool {
+    input.extensions.iter().any(|ext| {
+        let ext = ext.trim().trim_start_matches('.').to_ascii_lowercase();
+        matches!(ext.as_str(), "jpg" | "jpeg" | "png")
+    })
+}
+
+fn path_is_supported_preview_image(path: &str) -> bool {
+    std::path::Path::new(path)
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext| ext.to_ascii_lowercase())
+        .is_some_and(|ext| matches!(ext.as_str(), "jpg" | "jpeg" | "png"))
+}
+
+fn is_supported_preview_source(value: &str) -> bool {
+    value.starts_with("data:") || path_is_supported_preview_image(value)
 }
 
 /// Returns true when the image source is empty or missing.
