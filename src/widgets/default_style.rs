@@ -220,14 +220,41 @@ input {
         z-index: 30000;
     }
 
+    &:invalid {
+        border-color: #e06a7b;
+        color: var(--text-color);
+    }
+
     &:focus > .input-label {
         color: var(--primary);
+    }
+
+    &:invalid > .input-label {
+        color: #ff9eaa;
     }
 
     > .input-label {
         position: absolute;
         left: 10px;
         top: 19px;
+        transition: all 0.3s;
+    }
+
+    > .input-file-size {
+        position: absolute;
+        right: 10px;
+        top: 20px;
+        font-size: 12px;
+        color: var(--text-color-dark);
+        transition: all 0.3s;
+    }
+
+    > .input-file-error {
+        position: absolute;
+        left: 10px;
+        bottom: -16px;
+        font-size: 11px;
+        color: #ff9eaa;
         transition: all 0.3s;
     }
 
@@ -272,6 +299,18 @@ input {
 
     &:disabled > .in-text-container > .input-cursor {
         background: var(--disabled-text);
+    }
+
+    &:focus > .input-file-size {
+        color: var(--text-color);
+    }
+
+    &:disabled > .input-file-size {
+        color: var(--disabled-text);
+    }
+
+    &:invalid > .input-file-size {
+        color: #ff9eaa;
     }
 }
 

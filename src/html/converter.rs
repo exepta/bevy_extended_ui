@@ -705,6 +705,11 @@ fn parse_html_node(
         "img" => {
             let src_raw = attributes.get("src").unwrap_or("").to_string();
             let alt = attributes.get("alt").unwrap_or("").to_string();
+            let preview = attributes
+                .get("preview")
+                .map(str::trim)
+                .map(|value| value.trim_start_matches('#').to_string())
+                .filter(|value| !value.is_empty());
 
             let src_resolved = if src_raw.trim().is_empty() {
                 None
@@ -719,6 +724,7 @@ fn parse_html_node(
                 Img {
                     src: src_resolved,
                     alt,
+                    preview,
                     ..default()
                 },
                 meta,
@@ -750,6 +756,10 @@ fn parse_html_node(
                 .map(str::trim)
                 .filter(|value| !value.is_empty())
                 .map(str::to_string);
+            let folder = parse_bool_attribute(&attributes, "folder");
+            let extensions = parse_extensions_attribute(attributes.get("extensions"));
+            let show_size = parse_bool_attribute(&attributes, "show-size");
+            let max_size_bytes = parse_max_size_attribute(attributes.get("max-size"));
             let icon_path = attributes.get("icon").unwrap_or("");
             let icon: Option<String> = if !icon_path.is_empty() {
                 Some(String::from(icon_path))
@@ -775,6 +785,10 @@ fn parse_html_node(
                     text,
                     input_type: InputType::from_str(&input_type).unwrap_or_default(),
                     date_format,
+                    folder,
+                    extensions,
+                    show_size,
+                    max_size_bytes,
                     icon_path: icon,
                     cap_text_at: cap,
                     ..default()
@@ -1178,6 +1192,73 @@ fn parse_validation_attributes(attributes: &Attributes) -> Option<ValidationRule
     }
 
     rules
+}
+
+/// Parses boolean attributes with `true`/`false` semantics.
+fn parse_bool_attribute(attributes: &Attributes, key: &str) -> bool {
+    let Some(value) = attributes.get(key) else {
+        return false;
+    };
+
+    let normalized = value.trim().to_ascii_lowercase();
+    normalized.is_empty() || normalized == "true"
+}
+
+/// Parses `extensions` values from either a single token or list syntax.
+fn parse_extensions_attribute(raw: Option<&str>) -> Vec<String> {
+    let Some(value) = raw else {
+        return Vec::new();
+    };
+
+    let value = value.trim();
+    if value.is_empty() {
+        return Vec::new();
+    }
+
+    let inner = value
+        .strip_prefix('[')
+        .and_then(|s| s.strip_suffix(']'))
+        .unwrap_or(value);
+
+    inner
+        .split(',')
+        .map(str::trim)
+        .map(|token| token.trim_matches('"').trim_matches('\''))
+        .map(|token| token.trim_start_matches('.'))
+        .filter(|token| !token.is_empty())
+        .map(str::to_ascii_lowercase)
+        .collect()
+}
+
+/// Parses `max-size` values like `1KB`, `2MB`, `0.5GB` into bytes.
+fn parse_max_size_attribute(raw: Option<&str>) -> Option<u64> {
+    let value = raw?.trim();
+    if value.is_empty() {
+        return None;
+    }
+
+    let compact = value
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .collect::<String>();
+    let normalized = compact.to_ascii_uppercase();
+
+    let (number, multiplier) = if let Some(number) = normalized.strip_suffix("KB") {
+        (number, 1024_f64)
+    } else if let Some(number) = normalized.strip_suffix("MB") {
+        (number, 1024_f64 * 1024_f64)
+    } else if let Some(number) = normalized.strip_suffix("GB") {
+        (number, 1024_f64 * 1024_f64 * 1024_f64)
+    } else {
+        return None;
+    };
+
+    let amount = number.parse::<f64>().ok()?;
+    if !amount.is_finite() || amount < 0.0 {
+        return None;
+    }
+
+    Some((amount * multiplier).round() as u64)
 }
 
 #[cfg(feature = "extended-dialog")]

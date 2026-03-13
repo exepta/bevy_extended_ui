@@ -662,6 +662,8 @@ pub struct Img {
     pub entry: usize,
     pub src: Option<String>,
     pub alt: String,
+    /// Optional input id to auto-preview selected files from `input type="file"`.
+    pub preview: Option<String>,
 }
 
 impl Default for Img {
@@ -673,6 +675,7 @@ impl Default for Img {
             entry,
             src: None,
             alt: String::from(""),
+            preview: None,
         }
     }
 }
@@ -770,6 +773,14 @@ pub struct InputField {
     pub input_type: InputType,
     /// Optional date format string used when `input_type="date"`.
     pub date_format: Option<String>,
+    /// Opens a folder picker instead of a file picker for `input_type="file"`.
+    pub folder: bool,
+    /// Allowed file extensions for `input_type="file"` (ignored when `folder=true`).
+    pub extensions: Vec<String>,
+    /// Displays the selected file size as a right-side suffix for `input_type="file"`.
+    pub show_size: bool,
+    /// Optional max file size in bytes for `input_type="file"` selections.
+    pub max_size_bytes: Option<u64>,
     pub cap_text_at: InputCap,
 }
 
@@ -790,6 +801,10 @@ impl Default for InputField {
             cap_text_at: InputCap::default(),
             input_type: InputType::default(),
             date_format: None,
+            folder: false,
+            extensions: Vec::new(),
+            show_size: false,
+            max_size_bytes: None,
         }
     }
 }
@@ -804,6 +819,7 @@ pub enum InputType {
     Range,
     Password,
     Number,
+    File,
 }
 
 impl InputType {
@@ -815,6 +831,7 @@ impl InputType {
             InputType::Email => c.is_ascii_alphanumeric() || c == '@' || c == '.' || c == '-',
             InputType::Date => c.is_ascii_digit() || c == '/' || c == '-' || c == '.',
             InputType::Range => c.is_ascii_digit() || c == '/' || c == '-' || c == '.' || c == ' ',
+            InputType::File => false,
         }
     }
 
@@ -827,6 +844,7 @@ impl InputType {
             "email" => Some(InputType::Email),
             "date" => Some(InputType::Date),
             "range" => Some(InputType::Range),
+            "file" => Some(InputType::File),
             _ => None,
         }
     }

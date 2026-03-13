@@ -1,4 +1,5 @@
 use crate::{ExtendedUiConfiguration, ImageCache};
+use base64::Engine;
 use bevy::asset::RenderAssetUsages;
 use bevy::image::{CompressedImageFormats, ImageSampler, ImageType};
 use bevy::prelude::*;
@@ -84,6 +85,16 @@ pub fn get_or_load_image(
         return handle.clone();
     }
 
+    if let Some(handle) = load_image_from_data_url(path, images) {
+        image_cache.map.insert(path.to_string(), handle.clone());
+        return handle;
+    }
+
+    if let Some(handle) = load_image_from_filesystem(path, images) {
+        image_cache.map.insert(path.to_string(), handle.clone());
+        return handle;
+    }
+
     #[cfg(all(feature = "svg", not(target_arch = "wasm32")))]
     if path_is_svg(path) {
         if let Some(handle) = load_svg_image_from_project(path, images) {
@@ -124,6 +135,84 @@ pub fn get_or_load_image(
 
     image_cache.map.insert(path.to_string(), handle.clone());
     handle
+}
+
+fn load_image_from_filesystem(path: &str, images: &mut Assets<Image>) -> Option<Handle<Image>> {
+    let fs_path = Path::new(path);
+    if !fs_path.is_file() {
+        return None;
+    }
+
+    let ext = fs_path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .map(str::to_ascii_lowercase)?;
+
+    if !matches!(
+        ext.as_str(),
+        "png" | "jpg" | "jpeg" | "webp" | "gif" | "ico"
+    ) {
+        return None;
+    }
+
+    let bytes = fs::read(fs_path).ok()?;
+    let image = Image::from_buffer(
+        &bytes,
+        ImageType::Extension(ext.as_str()),
+        CompressedImageFormats::empty(),
+        true,
+        ImageSampler::default(),
+        RenderAssetUsages::default(),
+    )
+    .ok()?;
+
+    Some(images.add(image))
+}
+
+fn load_image_from_data_url(path: &str, images: &mut Assets<Image>) -> Option<Handle<Image>> {
+    let raw = path.trim();
+    if !raw.starts_with("data:") {
+        return None;
+    }
+
+    let (meta, payload) = raw.split_once(',')?;
+    if !meta.contains(";base64") {
+        return None;
+    }
+
+    let mime = meta
+        .strip_prefix("data:")
+        .and_then(|value| value.split(';').next())
+        .unwrap_or_default();
+    if !mime.starts_with("image/") {
+        return None;
+    }
+
+    let extension = match mime {
+        "image/png" => "png",
+        "image/jpeg" => "jpeg",
+        "image/jpg" => "jpg",
+        "image/webp" => "webp",
+        "image/gif" => "gif",
+        "image/x-icon" | "image/vnd.microsoft.icon" => "ico",
+        _ => return None,
+    };
+
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(payload.as_bytes())
+        .ok()?;
+
+    let image = Image::from_buffer(
+        &bytes,
+        ImageType::Extension(extension),
+        CompressedImageFormats::empty(),
+        true,
+        ImageSampler::default(),
+        RenderAssetUsages::default(),
+    )
+    .ok()?;
+
+    Some(images.add(image))
 }
 
 fn embedded_icon_bytes(path: &str) -> Option<&'static [u8]> {

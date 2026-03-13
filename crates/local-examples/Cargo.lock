@@ -847,6 +847,7 @@ name = "bevy_extended_ui"
 version = "1.0.0-beta.1"
 dependencies = [
  "arboard",
+ "base64",
  "bevy",
  "bevy_extended_ui_macros",
  "fluent",

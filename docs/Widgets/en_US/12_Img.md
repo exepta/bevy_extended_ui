@@ -16,12 +16,18 @@ Image widget that renders a referenced asset path and stores alternative text me
 
 - src resolves relative to HTML asset path.
 - alt stores fallback text metadata.
+- preview can bind image source updates to an `input type="file"` id (e.g. `preview="avatar-file"`).
 - Works as a lightweight content image widget.
 
 ## HTML Example
 
 ```html
 <img src="ui/logo.png" alt="Project logo" oninit="log_img" />
+```
+
+```html
+<input id="avatar-file" type="file" extensions="[jpg, jpeg, png]" show-size="true" />
+<img preview="avatar-file" alt="Avatar preview" />
 ```
 
 ## Bevy Example

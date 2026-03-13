@@ -18,6 +18,8 @@ coverage:
 ignore:
   - "src/html/bindings.rs"
   - "crates/bevy_extended_ui_macros/src/lib.rs"
+  - "crates/local-examples/**"
+  - "crates/local-wasm-examples/**"
   - "src/example_utils.rs"
   - "src/utils.rs"
   # Services: heavy runtime styling pipeline remains excluded until dedicated tests exist.

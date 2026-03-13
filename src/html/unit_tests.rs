@@ -2,6 +2,8 @@
 mod tests {
     use super::super::*;
     use crate::ExtendedUiConfiguration;
+    #[cfg(feature = "extended-dialog")]
+    use crate::dialog::{DialogProvider, DialogWidget, DialogWidgetType, ExtendedDialogPlugin};
     use crate::html::builder;
     use crate::html::converter::{self, HtmlConverterSystem};
     use crate::html::reload::{CssDirty, HtmlReloadPlugin};
@@ -238,11 +240,13 @@ mod tests {
               <input id="email" name="email_name" type="email" value="a@b.c" placeholder="mail" maxlength="12" required validation="length(2, 64)&pattern('^.+@.+$')" />
               <input id="auto-cap" type="text" maxlength="auto" />
               <input id="empty-cap" type="text" maxlength="" />
+              <input id="json-file" type="file" extensions="[json, css, yaml, png]" show-size="true" max-size="1MB" />
+              <input id="folder-input" type="file" folder="true" extensions="js" />
               <date-picker id="birthday" for="#email" placeholder="Datum" value="2026-02-20" min="2025-01-01" max="2027-01-01" format="yyyy-mm-dd"></date-picker>
               <tool-tip for="#email" variant="point" prio="top" alignment="vertical" trigger="hover | click, drag">  Tip text  </tool-tip>
               <badge for="#email" value="143" max="99" anchor="top right"></badge>
               <p>{{ user.name }}</p>
-              <img src="./images/avatar.png" alt="avatar" />
+              <img src="./images/avatar.png" alt="avatar" preview="#json-file" />
               <divider alignment="horizontal"></divider>
               <checkbox icon="check.png">Ich stimme zu</checkbox>
               <colorpicker value="#112233" alpha="0.5"></colorpicker>
@@ -478,6 +482,49 @@ mod tests {
             node,
             HtmlWidgetNode::Input(
                 InputField {
+                    input_type: InputType::File,
+                    show_size: true,
+                    folder: false,
+                    max_size_bytes,
+                    extensions,
+                    ..
+                },
+                _,
+                _,
+                _,
+                _,
+                _
+            ) if *max_size_bytes == Some(1024 * 1024) && extensions == &vec![
+                "json".to_string(),
+                "css".to_string(),
+                "yaml".to_string(),
+                "png".to_string(),
+            ]
+        )));
+
+        assert!(all.iter().any(|node| matches!(
+            node,
+            HtmlWidgetNode::Input(
+                InputField {
+                    input_type: InputType::File,
+                    folder: true,
+                    show_size: false,
+                    max_size_bytes,
+                    extensions,
+                    ..
+                },
+                _,
+                _,
+                _,
+                _,
+                _
+            ) if max_size_bytes.is_none() && extensions == &vec!["js".to_string()]
+        )));
+
+        assert!(all.iter().any(|node| matches!(
+            node,
+            HtmlWidgetNode::Input(
+                InputField {
                     cap_text_at: InputCap::CapAtNodeSize,
                     ..
                 },
@@ -555,7 +602,9 @@ mod tests {
         assert!(all.iter().any(|node| matches!(
             node,
             HtmlWidgetNode::Img(img, _, _, _, _, _)
-                if img.src.as_deref().is_some_and(|src| src.ends_with("images/avatar.png")) && img.alt == "avatar"
+                if img.src.as_deref().is_some_and(|src| src.ends_with("images/avatar.png"))
+                    && img.alt == "avatar"
+                    && img.preview.as_deref() == Some("json-file")
         )));
 
         assert!(all.iter().any(|node| matches!(
@@ -781,9 +830,13 @@ mod tests {
     fn builder_show_widgets_timer_reveals_visible_nodes_only() {
         let mut app = App::new();
         app.add_plugins((MinimalPlugins, AssetPlugin::default()));
+        #[cfg(feature = "extended-dialog")]
+        app.init_resource::<ExtendedUiConfiguration>();
         app.init_resource::<HtmlStructureMap>();
         app.init_resource::<HtmlDirty>();
         app.add_plugins(HtmlBuilderSystem);
+        #[cfg(feature = "extended-dialog")]
+        app.add_plugins(ExtendedDialogPlugin);
 
         let mk_meta = || HtmlMeta {
             css: vec![],
@@ -796,6 +849,46 @@ mod tests {
         let mk_bindings = || HtmlEventBindings::default();
         let mk_widget = || Widget(None);
 
+        let mut children = vec![
+            HtmlWidgetNode::Button(
+                Button::default(),
+                mk_meta(),
+                HtmlStates::default(),
+                mk_bindings(),
+                mk_widget(),
+                HtmlID::default(),
+            ),
+            HtmlWidgetNode::Paragraph(
+                Paragraph::default(),
+                mk_meta(),
+                HtmlStates {
+                    hidden: true,
+                    disabled: false,
+                    readonly: false,
+                },
+                mk_bindings(),
+                mk_widget(),
+                HtmlID::default(),
+            ),
+        ];
+
+        #[cfg(feature = "extended-dialog")]
+        children.push(HtmlWidgetNode::Dialog(
+            DialogWidget {
+                trigger: None,
+                renderer: DialogProvider::BevyApp,
+                dialog_type: DialogWidgetType::Info,
+                content_text: "Dialog".to_string(),
+                open: false,
+            },
+            mk_meta(),
+            HtmlStates::default(),
+            Vec::new(),
+            mk_bindings(),
+            mk_widget(),
+            HtmlID::default(),
+        ));
+
         let tree = HtmlWidgetNode::Body(
             Body {
                 entry: 1,
@@ -803,28 +896,7 @@ mod tests {
             },
             mk_meta(),
             HtmlStates::default(),
-            vec![
-                HtmlWidgetNode::Button(
-                    Button::default(),
-                    mk_meta(),
-                    HtmlStates::default(),
-                    mk_bindings(),
-                    mk_widget(),
-                    HtmlID::default(),
-                ),
-                HtmlWidgetNode::Paragraph(
-                    Paragraph::default(),
-                    mk_meta(),
-                    HtmlStates {
-                        hidden: true,
-                        disabled: false,
-                        readonly: false,
-                    },
-                    mk_bindings(),
-                    mk_widget(),
-                    HtmlID::default(),
-                ),
-            ],
+            children,
             mk_bindings(),
             mk_widget(),
             HtmlID::default(),
@@ -867,6 +939,20 @@ mod tests {
 
         assert!(button_visible);
         assert!(hidden_paragraph_still_hidden);
+
+        #[cfg(feature = "extended-dialog")]
+        {
+            let mut dialog_still_hidden = false;
+            let mut query = app
+                .world_mut()
+                .query::<(&Visibility, Option<&NeedHidden>, &DialogWidget)>();
+            for (visibility, hidden_marker, _dialog) in query.iter(app.world()) {
+                if hidden_marker.is_some() {
+                    dialog_still_hidden = *visibility == Visibility::Hidden;
+                }
+            }
+            assert!(dialog_still_hidden);
+        }
     }
 
     #[test]

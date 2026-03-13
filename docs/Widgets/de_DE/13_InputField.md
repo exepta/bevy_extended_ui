@@ -6,7 +6,7 @@ title: InputField (Eingabefeld)
 
 ## Überblick
 
-Textbasiertes Eingabe-Widget für Text-, E-Mail-, Datum-, Zahl- und Passwort-Felder.
+Textbasiertes Eingabe-Widget für Text-, E-Mail-, Datum-, Zahl-, Passwort- und Datei-Felder.
 
 - Rust-Komponente: InputField
 - HTML-Tag: input
@@ -14,8 +14,13 @@ Textbasiertes Eingabe-Widget für Text-, E-Mail-, Datum-, Zahl- und Passwort-Fel
 
 ## Wichtige Attribute und Verhalten
 
-- Unterstützt id, name, type, value, placeholder, icon, maxlength, format.
-- Eingabetypen: text/email/date/password/number.
+- Unterstützt id, name, type, value, placeholder, icon, maxlength, format, folder, extensions, show-size, max-size.
+- Eingabetypen: text/email/date/password/number/file.
+- Hinweise für `type="file"`:
+  - `folder="true|false"` (Standard `false`)
+  - `extensions="json"` oder `extensions="[json, css, yaml, png]"` (wird bei `folder="true"` ignoriert)
+  - `show-size="true|false"` (Standard `false`)
+  - `max-size="1KB|1MB|1GB"` weist Dateien zurück, die größer als das Limit sind
 - Validierungsattribute required und validation werden unterstützt.
 
 ## HTML-Beispiel

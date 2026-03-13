@@ -336,7 +336,7 @@ pub enum HtmlWidgetNode {
     ),
     /// A img element (`<img>`).
     Img(Img, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
-    /// An `<input type="text">` field.
+    /// An `<input ...>` field.
     Input(
         InputField,
         HtmlMeta,
