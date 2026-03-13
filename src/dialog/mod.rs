@@ -14,6 +14,9 @@ use crate::widgets::{Body, UIWidgetState};
 #[cfg(all(target_os = "linux", not(target_arch = "wasm32")))]
 static SYSTEM_DIALOG_IN_FLIGHT: Lazy<AtomicBool> = Lazy::new(|| AtomicBool::new(false));
 
+const DIALOG_WIDGET_Z_INDEX: i32 = 120_000;
+const DIALOG_RUNTIME_BASE_Z_INDEX: i32 = 130_000;
+
 /// Selects how a dialog is presented.
 #[derive(Debug, Clone, Copy, Reflect, Default, Eq, PartialEq)]
 pub enum DialogProvider {
@@ -292,7 +295,7 @@ impl Default for DialogRuntimeState {
     fn default() -> Self {
         Self {
             next_request_id: 0,
-            next_z_index: 20_000,
+            next_z_index: DIALOG_RUNTIME_BASE_Z_INDEX,
         }
     }
 }
@@ -506,7 +509,7 @@ fn initialize_dialog_widgets(
         overlay_style.justify_content = Some(JustifyContent::Center);
         overlay_style.align_items = Some(AlignItems::Center);
         overlay_style.padding = Some(UiRect::all(Val::Px(16.0)));
-        overlay_style.z_index = Some(30_000);
+        overlay_style.z_index = Some(DIALOG_WIDGET_Z_INDEX);
         overlay_style.background = Some(Background {
             color: Color::srgba(0.0, 0.0, 0.0, 0.55),
             image: None,
@@ -518,7 +521,8 @@ fn initialize_dialog_widgets(
             Name::new(dialog_name),
             root_node,
             BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.55)),
-            ZIndex(30_000),
+            ZIndex(DIALOG_WIDGET_Z_INDEX),
+            GlobalZIndex(DIALOG_WIDGET_Z_INDEX),
             RenderLayers::layer(layer),
             Pickable::default(),
             TagName("dialog".to_string()),
@@ -1011,6 +1015,7 @@ fn spawn_bevy_dialog(
             root_node,
             BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.45)),
             ZIndex(z_index),
+            GlobalZIndex(z_index),
             RenderLayers::layer(layer),
             Pickable::default(),
             UIWidgetState::default(),
