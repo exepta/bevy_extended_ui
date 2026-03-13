@@ -14,7 +14,7 @@ widget-overview = []
 [dependencies]
 bevy = "0.18.1"
 # Keep WASM example portable: avoid native-only default features (e.g. `fluent` -> `rusqlite`).
-bevy_extended_ui = { path = "../..", default-features = false, features = ["wasm-default", "providers", "svg"] }
+bevy_extended_ui = { path = "../..", default-features = false, features = ["wasm-default", "providers", "svg", "extended-dialog"] }
 bevy_extended_ui_macros = { path = "../bevy_extended_ui_macros" }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]

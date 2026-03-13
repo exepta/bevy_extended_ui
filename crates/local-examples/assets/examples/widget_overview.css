@@ -177,3 +177,30 @@ badge > .badge-text {
     flex-direction: column;
     gap: 6px;
 }
+
+dialog {
+    z-index: 60000;
+}
+
+dialog.dialog-renderer-bevy-app {
+    background: rgba(8, 10, 16, 0.7);
+}
+
+dialog.dialog-renderer-bevy-app > .dialog-panel {
+    max-width: 520px;
+    border: 1px #3f4967;
+    background: #161d2f;
+}
+
+dialog.dialog-renderer-bevy-app.dialog-type-error > .dialog-panel {
+    border: 1px #a53a50;
+}
+
+.dialog-demo-content {
+    width: 100%;
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    flex-direction: column;
+    gap: 10px;
+}

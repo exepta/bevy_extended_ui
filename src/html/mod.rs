@@ -16,6 +16,8 @@ use bevy::prelude::*;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+#[cfg(feature = "extended-dialog")]
+use crate::dialog::DialogWidget;
 use crate::io::{CssAsset, HtmlAsset};
 use crate::styles::Style;
 use crate::styles::parser::apply_property_to_style;
@@ -241,6 +243,17 @@ pub enum HtmlWidgetNode {
     /// A `<form>` container element with nested child nodes.
     Form(
         Form,
+        HtmlMeta,
+        HtmlStates,
+        Vec<HtmlWidgetNode>,
+        HtmlEventBindings,
+        Widget,
+        HtmlID,
+    ),
+    /// A `<dialog>` widget container with nested child nodes.
+    #[cfg(feature = "extended-dialog")]
+    Dialog(
+        DialogWidget,
         HtmlMeta,
         HtmlStates,
         Vec<HtmlWidgetNode>,
