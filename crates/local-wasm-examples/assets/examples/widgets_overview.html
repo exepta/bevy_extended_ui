@@ -18,13 +18,13 @@
   <div class="widget-card">
     <h5>Dialog</h5>
     <button id="open-dialog-bevy">Open BevyApp Dialog</button>
-    <button id="open-dialog-system">Open System Dialog (WASM: fallback)</button>
+    <button id="open-dialog-system">Open System Dialog</button>
 
-    <dialog trigger="open-dialog-system" renderer="system" type="error">
+    <dialog trigger="open-dialog-system" renderer="system">
       Content Text by system type.
     </dialog>
 
-    <dialog trigger="open-dialog-bevy" renderer="bevy-app" type="info">
+    <dialog trigger="open-dialog-bevy" renderer="bevy-app">
       <div class="dialog-demo-content">
         <p>Hello World from HTML dialog content.</p>
         <img src="/extended_ui/icons/color.png" class="demo-image" alt="dialog icon" />
@@ -69,18 +69,18 @@
     <h5>InputField Preview</h5>
     <label for="demo-preview-file">Image File</label>
     <input
-      id="demo-preview-file"
-      type="file"
-      max-size="2MB"
-      extensions="[jpg, jpeg, png]"
-      show-size="true"
+            id="demo-preview-file"
+            type="file"
+            max-size="2MB"
+            extensions="[jpg, jpeg, png]"
+            show-size="true"
     />
     <img
-      id="demo-preview-image"
-      src="/extended_ui/icons/color.png"
-      preview="demo-preview-file"
-      class="demo-image input-preview-image"
-      alt="selected image preview"
+            id="demo-preview-image"
+            src="/extended_ui/icons/color.png"
+            preview="demo-preview-file"
+            class="demo-image input-preview-image"
+            alt="selected image preview"
     />
   </div>
 
@@ -92,6 +92,13 @@
   <div class="widget-card">
     <h5>Slider</h5>
     <slider value="35" min="0" max="100" step="1"></slider>
+    <slider value="0" min="0" max="100" step="1" dots="4" show-labels="true" tip="false"></slider>
+  </div>
+
+  <div class="widget-card">
+    <h5>Slider (range)</h5>
+    <slider id="range-slider-demo" type="range" value="20 - 40" dots="4" show-labels="true" dot-anchor="bottom"></slider>
+    <p id="range-slider-debug">Range: 20 - 40</p>
   </div>
 
   <div class="widget-card">

@@ -211,3 +211,7 @@ dialog.dialog-renderer-bevy-app.dialog-type-error > .dialog-panel {
     flex-direction: column;
     gap: 10px;
 }
+
+#range-slider-debug {
+    margin-top: 20px;
+}

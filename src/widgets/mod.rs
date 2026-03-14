@@ -1200,16 +1200,61 @@ impl Default for Scrollbar {
 //                      Slider
 // ===============================================
 
+/// Slider behavior mode.
+#[derive(Reflect, Default, Debug, Clone, Copy, Eq, PartialEq)]
+pub enum SliderType {
+    #[default]
+    Default,
+    Range,
+}
+
+impl SliderType {
+    /// Parses slider type from string.
+    pub fn from_str(value: &str) -> Option<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "default" => Some(Self::Default),
+            "range" => Some(Self::Range),
+            _ => None,
+        }
+    }
+}
+
+/// Label anchor position for slider dots.
+#[derive(Reflect, Default, Debug, Clone, Copy, Eq, PartialEq)]
+pub enum SliderDotAnchor {
+    #[default]
+    Top,
+    Bottom,
+}
+
+impl SliderDotAnchor {
+    /// Parses dot anchor from string.
+    pub fn from_str(value: &str) -> Option<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "top" => Some(Self::Top),
+            "bottom" => Some(Self::Bottom),
+            _ => None,
+        }
+    }
+}
+
 /// Slider widget with numeric range.
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, Widget)]
 pub struct Slider {
     pub entry: usize,
+    pub slider_type: SliderType,
     pub value: f32,
+    pub range_start: f32,
+    pub range_end: f32,
     pub step: f32,
     pub min: f32,
     pub max: f32,
+    pub dots: Option<u32>,
+    pub show_labels: bool,
+    pub show_tip: bool,
+    pub dot_anchor: SliderDotAnchor,
 }
 
 impl Default for Slider {
@@ -1219,10 +1264,17 @@ impl Default for Slider {
 
         Self {
             entry,
+            slider_type: SliderType::Default,
             value: 0.0,
+            range_start: 20.0,
+            range_end: 40.0,
             step: 1.0,
             min: 0.0,
             max: 100.0,
+            dots: None,
+            show_labels: false,
+            show_tip: true,
+            dot_anchor: SliderDotAnchor::Top,
         }
     }
 }

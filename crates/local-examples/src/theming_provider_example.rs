@@ -20,10 +20,7 @@ pub fn run() {
             ..default()
         }))
         .add_plugins(ExtendedUiPlugin)
-        .add_systems(
-            Startup,
-            (spawn_camera, configure_ui, load_ui),
-        )
+        .add_systems(Startup, (spawn_camera, configure_ui, load_ui))
         .run();
 }
 
