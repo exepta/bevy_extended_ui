@@ -7,6 +7,8 @@ This document describes the HTML event bindings provided by `bevy_extended_ui` a
 Use these attributes in your HTML:
 
 - `onclick`
+- `onmousedown`
+- `onmouseup`
 - `onchange`
 - `action` (on `<form>`, submit handler name)
 - `oninit`
@@ -14,11 +16,15 @@ Use these attributes in your HTML:
 - `onmouseout`
 - `onfoucs` (alias: `onfocus`)
 - `onscroll`
+- `onwheel` (alias: `onmousewheel`)
 - `onkeydown`
 - `onkeyup`
 - `ondragstart`
 - `ondrag`
 - `ondragstop` (alias: `ondragend`)
+- `ontouchstart`
+- `ontouchmove`
+- `ontouchend`
 
 ## Using handlers
 
@@ -77,6 +83,21 @@ All events include `target` (the Bevy `Entity` that fired the event).
 - `position`: screen-space pointer position
 - `inner_position`: pointer position inside the target (best effort; falls back to `position`)
 
+### HtmlMouseDown / HtmlMouseUp
+
+- `target`
+- `button`: `PointerButton`
+- `position`
+- `inner_position`
+
+### HtmlWheel
+
+- `target`
+- `unit`: `MouseScrollUnit` (`Line` or `Pixel`)
+- `delta`: `Vec2` wheel delta
+- `position`
+- `inner_position`
+
 ### HtmlKeyDown / HtmlKeyUp
 
 - `target`
@@ -86,3 +107,11 @@ All events include `target` (the Bevy `Entity` that fired the event).
 
 - `target`
 - `position`: screen-space pointer position
+
+### HtmlTouchStart / HtmlTouchMove / HtmlTouchEnd
+
+- `target`
+- `touch_id`: touch pointer id from Bevy picking
+- `position`
+- `inner_position`
+- `delta` (only on `HtmlTouchMove`)

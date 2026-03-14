@@ -29,6 +29,12 @@ mod tests {
     fn build_test_html_click(world: &mut World) -> SystemId<In<HtmlClick>, ()> {
         world.register_system(|In(_event): In<HtmlClick>| {})
     }
+    fn build_test_html_mousedown(world: &mut World) -> SystemId<In<HtmlMouseDown>, ()> {
+        world.register_system(|In(_event): In<HtmlMouseDown>| {})
+    }
+    fn build_test_html_mouseup(world: &mut World) -> SystemId<In<HtmlMouseUp>, ()> {
+        world.register_system(|In(_event): In<HtmlMouseUp>| {})
+    }
     fn build_test_html_change(world: &mut World) -> SystemId<In<HtmlChange>, ()> {
         world.register_system(|In(_event): In<HtmlChange>| {})
     }
@@ -50,6 +56,9 @@ mod tests {
     fn build_test_html_scroll(world: &mut World) -> SystemId<In<HtmlScroll>, ()> {
         world.register_system(|In(_event): In<HtmlScroll>| {})
     }
+    fn build_test_html_wheel(world: &mut World) -> SystemId<In<HtmlWheel>, ()> {
+        world.register_system(|In(_event): In<HtmlWheel>| {})
+    }
     fn build_test_html_keydown(world: &mut World) -> SystemId<In<HtmlKeyDown>, ()> {
         world.register_system(|In(_event): In<HtmlKeyDown>| {})
     }
@@ -65,6 +74,15 @@ mod tests {
     fn build_test_html_dragstop(world: &mut World) -> SystemId<In<HtmlDragStop>, ()> {
         world.register_system(|In(_event): In<HtmlDragStop>| {})
     }
+    fn build_test_html_touchstart(world: &mut World) -> SystemId<In<HtmlTouchStart>, ()> {
+        world.register_system(|In(_event): In<HtmlTouchStart>| {})
+    }
+    fn build_test_html_touchmove(world: &mut World) -> SystemId<In<HtmlTouchMove>, ()> {
+        world.register_system(|In(_event): In<HtmlTouchMove>| {})
+    }
+    fn build_test_html_touchend(world: &mut World) -> SystemId<In<HtmlTouchEnd>, ()> {
+        world.register_system(|In(_event): In<HtmlTouchEnd>| {})
+    }
 
     inventory::submit! {
         HtmlFnRegistration::HtmlEvent {
@@ -76,6 +94,18 @@ mod tests {
         HtmlFnRegistration::HtmlClick {
             name: "__unit_html_click",
             build: build_test_html_click,
+        }
+    }
+    inventory::submit! {
+        HtmlFnRegistration::HtmlMouseDown {
+            name: "__unit_html_mousedown",
+            build: build_test_html_mousedown,
+        }
+    }
+    inventory::submit! {
+        HtmlFnRegistration::HtmlMouseUp {
+            name: "__unit_html_mouseup",
+            build: build_test_html_mouseup,
         }
     }
     inventory::submit! {
@@ -121,6 +151,12 @@ mod tests {
         }
     }
     inventory::submit! {
+        HtmlFnRegistration::HtmlWheel {
+            name: "__unit_html_wheel",
+            build: build_test_html_wheel,
+        }
+    }
+    inventory::submit! {
         HtmlFnRegistration::HtmlKeyDown {
             name: "__unit_html_keydown",
             build: build_test_html_keydown,
@@ -148,6 +184,24 @@ mod tests {
         HtmlFnRegistration::HtmlDragStop {
             name: "__unit_html_dragstop",
             build: build_test_html_dragstop,
+        }
+    }
+    inventory::submit! {
+        HtmlFnRegistration::HtmlTouchStart {
+            name: "__unit_html_touchstart",
+            build: build_test_html_touchstart,
+        }
+    }
+    inventory::submit! {
+        HtmlFnRegistration::HtmlTouchMove {
+            name: "__unit_html_touchmove",
+            build: build_test_html_touchmove,
+        }
+    }
+    inventory::submit! {
+        HtmlFnRegistration::HtmlTouchEnd {
+            name: "__unit_html_touchend",
+            build: build_test_html_touchend,
         }
     }
 
@@ -368,6 +422,8 @@ mod tests {
         let registry = app.world().resource::<HtmlFunctionRegistry>();
 
         assert!(registry.click.contains_key("__unit_html_event"));
+        assert!(registry.mousedown.contains_key("__unit_html_event"));
+        assert!(registry.mouseup.contains_key("__unit_html_event"));
         assert!(registry.change.contains_key("__unit_html_event"));
         assert!(registry.submit.contains_key("__unit_html_event"));
         assert!(registry.init.contains_key("__unit_html_event"));
@@ -375,13 +431,23 @@ mod tests {
         assert!(registry.over.contains_key("__unit_html_event"));
         assert!(registry.focus.contains_key("__unit_html_event"));
         assert!(registry.scroll.contains_key("__unit_html_event"));
+        assert!(registry.wheel.contains_key("__unit_html_event"));
         assert!(registry.keydown.contains_key("__unit_html_event"));
         assert!(registry.keyup.contains_key("__unit_html_event"));
         assert!(registry.dragstart.contains_key("__unit_html_event"));
         assert!(registry.drag.contains_key("__unit_html_event"));
         assert!(registry.dragstop.contains_key("__unit_html_event"));
+        assert!(registry.touchstart.contains_key("__unit_html_event"));
+        assert!(registry.touchmove.contains_key("__unit_html_event"));
+        assert!(registry.touchend.contains_key("__unit_html_event"));
 
         assert!(registry.click_typed.contains_key("__unit_html_click"));
+        assert!(
+            registry
+                .mousedown_typed
+                .contains_key("__unit_html_mousedown")
+        );
+        assert!(registry.mouseup_typed.contains_key("__unit_html_mouseup"));
         assert!(registry.change_typed.contains_key("__unit_html_change"));
         assert!(registry.submit_typed.contains_key("__unit_html_submit"));
         assert!(registry.init_typed.contains_key("__unit_html_init"));
@@ -389,6 +455,7 @@ mod tests {
         assert!(registry.over_typed.contains_key("__unit_html_over"));
         assert!(registry.focus_typed.contains_key("__unit_html_focus"));
         assert!(registry.scroll_typed.contains_key("__unit_html_scroll"));
+        assert!(registry.wheel_typed.contains_key("__unit_html_wheel"));
         assert!(registry.keydown_typed.contains_key("__unit_html_keydown"));
         assert!(registry.keyup_typed.contains_key("__unit_html_keyup"));
         assert!(
@@ -398,6 +465,17 @@ mod tests {
         );
         assert!(registry.drag_typed.contains_key("__unit_html_drag"));
         assert!(registry.dragstop_typed.contains_key("__unit_html_dragstop"));
+        assert!(
+            registry
+                .touchstart_typed
+                .contains_key("__unit_html_touchstart")
+        );
+        assert!(
+            registry
+                .touchmove_typed
+                .contains_key("__unit_html_touchmove")
+        );
+        assert!(registry.touchend_typed.contains_key("__unit_html_touchend"));
     }
 
     #[test]

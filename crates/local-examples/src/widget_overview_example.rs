@@ -1,13 +1,18 @@
 use bevy::prelude::*;
-use bevy_extended_ui::html::HtmlSource;
+use bevy_extended_ui::html::{
+    HtmlMouseDown, HtmlMouseUp, HtmlSource, HtmlTouchEnd, HtmlTouchMove, HtmlTouchStart, HtmlWheel,
+};
 use bevy_extended_ui::io::HtmlAsset;
 use bevy_extended_ui::registry::UiRegistry;
 use bevy_extended_ui::styles::CssID;
 use bevy_extended_ui::widgets::{Badge, Paragraph, Slider, SliderType};
 use bevy_extended_ui::{ExtendedCam, ExtendedUiConfiguration, ExtendedUiPlugin};
+use bevy_extended_ui_macros::html_fn;
 
 #[derive(Resource)]
 struct BadgeTickTimer(Timer);
+
+const EVENT_DEBUG_ID: &str = "event-debug-log";
 
 pub fn run() {
     App::new()
@@ -92,4 +97,105 @@ fn format_debug_value(value: f32) -> String {
         txt.pop();
     }
     txt
+}
+
+fn set_event_debug_message(
+    text: String,
+    paragraph_q: &mut Query<(&mut Paragraph, &CssID), With<Paragraph>>,
+) {
+    for (mut paragraph, id) in paragraph_q.iter_mut() {
+        if id.0 != EVENT_DEBUG_ID {
+            continue;
+        }
+        paragraph.text = text;
+        return;
+    }
+}
+
+#[html_fn("event_mouse_down")]
+fn event_mouse_down(
+    In(event): In<HtmlMouseDown>,
+    mut paragraph_q: Query<(&mut Paragraph, &CssID), With<Paragraph>>,
+) {
+    set_event_debug_message(
+        format!(
+            "Event: mousedown ({:?}) @ {:.0}, {:.0}",
+            event.button, event.inner_position.x, event.inner_position.y
+        ),
+        &mut paragraph_q,
+    );
+}
+
+#[html_fn("event_mouse_up")]
+fn event_mouse_up(
+    In(event): In<HtmlMouseUp>,
+    mut paragraph_q: Query<(&mut Paragraph, &CssID), With<Paragraph>>,
+) {
+    set_event_debug_message(
+        format!(
+            "Event: mouseup ({:?}) @ {:.0}, {:.0}",
+            event.button, event.inner_position.x, event.inner_position.y
+        ),
+        &mut paragraph_q,
+    );
+}
+
+#[html_fn("event_wheel")]
+fn event_wheel(
+    In(event): In<HtmlWheel>,
+    mut paragraph_q: Query<(&mut Paragraph, &CssID), With<Paragraph>>,
+) {
+    let unit = match event.unit {
+        bevy::input::mouse::MouseScrollUnit::Line => "line",
+        bevy::input::mouse::MouseScrollUnit::Pixel => "pixel",
+    };
+    set_event_debug_message(
+        format!(
+            "Event: wheel [{}] dx={:.2} dy={:.2}",
+            unit, event.delta.x, event.delta.y
+        ),
+        &mut paragraph_q,
+    );
+}
+
+#[html_fn("event_touch_start")]
+fn event_touch_start(
+    In(event): In<HtmlTouchStart>,
+    mut paragraph_q: Query<(&mut Paragraph, &CssID), With<Paragraph>>,
+) {
+    set_event_debug_message(
+        format!(
+            "Event: touchstart #{} @ {:.0}, {:.0}",
+            event.touch_id, event.inner_position.x, event.inner_position.y
+        ),
+        &mut paragraph_q,
+    );
+}
+
+#[html_fn("event_touch_move")]
+fn event_touch_move(
+    In(event): In<HtmlTouchMove>,
+    mut paragraph_q: Query<(&mut Paragraph, &CssID), With<Paragraph>>,
+) {
+    set_event_debug_message(
+        format!(
+            "Event: touchmove #{} dx={:.1} dy={:.1}",
+            event.touch_id, event.delta.x, event.delta.y
+        ),
+        &mut paragraph_q,
+    );
+}
+
+#[html_fn("event_touch_end")]
+fn event_touch_end(
+    In(event): In<HtmlTouchEnd>,
+    mut paragraph_q: Query<(&mut Paragraph, &CssID), With<Paragraph>>,
+) {
+    set_event_debug_message(
+        format!(
+            "Event: touchend #{} @ {:.0}, {:.0}",
+            event.touch_id, event.inner_position.x, event.inner_position.y
+        ),
+        &mut paragraph_q,
+    );
 }

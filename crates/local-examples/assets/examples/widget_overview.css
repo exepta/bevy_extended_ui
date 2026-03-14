@@ -115,6 +115,37 @@ body {
     flex-direction: row;
 }
 
+.event-pad {
+    width: 100%;
+    height: 108px;
+    border: 1px #3d4967;
+    border-radius: 8px;
+    background: #141d31;
+    overflow: scroll;
+}
+
+.event-pad-content {
+    width: 100%;
+    min-height: 180px;
+    padding: 8px;
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.event-pad-content > h6 {
+    margin: 0;
+    color: #c9d5f3;
+}
+
+#event-debug-log {
+    min-height: 18px;
+    color: #8dd7ff;
+    font-size: 12px;
+}
+
 .notification-target {
     position: relative;
     width: 100%;

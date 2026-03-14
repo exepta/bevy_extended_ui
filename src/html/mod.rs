@@ -476,6 +476,14 @@ pub enum HtmlFnRegistration {
         name: &'static str,
         build: fn(&mut World) -> SystemId<In<HtmlClick>, ()>,
     },
+    HtmlMouseDown {
+        name: &'static str,
+        build: fn(&mut World) -> SystemId<In<HtmlMouseDown>, ()>,
+    },
+    HtmlMouseUp {
+        name: &'static str,
+        build: fn(&mut World) -> SystemId<In<HtmlMouseUp>, ()>,
+    },
     HtmlChange {
         name: &'static str,
         build: fn(&mut World) -> SystemId<In<HtmlChange>, ()>,
@@ -504,6 +512,10 @@ pub enum HtmlFnRegistration {
         name: &'static str,
         build: fn(&mut World) -> SystemId<In<HtmlScroll>, ()>,
     },
+    HtmlWheel {
+        name: &'static str,
+        build: fn(&mut World) -> SystemId<In<HtmlWheel>, ()>,
+    },
     HtmlKeyDown {
         name: &'static str,
         build: fn(&mut World) -> SystemId<In<HtmlKeyDown>, ()>,
@@ -523,6 +535,18 @@ pub enum HtmlFnRegistration {
     HtmlDragStop {
         name: &'static str,
         build: fn(&mut World) -> SystemId<In<HtmlDragStop>, ()>,
+    },
+    HtmlTouchStart {
+        name: &'static str,
+        build: fn(&mut World) -> SystemId<In<HtmlTouchStart>, ()>,
+    },
+    HtmlTouchMove {
+        name: &'static str,
+        build: fn(&mut World) -> SystemId<In<HtmlTouchMove>, ()>,
+    },
+    HtmlTouchEnd {
+        name: &'static str,
+        build: fn(&mut World) -> SystemId<In<HtmlTouchEnd>, ()>,
     },
 }
 
@@ -545,6 +569,8 @@ impl HtmlEvent {
 #[derive(Default, Resource)]
 pub struct HtmlFunctionRegistry {
     pub click: HashMap<String, SystemId<In<HtmlEvent>>>,
+    pub mousedown: HashMap<String, SystemId<In<HtmlEvent>>>,
+    pub mouseup: HashMap<String, SystemId<In<HtmlEvent>>>,
     pub over: HashMap<String, SystemId<In<HtmlEvent>>>,
     pub out: HashMap<String, SystemId<In<HtmlEvent>>>,
     pub change: HashMap<String, SystemId<In<HtmlEvent>>>,
@@ -552,12 +578,18 @@ pub struct HtmlFunctionRegistry {
     pub init: HashMap<String, SystemId<In<HtmlEvent>>>,
     pub focus: HashMap<String, SystemId<In<HtmlEvent>>>,
     pub scroll: HashMap<String, SystemId<In<HtmlEvent>>>,
+    pub wheel: HashMap<String, SystemId<In<HtmlEvent>>>,
     pub keydown: HashMap<String, SystemId<In<HtmlEvent>>>,
     pub keyup: HashMap<String, SystemId<In<HtmlEvent>>>,
     pub dragstart: HashMap<String, SystemId<In<HtmlEvent>>>,
     pub drag: HashMap<String, SystemId<In<HtmlEvent>>>,
     pub dragstop: HashMap<String, SystemId<In<HtmlEvent>>>,
+    pub touchstart: HashMap<String, SystemId<In<HtmlEvent>>>,
+    pub touchmove: HashMap<String, SystemId<In<HtmlEvent>>>,
+    pub touchend: HashMap<String, SystemId<In<HtmlEvent>>>,
     pub click_typed: HashMap<String, SystemId<In<HtmlClick>>>,
+    pub mousedown_typed: HashMap<String, SystemId<In<HtmlMouseDown>>>,
+    pub mouseup_typed: HashMap<String, SystemId<In<HtmlMouseUp>>>,
     pub over_typed: HashMap<String, SystemId<In<HtmlMouseOver>>>,
     pub out_typed: HashMap<String, SystemId<In<HtmlMouseOut>>>,
     pub change_typed: HashMap<String, SystemId<In<HtmlChange>>>,
@@ -565,11 +597,15 @@ pub struct HtmlFunctionRegistry {
     pub init_typed: HashMap<String, SystemId<In<HtmlInit>>>,
     pub focus_typed: HashMap<String, SystemId<In<HtmlFocus>>>,
     pub scroll_typed: HashMap<String, SystemId<In<HtmlScroll>>>,
+    pub wheel_typed: HashMap<String, SystemId<In<HtmlWheel>>>,
     pub keydown_typed: HashMap<String, SystemId<In<HtmlKeyDown>>>,
     pub keyup_typed: HashMap<String, SystemId<In<HtmlKeyUp>>>,
     pub dragstart_typed: HashMap<String, SystemId<In<HtmlDragStart>>>,
     pub drag_typed: HashMap<String, SystemId<In<HtmlDrag>>>,
     pub dragstop_typed: HashMap<String, SystemId<In<HtmlDragStop>>>,
+    pub touchstart_typed: HashMap<String, SystemId<In<HtmlTouchStart>>>,
+    pub touchmove_typed: HashMap<String, SystemId<In<HtmlTouchMove>>>,
+    pub touchend_typed: HashMap<String, SystemId<In<HtmlTouchEnd>>>,
 }
 
 /// Component storing event handler names attached in HTML.
@@ -577,17 +613,23 @@ pub struct HtmlFunctionRegistry {
 #[reflect(Component)]
 pub struct HtmlEventBindings {
     pub onclick: Option<String>,
+    pub onmousedown: Option<String>,
+    pub onmouseup: Option<String>,
     pub onmouseover: Option<String>,
     pub onmouseout: Option<String>,
     pub onchange: Option<String>,
     pub oninit: Option<String>,
     pub onfoucs: Option<String>,
     pub onscroll: Option<String>,
+    pub onwheel: Option<String>,
     pub onkeydown: Option<String>,
     pub onkeyup: Option<String>,
     pub ondragstart: Option<String>,
     pub ondrag: Option<String>,
     pub ondragstop: Option<String>,
+    pub ontouchstart: Option<String>,
+    pub ontouchmove: Option<String>,
+    pub ontouchend: Option<String>,
 }
 
 /// Click event sent from HTML widgets.
@@ -595,6 +637,26 @@ pub struct HtmlEventBindings {
 pub struct HtmlClick {
     #[event_target]
     pub entity: Entity,
+    pub position: Vec2,
+    pub inner_position: Vec2,
+}
+
+/// Mouse-down event sent from HTML widgets.
+#[derive(EntityEvent, Clone, Copy)]
+pub struct HtmlMouseDown {
+    #[event_target]
+    pub entity: Entity,
+    pub button: PointerButton,
+    pub position: Vec2,
+    pub inner_position: Vec2,
+}
+
+/// Mouse-up event sent from HTML widgets.
+#[derive(EntityEvent, Clone, Copy)]
+pub struct HtmlMouseUp {
+    #[event_target]
+    pub entity: Entity,
+    pub button: PointerButton,
     pub position: Vec2,
     pub inner_position: Vec2,
 }
@@ -671,6 +733,17 @@ pub struct HtmlScroll {
     pub y: f32,
 }
 
+/// Wheel event emitted by HTML widgets.
+#[derive(EntityEvent, Clone, Copy)]
+pub struct HtmlWheel {
+    #[event_target]
+    pub entity: Entity,
+    pub unit: bevy::input::mouse::MouseScrollUnit,
+    pub delta: Vec2,
+    pub position: Vec2,
+    pub inner_position: Vec2,
+}
+
 /// Key-down event emitted by HTML widgets.
 #[derive(EntityEvent, Clone, Copy)]
 pub struct HtmlKeyDown {
@@ -709,6 +782,37 @@ pub struct HtmlDragStop {
     #[event_target]
     pub entity: Entity,
     pub position: Vec2,
+}
+
+/// Touch-start event emitted by HTML widgets.
+#[derive(EntityEvent, Clone, Copy)]
+pub struct HtmlTouchStart {
+    #[event_target]
+    pub entity: Entity,
+    pub touch_id: u64,
+    pub position: Vec2,
+    pub inner_position: Vec2,
+}
+
+/// Touch-move event emitted by HTML widgets.
+#[derive(EntityEvent, Clone, Copy)]
+pub struct HtmlTouchMove {
+    #[event_target]
+    pub entity: Entity,
+    pub touch_id: u64,
+    pub position: Vec2,
+    pub inner_position: Vec2,
+    pub delta: Vec2,
+}
+
+/// Touch-end event emitted by HTML widgets.
+#[derive(EntityEvent, Clone, Copy)]
+pub struct HtmlTouchEnd {
+    #[event_target]
+    pub entity: Entity,
+    pub touch_id: u64,
+    pub position: Vec2,
+    pub inner_position: Vec2,
 }
 
 /// Main plugin for HTML UI: converter + builder + reload integration.
@@ -770,6 +874,20 @@ pub fn register_html_fns(world: &mut World) {
                     .click_typed
                     .insert((*name).to_string(), id);
             }
+            HtmlFnRegistration::HtmlMouseDown { name, build } => {
+                let id = (*build)(world);
+                world
+                    .resource_mut::<HtmlFunctionRegistry>()
+                    .mousedown_typed
+                    .insert((*name).to_string(), id);
+            }
+            HtmlFnRegistration::HtmlMouseUp { name, build } => {
+                let id = (*build)(world);
+                world
+                    .resource_mut::<HtmlFunctionRegistry>()
+                    .mouseup_typed
+                    .insert((*name).to_string(), id);
+            }
             HtmlFnRegistration::HtmlChange { name, build } => {
                 let id = (*build)(world);
                 world
@@ -819,6 +937,13 @@ pub fn register_html_fns(world: &mut World) {
                     .scroll_typed
                     .insert((*name).to_string(), id);
             }
+            HtmlFnRegistration::HtmlWheel { name, build } => {
+                let id = (*build)(world);
+                world
+                    .resource_mut::<HtmlFunctionRegistry>()
+                    .wheel_typed
+                    .insert((*name).to_string(), id);
+            }
             HtmlFnRegistration::HtmlKeyDown { name, build } => {
                 let id = (*build)(world);
                 world
@@ -854,6 +979,27 @@ pub fn register_html_fns(world: &mut World) {
                     .dragstop_typed
                     .insert((*name).to_string(), id);
             }
+            HtmlFnRegistration::HtmlTouchStart { name, build } => {
+                let id = (*build)(world);
+                world
+                    .resource_mut::<HtmlFunctionRegistry>()
+                    .touchstart_typed
+                    .insert((*name).to_string(), id);
+            }
+            HtmlFnRegistration::HtmlTouchMove { name, build } => {
+                let id = (*build)(world);
+                world
+                    .resource_mut::<HtmlFunctionRegistry>()
+                    .touchmove_typed
+                    .insert((*name).to_string(), id);
+            }
+            HtmlFnRegistration::HtmlTouchEnd { name, build } => {
+                let id = (*build)(world);
+                world
+                    .resource_mut::<HtmlFunctionRegistry>()
+                    .touchend_typed
+                    .insert((*name).to_string(), id);
+            }
         }
     }
 
@@ -862,14 +1008,20 @@ pub fn register_html_fns(world: &mut World) {
         reg.change.insert(name.clone(), id);
         reg.submit.insert(name.clone(), id);
         reg.click.insert(name.clone(), id);
+        reg.mousedown.insert(name.clone(), id);
+        reg.mouseup.insert(name.clone(), id);
         reg.focus.insert(name.clone(), id);
         reg.init.insert(name.clone(), id);
         reg.scroll.insert(name.clone(), id);
+        reg.wheel.insert(name.clone(), id);
         reg.keydown.insert(name.clone(), id);
         reg.keyup.insert(name.clone(), id);
         reg.dragstart.insert(name.clone(), id);
         reg.drag.insert(name.clone(), id);
         reg.dragstop.insert(name.clone(), id);
+        reg.touchstart.insert(name.clone(), id);
+        reg.touchmove.insert(name.clone(), id);
+        reg.touchend.insert(name.clone(), id);
         reg.out.insert(name.clone(), id);
         reg.over.insert(name.clone(), id);
         debug!("Registered html fn '{name}' with id {id:?}");

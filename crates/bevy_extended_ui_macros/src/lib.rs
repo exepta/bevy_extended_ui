@@ -109,6 +109,8 @@ fn extract_event_type(input_fn: &ItemFn) -> Result<Option<(syn::Ident, Type)>> {
     let variant = match event_ident.to_string().as_str() {
         "HtmlEvent" => format_ident!("HtmlEvent"),
         "HtmlClick" => format_ident!("HtmlClick"),
+        "HtmlMouseDown" => format_ident!("HtmlMouseDown"),
+        "HtmlMouseUp" => format_ident!("HtmlMouseUp"),
         "HtmlChange" => format_ident!("HtmlChange"),
         "HtmlSubmit" => format_ident!("HtmlSubmit"),
         "HtmlInit" => format_ident!("HtmlInit"),
@@ -116,11 +118,15 @@ fn extract_event_type(input_fn: &ItemFn) -> Result<Option<(syn::Ident, Type)>> {
         "HtmlMouseOver" => format_ident!("HtmlMouseOver"),
         "HtmlFocus" => format_ident!("HtmlFocus"),
         "HtmlScroll" => format_ident!("HtmlScroll"),
+        "HtmlWheel" => format_ident!("HtmlWheel"),
         "HtmlKeyDown" => format_ident!("HtmlKeyDown"),
         "HtmlKeyUp" => format_ident!("HtmlKeyUp"),
         "HtmlDragStart" => format_ident!("HtmlDragStart"),
         "HtmlDrag" => format_ident!("HtmlDrag"),
         "HtmlDragStop" => format_ident!("HtmlDragStop"),
+        "HtmlTouchStart" => format_ident!("HtmlTouchStart"),
+        "HtmlTouchMove" => format_ident!("HtmlTouchMove"),
+        "HtmlTouchEnd" => format_ident!("HtmlTouchEnd"),
         _ => {
             return Err(syn::Error::new_spanned(
                 &event_ident,

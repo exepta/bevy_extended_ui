@@ -1224,6 +1224,8 @@ fn parse_html_node(
 fn bind_html_func(attributes: &Attributes) -> HtmlEventBindings {
     HtmlEventBindings {
         onclick: attributes.get("onclick").map(|s| s.to_string()),
+        onmousedown: attributes.get("onmousedown").map(|s| s.to_string()),
+        onmouseup: attributes.get("onmouseup").map(|s| s.to_string()),
         onmouseover: attributes
             .get("onmouseover")
             .or_else(|| attributes.get("onmouseenter"))
@@ -1239,6 +1241,10 @@ fn bind_html_func(attributes: &Attributes) -> HtmlEventBindings {
             .or_else(|| attributes.get("onfocus"))
             .map(|s| s.to_string()),
         onscroll: attributes.get("onscroll").map(|s| s.to_string()),
+        onwheel: attributes
+            .get("onwheel")
+            .or_else(|| attributes.get("onmousewheel"))
+            .map(|s| s.to_string()),
         onkeydown: attributes.get("onkeydown").map(|s| s.to_string()),
         onkeyup: attributes.get("onkeyup").map(|s| s.to_string()),
         ondragstart: attributes.get("ondragstart").map(|s| s.to_string()),
@@ -1247,6 +1253,9 @@ fn bind_html_func(attributes: &Attributes) -> HtmlEventBindings {
             .get("ondragstop")
             .or_else(|| attributes.get("ondragend"))
             .map(|s| s.to_string()),
+        ontouchstart: attributes.get("ontouchstart").map(|s| s.to_string()),
+        ontouchmove: attributes.get("ontouchmove").map(|s| s.to_string()),
+        ontouchend: attributes.get("ontouchend").map(|s| s.to_string()),
     }
 }
 

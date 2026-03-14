@@ -35,6 +35,10 @@ impl Plugin for HtmlEventBindingsPlugin {
         // observer (click)
         app.add_observer(emit_html_click_events);
         app.add_observer(on_html_click);
+        app.add_observer(emit_html_mouse_down_events);
+        app.add_observer(on_html_mouse_down);
+        app.add_observer(emit_html_mouse_up_events);
+        app.add_observer(on_html_mouse_up);
         app.add_observer(emit_html_submit_events);
         app.add_observer(on_html_submit);
 
@@ -93,6 +97,8 @@ impl Plugin for HtmlEventBindingsPlugin {
             emit_html_scrollbar_events.in_set(HtmlSystemSet::Bindings),
         );
         app.add_observer(on_html_scroll);
+        app.add_observer(emit_html_wheel_events);
+        app.add_observer(on_html_wheel);
 
         // observer (keyboard)
         app.add_systems(
@@ -106,6 +112,14 @@ impl Plugin for HtmlEventBindingsPlugin {
         app.add_observer(on_html_key_down);
         app.add_observer(on_html_key_up);
 
+        // observer (touch)
+        app.add_observer(emit_html_touch_start_events);
+        app.add_observer(on_html_touch_start);
+        app.add_observer(emit_html_touch_move_events);
+        app.add_observer(on_html_touch_move);
+        app.add_observer(emit_html_touch_end_events);
+        app.add_observer(on_html_touch_end);
+
         // observer (drag)
         app.add_observer(emit_html_drag_start_events);
         app.add_observer(on_html_drag_start);
@@ -114,6 +128,23 @@ impl Plugin for HtmlEventBindingsPlugin {
         app.add_observer(emit_html_drag_stop_events);
         app.add_observer(on_html_drag_stop);
     }
+}
+
+fn pointer_inner_position(
+    rel_pos: Option<&RelativeCursorPosition>,
+    node: Option<&ComputedNode>,
+    fallback: Vec2,
+) -> Vec2 {
+    rel_pos
+        .and_then(|rel| rel.normalized)
+        .map(|norm| {
+            if let Some(node) = node {
+                Vec2::new(norm.x * node.size.x, norm.y * node.size.y)
+            } else {
+                norm
+            }
+        })
+        .unwrap_or(fallback)
 }
 
 // =================================================
@@ -143,16 +174,7 @@ pub(crate) fn emit_html_click_events(
     }
     if bindings.onclick.is_some() {
         let position = ev.pointer_location.position;
-        let inner_position = rel_pos
-            .and_then(|rel| rel.normalized)
-            .map(|norm| {
-                if let Some(node) = node {
-                    Vec2::new(norm.x * node.size.x, norm.y * node.size.y)
-                } else {
-                    norm
-                }
-            })
-            .unwrap_or(position);
+        let inner_position = pointer_inner_position(rel_pos, node, position);
         commands.trigger(HtmlClick {
             entity,
             position,
@@ -183,6 +205,124 @@ pub(crate) fn on_html_click(
         commands.run_system_with(sys_id, HtmlEvent { entity });
     } else {
         warn!("onclick binding '{name}' not registered via #[html_fn(...)]");
+    }
+}
+
+/// Emits mousedown events for widgets with `onmousedown` bindings.
+pub(crate) fn emit_html_mouse_down_events(
+    ev: On<Pointer<Press>>,
+    mut commands: Commands,
+    q_bindings: Query<(
+        &HtmlEventBindings,
+        Option<&UIWidgetState>,
+        Option<&RelativeCursorPosition>,
+        Option<&ComputedNode>,
+    )>,
+) {
+    if !ev.pointer_id.is_mouse() {
+        return;
+    }
+
+    let entity = ev.event().entity;
+    let Ok((bindings, state_opt, rel_pos, node)) = q_bindings.get(entity) else {
+        return;
+    };
+    if state_opt.is_some_and(|state| state.disabled) {
+        return;
+    }
+    if bindings.onmousedown.is_some() {
+        let position = ev.pointer_location.position;
+        let inner_position = pointer_inner_position(rel_pos, node, position);
+        commands.trigger(HtmlMouseDown {
+            entity,
+            button: ev.button,
+            position,
+            inner_position,
+        });
+    }
+}
+
+/// Dispatches registered mousedown handlers for HTML widgets.
+pub(crate) fn on_html_mouse_down(
+    down: On<HtmlMouseDown>,
+    mut commands: Commands,
+    reg: Res<HtmlFunctionRegistry>,
+    q_bindings: Query<&HtmlEventBindings>,
+) {
+    let entity = down.entity;
+
+    let Ok(bindings) = q_bindings.get(entity) else {
+        return;
+    };
+    let Some(name) = bindings.onmousedown.as_deref() else {
+        return;
+    };
+
+    if let Some(&sys_id) = reg.mousedown_typed.get(name) {
+        commands.run_system_with(sys_id, *down);
+    } else if let Some(&sys_id) = reg.mousedown.get(name) {
+        commands.run_system_with(sys_id, HtmlEvent { entity });
+    } else {
+        warn!("onmousedown binding '{name}' not registered via #[html_fn(...)]");
+    }
+}
+
+/// Emits mouseup events for widgets with `onmouseup` bindings.
+pub(crate) fn emit_html_mouse_up_events(
+    ev: On<Pointer<Release>>,
+    mut commands: Commands,
+    q_bindings: Query<(
+        &HtmlEventBindings,
+        Option<&UIWidgetState>,
+        Option<&RelativeCursorPosition>,
+        Option<&ComputedNode>,
+    )>,
+) {
+    if !ev.pointer_id.is_mouse() {
+        return;
+    }
+
+    let entity = ev.event().entity;
+    let Ok((bindings, state_opt, rel_pos, node)) = q_bindings.get(entity) else {
+        return;
+    };
+    if state_opt.is_some_and(|state| state.disabled) {
+        return;
+    }
+    if bindings.onmouseup.is_some() {
+        let position = ev.pointer_location.position;
+        let inner_position = pointer_inner_position(rel_pos, node, position);
+        commands.trigger(HtmlMouseUp {
+            entity,
+            button: ev.button,
+            position,
+            inner_position,
+        });
+    }
+}
+
+/// Dispatches registered mouseup handlers for HTML widgets.
+pub(crate) fn on_html_mouse_up(
+    up: On<HtmlMouseUp>,
+    mut commands: Commands,
+    reg: Res<HtmlFunctionRegistry>,
+    q_bindings: Query<&HtmlEventBindings>,
+) {
+    let entity = up.entity;
+
+    let Ok(bindings) = q_bindings.get(entity) else {
+        return;
+    };
+    let Some(name) = bindings.onmouseup.as_deref() else {
+        return;
+    };
+
+    if let Some(&sys_id) = reg.mouseup_typed.get(name) {
+        commands.run_system_with(sys_id, *up);
+    } else if let Some(&sys_id) = reg.mouseup.get(name) {
+        commands.run_system_with(sys_id, HtmlEvent { entity });
+    } else {
+        warn!("onmouseup binding '{name}' not registered via #[html_fn(...)]");
     }
 }
 
@@ -863,6 +1003,62 @@ pub(crate) fn on_html_scroll(
     }
 }
 
+/// Emits wheel events for widgets with `onwheel` bindings.
+pub(crate) fn emit_html_wheel_events(
+    ev: On<Pointer<Scroll>>,
+    mut commands: Commands,
+    q_bindings: Query<(
+        &HtmlEventBindings,
+        Option<&UIWidgetState>,
+        Option<&RelativeCursorPosition>,
+        Option<&ComputedNode>,
+    )>,
+) {
+    let entity = ev.event().entity;
+    let Ok((bindings, state_opt, rel_pos, node)) = q_bindings.get(entity) else {
+        return;
+    };
+    if state_opt.is_some_and(|state| state.disabled) {
+        return;
+    }
+    if bindings.onwheel.is_some() {
+        let position = ev.pointer_location.position;
+        let inner_position = pointer_inner_position(rel_pos, node, position);
+        commands.trigger(HtmlWheel {
+            entity,
+            unit: ev.unit,
+            delta: Vec2::new(ev.x, ev.y),
+            position,
+            inner_position,
+        });
+    }
+}
+
+/// Dispatches registered wheel handlers for HTML widgets.
+pub(crate) fn on_html_wheel(
+    wheel: On<HtmlWheel>,
+    mut commands: Commands,
+    reg: Res<HtmlFunctionRegistry>,
+    q_bindings: Query<&HtmlEventBindings>,
+) {
+    let entity = wheel.entity;
+
+    let Ok(bindings) = q_bindings.get(entity) else {
+        return;
+    };
+    let Some(name) = bindings.onwheel.as_deref() else {
+        return;
+    };
+
+    if let Some(&sys_id) = reg.wheel_typed.get(name) {
+        commands.run_system_with(sys_id, *wheel);
+    } else if let Some(&sys_id) = reg.wheel.get(name) {
+        commands.run_system_with(sys_id, HtmlEvent { entity });
+    } else {
+        warn!("onwheel binding '{name}' not registered via #[html_fn(...)]");
+    }
+}
+
 // =================================================
 //                       Keyboard
 // =================================================
@@ -989,6 +1185,188 @@ pub(crate) fn on_html_key_up(
         commands.run_system_with(sys_id, HtmlEvent { entity });
     } else {
         warn!("onkeyup binding '{name}' not registered via #[html_fn(...)]");
+    }
+}
+
+// =================================================
+//                        Touch
+// =================================================
+
+/// Emits touch-start events for widgets with `ontouchstart` bindings.
+pub(crate) fn emit_html_touch_start_events(
+    ev: On<Pointer<Press>>,
+    mut commands: Commands,
+    q_bindings: Query<(
+        &HtmlEventBindings,
+        Option<&UIWidgetState>,
+        Option<&RelativeCursorPosition>,
+        Option<&ComputedNode>,
+    )>,
+) {
+    let Some(touch_id) = ev.pointer_id.get_touch_id() else {
+        return;
+    };
+
+    let entity = ev.event().entity;
+    let Ok((bindings, state_opt, rel_pos, node)) = q_bindings.get(entity) else {
+        return;
+    };
+    if state_opt.is_some_and(|state| state.disabled) {
+        return;
+    }
+    if bindings.ontouchstart.is_some() {
+        let position = ev.pointer_location.position;
+        let inner_position = pointer_inner_position(rel_pos, node, position);
+        commands.trigger(HtmlTouchStart {
+            entity,
+            touch_id,
+            position,
+            inner_position,
+        });
+    }
+}
+
+/// Dispatches registered touch-start handlers for HTML widgets.
+pub(crate) fn on_html_touch_start(
+    start: On<HtmlTouchStart>,
+    mut commands: Commands,
+    reg: Res<HtmlFunctionRegistry>,
+    q_bindings: Query<&HtmlEventBindings>,
+) {
+    let entity = start.entity;
+
+    let Ok(bindings) = q_bindings.get(entity) else {
+        return;
+    };
+    let Some(name) = bindings.ontouchstart.as_deref() else {
+        return;
+    };
+
+    if let Some(&sys_id) = reg.touchstart_typed.get(name) {
+        commands.run_system_with(sys_id, *start);
+    } else if let Some(&sys_id) = reg.touchstart.get(name) {
+        commands.run_system_with(sys_id, HtmlEvent { entity });
+    } else {
+        warn!("ontouchstart binding '{name}' not registered via #[html_fn(...)]");
+    }
+}
+
+/// Emits touch-move events for widgets with `ontouchmove` bindings.
+pub(crate) fn emit_html_touch_move_events(
+    ev: On<Pointer<Move>>,
+    mut commands: Commands,
+    q_bindings: Query<(
+        &HtmlEventBindings,
+        Option<&UIWidgetState>,
+        Option<&RelativeCursorPosition>,
+        Option<&ComputedNode>,
+    )>,
+) {
+    let Some(touch_id) = ev.pointer_id.get_touch_id() else {
+        return;
+    };
+
+    let entity = ev.event().entity;
+    let Ok((bindings, state_opt, rel_pos, node)) = q_bindings.get(entity) else {
+        return;
+    };
+    if state_opt.is_some_and(|state| state.disabled) {
+        return;
+    }
+    if bindings.ontouchmove.is_some() {
+        let position = ev.pointer_location.position;
+        let inner_position = pointer_inner_position(rel_pos, node, position);
+        commands.trigger(HtmlTouchMove {
+            entity,
+            touch_id,
+            position,
+            inner_position,
+            delta: ev.delta,
+        });
+    }
+}
+
+/// Dispatches registered touch-move handlers for HTML widgets.
+pub(crate) fn on_html_touch_move(
+    move_ev: On<HtmlTouchMove>,
+    mut commands: Commands,
+    reg: Res<HtmlFunctionRegistry>,
+    q_bindings: Query<&HtmlEventBindings>,
+) {
+    let entity = move_ev.entity;
+
+    let Ok(bindings) = q_bindings.get(entity) else {
+        return;
+    };
+    let Some(name) = bindings.ontouchmove.as_deref() else {
+        return;
+    };
+
+    if let Some(&sys_id) = reg.touchmove_typed.get(name) {
+        commands.run_system_with(sys_id, *move_ev);
+    } else if let Some(&sys_id) = reg.touchmove.get(name) {
+        commands.run_system_with(sys_id, HtmlEvent { entity });
+    } else {
+        warn!("ontouchmove binding '{name}' not registered via #[html_fn(...)]");
+    }
+}
+
+/// Emits touch-end events for widgets with `ontouchend` bindings.
+pub(crate) fn emit_html_touch_end_events(
+    ev: On<Pointer<Release>>,
+    mut commands: Commands,
+    q_bindings: Query<(
+        &HtmlEventBindings,
+        Option<&UIWidgetState>,
+        Option<&RelativeCursorPosition>,
+        Option<&ComputedNode>,
+    )>,
+) {
+    let Some(touch_id) = ev.pointer_id.get_touch_id() else {
+        return;
+    };
+
+    let entity = ev.event().entity;
+    let Ok((bindings, state_opt, rel_pos, node)) = q_bindings.get(entity) else {
+        return;
+    };
+    if state_opt.is_some_and(|state| state.disabled) {
+        return;
+    }
+    if bindings.ontouchend.is_some() {
+        let position = ev.pointer_location.position;
+        let inner_position = pointer_inner_position(rel_pos, node, position);
+        commands.trigger(HtmlTouchEnd {
+            entity,
+            touch_id,
+            position,
+            inner_position,
+        });
+    }
+}
+
+/// Dispatches registered touch-end handlers for HTML widgets.
+pub(crate) fn on_html_touch_end(
+    end: On<HtmlTouchEnd>,
+    mut commands: Commands,
+    reg: Res<HtmlFunctionRegistry>,
+    q_bindings: Query<&HtmlEventBindings>,
+) {
+    let entity = end.entity;
+
+    let Ok(bindings) = q_bindings.get(entity) else {
+        return;
+    };
+    let Some(name) = bindings.ontouchend.as_deref() else {
+        return;
+    };
+
+    if let Some(&sys_id) = reg.touchend_typed.get(name) {
+        commands.run_system_with(sys_id, *end);
+    } else if let Some(&sys_id) = reg.touchend.get(name) {
+        commands.run_system_with(sys_id, HtmlEvent { entity });
+    } else {
+        warn!("ontouchend binding '{name}' not registered via #[html_fn(...)]");
     }
 }
 
