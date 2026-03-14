@@ -6,6 +6,7 @@ mod unit_tests;
 use crate::io::CssAsset;
 use crate::styles::components::UiStyle;
 use bevy::prelude::*;
+use bevy::text::LineHeight;
 use bevy::window::SystemCursorIcon;
 use std::cmp::PartialEq;
 use std::collections::{HashMap, HashSet};
@@ -794,6 +795,15 @@ pub enum CursorStyle {
     Custom(String),
 }
 
+/// Text casing transformation parsed from `text-transform`.
+#[derive(Reflect, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TextTransform {
+    None,
+    Uppercase,
+    Lowercase,
+    Capitalize,
+}
+
 /// Comprehensive style properties for UI elements.
 #[derive(Reflect, Default, Debug, Clone, PartialEq)]
 pub struct Style {
@@ -846,7 +856,10 @@ pub struct Style {
     pub font_size: Option<FontVal>,
     pub font_family: Option<FontFamily>,
     pub font_weight: Option<FontWeight>,
+    pub line_height: Option<LineHeight>,
     pub box_shadow: Option<BoxShadow>,
+    pub text_shadow: Option<TextShadow>,
+    pub text_transform: Option<TextTransform>,
     pub justify_content: Option<JustifyContent>,
     pub justify_items: Option<JustifyItems>,
     pub justify_self: Option<JustifySelf>,
@@ -980,7 +993,10 @@ impl Style {
         merge_opt(&mut self.font_size, &other.font_size);
         merge_opt(&mut self.font_family, &other.font_family);
         merge_opt(&mut self.font_weight, &other.font_weight);
+        merge_opt(&mut self.line_height, &other.line_height);
         merge_opt(&mut self.box_shadow, &other.box_shadow);
+        merge_opt(&mut self.text_shadow, &other.text_shadow);
+        merge_opt(&mut self.text_transform, &other.text_transform);
 
         merge_opt(&mut self.justify_content, &other.justify_content);
         merge_opt(&mut self.justify_items, &other.justify_items);
