@@ -35,7 +35,7 @@ Available features:
 - [x] Custom Cursor or system cursor support.
 - [x] Form Widget for validation and submission.
 - [x] Dialog system with Bevy modals and native system dialogs.
-- [ ] Customizable theme.
+- [x] Customizable theme.
 
 There are many other things, but currently you can use the core (HTML / CSS) features.
 
@@ -53,8 +53,8 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-bevy_extended_ui = "1.4.2"
-bevy_extended_ui_macros = "1.4.2"
+bevy_extended_ui = "1.5.0"
+bevy_extended_ui_macros = "1.5.0"
 ```
 
 #### Features
@@ -323,7 +323,7 @@ If anyone has any ideas, I'd be happy to hear them.
 
 | `Bevy` version | `bevy_extended_ui` version |
 |----------------|----------------------------|
-| 0.18.0         | 1.2.0 - 1.4.2              |
+| 0.18.1         | 1.2.0 - 1.5.0              |
 | 0.17.0         | 1.0.0 - 1.1.0              |
 | 0.16.0         | 0.1.0 - 0.2.2              |
 
