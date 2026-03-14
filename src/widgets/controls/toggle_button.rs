@@ -48,6 +48,7 @@ fn internal_node_creation_system(
     config: Res<ExtendedUiConfiguration>,
     asset_server: Res<AssetServer>,
     mut image_cache: ResMut<ImageCache>,
+    mut images: ResMut<Assets<Image>>,
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
     for (entity, id, mut toggle_button, source_opt, ui_state_opt) in query.iter_mut() {
@@ -126,6 +127,7 @@ fn internal_node_creation_system(
                     toggle_button.entry,
                     &asset_server,
                     &mut image_cache,
+                    &mut images,
                     vec!["button-text".to_string()],
                     id.0,
                     *layer,
@@ -156,6 +158,7 @@ fn internal_node_creation_system(
                     toggle_button.entry,
                     &asset_server,
                     &mut image_cache,
+                    &mut images,
                     vec!["button-text".to_string()],
                     id.0,
                     *layer,
@@ -222,6 +225,10 @@ fn on_internal_click(
     // Standalone Toggle
     if fs_entity_opt.is_none() {
         if let Ok((_e, mut st, gen_id, mut tb)) = toggles_q.get_mut(clicked) {
+            if st.disabled {
+                trigger.propagate(false);
+                return;
+            }
             current_widget_state.widget_id = gen_id.0;
             st.checked = !st.checked;
             tb.selected = st.checked;
@@ -334,7 +341,11 @@ fn on_internal_cursor_entered(
     mut query: Query<&mut UIWidgetState, With<ToggleButton>>,
 ) {
     if let Ok(mut state) = query.get_mut(trigger.entity) {
-        state.hovered = true;
+        if state.disabled {
+            state.hovered = false;
+        } else {
+            state.hovered = true;
+        }
     }
 
     trigger.propagate(false);

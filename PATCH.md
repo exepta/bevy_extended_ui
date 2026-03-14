@@ -1,15 +1,13 @@
 ## Patch Notes
+Thanks to `@lizhanyin` for this PATCH!
 
-### Version 1.4.0
+### Version 1.4.2
 
-- CSS variables support bo have fallbacks
-- CSS support for `vh` and `vw`
-- CSS functions support `calc`, `var`, `sin`, `max`, `min` and `minmax`
-- Clipboard Support
-- Better Background handling
-
-### Fixes
-
-- Fixed a bug where the scrollbar was flickering
-- Fixed a bug where the `grid` layout not react to `gap`
-- Fixed `background` for images like `center` or `cover`
+- Fixed a bug where colors override backgrounds.
+- Fixed a bug where images destroy background colors.
+- Fixed a bug where `justify-content: flex-end` not work.
+- Fixed GPU Shader system load to heavy.
+- Fixed CSS border shortland not working correct.
+- Fixed TAB selection for backtrack selection via `SHIFT + TAB`.
+- Include aliases for HTML attributes `onmouseover` and `onmouseout`.
+- Fixed a bug where images wasn't scale correct after window resize.

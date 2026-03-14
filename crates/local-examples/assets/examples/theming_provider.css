@@ -1,0 +1,71 @@
+body {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 24px;
+    background: var(--demo-bg);
+    color: var(--demo-text);
+}
+
+.demo-shell {
+    width: 100%;
+    max-width: 920px;
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.demo-shell > h3 {
+    margin: 0;
+}
+
+.demo-shell > .subtitle {
+    margin: 0;
+    color: var(--demo-muted);
+    font-size: 14px;
+}
+
+.demo-shell > .switch-theme {
+    width: 240px;
+}
+
+.demo-grid {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.demo-grid > .panel {
+    width: 290px;
+    min-height: 128px;
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+    background: var(--demo-panel-bg);
+    border: 1px var(--demo-panel-border);
+    border-radius: 10px;
+    padding: 12px;
+}
+
+.demo-grid > .panel > p {
+    margin: 0;
+}
+
+.demo-grid > .panel > input,
+.demo-grid > .panel > select,
+.demo-grid > .panel > date-picker,
+.demo-grid > .panel > progressbar,
+.demo-grid > .panel > switch {
+    width: 100%;
+}
+
+.demo-grid > .panel > switch {
+    margin-top: 6px;
+}

@@ -17,6 +17,13 @@ mod tests {
         assert_eq!(loader.extensions(), &["html", "htm"]);
     }
 
+    #[cfg(feature = "svg")]
+    #[test]
+    fn svg_loader_extensions_are_correct() {
+        let loader = SvgImageLoader;
+        assert_eq!(loader.extensions(), &["svg"]);
+    }
+
     #[test]
     fn extract_attr_reads_double_quoted_values() {
         let tag = r#" rel="stylesheet" href="examples/base.css" "#;

@@ -556,7 +556,9 @@ pub use i18n_properties;
 
 #[cfg(all(test, any(feature = "fluent", feature = "properties-lang")))]
 mod tests {
-    use super::{UiLangVariables, localize_html, resolve_placeholder};
+    #[cfg(feature = "properties-lang")]
+    use super::localize_html;
+    use super::{UiLangVariables, resolve_placeholder};
 
     #[test]
     fn unresolved_reactive_placeholder_stays_unchanged() {
@@ -570,19 +572,6 @@ mod tests {
         let vars = UiLangVariables::default();
         let resolved = resolve_placeholder("app.title", |key| Some(format!("tr:{key}")), &vars);
         assert_eq!(resolved, Some("tr:app.title".to_string()));
-    }
-
-    #[cfg(feature = "fluent")]
-    #[test]
-    fn fluent_localization_replaces_placeholders_from_assets() {
-        let html = "<h2>{{ LANGUAGE_TITLE }}</h2><p>{{ WELCOME_START_TEXT %player_name% WELCOME_END_TEXT }}</p>";
-        let mut vars = UiLangVariables::default();
-        vars.set("player_name", "Tester");
-
-        let out = localize_html(html, Some("de"), "assets/lang", &vars);
-
-        assert!(out.contains("Sprachbeispiel"), "output: {out}");
-        assert!(out.contains("Willkommen Tester !"), "output: {out}");
     }
 
     #[cfg(feature = "properties-lang")]

@@ -1,0 +1,289 @@
+body {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 18px;
+    padding: 24px;
+    background: #141723;
+    overflow-y: scroll;
+    overflow-x: hidden;
+}
+
+.page-head {
+    width: 100%;
+    min-height: 60px;
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.page-head > h3 {
+    margin: 0;
+    color: #f5f7ff;
+}
+
+.page-head > p {
+    margin: 0;
+    color: #b8bfd6;
+    font-size: 13px;
+}
+
+.widget-grid {
+    width: 100%;
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 14px;
+}
+
+.widget-card {
+    position: relative;
+    width: 320px;
+    min-height: 180px;
+    padding: 14px;
+    border-radius: 12px;
+    border: 2px #2f3750;
+    background: #1f2636;
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.widget-card > h5 {
+    margin: 0;
+    color: #f2f4ff;
+}
+
+.widget-card > p {
+    margin: 0;
+}
+
+.widget-card > button,
+.widget-card > a,
+.widget-card > select,
+.widget-card > input,
+.widget-card > slider,
+.widget-card > switch,
+.widget-card > toggle,
+.widget-card > progressbar,
+.widget-card > date-picker,
+.widget-card > fieldset,
+.widget-card > colorpicker,
+.widget-card > form {
+    width: 100%;
+}
+
+.widget-card > form {
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.widget-card > form > input,
+.widget-card > form > button {
+    width: 100%;
+}
+
+.widget-card > scroll {
+    width: 100%;
+}
+
+.scroll-div {
+    width: 100%;
+    height: 100px;
+    overflow: scroll;
+    display: flex;
+    flex-direction: column;
+}
+
+.scroll-hori-div {
+    width: 100%;
+    height: 100px;
+    overflow: scroll;
+    display: flex;
+    flex-direction: row;
+}
+
+.event-pad {
+    width: 100%;
+    height: 108px;
+    border: 1px #3d4967;
+    border-radius: 8px;
+    background: #141d31;
+    overflow: scroll;
+}
+
+.event-pad-content {
+    width: 100%;
+    min-height: 180px;
+    padding: 8px;
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.event-pad-content > h6 {
+    margin: 0;
+    color: #c9d5f3;
+}
+
+#event-debug-log {
+    min-height: 18px;
+    color: #8dd7ff;
+    font-size: 12px;
+}
+
+.button-card > button {
+    outline: 2px rgba(138, 166, 255, 0.45);
+    outline-offset: 2px;
+}
+
+.notification-target {
+    position: relative;
+    width: 100%;
+    min-height: 64px;
+    border-radius: 12px;
+    background: #1f2636;
+    border: 2px #2f3750;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.notification-target > button {
+    width: 100%;
+    min-height: 44px;
+}
+
+badge {
+    background: #8940ff;
+    border-color: #6f32d3;
+    min-width: 22px;
+    height: 22px;
+    font-size: 12px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+badge > .badge-text {
+    text-align: center;
+    transform: translateX(1px);
+}
+
+.demo-image {
+    width: 64px;
+    height: 64px;
+    border: 1px #3a435c;
+    border-radius: 8px;
+    background: #22293a;
+}
+
+.demo-svg-image {
+    background: #0f1d35;
+    border: 1px #4a6292;
+}
+
+.input-preview-image {
+    width: 56px;
+    height: 56px;
+    object-fit: contain;
+    background: #171e2d;
+}
+
+.full-divider {
+    width: 100%;
+}
+
+.demo-div {
+    width: 100%;
+    min-height: 96px;
+    border-radius: 8px;
+    border: 1px #39415a;
+    background: #1a2130;
+    padding: 8px;
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+}
+
+dialog {
+    z-index: 60000;
+}
+
+dialog.dialog-renderer-bevy-app {
+    background: rgba(8, 10, 16, 0.7);
+}
+
+dialog.dialog-renderer-bevy-app > .dialog-panel {
+    max-width: 520px;
+    border: 1px #3f4967;
+    background: #161d2f;
+}
+
+dialog.dialog-renderer-bevy-app.dialog-type-error > .dialog-panel {
+    border: 1px #a53a50;
+}
+
+.dialog-demo-content {
+    width: 100%;
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    flex-direction: column;
+    gap: 10px;
+}
+
+#range-slider-debug {
+    margin-top: 20px;
+}
+
+.text-style-card {
+    gap: 6px;
+}
+
+.text-style-card > p {
+    margin: 0;
+}
+
+.text-shadow-demo {
+    font-size: 20px;
+    font-weight: 700;
+    color: #f2f6ff;
+    text-shadow: 6px 5px 0px rgb(162, 78, 159);
+}
+
+.text-transform-upper {
+    color: #9dc7ff;
+    text-transform: uppercase;
+}
+
+.text-transform-lower {
+    color: #c4ffd1;
+    text-transfrom: lowercase;
+}
+
+.text-transform-cap {
+    color: #ffd0a3;
+    text-transform: capitalize;
+}
+
+.line-height-demo {
+    line-height: 175%;
+    color: #9eb0d4;
+}

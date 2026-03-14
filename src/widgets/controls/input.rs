@@ -1,6 +1,14 @@
 use std::collections::HashMap;
+#[cfg(all(
+    target_os = "linux",
+    not(target_arch = "wasm32"),
+    feature = "extended-dialog"
+))]
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use crate::services::image_service::get_or_load_image;
 use crate::styles::components::UiStyle;
 use crate::styles::paint::Colored;
 use crate::styles::{Background, CssClass, CssSource, FontVal, Style, TagName};
@@ -15,10 +23,11 @@ use arboard::Clipboard;
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
 use bevy::text::{TextBackgroundColor, TextLayoutInfo, TextSpan};
-use bevy::ui::{RelativeCursorPosition, ScrollPosition, UiScale};
-use bevy::window::PrimaryWindow;
+use bevy::ui::{RelativeCursorPosition, ScrollPosition};
+#[cfg(all(not(target_arch = "wasm32"), feature = "extended-dialog"))]
+use rfd::FileDialog;
 #[cfg(all(target_arch = "wasm32", feature = "clipboard-wasm"))]
-use std::sync::{Arc, Mutex};
+use wasm_bindgen::{JsCast, closure::Closure};
 #[cfg(all(target_arch = "wasm32", feature = "clipboard-wasm"))]
 use wasm_bindgen_futures::{JsFuture, spawn_local};
 
@@ -66,11 +75,48 @@ struct InputSuffixSpan;
 #[derive(Component)]
 struct OverlayLabel;
 
+/// Marker component for the file-size suffix label.
+#[derive(Component)]
+struct InputFileSizeText;
+
+/// Marker component for the file-size validation message.
+#[derive(Component)]
+struct InputFileErrorText;
+
+/// Runtime metadata for file input selections.
+#[derive(Component, Default, Clone)]
+struct InputFileState {
+    selected_size_bytes: Option<u64>,
+    error_message: Option<String>,
+}
+
 /// Tracks key repeat timers for continuous input.
 #[derive(Resource, Default)]
 struct KeyRepeatTimers {
     timers: HashMap<KeyCode, Timer>,
 }
+
+#[derive(Clone, Debug)]
+struct PendingFileSelection {
+    target: usize,
+    display_name: String,
+    value: String,
+    size_bytes: Option<u64>,
+    error_message: Option<String>,
+}
+
+/// Bridge resource for asynchronous file picker callbacks.
+#[derive(Resource, Default, Clone)]
+struct InputFileDialogBridge {
+    pending: Arc<Mutex<Vec<PendingFileSelection>>>,
+}
+
+#[cfg(all(
+    target_os = "linux",
+    not(target_arch = "wasm32"),
+    feature = "extended-dialog"
+))]
+static FILE_DIALOG_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
 
 /// Clipboard access for input shortcuts.
 #[derive(Resource)]
@@ -226,6 +272,7 @@ impl Plugin for InputWidget {
         app.insert_resource(KeyRepeatTimers::default());
         app.insert_resource(CursorBlinkTimer::default());
         app.insert_resource(InputClipboard::default());
+        app.insert_resource(InputFileDialogBridge::default());
         #[cfg(all(target_arch = "wasm32", feature = "clipboard-wasm"))]
         let typing_chain = (handle_typing, sync_input_text_spans, apply_pending_paste).chain();
 
@@ -236,7 +283,9 @@ impl Plugin for InputWidget {
             Update,
             (
                 internal_node_creation_system,
-                sync_input_field_updates,
+                apply_pending_file_selection,
+                sync_input_field_updates.after(apply_pending_file_selection),
+                sync_file_input_feedback.after(apply_pending_file_selection),
                 update_cursor_visibility,
                 update_cursor_position,
                 typing_chain,
@@ -270,6 +319,7 @@ fn internal_node_creation_system(
     config: Res<ExtendedUiConfiguration>,
     asset_server: Res<AssetServer>,
     mut image_cache: ResMut<ImageCache>,
+    mut images: ResMut<Assets<Image>>,
 ) {
     let layer = *config.render_layers.first().unwrap_or(&1);
 
@@ -312,6 +362,7 @@ fn internal_node_creation_system(
                     dragging: false,
                 },
             ))
+            .insert(InputFileState::default())
             .with_children(|builder| {
                 let icon_path = field
                     .icon_path
@@ -319,12 +370,8 @@ fn internal_node_creation_system(
                     .map(str::trim)
                     .filter(|path| !path.is_empty());
                 if let Some(icon_path) = icon_path {
-                    let owned_icon = icon_path.to_string();
-                    let handle = image_cache
-                        .map
-                        .entry(owned_icon.clone())
-                        .or_insert_with(|| asset_server.load(owned_icon))
-                        .clone();
+                    let handle =
+                        get_or_load_image(icon_path, &mut image_cache, &mut images, &asset_server);
 
                     // Icon left
                     builder.spawn((
@@ -451,6 +498,45 @@ fn internal_node_creation_system(
                         ],
                     ))
                     .insert(ImageNode::default());
+
+                if field.input_type == InputType::File && field.show_size {
+                    builder.spawn((
+                        Name::new(format!("Input-File-Size-{}", field.entry)),
+                        Node::default(),
+                        Text::new(String::new()),
+                        TextColor::default(),
+                        TextLayout::default(),
+                        TextFont::default(),
+                        ZIndex::default(),
+                        UIWidgetState::default(),
+                        css_source.clone(),
+                        CssClass(vec!["input-file-size".to_string()]),
+                        Pickable::IGNORE,
+                        RenderLayers::layer(layer),
+                        InputFileSizeText,
+                        BindToID(id.0),
+                    ));
+                }
+
+                if field.input_type == InputType::File {
+                    builder.spawn((
+                        Name::new(format!("Input-File-Error-{}", field.entry)),
+                        Node::default(),
+                        Text::new(String::new()),
+                        TextColor::default(),
+                        TextLayout::default(),
+                        TextFont::default(),
+                        ZIndex::default(),
+                        UIWidgetState::default(),
+                        css_source.clone(),
+                        CssClass(vec!["input-file-error".to_string()]),
+                        Visibility::Hidden,
+                        Pickable::IGNORE,
+                        RenderLayers::layer(layer),
+                        InputFileErrorText,
+                        BindToID(id.0),
+                    ));
+                }
             })
             .observe(on_internal_press)
             .observe(on_internal_drag)
@@ -467,12 +553,14 @@ fn sync_input_field_updates(
     config: Res<ExtendedUiConfiguration>,
     asset_server: Res<AssetServer>,
     mut image_cache: ResMut<ImageCache>,
+    mut images: ResMut<Assets<Image>>,
     mut query: Query<
         (
             Entity,
             &mut InputField,
             &mut InputValue,
             &mut InputSelection,
+            &InputFileState,
             &UIGenID,
             Option<&CssSource>,
         ),
@@ -480,7 +568,22 @@ fn sync_input_field_updates(
     >,
     children_query: Query<&Children, With<InputFieldBase>>,
     // text is synced in `sync_input_text_spans`
-    mut label_query: Query<(&mut Text, &BindToID), (With<OverlayLabel>, Without<InputFieldText>)>,
+    mut label_query: Query<
+        (&mut Text, &BindToID),
+        (
+            With<OverlayLabel>,
+            Without<InputFieldText>,
+            Without<InputFileSizeText>,
+        ),
+    >,
+    mut file_size_text_query: Query<
+        (&mut Text, &BindToID),
+        (
+            With<InputFileSizeText>,
+            Without<OverlayLabel>,
+            Without<InputFieldText>,
+        ),
+    >,
     icon_query: Query<(Entity, &BindToID), With<InputFieldIcon>>,
     mut icon_image_query: Query<(&mut ImageNode, &BindToID), With<InputFieldIconImage>>,
 ) {
@@ -491,13 +594,15 @@ fn sync_input_field_updates(
         icon_entities.insert(bind.0, entity);
     }
 
-    for (entity, mut field, mut input_value, mut selection, ui_id, source_opt) in query.iter_mut() {
+    for (entity, mut field, mut input_value, mut selection, file_state, ui_id, source_opt) in
+        query.iter_mut()
+    {
         let css_source = source_opt.cloned().unwrap_or_default();
 
         field.cursor_position = field.cursor_position.min(field.text.len());
         selection.anchor = selection.anchor.min(field.text.len());
         selection.focus = selection.focus.min(field.text.len());
-        if input_value.0 != field.text {
+        if field.input_type != InputType::File && input_value.0 != field.text {
             input_value.0 = field.text.clone();
         }
 
@@ -509,18 +614,28 @@ fn sync_input_field_updates(
             label_text.0 = field.label.clone();
         }
 
+        let file_size_text = if field.input_type == InputType::File && field.show_size {
+            file_state
+                .selected_size_bytes
+                .map(format_file_size)
+                .unwrap_or_default()
+        } else {
+            String::new()
+        };
+        for (mut text, bind_id) in file_size_text_query.iter_mut() {
+            if bind_id.0 != ui_id.0 {
+                continue;
+            }
+            text.0 = file_size_text.clone();
+        }
+
         let icon_path = field
             .icon_path
             .as_deref()
             .map(str::trim)
             .filter(|path| !path.is_empty());
         if let Some(icon_path) = icon_path {
-            let owned_icon = icon_path.to_string();
-            let handle = image_cache
-                .map
-                .entry(owned_icon.clone())
-                .or_insert_with(|| asset_server.load(owned_icon))
-                .clone();
+            let handle = get_or_load_image(icon_path, &mut image_cache, &mut images, &asset_server);
 
             if let Some(icon_entity) = icon_entities.get(&ui_id.0).copied() {
                 for (mut image_node, bind_id) in icon_image_query.iter_mut() {
@@ -577,6 +692,101 @@ fn sync_input_field_updates(
     }
 }
 
+fn apply_pending_file_selection(
+    bridge: Res<InputFileDialogBridge>,
+    mut query: Query<
+        (
+            &UIGenID,
+            &mut InputField,
+            &mut InputValue,
+            &mut InputSelection,
+            &mut InputFileState,
+            &mut UIWidgetState,
+        ),
+        With<InputField>,
+    >,
+) {
+    let pending = {
+        let Ok(mut guard) = bridge.pending.lock() else {
+            return;
+        };
+        std::mem::take(&mut *guard)
+    };
+
+    if pending.is_empty() {
+        return;
+    }
+
+    for selection in pending {
+        if let Some((
+            _,
+            mut field,
+            mut input_value,
+            mut text_selection,
+            mut file_state,
+            mut state,
+        )) = query
+            .iter_mut()
+            .find(|(ui_id, _, _, _, _, _)| ui_id.0 == selection.target)
+        {
+            if let Some(error_message) = selection.error_message {
+                file_state.error_message = Some(error_message);
+                state.invalid = true;
+                state.focused = false;
+                clear_selection(&mut text_selection, field.cursor_position);
+                continue;
+            }
+
+            field.text = selection.display_name;
+            field.cursor_position = field.text.len();
+            file_state.selected_size_bytes = selection.size_bytes;
+            file_state.error_message = None;
+
+            if input_value.0 != selection.value {
+                input_value.0 = selection.value;
+            }
+
+            state.invalid = false;
+            state.focused = false;
+            clear_selection(&mut text_selection, field.cursor_position);
+        }
+    }
+}
+
+/// Syncs visual feedback message for file-input validation failures (e.g. max-size).
+fn sync_file_input_feedback(
+    input_query: Query<
+        (&UIGenID, &InputField, &InputFileState),
+        (With<InputFieldBase>, Changed<InputFileState>),
+    >,
+    mut error_query: Query<(&mut Text, &mut Visibility, &BindToID), With<InputFileErrorText>>,
+) {
+    for (ui_id, field, file_state) in input_query.iter() {
+        if field.input_type != InputType::File {
+            continue;
+        }
+
+        let has_error = file_state
+            .error_message
+            .as_ref()
+            .is_some_and(|message| !message.trim().is_empty());
+
+        for (mut text, mut visibility, bind_id) in error_query.iter_mut() {
+            if bind_id.0 != ui_id.0 {
+                continue;
+            }
+
+            if has_error {
+                text.0 = file_state.error_message.clone().unwrap_or_default();
+                *visibility = Visibility::Inherited;
+            } else {
+                text.0.clear();
+                *visibility = Visibility::Hidden;
+            }
+        }
+    }
+}
+
 // ===============================================
 //             Internal Functions
 // ===============================================
@@ -612,15 +822,17 @@ fn update_cursor_visibility(
     struct FieldView {
         focused: bool,
         disabled: bool,
+        is_file: bool,
     }
 
     let mut fields: HashMap<usize, FieldView> = HashMap::new();
-    for (_field, state, ui_id) in input_field_query.iter() {
+    for (field, state, ui_id) in input_field_query.iter() {
         fields.insert(
             ui_id.0,
             FieldView {
                 focused: state.focused,
                 disabled: state.disabled,
+                is_file: field.input_type == InputType::File,
             },
         );
     }
@@ -630,7 +842,7 @@ fn update_cursor_visibility(
             continue;
         };
 
-        if field.focused && !field.disabled {
+        if field.focused && !field.disabled && !field.is_file {
             let alpha =
                 (cursor_blink_timer.timer.elapsed_secs() * 2.0 * std::f32::consts::PI).sin() * 0.5
                     + 0.5;
@@ -695,7 +907,7 @@ fn update_cursor_position(
             continue;
         };
 
-        if !state.focused || state.disabled {
+        if !state.focused || state.disabled || text_field.input_type == InputType::File {
             continue;
         }
 
@@ -770,7 +982,8 @@ fn update_cursor_position(
 
 /// Adjusts the width of the input text container when the input field or style changes.
 ///
-/// - If the input field has an icon, reduces the text container width by a fixed percentage to accommodate the icon.
+/// - If the input field has an icon, reduces the text container width to accommodate the icon.
+/// - If file size suffix is enabled, reserves extra width on the right side.
 /// - Caches the original width to avoid repeated adjustments.
 /// Adjusts the text container width based on content and cap rules.
 fn calculate_correct_text_container_width(
@@ -785,10 +998,6 @@ fn calculate_correct_text_container_width(
     mut container_query: Query<(&mut UiStyle, &mut OriginalWidth, &BindToID), With<InputContainer>>,
 ) {
     for (input_field, ui_id) in query.iter() {
-        if input_field.icon_path.is_none() {
-            continue;
-        }
-
         for (mut style, mut original_width, bind_id) in container_query.iter_mut() {
             if bind_id.0 != ui_id.0 {
                 continue;
@@ -807,12 +1016,24 @@ fn calculate_correct_text_container_width(
                 original_width.0 = current;
             }
 
-            if original_width.0 > current {
-                continue;
-            }
+            let icon_reserve = input_field
+                .icon_path
+                .as_deref()
+                .map(str::trim)
+                .filter(|path| !path.is_empty())
+                .map(|_| 15.0)
+                .unwrap_or(0.0);
+            let file_size_reserve =
+                if input_field.input_type == InputType::File && input_field.show_size {
+                    25.0
+                } else {
+                    0.0
+                };
+            let reserve = icon_reserve + file_size_reserve;
+            let target = (original_width.0 - reserve).max(0.0);
 
             for (_, value) in style.styles.iter_mut() {
-                value.normal.width = Some(Val::Percent((current - 15.0).max(0.0)));
+                value.normal.width = Some(Val::Percent(target));
             }
         }
     }
@@ -837,7 +1058,7 @@ fn handle_input_horizontal_scroll(
     }
 
     for (input_field, ui_id, state) in query.iter() {
-        if !state.focused || state.disabled {
+        if !state.focused || state.disabled || input_field.input_type == InputType::File {
             continue;
         }
 
@@ -919,6 +1140,11 @@ fn handle_typing(
         }
 
         if !state.focused {
+            continue;
+        }
+
+        if in_field.input_type == InputType::File {
+            clear_selection(&mut selection, in_field.cursor_position);
             continue;
         }
 
@@ -1403,6 +1629,334 @@ fn calculate_text_width(text: &str, style: &TextFont) -> f32 {
     text.len() as f32 * style.font_size * 0.6
 }
 
+fn normalized_extensions(values: &[String]) -> Vec<String> {
+    values
+        .iter()
+        .map(String::as_str)
+        .map(str::trim)
+        .map(|token| token.trim_start_matches('.'))
+        .filter(|token| !token.is_empty())
+        .map(str::to_ascii_lowercase)
+        .collect()
+}
+
+fn format_file_size(bytes: u64) -> String {
+    const UNITS: [&str; 5] = ["B", "KB", "MB", "GB", "TB"];
+
+    let mut value = bytes as f64;
+    let mut unit_idx = 0usize;
+    while unit_idx < UNITS.len() - 1 && value >= 900.0 {
+        value /= 1024.0;
+        unit_idx += 1;
+    }
+
+    format!("{:.0} {}", value.round(), UNITS[unit_idx])
+}
+
+fn push_pending_file_selection(
+    bridge: &InputFileDialogBridge,
+    target: usize,
+    display_name: String,
+    value: String,
+    size_bytes: Option<u64>,
+) {
+    let Ok(mut guard) = bridge.pending.lock() else {
+        return;
+    };
+    guard.push(PendingFileSelection {
+        target,
+        display_name,
+        value,
+        size_bytes,
+        error_message: None,
+    });
+}
+
+fn push_pending_file_selection_error(
+    bridge: &InputFileDialogBridge,
+    target: usize,
+    error_message: String,
+) {
+    let Ok(mut guard) = bridge.pending.lock() else {
+        return;
+    };
+    guard.push(PendingFileSelection {
+        target,
+        display_name: String::new(),
+        value: String::new(),
+        size_bytes: None,
+        error_message: Some(error_message),
+    });
+}
+
+#[cfg(all(
+    target_os = "linux",
+    not(target_arch = "wasm32"),
+    feature = "extended-dialog"
+))]
+fn spawn_linux_file_dialog_task(task: impl FnOnce() + Send + 'static) -> bool {
+    if FILE_DIALOG_IN_FLIGHT
+        .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+        .is_err()
+    {
+        warn!("File dialog request ignored: another file dialog is already open (linux backend).");
+        return false;
+    }
+
+    std::thread::spawn(move || {
+        task();
+        FILE_DIALOG_IN_FLIGHT.store(false, Ordering::Release);
+    });
+
+    true
+}
+
+#[cfg(all(not(target_arch = "wasm32"), feature = "extended-dialog"))]
+fn run_native_file_picker(
+    target: usize,
+    folder_mode: bool,
+    extensions: Vec<String>,
+    include_size: bool,
+    max_size_bytes: Option<u64>,
+    bridge: InputFileDialogBridge,
+) {
+    let mut dialog = FileDialog::new();
+    if !folder_mode && !extensions.is_empty() {
+        let extension_refs: Vec<&str> = extensions.iter().map(String::as_str).collect();
+        dialog = dialog.add_filter("Allowed", &extension_refs);
+    }
+
+    if folder_mode {
+        if let Some(path) = dialog.pick_folder() {
+            let display_name = path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .map(str::to_string)
+                .unwrap_or_else(|| path.to_string_lossy().into_owned());
+            let value = path.to_string_lossy().into_owned();
+            push_pending_file_selection(&bridge, target, display_name, value, None);
+        }
+        return;
+    }
+
+    if let Some(path) = dialog.pick_file() {
+        let display_name = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .map(str::to_string)
+            .unwrap_or_else(|| path.to_string_lossy().into_owned());
+        let value = path.to_string_lossy().into_owned();
+        let selected_size = std::fs::metadata(&path).ok().map(|meta| meta.len());
+
+        if let (Some(limit), Some(size)) = (max_size_bytes, selected_size)
+            && size > limit
+        {
+            push_pending_file_selection_error(
+                &bridge,
+                target,
+                format!("File is too large (max: {})", format_file_size(limit)),
+            );
+            warn!(
+                "File selection rejected: '{}' is {} bytes but max-size is {} bytes.",
+                display_name, size, limit
+            );
+            return;
+        }
+
+        let size_bytes = if include_size { selected_size } else { None };
+
+        push_pending_file_selection(&bridge, target, display_name, value, size_bytes);
+    }
+}
+
+fn open_file_picker(target: usize, field: &InputField, bridge: &InputFileDialogBridge) {
+    #[cfg(all(not(target_arch = "wasm32"), feature = "extended-dialog"))]
+    {
+        let folder_mode = field.folder;
+        let extensions = normalized_extensions(&field.extensions);
+        let include_size = field.show_size && !folder_mode;
+        let max_size_bytes = if folder_mode {
+            None
+        } else {
+            field.max_size_bytes
+        };
+
+        #[cfg(target_os = "linux")]
+        {
+            let bridge = bridge.clone();
+            let _ = spawn_linux_file_dialog_task(move || {
+                run_native_file_picker(
+                    target,
+                    folder_mode,
+                    extensions,
+                    include_size,
+                    max_size_bytes,
+                    bridge,
+                );
+            });
+            return;
+        }
+
+        #[cfg(not(target_os = "linux"))]
+        {
+            run_native_file_picker(
+                target,
+                folder_mode,
+                extensions,
+                include_size,
+                max_size_bytes,
+                bridge.clone(),
+            );
+            return;
+        }
+    }
+
+    #[cfg(all(target_arch = "wasm32", feature = "clipboard-wasm"))]
+    {
+        let Some(window) = web_sys::window() else {
+            return;
+        };
+        let Some(document) = window.document() else {
+            return;
+        };
+        let Ok(element) = document.create_element("input") else {
+            return;
+        };
+        let Ok(input) = element.dyn_into::<web_sys::HtmlInputElement>() else {
+            return;
+        };
+
+        input.set_type("file");
+        let _ = input.set_attribute("style", "display: none;");
+
+        let folder_mode = field.folder;
+        if folder_mode {
+            let _ = input.set_attribute("webkitdirectory", "");
+            let _ = input.set_attribute("directory", "");
+        } else {
+            let extensions = normalized_extensions(&field.extensions);
+            if !extensions.is_empty() {
+                let accept = extensions
+                    .iter()
+                    .map(|ext| format!(".{ext}"))
+                    .collect::<Vec<_>>()
+                    .join(",");
+                input.set_accept(&accept);
+            }
+        }
+
+        let bridge = bridge.clone();
+        let input_clone = input.clone();
+        let include_size = field.show_size && !folder_mode;
+        let max_size_bytes = if folder_mode {
+            None
+        } else {
+            field.max_size_bytes
+        };
+
+        let onchange = Closure::wrap(Box::new(move |_event: web_sys::Event| {
+            let Some(files) = input_clone.files() else {
+                return;
+            };
+
+            let Some(file) = files.item(0) else {
+                return;
+            };
+
+            let (display_name, size_bytes) = if folder_mode {
+                let relative = js_sys::Reflect::get(
+                    file.as_ref(),
+                    &wasm_bindgen::JsValue::from_str("webkitRelativePath"),
+                )
+                .ok()
+                .and_then(|value| value.as_string())
+                .unwrap_or_default();
+
+                let folder_name = relative
+                    .split('/')
+                    .next()
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(str::to_string)
+                    .unwrap_or_else(|| file.name());
+                (folder_name, None)
+            } else {
+                let selected_size = file.size() as u64;
+                if let Some(limit) = max_size_bytes
+                    && selected_size > limit
+                {
+                    push_pending_file_selection_error(
+                        &bridge,
+                        target,
+                        format!("File is too large (max: {})", format_file_size(limit)),
+                    );
+                    warn!(
+                        "File selection rejected: '{}' is {} bytes but max-size is {} bytes.",
+                        file.name(),
+                        selected_size,
+                        limit
+                    );
+                    return;
+                }
+
+                let size = if include_size {
+                    Some(selected_size)
+                } else {
+                    None
+                };
+                let display_name = file.name();
+                let bridge_load = bridge.clone();
+                let display_name_load = display_name.clone();
+                let reader_name_fallback = display_name.clone();
+                let Ok(reader) = web_sys::FileReader::new() else {
+                    push_pending_file_selection(
+                        &bridge,
+                        target,
+                        display_name.clone(),
+                        display_name,
+                        size,
+                    );
+                    return;
+                };
+                let reader_for_load = reader.clone();
+                let onload = Closure::wrap(Box::new(move |_event: web_sys::Event| {
+                    let value = reader_for_load
+                        .result()
+                        .ok()
+                        .and_then(|data| data.as_string())
+                        .unwrap_or_else(|| reader_name_fallback.clone());
+
+                    push_pending_file_selection(
+                        &bridge_load,
+                        target,
+                        display_name_load.clone(),
+                        value,
+                        size,
+                    );
+                }) as Box<dyn FnMut(_)>);
+                reader.set_onload(Some(onload.as_ref().unchecked_ref()));
+                onload.forget();
+                let _ = reader.read_as_data_url(&file);
+                return;
+            };
+
+            push_pending_file_selection(
+                &bridge,
+                target,
+                display_name.clone(),
+                display_name,
+                size_bytes,
+            );
+        }) as Box<dyn FnMut(_)>);
+
+        input.set_onchange(Some(onchange.as_ref().unchecked_ref()));
+        onchange.forget();
+
+        input.click();
+        return;
+    }
+}
+
 /// Retrieves the active text color from a widget style, falling back to white.
 /// Resolves the active text color from the UI style.
 fn get_active_text_color(style: &UiStyle) -> Color {
@@ -1629,16 +2183,10 @@ fn cursor_position_from_pointer(
     >,
     text_query: &Query<(&TextFont, &BindToID), With<InputFieldText>>,
     layout_query: &Query<(&TextLayoutInfo, &BindToID), With<InputFieldText>>,
-    window_q: &Query<&Window, With<PrimaryWindow>>,
-    ui_scale: &UiScale,
 ) -> Option<usize> {
     if text_len == 0 {
         return Some(0);
     }
-    let Ok(window) = window_q.single() else {
-        return None;
-    };
-    let sf = window.scale_factor() * ui_scale.0;
 
     let mut cursor_x = None;
     let mut padding_left = 0.0;
@@ -1653,7 +2201,9 @@ fn cursor_position_from_pointer(
             return None;
         };
 
-        let width = (node.size().x / sf).max(1.0);
+        // Use the node-local inverse scale instead of recomputing from the window scale.
+        // This avoids platform-specific mismatches (notably on Windows DPI scaling).
+        let width = (node.size().x * node.inverse_scale_factor).max(1.0);
         let clamped = (normalized.x + 0.5).clamp(0.0, 1.0);
         cursor_x = Some(clamped * width);
 
@@ -1779,8 +2329,6 @@ fn on_internal_press(
     >,
     text_query: Query<(&TextFont, &BindToID), With<InputFieldText>>,
     layout_query: Query<(&TextLayoutInfo, &BindToID), With<InputFieldText>>,
-    window_q: Query<&Window, With<PrimaryWindow>>,
-    ui_scale: Res<UiScale>,
     mut current_widget_state: ResMut<CurrentWidgetState>,
 ) {
     if trigger.button != PointerButton::Primary {
@@ -1797,6 +2345,14 @@ fn on_internal_press(
             return;
         }
 
+        if field.input_type == InputType::File {
+            state.focused = false;
+            selection.dragging = false;
+            clear_selection(&mut selection, field.cursor_position);
+            current_widget_state.widget_id = gen_id.0;
+            return;
+        }
+
         state.focused = true;
         current_widget_state.widget_id = gen_id.0;
 
@@ -1807,8 +2363,6 @@ fn on_internal_press(
             &container_query,
             &text_query,
             &layout_query,
-            &window_q,
-            &ui_scale,
         ) {
             field.cursor_position = pos;
             selection.anchor = pos;
@@ -1855,8 +2409,6 @@ fn on_internal_drag(
     >,
     text_query: Query<(&TextFont, &BindToID), With<InputFieldText>>,
     layout_query: Query<(&TextLayoutInfo, &BindToID), With<InputFieldText>>,
-    window_q: Query<&Window, With<PrimaryWindow>>,
-    ui_scale: Res<UiScale>,
 ) {
     if event.button != PointerButton::Primary {
         return;
@@ -1868,7 +2420,7 @@ fn on_internal_drag(
                       mut selection: Mut<InputSelection>,
                       state: &UIWidgetState,
                       gen_id: &UIGenID| {
-        if state.disabled || !state.focused {
+        if state.disabled || !state.focused || field.input_type == InputType::File {
             return;
         }
 
@@ -1879,8 +2431,6 @@ fn on_internal_drag(
             &container_query,
             &text_query,
             &layout_query,
-            &window_q,
-            &ui_scale,
         ) {
             field.cursor_position = pos;
             selection.focus = pos;
@@ -1925,21 +2475,33 @@ fn on_internal_release(
 /// Focuses the input field on click and updates the current widget state.
 fn on_internal_click(
     mut trigger: On<Pointer<Click>>,
-    mut query: Query<(&mut UIWidgetState, &UIGenID), With<InputField>>,
+    mut query: Query<(&mut UIWidgetState, &UIGenID, &InputField), With<InputField>>,
     bind_query: Query<&BindToID>,
     mut current_widget_state: ResMut<CurrentWidgetState>,
+    file_dialog_bridge: Res<InputFileDialogBridge>,
 ) {
     let target = trigger.event_target();
-    if let Ok((mut state, gen_id)) = query.get_mut(target) {
+    if let Ok((mut state, gen_id, field)) = query.get_mut(target) {
         if !state.disabled {
-            state.focused = true;
             current_widget_state.widget_id = gen_id.0;
+            if field.input_type == InputType::File {
+                state.focused = false;
+                open_file_picker(gen_id.0, field, &file_dialog_bridge);
+            } else {
+                state.focused = true;
+            }
         }
     } else if let Ok(bind) = bind_query.get(target) {
-        if let Some((mut state, gen_id)) = query.iter_mut().find(|(_, id)| id.0 == bind.0) {
+        if let Some((mut state, gen_id, field)) = query.iter_mut().find(|(_, id, _)| id.0 == bind.0)
+        {
             if !state.disabled {
-                state.focused = true;
                 current_widget_state.widget_id = gen_id.0;
+                if field.input_type == InputType::File {
+                    state.focused = false;
+                    open_file_picker(gen_id.0, field, &file_dialog_bridge);
+                } else {
+                    state.focused = true;
+                }
             }
         }
     }

@@ -60,9 +60,12 @@ properties or values are ignored silently.
 ### Typography
 
 - `font-size`
+- `line-height`
 - `font-family`
 - `font-weight`
 - `text-wrap`
+- `text-align`
+- `text-transform` (also typo-alias `text-transfrom`)
 
 ### Visuals
 
@@ -72,7 +75,12 @@ properties or values are ignored silently.
 - `background-image`
 - `backdrop-filter` (`blur(<px>)`, `none`)
 - `border-color`
+- `outline`
+- `outline-width`
+- `outline-color`
+- `outline-offset`
 - `box-shadow`
+- `text-shadow`
 
 ### Interaction / Misc
 
@@ -116,6 +124,13 @@ Note: `gap` sets both row and column gaps. `row-gap` and `column-gap` override t
 - `rem` -> `FontVal::Rem`
 - Math functions: `calc`, `min`, `max`, `sin` (unitless radians)
 
+### Line Height (`line-height`)
+
+- `normal` -> Bevy default (`RelativeToFont(1.2)`)
+- unitless number (e.g. `1.4`) -> relative to font size
+- percent (e.g. `140%`) -> relative to font size
+- `px` (e.g. `22px`) -> absolute line height
+
 ### Colors
 
 - Named colors (via `Colored::named`)
@@ -142,6 +157,14 @@ Note: `gap` sets both row and column gaps. `row-gap` and `column-gap` override t
 - `border-width`: shorthand like `padding` (1-4 values)
 - `border-color`: color only
 - `border-radius`: 1-4 values in `px` or `%`
+
+### Outline
+
+- `outline`: expects `WIDTH [COLOR]` (style keywords are ignored)
+- `outline-width`: single width value
+- `outline-color`: color only
+- `outline-offset`: single length value (`px`, `%`, viewport units, or `0`)
+- `outline: none` hides outline by setting transparent color and zero width
 
 ### Padding / Margin Shorthand
 
@@ -177,6 +200,15 @@ Single shadow only. Syntax: up to 4 size values plus optional color.
 - Color can be `#`, `rgb(...)`, or `rgba(...)`
 - `inset` is not supported
 
+### Text Shadow
+
+Single shadow only. Syntax: `offset-x offset-y [blur] [color]`.
+
+- Only first shadow from comma-separated lists is used
+- Offsets currently support `px` or `0`
+- Blur is accepted but ignored (Bevy `TextShadow` has no blur field)
+- Color can be named, `#`, `rgb(...)`, or `rgba(...)`
+
 ### Transform
 
 `transform` parses a list of functions. Supported functions:
@@ -190,6 +222,14 @@ Single shadow only. Syntax: up to 4 size values plus optional color.
 - `rotate(10deg)` / `rotate(0.5rad)` (numeric values are treated as degrees)
 
 Translations use `px`, `%`, or `0`. Scale is unitless `f32`.
+
+### Text Transform
+
+- `uppercase`
+- `lowercase`
+- `capitalize`
+- `none`
+- Alias: `text-transfrom` is accepted for compatibility with common typo
 
 ### Overflow
 
@@ -228,6 +268,15 @@ System cursor keywords:
 - `nowrap` -> no wrap
 - `pretty`, `balance` -> word boundary
 - `unset` -> any character
+
+### Text Align
+
+`text-align` maps to Bevy `Justify`:
+
+- `left`, `start`, `flex-start`
+- `center`
+- `right`, `end`, `flex-end`
+- `justify`
 
 ### Z-Index
 

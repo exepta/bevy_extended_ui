@@ -7,22 +7,32 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 
 use crate::ExtendedUiConfiguration;
+#[cfg(feature = "extended-dialog")]
+use crate::dialog::{DialogProvider, DialogWidget, DialogWidgetType};
 use crate::html::{
     HtmlDirty, HtmlEventBindings, HtmlID, HtmlInnerContent, HtmlMeta, HtmlSource, HtmlStates,
     HtmlStructureMap, HtmlStyle, HtmlSystemSet, HtmlWidgetNode,
 };
 use crate::io::{CssAsset, DefaultCssHandle, HtmlAsset};
 use crate::lang::{UILang, UiLangState, UiLangVariables, localize_html, vars_fingerprint};
+#[cfg(feature = "providers")]
+use crate::providers::{
+    ProviderChildPolicy, ProviderResolveContext, ThemeProviderState, UiProvider, UiProviderRegistry,
+};
 use crate::styles::IconPlace;
 use crate::styles::parser::convert_to_color;
 use crate::widgets::Button;
 use crate::widgets::*;
 
-/// Default CSS asset path applied to every HTML UI.
-pub const DEFAULT_UI_CSS: &str = "default/extended_ui.css";
+/// Legacy identifier for the built-in embedded default stylesheet.
+pub const DEFAULT_UI_CSS: &str = "embedded/default_style";
 
 static INNER_BINDING_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?s)\{\{\s*([^{}]+?)\s*\}\}").unwrap());
+static SLIDER_RANGE_VALUE_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^\s*([+-]?(?:\d+(?:\.\d+)?|\.\d+))\s*-\s*([+-]?(?:\d+(?:\.\d+)?|\.\d+))\s*$")
+        .unwrap()
+});
 
 /// Plugin that parses HTML assets into widget trees.
 pub struct HtmlConverterSystem;
@@ -56,6 +66,8 @@ fn update_html_ui(
     html_assets: Res<Assets<HtmlAsset>>,
     mut html_asset_events: MessageReader<AssetEvent<HtmlAsset>>,
     default_css: Res<DefaultCssHandle>,
+    #[cfg(feature = "providers")] provider_registry: Option<Res<UiProviderRegistry>>,
+    #[cfg(feature = "providers")] mut theme_provider_state: Option<ResMut<ThemeProviderState>>,
 
     query_added: Query<(Entity, &HtmlSource), Added<HtmlSource>>,
     query_pending: Query<Entity, With<PendingHtmlParse>>,
@@ -148,8 +160,13 @@ fn update_html_ui(
         let document = if localized == content {
             raw_document
         } else {
-            kuchiki::parse_html().one(localized)
+            kuchiki::parse_html().one(localized.clone())
         };
+
+        #[cfg(feature = "providers")]
+        if let Some(provider_registry) = provider_registry.as_ref() {
+            unwrap_provider_nodes(&document, provider_registry);
+        }
 
         // Extract unique UI key from <meta name="...">
         let Some(meta_key) = document
@@ -211,9 +228,23 @@ fn update_html_ui(
             .collect();
 
         css_handles = with_default_css_first(&default_css, css_handles);
+        #[cfg(feature = "providers")]
+        if let Some(provider_registry) = provider_registry.as_ref() {
+            let mut provider_css = resolve_provider_css_handles(
+                &localized,
+                provider_registry,
+                html,
+                &asset_server,
+                theme_provider_state.as_deref_mut(),
+            );
+            css_handles.append(&mut provider_css);
+            css_handles = dedup_css_handles(css_handles);
+        }
 
-        // Parse body
-        let Ok(body_node) = document.select_first("body") else {
+        // Parse body. If multiple <body> nodes exist (invalid HTML), prefer the one
+        // with the most descendants so provider-wrapped templates still resolve.
+        let body_node = select_primary_body_node(&document);
+        let Some(body_node) = body_node else {
             error!("Missing <body> tag!");
             continue;
         };
@@ -223,10 +254,10 @@ fn update_html_ui(
             debug!("UI controller [{:?}]", meta_controller);
         }
 
-        let label_map = collect_labels_by_for(body_node.as_node());
+        let label_map = collect_labels_by_for(&body_node);
 
         if let Some(body_widget) =
-            parse_html_node(body_node.as_node(), &css_handles, &label_map, &ui_key, html)
+            parse_html_node(&body_node, &css_handles, &label_map, &ui_key, html)
         {
             structure_map.html_map.insert(ui_key, vec![body_widget]);
 
@@ -423,6 +454,120 @@ fn parse_html_node(
             ))
         }
 
+        #[cfg(feature = "extended-dialog")]
+        "dialog" => {
+            let mut children = Vec::new();
+            for child in node.children() {
+                if let Some(parsed) = parse_html_node(&child, css_sources, label_map, key, html) {
+                    children.push(parsed);
+                }
+            }
+
+            let trigger = attributes
+                .get("trigger")
+                .or_else(|| attributes.get("triggger"))
+                .map(|raw| raw.trim().trim_start_matches('#').to_string())
+                .filter(|value| !value.is_empty());
+            let renderer = attributes
+                .get("renderer")
+                .and_then(DialogProvider::from_attr)
+                .unwrap_or(DialogProvider::BevyApp);
+            let dialog_type = attributes
+                .get("type")
+                .and_then(DialogWidgetType::from_attr)
+                .unwrap_or(DialogWidgetType::Info);
+            let content_text = node
+                .text_contents()
+                .split_whitespace()
+                .collect::<Vec<_>>()
+                .join(" ");
+
+            Some(HtmlWidgetNode::Dialog(
+                DialogWidget {
+                    trigger,
+                    renderer,
+                    dialog_type,
+                    content_text,
+                    open: false,
+                },
+                meta,
+                states,
+                children,
+                functions,
+                widget.clone(),
+                HtmlID::default(),
+            ))
+        }
+
+        #[cfg(feature = "extended-dialog")]
+        "dialog-header" => {
+            let mut children = Vec::new();
+            for child in node.children() {
+                if let Some(parsed) = parse_html_node(&child, css_sources, label_map, key, html) {
+                    children.push(parsed);
+                }
+            }
+
+            let mut meta = meta;
+            ensure_meta_class(&mut meta, "dialog-header");
+
+            Some(HtmlWidgetNode::Div(
+                Div::default(),
+                meta,
+                states,
+                children,
+                functions,
+                widget.clone(),
+                HtmlID::default(),
+            ))
+        }
+
+        #[cfg(feature = "extended-dialog")]
+        "dialog-body" => {
+            let mut children = Vec::new();
+            for child in node.children() {
+                if let Some(parsed) = parse_html_node(&child, css_sources, label_map, key, html) {
+                    children.push(parsed);
+                }
+            }
+
+            let mut meta = meta;
+            ensure_meta_class(&mut meta, "dialog-body");
+
+            Some(HtmlWidgetNode::Div(
+                Div::default(),
+                meta,
+                states,
+                children,
+                functions,
+                widget.clone(),
+                HtmlID::default(),
+            ))
+        }
+
+        #[cfg(feature = "extended-dialog")]
+        "dialog-footer" => {
+            let mut children = Vec::new();
+            for child in node.children() {
+                if let Some(parsed) = parse_html_node(&child, css_sources, label_map, key, html) {
+                    children.push(parsed);
+                }
+            }
+
+            let mut meta = meta;
+            ensure_meta_class(&mut meta, "dialog-footer");
+
+            Some(HtmlWidgetNode::Div(
+                Div::default(),
+                meta,
+                states,
+                children,
+                functions,
+                widget.clone(),
+                HtmlID::default(),
+            ))
+        }
+
         "divider" => {
             let alignment = attributes.get("alignment").unwrap_or("horizontal");
             Some(HtmlWidgetNode::Divider(
@@ -561,9 +706,46 @@ fn parse_html_node(
             ))
         }
 
+        "a" => {
+            let text = node.text_contents().trim().to_string();
+            let href = attributes
+                .get("href")
+                .map(str::trim)
+                .unwrap_or_default()
+                .to_string();
+            let open_modal = parse_bool_attribute(&attributes, "open-modal");
+            let browsers = match attributes.get("browsers") {
+                Some(raw) => HyperLinkBrowsers::from_str(raw).unwrap_or_else(|| {
+                    warn!("Invalid hyperlink browsers attribute; falling back to system.");
+                    HyperLinkBrowsers::System
+                }),
+                None => HyperLinkBrowsers::System,
+            };
+
+            Some(HtmlWidgetNode::HyperLink(
+                HyperLink {
+                    text,
+                    href,
+                    browsers,
+                    open_modal,
+                    ..default()
+                },
+                meta,
+                states,
+                functions,
+                widget.clone(),
+                HtmlID::default(),
+            ))
+        }
+
         "img" => {
             let src_raw = attributes.get("src").unwrap_or("").to_string();
             let alt = attributes.get("alt").unwrap_or("").to_string();
+            let preview = attributes
+                .get("preview")
+                .map(str::trim)
+                .map(|value| value.trim_start_matches('#').to_string())
+                .filter(|value| !value.is_empty());
 
             let src_resolved = if src_raw.trim().is_empty() {
                 None
@@ -578,6 +760,7 @@ fn parse_html_node(
                 Img {
                     src: src_resolved,
                     alt,
+                    preview,
                     ..default()
                 },
                 meta,
@@ -609,6 +792,10 @@ fn parse_html_node(
                 .map(str::trim)
                 .filter(|value| !value.is_empty())
                 .map(str::to_string);
+            let folder = parse_bool_attribute(&attributes, "folder");
+            let extensions = parse_extensions_attribute(attributes.get("extensions"));
+            let show_size = parse_bool_attribute(&attributes, "show-size");
+            let max_size_bytes = parse_max_size_attribute(attributes.get("max-size"));
             let icon_path = attributes.get("icon").unwrap_or("");
             let icon: Option<String> = if !icon_path.is_empty() {
                 Some(String::from(icon_path))
@@ -634,6 +821,10 @@ fn parse_html_node(
                     text,
                     input_type: InputType::from_str(&input_type).unwrap_or_default(),
                     date_format,
+                    folder,
+                    extensions,
+                    show_size,
+                    max_size_bytes,
                     icon_path: icon,
                     cap_text_at: cap,
                     ..default()
@@ -647,11 +838,7 @@ fn parse_html_node(
         }
 
         "date-picker" => {
-            let for_id = attributes
-                .get("for")
-                .map(str::trim)
-                .map(|value| value.trim_start_matches('#').to_string())
-                .filter(|value| !value.is_empty());
+            let for_id = parse_for_attribute_id(&attributes);
             let id = attributes.get("id").map(|s| s.to_string());
             let name = attributes
                 .get("name")
@@ -723,11 +910,7 @@ fn parse_html_node(
                 .split_whitespace()
                 .collect::<Vec<_>>()
                 .join(" ");
-            let for_id = attributes
-                .get("for")
-                .map(str::trim)
-                .map(|value| value.trim_start_matches('#').to_string())
-                .filter(|value| !value.is_empty());
+            let for_id = parse_for_attribute_id(&attributes);
             let variant = attributes
                 .get("variant")
                 .and_then(ToolTipVariant::from_str)
@@ -753,6 +936,39 @@ fn parse_html_node(
                     prio,
                     alignment,
                     trigger,
+                    ..default()
+                },
+                meta,
+                states,
+                functions,
+                widget.clone(),
+                HtmlID::default(),
+            ))
+        }
+
+        "badge" => {
+            let for_id = parse_for_attribute_id(&attributes);
+            let max = attributes
+                .get("max")
+                .and_then(|raw| raw.trim().parse::<u32>().ok())
+                .unwrap_or(99);
+            let value = attributes
+                .get("value")
+                .or_else(|| attributes.get("count"))
+                .and_then(|raw| raw.trim().parse::<u32>().ok())
+                .or_else(|| node.text_contents().trim().parse::<u32>().ok())
+                .unwrap_or(0);
+            let anchor = attributes
+                .get("anchor")
+                .and_then(BadgeAnchor::from_str)
+                .unwrap_or_default();
+
+            Some(HtmlWidgetNode::Badge(
+                Badge {
+                    value,
+                    max,
+                    for_id,
+                    anchor,
                     ..default()
                 },
                 meta,
@@ -884,32 +1100,67 @@ fn parse_html_node(
         }
 
         "slider" => {
-            let min = attributes
+            let min_raw = attributes
                 .get("min")
                 .and_then(|v| v.parse::<f32>().ok())
                 .unwrap_or(0.0);
 
-            let max = attributes
+            let max_raw = attributes
                 .get("max")
                 .and_then(|v| v.parse::<f32>().ok())
                 .unwrap_or(100.0);
 
-            let value = attributes
-                .get("value")
-                .and_then(|v| v.parse::<f32>().ok())
-                .unwrap_or(min);
+            let (min, max) = if max_raw >= min_raw {
+                (min_raw, max_raw)
+            } else {
+                (max_raw, min_raw)
+            };
 
             let step = attributes
                 .get("step")
                 .and_then(|v| v.parse::<f32>().ok())
                 .unwrap_or(1.0);
 
+            let slider_type = attributes
+                .get("type")
+                .and_then(SliderType::from_str)
+                .unwrap_or_default();
+
+            let dots = attributes
+                .get("dots")
+                .and_then(|v| v.trim().parse::<i32>().ok())
+                .map(|v| if v <= 1 { 1 } else { v as u32 });
+
+            let show_labels = parse_bool_attribute(&attributes, "show-labels");
+            let show_tip = attributes
+                .get("tip")
+                .map(|value| {
+                    let normalized = value.trim().to_ascii_lowercase();
+                    normalized.is_empty() || normalized == "true"
+                })
+                .unwrap_or(true);
+
+            let dot_anchor = attributes
+                .get("dot-anchor")
+                .and_then(SliderDotAnchor::from_str)
+                .unwrap_or_default();
+
+            let (value, range_start, range_end) =
+                parse_slider_values(attributes.get("value"), min, max, slider_type);
+
             Some(HtmlWidgetNode::Slider(
                 Slider {
+                    slider_type,
                     value,
+                    range_start,
+                    range_end,
                     min,
                     max,
                     step,
+                    dots,
+                    show_labels,
+                    show_tip,
+                    dot_anchor,
                     ..default()
                 },
                 meta,
@@ -973,8 +1224,16 @@ fn parse_html_node(
 fn bind_html_func(attributes: &Attributes) -> HtmlEventBindings {
     HtmlEventBindings {
         onclick: attributes.get("onclick").map(|s| s.to_string()),
-        onmouseover: attributes.get("onmouseenter").map(|s| s.to_string()),
-        onmouseout: attributes.get("onmouseleave").map(|s| s.to_string()),
+        onmousedown: attributes.get("onmousedown").map(|s| s.to_string()),
+        onmouseup: attributes.get("onmouseup").map(|s| s.to_string()),
+        onmouseover: attributes
+            .get("onmouseover")
+            .or_else(|| attributes.get("onmouseenter"))
+            .map(|s| s.to_string()),
+        onmouseout: attributes
+            .get("onmouseout")
+            .or_else(|| attributes.get("onmouseleave"))
+            .map(|s| s.to_string()),
         onchange: attributes.get("onchange").map(|s| s.to_string()),
         oninit: attributes.get("oninit").map(|s| s.to_string()),
         onfoucs: attributes
@@ -982,6 +1241,10 @@ fn bind_html_func(attributes: &Attributes) -> HtmlEventBindings {
             .or_else(|| attributes.get("onfocus"))
             .map(|s| s.to_string()),
         onscroll: attributes.get("onscroll").map(|s| s.to_string()),
+        onwheel: attributes
+            .get("onwheel")
+            .or_else(|| attributes.get("onmousewheel"))
+            .map(|s| s.to_string()),
         onkeydown: attributes.get("onkeydown").map(|s| s.to_string()),
         onkeyup: attributes.get("onkeyup").map(|s| s.to_string()),
         ondragstart: attributes.get("ondragstart").map(|s| s.to_string()),
@@ -990,7 +1253,54 @@ fn bind_html_func(attributes: &Attributes) -> HtmlEventBindings {
             .get("ondragstop")
             .or_else(|| attributes.get("ondragend"))
             .map(|s| s.to_string()),
+        ontouchstart: attributes.get("ontouchstart").map(|s| s.to_string()),
+        ontouchmove: attributes.get("ontouchmove").map(|s| s.to_string()),
+        ontouchend: attributes.get("ontouchend").map(|s| s.to_string()),
     }
+}
+
+/// Parses slider values from the `value` attribute.
+fn parse_slider_values(
+    raw_value: Option<&str>,
+    min: f32,
+    max: f32,
+    slider_type: SliderType,
+) -> (f32, f32, f32) {
+    let single = raw_value
+        .and_then(|v| v.trim().parse::<f32>().ok())
+        .unwrap_or(min)
+        .clamp(min, max);
+
+    if slider_type != SliderType::Range {
+        return (single, min, max);
+    }
+
+    let (start_raw, end_raw) = match raw_value.and_then(parse_slider_range_attribute) {
+        Some((start, end)) => (start, end),
+        None => {
+            if raw_value.is_some() {
+                (min, single)
+            } else {
+                (min, max)
+            }
+        }
+    };
+
+    let mut start = start_raw.clamp(min, max);
+    let mut end = end_raw.clamp(min, max);
+    if start > end {
+        std::mem::swap(&mut start, &mut end);
+    }
+
+    (single, start, end)
+}
+
+/// Parses a `start - end` slider range value pair.
+fn parse_slider_range_attribute(raw: &str) -> Option<(f32, f32)> {
+    let captures = SLIDER_RANGE_VALUE_RE.captures(raw.trim())?;
+    let start = captures.get(1)?.as_str().parse::<f32>().ok()?;
+    let end = captures.get(2)?.as_str().parse::<f32>().ok()?;
+    Some((start, end))
 }
 
 /// Parses validation rules from element attributes.
@@ -1008,6 +1318,90 @@ fn parse_validation_attributes(attributes: &Attributes) -> Option<ValidationRule
     rules
 }
 
+/// Parses boolean attributes with `true`/`false` semantics.
+fn parse_bool_attribute(attributes: &Attributes, key: &str) -> bool {
+    let Some(value) = attributes.get(key) else {
+        return false;
+    };
+
+    let normalized = value.trim().to_ascii_lowercase();
+    normalized.is_empty() || normalized == "true"
+}
+
+/// Parses `extensions` values from either a single token or list syntax.
+fn parse_extensions_attribute(raw: Option<&str>) -> Vec<String> {
+    let Some(value) = raw else {
+        return Vec::new();
+    };
+
+    let value = value.trim();
+    if value.is_empty() {
+        return Vec::new();
+    }
+
+    let inner = value
+        .strip_prefix('[')
+        .and_then(|s| s.strip_suffix(']'))
+        .unwrap_or(value);
+
+    inner
+        .split(',')
+        .map(str::trim)
+        .map(|token| token.trim_matches('"').trim_matches('\''))
+        .map(|token| token.trim_start_matches('.'))
+        .filter(|token| !token.is_empty())
+        .map(str::to_ascii_lowercase)
+        .collect()
+}
+
+/// Parses `max-size` values like `1KB`, `2MB`, `0.5GB` into bytes.
+fn parse_max_size_attribute(raw: Option<&str>) -> Option<u64> {
+    let value = raw?.trim();
+    if value.is_empty() {
+        return None;
+    }
+
+    let compact = value
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .collect::<String>();
+    let normalized = compact.to_ascii_uppercase();
+
+    let (number, multiplier) = if let Some(number) = normalized.strip_suffix("KB") {
+        (number, 1024_f64)
+    } else if let Some(number) = normalized.strip_suffix("MB") {
+        (number, 1024_f64 * 1024_f64)
+    } else if let Some(number) = normalized.strip_suffix("GB") {
+        (number, 1024_f64 * 1024_f64 * 1024_f64)
+    } else {
+        return None;
+    };
+
+    let amount = number.parse::<f64>().ok()?;
+    if !amount.is_finite() || amount < 0.0 {
+        return None;
+    }
+
+    Some((amount * multiplier).round() as u64)
+}
+
+#[cfg(feature = "extended-dialog")]
+fn ensure_meta_class(meta: &mut HtmlMeta, class_name: &str) {
+    let classes = meta.class.get_or_insert_with(Vec::new);
+    if !classes.iter().any(|class| class == class_name) {
+        classes.push(class_name.to_string());
+    }
+}
+
+/// Parses a `for` attribute into a normalized optional id (`#foo` => `foo`).
+fn parse_for_attribute_id(attributes: &Attributes) -> Option<String> {
+    attributes
+        .get("for")
+        .map(str::trim)
+        .map(|value| value.trim_start_matches('#').to_string())
+        .filter(|value| !value.is_empty())
+}
+
 /// Collects mappings from <label for="..."> to its label text.
 fn collect_labels_by_for(node: &NodeRef) -> HashMap<String, String> {
     let mut map = HashMap::new();
@@ -1021,6 +1415,33 @@ fn collect_labels_by_for(node: &NodeRef) -> HashMap<String, String> {
     }
 
     map
+}
+
+/// Chooses the most content-rich `<body>` node from a document.
+fn select_primary_body_node(document: &NodeRef) -> Option<NodeRef> {
+    let mut best: Option<NodeRef> = None;
+    let mut best_score = 0usize;
+    let mut count = 0usize;
+
+    let selected = document.select("body").ok()?;
+    for body in selected {
+        count += 1;
+        let node = body.as_node().clone();
+        let score = node.descendants().count();
+        if score >= best_score {
+            best_score = score;
+            best = Some(node);
+        }
+    }
+
+    if count > 1 {
+        warn!(
+            "HTML contains {} <body> tags. Only one body is supported; using the most content-rich one.",
+            count
+        );
+    }
+
+    best
 }
 
 /// Resolves a CSS href found inside an HTML document to a path that the AssetServer understands.
@@ -1056,6 +1477,290 @@ fn with_default_css_first(
     css.insert(0, default_handle);
 
     css
+}
+
+#[cfg(feature = "providers")]
+fn dedup_css_handles(css: Vec<Handle<CssAsset>>) -> Vec<Handle<CssAsset>> {
+    let mut seen = HashSet::new();
+    let mut out = Vec::with_capacity(css.len());
+
+    for handle in css {
+        if seen.insert(handle.id()) {
+            out.push(handle);
+        }
+    }
+
+    out
+}
+
+#[cfg(feature = "providers")]
+fn resolve_provider_css_handles(
+    html_content: &str,
+    provider_registry: &UiProviderRegistry,
+    html: &HtmlSource,
+    asset_server: &AssetServer,
+    mut theme_provider_state: Option<&mut ThemeProviderState>,
+) -> Vec<Handle<CssAsset>> {
+    let mut handles = Vec::new();
+    let source_path = html.get_source_path();
+
+    for provider in provider_registry.iter() {
+        let matches = collect_provider_matches(html_content, provider.tag());
+
+        for provider_match in matches {
+            let mut theme_known: Option<HashSet<String>> = None;
+            let mut theme_asset_dir: Option<String> = None;
+            let mut theme_fallback: Option<String> = None;
+            let mut theme_active: Option<String> = None;
+
+            if provider.tag().eq_ignore_ascii_case("theme-provider") {
+                if let Some(default_theme) = provider_match.attributes.get("default") {
+                    if let Some(state) = theme_provider_state.as_deref_mut() {
+                        state.set_default_theme(default_theme);
+                    }
+                }
+
+                if let Some(state) = theme_provider_state.as_deref() {
+                    theme_known = Some(state.known_themes());
+                    theme_asset_dir = Some(state.themes_asset_dir().to_string());
+                    theme_fallback = state.default_theme().map(str::to_string);
+                    theme_active = state.active_theme().map(str::to_string);
+                }
+            }
+
+            let direct_children = extract_direct_child_tags(&provider_match.inner_html);
+            if let Err(reason) =
+                validate_provider_rules(provider.as_ref(), &direct_children, provider_match.in_head)
+            {
+                warn!(
+                    "Provider <{}> ignored due to rule mismatch: {}",
+                    provider.tag(),
+                    reason
+                );
+                continue;
+            }
+
+            let mut ctx =
+                ProviderResolveContext::new(&provider_match.attributes, source_path.as_str());
+            ctx = ctx.with_theme_scope(
+                theme_asset_dir.as_deref(),
+                theme_known.as_ref(),
+                theme_fallback.as_deref(),
+                theme_active.as_deref(),
+            );
+            match provider.resolve(ctx) {
+                Ok(effect) => {
+                    for css_path in effect.extra_css_paths {
+                        let resolved = resolve_relative_asset_path(source_path.as_str(), &css_path);
+                        handles.push(asset_server.load::<CssAsset>(resolved));
+                    }
+                }
+                Err(error) => {
+                    warn!(
+                        "Provider <{}> failed to resolve effects: {}",
+                        provider.tag(),
+                        error
+                    );
+                }
+            }
+        }
+    }
+
+    handles
+}
+
+#[cfg(feature = "providers")]
+fn validate_provider_rules(
+    provider: &dyn UiProvider,
+    child_tags: &[String],
+    in_head: bool,
+) -> Result<(), String> {
+    let rules = provider.rules();
+
+    if in_head && !rules.allow_in_head {
+        return Err("<head> placement is not allowed".to_string());
+    }
+
+    if rules.requires_body_child
+        && !child_tags
+            .iter()
+            .any(|tag| tag.eq_ignore_ascii_case("body"))
+    {
+        return Err("expected a direct <body> child".to_string());
+    }
+
+    match rules.child_policy {
+        ProviderChildPolicy::Any => {}
+        ProviderChildPolicy::Only(allowed) => {
+            for child in child_tags {
+                if !allowed.iter().any(|tag| tag.eq_ignore_ascii_case(&child)) {
+                    return Err(format!("child <{}> is not allowed", child));
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+#[cfg(feature = "providers")]
+#[derive(Debug)]
+struct ProviderMatch {
+    attributes: HashMap<String, String>,
+    inner_html: String,
+    in_head: bool,
+}
+
+#[cfg(feature = "providers")]
+fn collect_provider_matches(html_content: &str, tag: &str) -> Vec<ProviderMatch> {
+    let head_ranges = collect_head_ranges(html_content);
+    let pattern = format!(
+        r"(?is)<\s*{}\b(?P<attrs>[^>]*)>(?P<inner>.*?)</\s*{}\s*>",
+        regex::escape(tag),
+        regex::escape(tag)
+    );
+    let Ok(regex) = Regex::new(&pattern) else {
+        return Vec::new();
+    };
+
+    regex
+        .captures_iter(html_content)
+        .map(|captures| {
+            let start = captures.get(0).map_or(0, |m| m.start());
+            let in_head = head_ranges
+                .iter()
+                .any(|(range_start, range_end)| start >= *range_start && start < *range_end);
+
+            ProviderMatch {
+                attributes: parse_provider_attributes(
+                    captures.name("attrs").map_or("", |m| m.as_str()),
+                ),
+                inner_html: captures
+                    .name("inner")
+                    .map_or_else(String::new, |m| m.as_str().to_string()),
+                in_head,
+            }
+        })
+        .collect()
+}
+
+#[cfg(feature = "providers")]
+fn collect_head_ranges(html_content: &str) -> Vec<(usize, usize)> {
+    let Ok(head_regex) = Regex::new(r"(?is)<\s*head\b[^>]*>.*?</\s*head\s*>") else {
+        return Vec::new();
+    };
+
+    head_regex
+        .captures_iter(html_content)
+        .filter_map(|captures| captures.get(0).map(|m| (m.start(), m.end())))
+        .collect()
+}
+
+#[cfg(feature = "providers")]
+fn unwrap_provider_nodes(document: &NodeRef, provider_registry: &UiProviderRegistry) {
+    for provider in provider_registry.iter() {
+        let selector = provider.tag();
+        let provider_nodes: Vec<NodeRef> = document
+            .select(selector)
+            .ok()
+            .into_iter()
+            .flatten()
+            .map(|node| node.as_node().clone())
+            .collect();
+
+        for provider_node in provider_nodes {
+            if provider_node.parent().is_none() {
+                continue;
+            }
+
+            let children: Vec<NodeRef> = provider_node.children().collect();
+            for child in children {
+                provider_node.insert_before(child);
+            }
+            provider_node.detach();
+        }
+    }
+}
+
+#[cfg(feature = "providers")]
+fn parse_provider_attributes(raw_attrs: &str) -> HashMap<String, String> {
+    let Ok(regex) =
+        Regex::new(r#"([A-Za-z_:][A-Za-z0-9_:\-\.]*)\s*=\s*("([^"]*)"|'([^']*)'|([^\s"'=<>`]+))"#)
+    else {
+        return HashMap::new();
+    };
+
+    let mut out = HashMap::new();
+    for capture in regex.captures_iter(raw_attrs) {
+        let Some(key) = capture.get(1).map(|m| m.as_str().to_ascii_lowercase()) else {
+            continue;
+        };
+        let value = capture
+            .get(3)
+            .or_else(|| capture.get(4))
+            .or_else(|| capture.get(5))
+            .map_or("", |m| m.as_str());
+        out.insert(key, value.to_string());
+    }
+
+    out
+}
+
+#[cfg(feature = "providers")]
+fn extract_direct_child_tags(inner_html: &str) -> Vec<String> {
+    let Ok(tag_regex) = Regex::new(r"(?is)<\s*(/)?\s*([A-Za-z][A-Za-z0-9:-]*)[^>]*?>") else {
+        return Vec::new();
+    };
+
+    let mut depth: i32 = 0;
+    let mut direct_children = Vec::new();
+
+    for capture in tag_regex.captures_iter(inner_html) {
+        let is_closing = capture.get(1).is_some();
+        let Some(name_match) = capture.get(2) else {
+            continue;
+        };
+
+        let tag_name = name_match.as_str().to_ascii_lowercase();
+        let full_match = capture.get(0).map_or("", |m| m.as_str());
+        let self_closing = full_match.trim_end().ends_with("/>");
+
+        if is_closing {
+            depth = (depth - 1).max(0);
+            continue;
+        }
+
+        if depth == 0 {
+            direct_children.push(tag_name.clone());
+        }
+
+        if !self_closing && !is_void_html_tag(&tag_name) {
+            depth += 1;
+        }
+    }
+
+    direct_children
+}
+
+#[cfg(feature = "providers")]
+fn is_void_html_tag(tag: &str) -> bool {
+    matches!(
+        tag,
+        "area"
+            | "base"
+            | "br"
+            | "col"
+            | "embed"
+            | "hr"
+            | "img"
+            | "input"
+            | "link"
+            | "meta"
+            | "param"
+            | "source"
+            | "track"
+            | "wbr"
+    )
 }
 
 /// Parses an optional icon source and determines its placement relative to text.

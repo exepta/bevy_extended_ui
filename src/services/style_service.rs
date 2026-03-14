@@ -8,7 +8,7 @@ use crate::styles::{
     AnimationDirection, AnimationKeyframe, AnimationSpec, BackdropFilter, BackgroundAttachment,
     BackgroundPosition, BackgroundPositionValue, BackgroundSize, BackgroundSizeValue, CalcContext,
     CalcExpr, CursorStyle, FontVal, FontWeight, GradientStopPosition, LinearGradient, Radius,
-    Style, TransformStyle, TransitionProperty, TransitionSpec,
+    Style, TextTransform, TransformStyle, TransitionProperty, TransitionSpec,
 };
 use crate::widgets::UIWidgetState;
 use std::collections::HashMap;
@@ -17,7 +17,7 @@ use bevy::asset::RenderAssetUsages;
 use bevy::asset::{load_internal_asset, uuid_handle};
 use bevy::color::Srgba;
 use bevy::core_pipeline::core_2d::graph::{Core2d, Node2d};
-use bevy::image::ImageSampler;
+use bevy::image::{ImageSampler, TRANSPARENT_IMAGE_HANDLE};
 use bevy::math::Rot2;
 use bevy::prelude::*;
 use bevy::reflect::TypePath;
@@ -38,15 +38,19 @@ use bevy::render::render_resource::{
 use bevy::render::texture::GpuImage;
 use bevy::render::view::{ExtractedView, RetainedViewEntity, ViewTarget};
 use bevy::shader::{Shader, ShaderRef};
+use bevy::text::LineHeight;
 use bevy::ui::{
     ComputedNode, ComputedUiRenderTargetInfo, UiGlobalTransform, UiSystems, UiTransform, Val2,
 };
 use bevy::ui_render::graph::NodeUi;
 use bevy::ui_render::{DrawUiMaterial, TransparentUi, UiCameraView};
-use bevy::window::{CursorIcon, CustomCursor, CustomCursorImage, PrimaryWindow, SystemCursorIcon};
+use bevy::window::{
+    CursorIcon, CustomCursor, CustomCursorImage, PrimaryWindow, SystemCursorIcon, WindowResized,
+};
 
 const BACKDROP_BLUR_SHADER_HANDLE: Handle<Shader> =
     uuid_handle!("9d04a8bb-b6cf-4758-bca8-30706480973f");
+const MAX_BACKDROP_BLUR_PX: f32 = 80.0;
 
 /// Plugin that applies CSS styles, transitions, and animations to UI nodes.
 pub struct StyleService;
@@ -161,6 +165,20 @@ struct CssCursorState {
 #[derive(Component)]
 pub(crate) struct StyleRefreshOnNodeAdded;
 
+#[derive(Component, Debug, Clone, Default)]
+pub(crate) struct TextTransformState {
+    source: String,
+    last_rendered: String,
+}
+
+/// Marks image handles generated from CSS linear-gradient backgrounds.
+#[derive(Component)]
+struct BackgroundGradientApplied;
+
+/// Marks image handles generated from CSS background-image rendering.
+#[derive(Component)]
+struct BackgroundImageApplied;
+
 #[derive(ShaderType, Clone, Copy, Debug)]
 struct BackdropBlurUniform {
     blur_radius_px: f32,
@@ -224,6 +242,8 @@ type UiStyleComponents<'w, 's> = (
     Option<Mut<'w, ZIndex>>,
     Option<Mut<'w, Pickable>>,
     Option<Mut<'w, UiTransform>>,
+    Option<Mut<'w, LineHeight>>,
+    Option<Mut<'w, Outline>>,
 );
 
 /// Updates the OS cursor icon based on hovered widget styles.
@@ -400,6 +420,19 @@ pub fn update_widget_styles_system(
         let has_changed = previous_style.as_ref() != Some(&final_style);
         if has_changed {
             ui_style.active_style = Some(final_style.clone());
+        }
+
+        if style_requests_outline(&final_style) {
+            let mut has_outline_component = false;
+            if let Ok(components) = qs.p0().get_mut(entity) {
+                has_outline_component = components.12.is_some();
+            }
+
+            if !has_outline_component {
+                commands
+                    .entity(entity)
+                    .insert(build_outline_from_style(&final_style));
+            }
         }
 
         update_style_animation_state(
@@ -824,8 +857,9 @@ fn resolve_layout_viewport(_window_q: &Query<&Window, With<PrimaryWindow>>) -> O
 }
 
 #[cfg(all(feature = "wasm-breakpoints", not(target_arch = "wasm32")))]
-fn resolve_layout_viewport(_window_q: &Query<&Window, With<PrimaryWindow>>) -> Option<Vec2> {
-    None
+fn resolve_layout_viewport(window_q: &Query<&Window, With<PrimaryWindow>>) -> Option<Vec2> {
+    let window = window_q.single().ok()?;
+    Some(window.resolution.size())
 }
 
 #[cfg(all(not(feature = "wasm-breakpoints"), feature = "css-breakpoints"))]
@@ -839,7 +873,15 @@ fn resolve_layout_viewport(_window_q: &Query<&Window, With<PrimaryWindow>>) -> O
     None
 }
 
+#[inline]
+fn clear_image_node_texture(img_node: &mut ImageNode) {
+    if img_node.image.id() != TRANSPARENT_IMAGE_HANDLE.id() {
+        img_node.image = TRANSPARENT_IMAGE_HANDLE;
+    }
+}
+
 fn apply_background_gradients_system(
+    mut commands: Commands,
     mut query: Query<(
         Entity,
         &UiStyle,
@@ -847,12 +889,25 @@ fn apply_background_gradients_system(
         Option<&StyleAnimation>,
         &ComputedNode,
         Option<&mut ImageNode>,
+        Option<&BackgroundGradientApplied>,
+        Option<&BackgroundImageApplied>,
     )>,
+    mut resize_events: MessageReader<WindowResized>,
     mut image_cache: ResMut<ImageCache>,
     mut images: ResMut<Assets<Image>>,
 ) {
-    for (_entity, ui_style, transition_opt, animation_opt, computed, img_node_opt) in
-        query.iter_mut()
+    let viewport_is_resizing = resize_events.read().next().is_some();
+
+    for (
+        entity,
+        ui_style,
+        transition_opt,
+        animation_opt,
+        computed,
+        img_node_opt,
+        gradient_applied,
+        image_applied,
+    ) in query.iter_mut()
     {
         let Some(mut img_node) = img_node_opt else {
             continue;
@@ -863,18 +918,48 @@ fn apply_background_gradients_system(
         } else if let Some(animation) = animation_opt {
             animation.current_style.as_ref().unwrap_or(&animation.base)
         } else {
-            let Some(active) = ui_style.active_style.as_ref() else {
-                continue;
-            };
-            active
+            match ui_style.active_style.as_ref() {
+                Some(active) => active,
+                None => {
+                    if gradient_applied.is_some() {
+                        if image_applied.is_none() {
+                            clear_image_node_texture(&mut img_node);
+                        }
+                        commands
+                            .entity(entity)
+                            .remove::<BackgroundGradientApplied>();
+                    }
+                    continue;
+                }
+            }
         };
 
         let Some(background) = style.background.as_ref() else {
+            if gradient_applied.is_some() {
+                if image_applied.is_none() {
+                    clear_image_node_texture(&mut img_node);
+                }
+                commands
+                    .entity(entity)
+                    .remove::<BackgroundGradientApplied>();
+            }
             continue;
         };
         let Some(gradient) = background.gradient.as_ref() else {
+            if gradient_applied.is_some() {
+                if background.image.is_none() {
+                    clear_image_node_texture(&mut img_node);
+                }
+                commands
+                    .entity(entity)
+                    .remove::<BackgroundGradientApplied>();
+            }
             continue;
         };
+
+        if image_applied.is_some() {
+            commands.entity(entity).remove::<BackgroundImageApplied>();
+        }
 
         if img_node.color != Color::WHITE {
             img_node.color = Color::WHITE;
@@ -895,6 +980,10 @@ fn apply_background_gradients_system(
         let handle = if let Some(handle) = image_cache.map.get(&key) {
             handle.clone()
         } else {
+            // Avoid generating many transient textures while the window size is still changing.
+            if viewport_is_resizing {
+                continue;
+            }
             let image = render_linear_gradient_image(gradient, size, scale_factor);
             let handle = images.add(image);
             image_cache.map.insert(key, handle.clone());
@@ -904,10 +993,15 @@ fn apply_background_gradients_system(
         if img_node.image != handle {
             img_node.image = handle;
         }
+
+        if gradient_applied.is_none() {
+            commands.entity(entity).insert(BackgroundGradientApplied);
+        }
     }
 }
 
 fn apply_background_images_system(
+    mut commands: Commands,
     mut query: Query<(
         Entity,
         &UiStyle,
@@ -917,13 +1011,18 @@ fn apply_background_images_system(
         &ComputedUiRenderTargetInfo,
         Option<&UiGlobalTransform>,
         Option<&mut ImageNode>,
+        Option<&BackgroundImageApplied>,
+        Option<&BackgroundGradientApplied>,
     )>,
+    mut resize_events: MessageReader<WindowResized>,
     asset_server: Res<AssetServer>,
     mut image_cache: ResMut<ImageCache>,
     mut images: ResMut<Assets<Image>>,
 ) {
+    let viewport_is_resizing = resize_events.read().next().is_some();
+
     for (
-        _entity,
+        entity,
         ui_style,
         transition_opt,
         animation_opt,
@@ -931,6 +1030,8 @@ fn apply_background_images_system(
         render_target,
         global_transform,
         img_node_opt,
+        image_applied,
+        gradient_applied,
     ) in query.iter_mut()
     {
         let Some(mut img_node) = img_node_opt else {
@@ -942,21 +1043,48 @@ fn apply_background_images_system(
         } else if let Some(animation) = animation_opt {
             animation.current_style.as_ref().unwrap_or(&animation.base)
         } else {
-            let Some(active) = ui_style.active_style.as_ref() else {
-                continue;
-            };
-            active
+            match ui_style.active_style.as_ref() {
+                Some(active) => active,
+                None => {
+                    if image_applied.is_some() {
+                        if gradient_applied.is_none() {
+                            clear_image_node_texture(&mut img_node);
+                        }
+                        commands.entity(entity).remove::<BackgroundImageApplied>();
+                    }
+                    continue;
+                }
+            }
         };
 
         let Some(background) = style.background.as_ref() else {
+            if image_applied.is_some() {
+                if gradient_applied.is_none() {
+                    clear_image_node_texture(&mut img_node);
+                }
+                commands.entity(entity).remove::<BackgroundImageApplied>();
+            }
             continue;
         };
         if background.gradient.is_some() {
+            if image_applied.is_some() {
+                commands.entity(entity).remove::<BackgroundImageApplied>();
+            }
             continue;
         }
         let Some(image_path) = background.image.as_ref() else {
+            if image_applied.is_some() {
+                clear_image_node_texture(&mut img_node);
+                commands.entity(entity).remove::<BackgroundImageApplied>();
+            }
             continue;
         };
+
+        if gradient_applied.is_some() {
+            commands
+                .entity(entity)
+                .remove::<BackgroundGradientApplied>();
+        }
 
         if img_node.color != Color::WHITE {
             img_node.color = Color::WHITE;
@@ -1033,6 +1161,10 @@ fn apply_background_images_system(
         let handle = if let Some(handle) = image_cache.map.get(&cache_key) {
             handle.clone()
         } else {
+            // Avoid generating many transient textures while the window size is still changing.
+            if viewport_is_resizing {
+                continue;
+            }
             let Some(image) =
                 render_background_image(source_image, container_size, draw_size, offset)
             else {
@@ -1045,6 +1177,10 @@ fn apply_background_images_system(
 
         if img_node.image != handle {
             img_node.image = handle;
+        }
+
+        if image_applied.is_none() {
+            commands.entity(entity).insert(BackgroundImageApplied);
         }
     }
 }
@@ -1095,7 +1231,7 @@ fn sync_backdrop_blur_materials_system(
         };
 
         let blur_radius = match style.backdrop_filter.as_ref() {
-            Some(BackdropFilter::Blur(radius)) if *radius > 0.0 => *radius,
+            Some(BackdropFilter::Blur(radius)) if *radius > 0.0 => radius.min(MAX_BACKDROP_BLUR_PX),
             _ => {
                 if material_node_opt.is_some() {
                     commands
@@ -1599,13 +1735,11 @@ fn render_background_image(
     offset: Vec2,
 ) -> Option<Image> {
     let source_format = source.texture_descriptor.format;
-    let supported = matches!(
-        source_format,
-        TextureFormat::Rgba8Unorm | TextureFormat::Rgba8UnormSrgb
-    );
-    if !supported {
-        return None;
-    }
+    let source_pixel_bytes = match source_format {
+        TextureFormat::Rgba8Unorm | TextureFormat::Rgba8UnormSrgb => 4usize,
+        TextureFormat::Rgba16Unorm => 8usize,
+        _ => return None,
+    };
 
     let data = source.data.as_ref()?;
     let source_size = source.size();
@@ -1617,38 +1751,70 @@ fn render_background_image(
 
     let out_w = container_size.x as usize;
     let out_h = container_size.y as usize;
-    let mut out = vec![0u8; out_w * out_h * 4];
+    if out_w == 0 || out_h == 0 {
+        return None;
+    }
+    let out_len = out_w.checked_mul(out_h)?.checked_mul(4)?;
+    let mut out = vec![0u8; out_len];
 
-    let draw_w = draw_size.x as usize;
-    let draw_h = draw_size.y as usize;
-    if draw_w == 0 || draw_h == 0 {
+    let draw_w = draw_size.x as i32;
+    let draw_h = draw_size.y as i32;
+    if draw_w <= 0 || draw_h <= 0 {
         return None;
     }
 
     let offset_x = offset.x.round() as i32;
     let offset_y = offset.y.round() as i32;
+    let out_w_i32 = out_w as i32;
+    let out_h_i32 = out_h as i32;
 
-    for y in 0..draw_h {
-        let dest_y = offset_y + y as i32;
-        if dest_y < 0 || dest_y >= out_h as i32 {
-            continue;
-        }
-        let src_y = ((y as f32 + 0.5) * src_h as f32 / draw_h as f32)
-            .floor()
-            .clamp(0.0, (src_h - 1) as f32) as usize;
+    let start_x = offset_x.max(0).min(out_w_i32);
+    let start_y = offset_y.max(0).min(out_h_i32);
+    let end_x = (offset_x + draw_w).max(0).min(out_w_i32);
+    let end_y = (offset_y + draw_h).max(0).min(out_h_i32);
 
-        for x in 0..draw_w {
-            let dest_x = offset_x + x as i32;
-            if dest_x < 0 || dest_x >= out_w as i32 {
-                continue;
+    if start_x < end_x && start_y < end_y {
+        let visible_w = (end_x - start_x) as usize;
+        let visible_h = (end_y - start_y) as usize;
+        let draw_w_usize = draw_w as usize;
+        let draw_h_usize = draw_h as usize;
+        let start_draw_x = (start_x - offset_x) as usize;
+        let start_draw_y = (start_y - offset_y) as usize;
+        let start_x_usize = start_x as usize;
+        let start_y_usize = start_y as usize;
+
+        let x_map: Vec<usize> = (0..visible_w)
+            .map(|i| {
+                let draw_x = start_draw_x + i;
+                (((draw_x * 2 + 1) * src_w) / (draw_w_usize * 2)).min(src_w - 1)
+            })
+            .collect();
+        let y_map: Vec<usize> = (0..visible_h)
+            .map(|i| {
+                let draw_y = start_draw_y + i;
+                (((draw_y * 2 + 1) * src_h) / (draw_h_usize * 2)).min(src_h - 1)
+            })
+            .collect();
+
+        for (row_index, src_y) in y_map.iter().copied().enumerate() {
+            let dest_y = start_y_usize + row_index;
+            let dst_row_start = (dest_y * out_w + start_x_usize) * 4;
+            let dst_row_end = dst_row_start + visible_w * 4;
+            let dst_row = &mut out[dst_row_start..dst_row_end];
+
+            for (col_index, src_x) in x_map.iter().copied().enumerate() {
+                let src_idx = (src_y * src_w + src_x) * source_pixel_bytes;
+                let dst_idx = col_index * 4;
+                if source_pixel_bytes == 4 {
+                    dst_row[dst_idx..dst_idx + 4].copy_from_slice(&data[src_idx..src_idx + 4]);
+                } else {
+                    for channel in 0..4 {
+                        let base = src_idx + channel * 2;
+                        let value = u16::from_le_bytes([data[base], data[base + 1]]);
+                        dst_row[dst_idx + channel] = (value >> 8) as u8;
+                    }
+                }
             }
-            let src_x = ((x as f32 + 0.5) * src_w as f32 / draw_w as f32)
-                .floor()
-                .clamp(0.0, (src_w - 1) as f32) as usize;
-
-            let src_idx = (src_y * src_w + src_x) * 4;
-            let dst_idx = (dest_y as usize * out_w + dest_x as usize) * 4;
-            out[dst_idx..dst_idx + 4].copy_from_slice(&data[src_idx..src_idx + 4]);
         }
     }
 
@@ -1873,8 +2039,8 @@ fn apply_style_components(
     style: &Style,
     components: &mut UiStyleComponents,
     asset_server: &AssetServer,
-    image_cache: &mut ImageCache,
-    images: &mut Assets<Image>,
+    _image_cache: &mut ImageCache,
+    _images: &mut Assets<Image>,
 ) {
     // Node
     if let Some(node) = components.0.as_mut() {
@@ -1933,22 +2099,25 @@ fn apply_style_components(
         }
     }
 
-    // TextLayout
-    if let Some(tl) = components.6.as_mut() {
-        if let Some(text_wrap) = style.text_wrap {
-            tl.linebreak = text_wrap;
+    // LineHeight
+    if let Some(line_height) = components.11.as_mut() {
+        if let Some(style_line_height) = style.line_height {
+            **line_height = style_line_height;
         }
     }
 
-    // ImageNode
-    if let Some(img_node) = components.7.as_mut() {
-        img_node.color = style.color.unwrap_or(Color::WHITE);
+    // Outline
+    if let Some(outline) = components.12.as_mut() {
+        **outline = build_outline_from_style(style);
+    }
 
-        if let Some(bg) = style.background.as_ref() {
-            if let Some(path) = bg.image.as_ref() {
-                let handle = get_or_load_image(path.as_str(), image_cache, images, asset_server);
-                img_node.image = handle;
-            }
+    // TextLayout
+    if let Some(tl) = components.6.as_mut() {
+        if let Some(text_align) = style.text_align {
+            tl.justify = text_align;
+        }
+        if let Some(text_wrap) = style.text_wrap {
+            tl.linebreak = text_wrap;
         }
     }
 
@@ -2027,6 +2196,7 @@ fn blend_style(from: &Style, to: &Style, t: f32, spec: &TransitionSpec) -> Style
     if transition_allows_color(spec) {
         blended.color = blend_color(from.color, to.color, t);
         blended.border_color = blend_color(from.border_color, to.border_color, t);
+        blended.outline_color = blend_color(from.outline_color, to.outline_color, t);
     }
 
     if transition_allows_background(spec) {
@@ -2041,6 +2211,7 @@ fn blend_animation_style(from: &Style, to: &Style, t: f32) -> Style {
     let mut blended = to.clone();
     blended.color = blend_color(from.color, to.color, t);
     blended.border_color = blend_color(from.border_color, to.border_color, t);
+    blended.outline_color = blend_color(from.outline_color, to.outline_color, t);
     blended.background = blend_background(from.background.clone(), to.background.clone(), t);
     blended.transform = blend_transform_style(&from.transform, &to.transform, t);
     blended.width = blend_val_opt(from.width.clone(), to.width.clone(), t);
@@ -2054,6 +2225,20 @@ fn blend_animation_style(from: &Style, to: &Style, t: f32) -> Style {
     blended.font_size = blend_font_val_opt(&from.font_size, &to.font_size, t);
     blended.border_radius = blend_radius_opt(&from.border_radius, &to.border_radius, t);
     blended
+}
+
+fn style_requests_outline(style: &Style) -> bool {
+    style.outline_width.is_some() || style.outline_offset.is_some() || style.outline_color.is_some()
+}
+
+fn build_outline_from_style(style: &Style) -> Outline {
+    let default_outline = Outline::default();
+
+    Outline {
+        width: style.outline_width.unwrap_or(default_outline.width),
+        offset: style.outline_offset.unwrap_or(default_outline.offset),
+        color: style.outline_color.unwrap_or(default_outline.color),
+    }
 }
 
 /// Resolves transform blending with optional cached transforms.
@@ -2279,7 +2464,7 @@ fn update_style_animation_state(
     commands: &mut Commands,
     entity: Entity,
     final_style: &Style,
-    keyframes: &std::collections::HashMap<String, Vec<AnimationKeyframe>>,
+    keyframes: &HashMap<String, Vec<AnimationKeyframe>>,
     now: f32,
     animation_query: &mut Query<Option<&mut StyleAnimation>>,
 ) {
@@ -2553,15 +2738,19 @@ fn folder_basename(folder: &str) -> &str {
 
 /// Propagates inheritable style fields down the widget tree.
 pub fn propagate_style_inheritance(
+    mut commands: Commands,
     root_query: Query<Entity, (With<UiStyle>, Without<ChildOf>)>,
     children_query: Query<&Children>,
     style_query: Query<&UiStyle>,
+    style_state_query: Query<(Option<&StyleTransition>, Option<&StyleAnimation>)>,
     mut target_query: Query<(
         Option<&mut TextColor>,
         Option<&mut TextFont>,
+        Option<&mut LineHeight>,
         Option<&mut ImageNode>,
-        Option<&StyleTransition>,
-        Option<&StyleAnimation>,
+        Option<&mut TextShadow>,
+        Option<&mut Text>,
+        Option<&mut TextTransformState>,
     )>,
     asset_server: Res<AssetServer>,
 ) {
@@ -2569,8 +2758,10 @@ pub fn propagate_style_inheritance(
         propagate_recursive(
             root_entity,
             None,
+            &mut commands,
             &children_query,
             &style_query,
+            &style_state_query,
             &mut target_query,
             &asset_server,
         );
@@ -2581,29 +2772,24 @@ pub fn propagate_style_inheritance(
 fn propagate_recursive(
     entity: Entity,
     inherited_style: Option<&Style>,
+    commands: &mut Commands,
     children_query: &Query<&Children>,
     style_query: &Query<&UiStyle>,
+    style_state_query: &Query<(Option<&StyleTransition>, Option<&StyleAnimation>)>,
     target_query: &mut Query<(
         Option<&mut TextColor>,
         Option<&mut TextFont>,
+        Option<&mut LineHeight>,
         Option<&mut ImageNode>,
-        Option<&StyleTransition>,
-        Option<&StyleAnimation>,
+        Option<&mut TextShadow>,
+        Option<&mut Text>,
+        Option<&mut TextTransformState>,
     )>,
     asset_server: &Res<AssetServer>,
 ) {
-    // 1. Determine the effective style for THIS entity
-    //    If this entity has its own active_style, we use it.
-    //    Otherwise, we might use inherited values.
-    //    BUT: The original requirement is about parents passing styles to children.
-    //    So we look at what we should pass down vs what we should apply here.
-
     let my_style_comp = style_query.get(entity).ok();
     let my_active_style = my_style_comp.and_then(|s| s.active_style.as_ref());
 
-    // 2. Prepare the style to pass down to children.
-    //    This is effective: inherited_style merged with my_active_style
-    //    (where my_active_style takes precedence).
     let mut style_to_propagate = if let Some(inherited) = inherited_style {
         inherited.clone()
     } else {
@@ -2614,26 +2800,29 @@ fn propagate_recursive(
         style_to_propagate.merge(mine);
     }
 
-    // 2.1 Check for active animations or transitions on this entity
-    // and use their current style if available.
-    if let Ok(components) = target_query.get(entity) {
-        if let Some(transition) = components.3 {
+    if let Ok((transition_opt, animation_opt)) = style_state_query.get(entity) {
+        if let Some(transition) = transition_opt {
             if let Some(current) = &transition.current_style {
                 style_to_propagate.merge(current);
             }
         }
-        if let Some(animation) = components.4 {
+        if let Some(animation) = animation_opt {
             if let Some(current) = &animation.current_style {
                 style_to_propagate.merge(current);
             }
         }
     }
 
-    // 3. Apply styles to THIS entity's components if strictly inherited (no local override)
-    if let Ok(components) = target_query.get_mut(entity) {
-        let (mut text_color_opt, mut text_font_opt, mut image_node_opt, _, _) = components;
-        // --- COLOR ---
-        // Apply inherited color if I don't have my own color
+    if let Ok((
+        mut text_color_opt,
+        mut text_font_opt,
+        mut line_height_opt,
+        mut image_node_opt,
+        mut text_shadow_opt,
+        mut text_opt,
+        mut text_transform_state_opt,
+    )) = target_query.get_mut(entity)
+    {
         let has_local_color = my_active_style.map_or(false, |s| s.color.is_some());
         if !has_local_color {
             if let Some(parent_color) = inherited_style.and_then(|s| s.color) {
@@ -2650,12 +2839,10 @@ fn propagate_recursive(
             }
         }
 
-        // --- FONT SIZE ---
         let has_local_size = my_active_style.map_or(false, |s| s.font_size.is_some());
         if !has_local_size {
             if let Some(parent_size_val) = inherited_style.and_then(|s| s.font_size.as_ref()) {
                 if let Some(text_font) = text_font_opt.as_mut() {
-                    // 12.0 is default base, could be configurable
                     let size_px = parent_size_val.get(Some(12.0));
                     if text_font.font_size != size_px {
                         text_font.font_size = size_px;
@@ -2664,28 +2851,27 @@ fn propagate_recursive(
             }
         }
 
-        // --- FONT FAMILY & WEIGHT ---
-        // Note: Logic similar to apply_text_style needed here to resolve handle.
-        // If we strictly inherit family/weight, we need to load the font.
-        // This is complex because we need the folder structure logic from apply_text_style.
-        // For now, a simpler approach: if we have a resolved font handle from parent logic?
-        // Actually, style_service resolves fonts every time active_style changes.
-        // Providing the full path logic again here might be duplicative.
-        // A better approach: The `inherited_style` now contains the family/weight.
-        // We can re-use the standard `apply_text_style` logic if we synthesize a style?
-        // OR: Just implement the specific property application here.
+        let has_local_line_height = my_active_style.map_or(false, |s| s.line_height.is_some());
+        if !has_local_line_height {
+            if let (Some(parent_line_height), Some(line_height)) = (
+                inherited_style.and_then(|s| s.line_height),
+                line_height_opt.as_mut(),
+            ) {
+                if **line_height != parent_line_height {
+                    **line_height = parent_line_height;
+                }
+            }
+        }
 
         let has_local_family = my_active_style.map_or(false, |s| s.font_family.is_some());
         let has_local_weight = my_active_style.map_or(false, |s| s.font_weight.is_some());
 
         if !has_local_family && !has_local_weight {
-            // We need to form the font path from inherited values
             if let Some(inherited) = inherited_style {
                 if let Some(family) = &inherited.font_family {
                     let weight = inherited.font_weight.unwrap_or(FontWeight::Normal);
-                    let folder = &family.0; // Assuming FontFamily is struct(String)
+                    let folder = &family.0;
                     let weight_str = weight_token_exact(weight);
-                    // This assumes a standard naming convention "Family-Weight.ttf"
                     let filename = format!("{}-{}.ttf", folder_basename(folder), weight_str);
                     let full_path = format!("{}/{}", folder, filename);
 
@@ -2698,19 +2884,137 @@ fn propagate_recursive(
                 }
             }
         }
+
+        let has_text = text_opt.is_some();
+        let has_css_context = my_style_comp.is_some() || inherited_style.is_some();
+
+        if has_css_context {
+            if let Some(shadow) = style_to_propagate.text_shadow {
+                if has_text {
+                    if let Some(current_shadow) = text_shadow_opt.as_mut() {
+                        if **current_shadow != shadow {
+                            **current_shadow = shadow;
+                        }
+                    } else {
+                        commands.entity(entity).insert(shadow);
+                    }
+                }
+            } else if text_shadow_opt.is_some() {
+                commands.entity(entity).remove::<TextShadow>();
+            }
+
+            sync_text_transform_entity(
+                entity,
+                style_to_propagate.text_transform,
+                &mut text_opt,
+                &mut text_transform_state_opt,
+                commands,
+            );
+        }
     }
 
-    // 4. Recurse to children
     if let Ok(children) = children_query.get(entity) {
         for child_entity in children {
             propagate_recursive(
                 *child_entity,
-                Some(&style_to_propagate), // Pass down the merged style
+                Some(&style_to_propagate),
+                commands,
                 children_query,
                 style_query,
+                style_state_query,
                 target_query,
                 asset_server,
             );
         }
     }
+}
+
+fn sync_text_transform_entity(
+    entity: Entity,
+    transform: Option<TextTransform>,
+    text_opt: &mut Option<Mut<Text>>,
+    transform_state_opt: &mut Option<Mut<TextTransformState>>,
+    commands: &mut Commands,
+) {
+    let Some(text) = text_opt.as_mut() else {
+        if transform_state_opt.is_some() {
+            commands.entity(entity).remove::<TextTransformState>();
+        }
+        return;
+    };
+
+    let active_transform = match transform {
+        Some(TextTransform::Uppercase) => Some(TextTransform::Uppercase),
+        Some(TextTransform::Lowercase) => Some(TextTransform::Lowercase),
+        Some(TextTransform::Capitalize) => Some(TextTransform::Capitalize),
+        _ => None,
+    };
+
+    match (transform_state_opt.as_mut(), active_transform) {
+        (None, None) => {}
+        (None, Some(mode)) => {
+            let source = text.0.clone();
+            let rendered = apply_text_transform(mode, source.as_str());
+            if text.0 != rendered {
+                text.0 = rendered.clone();
+            }
+            commands.entity(entity).insert(TextTransformState {
+                source,
+                last_rendered: rendered,
+            });
+        }
+        (Some(state), Some(mode)) => {
+            if text.0 != state.last_rendered {
+                state.source = text.0.clone();
+            }
+            let rendered = apply_text_transform(mode, state.source.as_str());
+            if text.0 != rendered {
+                text.0 = rendered.clone();
+            }
+            state.last_rendered = rendered;
+        }
+        (Some(state), None) => {
+            if text.0 != state.last_rendered {
+                state.source = text.0.clone();
+            }
+            if text.0 != state.source {
+                text.0 = state.source.clone();
+            }
+            commands.entity(entity).remove::<TextTransformState>();
+        }
+    }
+}
+
+fn apply_text_transform(transform: TextTransform, input: &str) -> String {
+    match transform {
+        TextTransform::None => input.to_string(),
+        TextTransform::Uppercase => input.to_uppercase(),
+        TextTransform::Lowercase => input.to_lowercase(),
+        TextTransform::Capitalize => capitalize_words(input),
+    }
+}
+
+fn capitalize_words(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    let mut start_word = true;
+
+    for ch in input.chars() {
+        if ch.is_alphabetic() {
+            if start_word {
+                for upper in ch.to_uppercase() {
+                    out.push(upper);
+                }
+                start_word = false;
+            } else {
+                for lower in ch.to_lowercase() {
+                    out.push(lower);
+                }
+            }
+        } else {
+            out.push(ch);
+            start_word = !ch.is_alphanumeric();
+        }
+    }
+
+    out
 }

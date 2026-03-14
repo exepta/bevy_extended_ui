@@ -4,9 +4,11 @@ use crate::styles::{
     BackgroundAttachment, BackgroundPosition, BackgroundPositionValue, BackgroundSize,
     BackgroundSizeValue, CalcExpr, CalcUnit, CalcValue, CursorStyle, FontFamily, FontVal,
     FontWeight, GradientStop, GradientStopPosition, LinearGradient, MediaQueryCondition, ParsedCss,
-    Radius, Style, StylePair, TransformStyle, TransitionProperty, TransitionSpec, TransitionTiming,
+    Radius, Style, StylePair, TextTransform, TransformStyle, TransitionProperty, TransitionSpec,
+    TransitionTiming,
 };
 use bevy::prelude::*;
+use bevy::text::LineHeight;
 use bevy::ui::Val2;
 use bevy::window::SystemCursorIcon;
 use lightningcss::media_query::{
@@ -21,24 +23,57 @@ use regex::Regex;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 
-/// Loads a CSS file and parses it into a [`ParsedCss`] with selectors and keyframes.
-///
-/// This function reads a `.css` file from the disk, parses its rules, and converts each supported
-/// CSS property into a Bevy-compatible [`Style`] representation. These styles can later be applied
-/// to UI nodes.
-///
-/// # Parameters
-/// - `path`: A path to the CSS file. If empty, it falls back to the default path `"assets/internal.css"`.
-///
-/// # Returns
-/// - `ParsedCss` on success, containing styles and keyframes.
-/// - Empty maps if the file cannot be parsed, but no panic occurs.
-///
-/// # Notes
-/// - This uses [`grass_compiler::StyleSheet`] to parse the file.
-/// - Supports standard properties like `width`, `height`, `padding`, `color`, `background`, `font-size`, `z-index`, etc.
-/// - Ignores unsupported or malformed declarations silently.
 pub fn load_css(css: &str) -> ParsedCss {
+    parse_css(css, HashMap::new(), true)
+}
+
+/// Loads a CSS file and resolves `var(...)` values against the provided global `:root` variables.
+///
+/// This is used when multiple CSS assets should share one theme-token scope (e.g. ThemeProvider),
+/// so files can consume variables defined in other files.
+pub fn load_css_with_root_vars(css: &str, root_vars: &HashMap<String, String>) -> ParsedCss {
+    parse_css(css, root_vars.clone(), false)
+}
+
+/// Extracts top-level `:root` custom properties from a CSS source.
+pub fn collect_root_css_vars(css: &str) -> HashMap<String, String> {
+    let mut options = ParserOptions::default();
+    options.flags.insert(ParserFlags::NESTING);
+
+    let stylesheet = match StyleSheet::parse(css, options) {
+        Ok(sheet) => sheet,
+        Err(_) => {
+            return HashMap::new();
+        }
+    };
+
+    let mut css_vars = HashMap::new();
+    for rule in &stylesheet.rules.0 {
+        match rule {
+            CssRule::Style(style_rule) => {
+                let selectors = selector_list_to_strings(&style_rule.selectors);
+                if selectors.len() == 1 && selectors[0].trim() == ":root" {
+                    collect_css_vars(&style_rule.declarations, &mut css_vars);
+                }
+            }
+            CssRule::Nesting(nesting_rule) => {
+                let selectors = selector_list_to_strings(&nesting_rule.style.selectors);
+                if selectors.len() == 1 && selectors[0].trim() == ":root" {
+                    collect_css_vars(&nesting_rule.style.declarations, &mut css_vars);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    css_vars
+}
+
+fn parse_css(
+    css: &str,
+    mut css_vars: HashMap<String, String>,
+    allow_root_var_collection: bool,
+) -> ParsedCss {
     let mut options = ParserOptions::default();
     options.flags.insert(ParserFlags::NESTING);
 
@@ -50,7 +85,6 @@ pub fn load_css(css: &str) -> ParsedCss {
         }
     };
 
-    let mut css_vars = HashMap::new();
     let mut style_map = HashMap::new();
     let mut keyframes_map: HashMap<String, Vec<AnimationKeyframe>> = HashMap::new();
 
@@ -61,6 +95,7 @@ pub fn load_css(css: &str) -> ParsedCss {
         &mut style_map,
         &mut keyframes_map,
         None,
+        allow_root_var_collection,
     );
 
     for keyframes in keyframes_map.values_mut() {
@@ -84,6 +119,7 @@ fn collect_css_rules(
     style_map: &mut HashMap<String, StylePair>,
     keyframes_map: &mut HashMap<String, Vec<AnimationKeyframe>>,
     media_condition: Option<MediaQueryCondition>,
+    allow_root_var_collection: bool,
 ) {
     for rule in &rules.0 {
         match rule {
@@ -94,6 +130,7 @@ fn collect_css_rules(
                 style_map,
                 keyframes_map,
                 media_condition.clone(),
+                allow_root_var_collection,
             ),
             CssRule::Nesting(nesting_rule) => collect_style_rule(
                 &nesting_rule.style,
@@ -102,6 +139,7 @@ fn collect_css_rules(
                 style_map,
                 keyframes_map,
                 media_condition.clone(),
+                allow_root_var_collection,
             ),
             CssRule::NestedDeclarations(nested_rule) => {
                 if let Some(parent_selectors) = parent_selectors {
@@ -135,6 +173,7 @@ fn collect_css_rules(
                     style_map,
                     keyframes_map,
                     combined_media,
+                    allow_root_var_collection,
                 );
             }
             CssRule::Keyframes(keyframes_rule) => {
@@ -152,6 +191,7 @@ fn collect_style_rule(
     style_map: &mut HashMap<String, StylePair>,
     keyframes_map: &mut HashMap<String, Vec<AnimationKeyframe>>,
     media_condition: Option<MediaQueryCondition>,
+    allow_root_var_collection: bool,
 ) {
     let selectors = selector_list_to_strings(&style_rule.selectors);
     if parent_selectors.is_none()
@@ -159,7 +199,9 @@ fn collect_style_rule(
         && selectors.len() == 1
         && selectors[0].trim() == ":root"
     {
-        collect_css_vars(&style_rule.declarations, css_vars);
+        if allow_root_var_collection {
+            collect_css_vars(&style_rule.declarations, css_vars);
+        }
         return;
     }
 
@@ -190,6 +232,7 @@ fn collect_style_rule(
         style_map,
         keyframes_map,
         media_condition,
+        allow_root_var_collection,
     );
 }
 
@@ -529,9 +572,61 @@ fn resolve_var_inner(value: &str, css_vars: &HashMap<String, String>, depth: u8)
         return value.to_string();
     }
 
-    let trimmed = value.trim();
+    let mut resolved = value.to_string();
+
+    while let Some((start, end)) = find_var_call_bounds(&resolved) {
+        let call = &resolved[start..end];
+        let replacement = resolve_single_var_call(call, css_vars, depth + 1);
+
+        let mut next = String::with_capacity(resolved.len() - (end - start) + replacement.len());
+        next.push_str(&resolved[..start]);
+        next.push_str(&replacement);
+        next.push_str(&resolved[end..]);
+
+        if next == resolved {
+            break;
+        }
+        resolved = next;
+    }
+
+    resolved
+}
+
+fn find_var_call_bounds(value: &str) -> Option<(usize, usize)> {
+    let lower = value.to_ascii_lowercase();
+    let start = lower.find("var(")?;
+    let mut depth = 0i32;
+    let mut end = None;
+
+    for (idx, ch) in value[start..].char_indices() {
+        match ch {
+            '(' => depth += 1,
+            ')' => {
+                depth -= 1;
+                if depth == 0 {
+                    end = Some(start + idx + 1);
+                    break;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    end.map(|end_idx| (start, end_idx))
+}
+
+fn resolve_single_var_call(
+    var_call: &str,
+    css_vars: &HashMap<String, String>,
+    depth: u8,
+) -> String {
+    if depth >= 8 {
+        return var_call.to_string();
+    }
+
+    let trimmed = var_call.trim();
     if !trimmed.starts_with("var(") || !trimmed.ends_with(')') {
-        return value.to_string();
+        return var_call.to_string();
     }
 
     let inner = &trimmed[4..trimmed.len() - 1];
@@ -546,7 +641,7 @@ fn resolve_var_inner(value: &str, css_vars: &HashMap<String, String>, depth: u8)
         return resolve_var_inner(fallback.trim(), css_vars, depth + 1);
     }
 
-    value.to_string()
+    var_call.to_string()
 }
 
 fn split_var_args(input: &str) -> (&str, Option<&str>) {
@@ -576,11 +671,11 @@ fn split_var_args(input: &str) -> (&str, Option<&str>) {
 /// - `value`: The CSS value as a string (e.g. `"100px"`, `"red"`, `"center"`).
 ///
 /// # Supported Properties
-/// - Box model: `width`, `height`, `padding`, `margin`, `border`, `border-radius`
-/// - Colors: `color`, `background-color`, `border-color`
+/// - Box model: `width`, `height`, `padding`, `margin`, `border`, `border-radius`, `outline`
+/// - Colors: `color`, `background-color`, `border-color`, `outline-color`
 /// - Flex/grid layout: `display`, `position`, `flex-grow`, `flex-direction`, `grid-template-columns`, etc.
 /// - Visuals: `background`, `background-image`, `box-shadow`, `z-index`, `overflow`, etc.
-/// - Typography: `font-size`, `text-wrap`
+/// - Typography: `font-size`, `line-height`, `text-wrap`, `text-align`, `text-transform`, `text-shadow`
 ///
 /// # Behavior
 /// - If a property or value is unsupported or invalid, it is silently ignored.
@@ -704,6 +799,7 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
         }
 
         "font-size" => style.font_size = convert_to_font_size(value.to_string()),
+        "line-height" => style.line_height = convert_to_bevy_line_height(value.to_string()),
         "font-family" => {
             style.font_family = Some(FontFamily(
                 value
@@ -724,21 +820,55 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
                 style.border_color = Some(color);
             }
         }
-        "border-left" => apply_border_side(value, RectSide::Left, &mut style.border),
-        "border-right" => apply_border_side(value, RectSide::Right, &mut style.border),
-        "border-top" => apply_border_side(value, RectSide::Top, &mut style.border),
-        "border-bottom" => apply_border_side(value, RectSide::Bottom, &mut style.border),
+        "border-left" => apply_border_side(
+            value,
+            RectSide::Left,
+            &mut style.border,
+            &mut style.border_color,
+        ),
+        "border-right" => apply_border_side(
+            value,
+            RectSide::Right,
+            &mut style.border,
+            &mut style.border_color,
+        ),
+        "border-top" => apply_border_side(
+            value,
+            RectSide::Top,
+            &mut style.border,
+            &mut style.border_color,
+        ),
+        "border-bottom" => apply_border_side(
+            value,
+            RectSide::Bottom,
+            &mut style.border,
+            &mut style.border_color,
+        ),
         "border-radius" => style.border_radius = convert_to_radius(value.to_string()),
         "border-color" => style.border_color = convert_to_color(value.to_string()),
         "border-width" => style.border = convert_to_ui_rect(value.to_string()),
+        "outline" => {
+            if let Some((width, color)) = convert_css_outline(value.to_string()) {
+                style.outline_width = Some(width);
+                style.outline_color = Some(color);
+            }
+        }
+        "outline-width" => style.outline_width = convert_to_val(value.to_string()),
+        "outline-color" => style.outline_color = convert_to_color(value.to_string()),
+        "outline-offset" => style.outline_offset = convert_to_val(value.to_string()),
 
         "box-shadow" => style.box_shadow = convert_to_bevy_box_shadow(value.to_string()),
+        "text-shadow" => style.text_shadow = convert_to_bevy_text_shadow(value.to_string()),
 
         "overflow" => style.overflow = convert_overflow(value.to_string(), "all"),
         "overflow-y" => apply_overflow_axis(style, value, OverflowAxisSelector::Y),
         "overflow-x" => apply_overflow_axis(style, value, OverflowAxisSelector::X),
 
         "text-wrap" => style.text_wrap = convert_to_bevy_line_break(value.to_string()),
+        "text-align" => style.text_align = convert_to_bevy_text_align(value.to_string()),
+        "text-transform" | "text-transfrom" => {
+            style.text_transform = convert_to_bevy_text_transform(value.to_string())
+        }
         "z-index" => style.z_index = convert_to_i32(value.to_string()),
         "pointer-events" => style.pointer_events = convert_to_bevy_pick_able(value.to_string()),
         "cursor" => style.cursor = convert_to_cursor_style(value.to_string()),
@@ -765,11 +895,29 @@ fn apply_rect_side(value: &str, side: RectSide, target: &mut Option<UiRect>) {
     *target = rect_from_side(value, side);
 }
 
-fn apply_border_side(value: &str, side: RectSide, target: &mut Option<UiRect>) {
-    let val = convert_to_val(value.to_string()).unwrap_or(Val::Px(0.0));
+fn apply_border_side(
+    value: &str,
+    side: RectSide,
+    target: &mut Option<UiRect>,
+    color_target: &mut Option<Color>,
+) {
+    let parts: Vec<&str> = value.split_whitespace().collect();
+
+    let val = parts
+        .iter()
+        .find_map(|token| convert_to_val((*token).to_string()))
+        .unwrap_or(Val::Px(0.0));
     let mut rect = target.unwrap_or_default();
     set_rect_side(&mut rect, side, val);
     *target = Some(rect);
+
+    for index in 0..parts.len() {
+        let color_candidate = parts[index..].join(" ");
+        if let Some(parsed_color) = convert_to_color(color_candidate) {
+            *color_target = Some(parsed_color);
+            break;
+        }
+    }
 }
 
 fn apply_overflow_axis(style: &mut Style, value: &str, axis: OverflowAxisSelector) {
@@ -2531,6 +2679,139 @@ pub fn convert_to_ui_rect(value: String) -> Option<UiRect> {
     })
 }
 
+fn split_css_whitespace_tokens(input: &str) -> Vec<&str> {
+    let mut tokens = Vec::new();
+    let mut start: Option<usize> = None;
+    let mut depth = 0u32;
+
+    for (idx, ch) in input.char_indices() {
+        match ch {
+            '(' => {
+                if start.is_none() {
+                    start = Some(idx);
+                }
+                depth = depth.saturating_add(1);
+            }
+            ')' => {
+                depth = depth.saturating_sub(1);
+            }
+            _ if ch.is_whitespace() && depth == 0 => {
+                if let Some(token_start) = start {
+                    let token = input[token_start..idx].trim();
+                    if !token.is_empty() {
+                        tokens.push(token);
+                    }
+                    start = None;
+                }
+            }
+            _ => {
+                if start.is_none() {
+                    start = Some(idx);
+                }
+            }
+        }
+    }
+
+    if let Some(token_start) = start {
+        let token = input[token_start..].trim();
+        if !token.is_empty() {
+            tokens.push(token);
+        }
+    }
+
+    tokens
+}
+
+fn split_css_top_level_commas(input: &str) -> Vec<&str> {
+    let mut out = Vec::new();
+    let mut depth = 0u32;
+    let mut start = 0usize;
+
+    for (idx, ch) in input.char_indices() {
+        match ch {
+            '(' => depth = depth.saturating_add(1),
+            ')' => depth = depth.saturating_sub(1),
+            ',' if depth == 0 => {
+                let part = input[start..idx].trim();
+                if !part.is_empty() {
+                    out.push(part);
+                }
+                start = idx + 1;
+            }
+            _ => {}
+        }
+    }
+
+    let tail = input[start..].trim();
+    if !tail.is_empty() {
+        out.push(tail);
+    }
+
+    out
+}
+
+fn parse_text_shadow_length_px(input: &str) -> Option<f32> {
+    let parsed = parse_math_value(input.trim())?;
+    match parsed.unit {
+        CalcUnit::Px => Some(parsed.value),
+        CalcUnit::None if parsed.value == 0.0 => Some(0.0),
+        _ => None,
+    }
+}
+
+/// Converts a CSS-like `text-shadow` string into Bevy [`TextShadow`].
+///
+/// Supported format:
+/// - `OFFSET_X OFFSET_Y [BLUR] [COLOR]`
+///
+/// Notes:
+/// - Only the first shadow from comma-separated lists is applied.
+/// - Blur is accepted but ignored (Bevy UI `TextShadow` does not expose blur radius).
+/// - Offsets currently require `px` or `0`.
+pub fn convert_to_bevy_text_shadow(value: String) -> Option<TextShadow> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("none") {
+        return None;
+    }
+
+    let segment = split_css_top_level_commas(trimmed)
+        .into_iter()
+        .next()
+        .unwrap_or(trimmed);
+    let tokens = split_css_whitespace_tokens(segment);
+    if tokens.is_empty() {
+        return None;
+    }
+
+    let mut lengths: Vec<f32> = Vec::new();
+    let mut color: Option<Color> = None;
+
+    for token in tokens {
+        if token.eq_ignore_ascii_case("inset") {
+            continue;
+        }
+        if let Some(px) = parse_text_shadow_length_px(token) {
+            lengths.push(px);
+            continue;
+        }
+        if let Some(parsed_color) = convert_to_color(token.to_string()) {
+            color = Some(parsed_color);
+        }
+    }
+
+    let (x, y) = match lengths.len() {
+        0 => return None,
+        1 => (lengths[0], lengths[0]),
+        _ => (lengths[0], lengths[1]),
+    };
+
+    let default_shadow = TextShadow::default();
+    Some(TextShadow {
+        offset: Vec2::new(x, y),
+        color: color.unwrap_or(default_shadow.color),
+    })
+}
+
 /// Converts a CSS-like box-shadow string into a Bevy [`BoxShadow`] struct.
 ///
 /// Parses shadow offset (x, y), blur radius, spread radius, and color from the input string.
@@ -2554,7 +2835,7 @@ pub fn convert_to_ui_rect(value: String) -> Option<UiRect> {
 /// - `None` on failure.
 ///
 pub fn convert_to_bevy_box_shadow(value: String) -> Option<BoxShadow> {
-    let parts: Vec<&str> = value.split_whitespace().collect();
+    let parts = split_css_whitespace_tokens(value.as_str());
     let mut vals = vec![];
     let mut color = Colored::TRANSPARENT;
 
@@ -2651,6 +2932,55 @@ pub fn convert_css_border(value: String) -> Option<(UiRect, Color)> {
     Some((rect, color))
 }
 
+/// Parses a CSS outline shorthand into width and color.
+///
+/// Supports values such as:
+/// - `"2px #ccd2de"`
+/// - `"2px solid rgba(192, 198, 210, 0.95)"`
+/// - `"none"`
+///
+/// The first parsable length token is used as width. Color is optional and defaults to transparent.
+pub fn convert_css_outline(value: String) -> Option<(Val, Color)> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    if trimmed.eq_ignore_ascii_case("none") {
+        return Some((Val::Px(0.0), Colored::TRANSPARENT));
+    }
+
+    let parts: Vec<&str> = trimmed.split_whitespace().collect();
+    if parts.is_empty() {
+        return None;
+    }
+
+    let mut width: Option<Val> = None;
+    let mut color: Option<Color> = None;
+
+    for (index, part) in parts.iter().enumerate() {
+        if width.is_none() {
+            width = convert_to_val((*part).to_string());
+            if width.is_some() {
+                continue;
+            }
+        }
+
+        if color.is_none() {
+            let color_candidate = parts[index..].join(" ");
+            if let Some(parsed_color) = convert_to_color(color_candidate) {
+                color = Some(parsed_color);
+                break;
+            }
+        }
+    }
+
+    let width = width?;
+    let color = color.unwrap_or(Colored::TRANSPARENT);
+
+    Some((width, color))
+}
+
 /**
  * Converts a string into a `JustifyContent` enum value.
  *
@@ -2667,7 +2997,7 @@ pub fn convert_to_bevy_justify_content(value: String) -> Option<JustifyContent> 
         "start" => Some(JustifyContent::Start),
         "flex-start" => Some(JustifyContent::FlexStart),
         "end" => Some(JustifyContent::End),
-        "flex-end" => Some(JustifyContent::FlexStart),
+        "flex-end" => Some(JustifyContent::FlexEnd),
         "center" => Some(JustifyContent::Center),
         "space-between" => Some(JustifyContent::SpaceBetween),
         "space-around" => Some(JustifyContent::SpaceAround),
@@ -2693,7 +3023,7 @@ pub fn convert_to_bevy_align_items(value: String) -> Option<AlignItems> {
         "start" => Some(AlignItems::Start),
         "flex-start" => Some(AlignItems::FlexStart),
         "end" => Some(AlignItems::End),
-        "flex-end" => Some(AlignItems::FlexStart),
+        "flex-end" => Some(AlignItems::FlexEnd),
         "center" => Some(AlignItems::Center),
         "baseline" => Some(AlignItems::Baseline),
         "stretch" => Some(AlignItems::Stretch),
@@ -2740,6 +3070,30 @@ pub fn convert_to_bevy_flex_wrap(value: String) -> Option<FlexWrap> {
     }
 }
 
+/// Converts a string into a text alignment value for Bevy [`TextLayout`].
+pub fn convert_to_bevy_text_align(value: String) -> Option<Justify> {
+    let trimmed = value.trim();
+    match trimmed {
+        "left" | "start" | "flex-start" => Some(Justify::Left),
+        "center" => Some(Justify::Center),
+        "right" | "end" | "flex-end" => Some(Justify::Right),
+        "justify" => Some(Justify::Justified),
+        _ => Some(Justify::default()),
+    }
+}
+
+/// Converts a string into a text transform value.
+pub fn convert_to_bevy_text_transform(value: String) -> Option<TextTransform> {
+    let lower = value.trim().to_ascii_lowercase();
+    match lower.as_str() {
+        "none" => Some(TextTransform::None),
+        "uppercase" => Some(TextTransform::Uppercase),
+        "lowercase" => Some(TextTransform::Lowercase),
+        "capitalize" => Some(TextTransform::Capitalize),
+        _ => None,
+    }
+}
+
 /**
  * Converts a string into a `LineBreak` enum value.
  *
@@ -2757,6 +3111,34 @@ pub fn convert_to_bevy_line_break(value: String) -> Option<LineBreak> {
         "pretty" | "balance" => Some(LineBreak::WordBoundary),
         "unset" => Some(LineBreak::AnyCharacter),
         _ => Some(LineBreak::default()),
+    }
+}
+
+/// Converts a CSS-like `line-height` value into Bevy [`LineHeight`].
+///
+/// Supported values:
+/// - `normal`
+/// - unitless number (relative to font size)
+/// - percentage (relative to font size)
+/// - px value (absolute)
+pub fn convert_to_bevy_line_height(value: String) -> Option<LineHeight> {
+    let trimmed = value.trim();
+    if trimmed.eq_ignore_ascii_case("normal") {
+        return Some(LineHeight::default());
+    }
+
+    if let Ok(unitless) = trimmed.parse::<f32>() {
+        if unitless > 0.0 {
+            return Some(LineHeight::RelativeToFont(unitless));
+        }
+    }
+
+    let parsed = parse_math_value(trimmed)?;
+    match parsed.unit {
+        CalcUnit::Percent => Some(LineHeight::RelativeToFont(parsed.value / 100.0)),
+        CalcUnit::Px => Some(LineHeight::Px(parsed.value)),
+        CalcUnit::None if parsed.value > 0.0 => Some(LineHeight::RelativeToFont(parsed.value)),
+        _ => None,
     }
 }
 
@@ -3299,6 +3681,66 @@ mod tests {
     }
 
     #[test]
+    fn background_gradient_resolves_nested_css_var_tokens() {
+        let parsed = load_css(
+            r#"
+            :root { --btn-bg: #ffd700; }
+            .btn-login {
+                background: linear-gradient(180deg, var(--btn-bg) 0%, #f0b90b 100%) center;
+            }
+        "#,
+        );
+
+        let pair = parsed
+            .styles
+            .values()
+            .find(|pair| pair.selector == ".btn-login")
+            .expect("missing parsed .btn-login style");
+
+        let background = pair.normal.background.as_ref().expect("missing background");
+        assert!(background.gradient.is_some());
+    }
+
+    #[test]
+    fn collects_root_css_vars_from_stylesheet() {
+        let vars = collect_root_css_vars(
+            r#"
+            :root {
+                --brand: #102030;
+                --accent: #445566;
+            }
+            .panel { color: var(--brand); }
+        "#,
+        );
+
+        assert_eq!(vars.get("--brand"), Some(&"#102030".to_string()));
+        assert_eq!(vars.get("--accent"), Some(&"#456".to_string()));
+    }
+
+    #[test]
+    fn resolves_vars_from_external_root_scope() {
+        let mut root_vars = HashMap::new();
+        root_vars.insert("--brand".to_string(), "#112233".to_string());
+
+        let parsed = load_css_with_root_vars(
+            r#"
+            :root { --brand: #ffeeaa; }
+            .panel { background: var(--brand); }
+        "#,
+            &root_vars,
+        );
+
+        let pair = parsed
+            .styles
+            .values()
+            .find(|pair| pair.selector == ".panel")
+            .expect("missing parsed .panel style");
+
+        let background = pair.normal.background.as_ref().expect("missing background");
+        assert_eq!(background.color, Color::srgb_u8(0x11, 0x22, 0x33));
+    }
+
+    #[test]
     fn parses_body_flex_layout_properties() {
         let parsed = load_css(
             r#"
@@ -3348,6 +3790,130 @@ mod tests {
         assert_eq!(parsed.0, UiRect::all(Val::Px(2.0)));
         assert_eq!(
             parsed.1,
+            convert_to_color("rgba(192, 198, 210, 0.95)".to_string()).expect("color")
+        );
+    }
+
+    #[test]
+    fn parses_outline_shorthand_with_style_token() {
+        let (width, color) = convert_css_outline("3px solid rgba(192, 198, 210, 0.95)".to_string())
+            .expect("outline");
+
+        assert_eq!(width, Val::Px(3.0));
+        assert_eq!(
+            color,
+            convert_to_color("rgba(192, 198, 210, 0.95)".to_string()).expect("color")
+        );
+    }
+
+    #[test]
+    fn outline_and_outline_offset_properties_map_to_style_fields() {
+        let mut style = Style::default();
+
+        apply_property_to_style(&mut style, "outline", "2px #7ea2ff");
+        apply_property_to_style(&mut style, "outline-offset", "5px");
+
+        assert_eq!(style.outline_width, Some(Val::Px(2.0)));
+        assert_eq!(style.outline_color, convert_to_color("#7ea2ff".to_string()));
+        assert_eq!(style.outline_offset, Some(Val::Px(5.0)));
+    }
+
+    #[test]
+    fn outline_none_hides_outline() {
+        let mut style = Style::default();
+
+        apply_property_to_style(&mut style, "outline", "none");
+
+        assert_eq!(style.outline_width, Some(Val::Px(0.0)));
+        assert_eq!(style.outline_color, Some(Color::NONE));
+    }
+
+    #[test]
+    fn outline_width_and_color_longhands_are_supported() {
+        let mut style = Style::default();
+
+        apply_property_to_style(&mut style, "outline-width", "4px");
+        apply_property_to_style(&mut style, "outline-color", "#4f83ff");
+
+        assert_eq!(style.outline_width, Some(Val::Px(4.0)));
+        assert_eq!(style.outline_color, convert_to_color("#4f83ff".to_string()));
+    }
+
+    #[test]
+    fn text_align_property_maps_to_text_layout_justify() {
+        let mut style = Style::default();
+        apply_property_to_style(&mut style, "text-align", "center");
+        assert_eq!(style.text_align, Some(Justify::Center));
+
+        apply_property_to_style(&mut style, "text-align", "right");
+        assert_eq!(style.text_align, Some(Justify::Right));
+
+        apply_property_to_style(&mut style, "text-align", "justify");
+        assert_eq!(style.text_align, Some(Justify::Justified));
+    }
+
+    #[test]
+    fn text_shadow_property_maps_to_bevy_text_shadow() {
+        let mut style = Style::default();
+        apply_property_to_style(
+            &mut style,
+            "text-shadow",
+            "3px 2px 8px rgba(10, 20, 30, 0.5)",
+        );
+
+        let shadow = style.text_shadow.expect("missing text shadow");
+        assert_eq!(shadow.offset, Vec2::new(3.0, 2.0));
+        assert_eq!(
+            shadow.color,
+            convert_to_color("rgba(10, 20, 30, 0.5)".to_string()).expect("color")
+        );
+    }
+
+    #[test]
+    fn text_transform_property_supports_upper_lower_capitalize_and_none() {
+        let mut style = Style::default();
+
+        apply_property_to_style(&mut style, "text-transform", "uppercase");
+        assert_eq!(style.text_transform, Some(TextTransform::Uppercase));
+
+        apply_property_to_style(&mut style, "text-transform", "lowercase");
+        assert_eq!(style.text_transform, Some(TextTransform::Lowercase));
+
+        apply_property_to_style(&mut style, "text-transform", "capitalize");
+        assert_eq!(style.text_transform, Some(TextTransform::Capitalize));
+
+        apply_property_to_style(&mut style, "text-transform", "none");
+        assert_eq!(style.text_transform, Some(TextTransform::None));
+    }
+
+    #[test]
+    fn text_transfrom_alias_is_supported() {
+        let mut style = Style::default();
+        apply_property_to_style(&mut style, "text-transfrom", "lowercase");
+        assert_eq!(style.text_transform, Some(TextTransform::Lowercase));
+    }
+
+    #[test]
+    fn line_height_property_maps_to_bevy_line_height() {
+        let mut style = Style::default();
+        apply_property_to_style(&mut style, "line-height", "150%");
+        assert_eq!(style.line_height, Some(LineHeight::RelativeToFont(1.5)));
+
+        apply_property_to_style(&mut style, "line-height", "20px");
+        assert_eq!(style.line_height, Some(LineHeight::Px(20.0)));
+    }
+
+    #[test]
+    fn box_shadow_parses_rgba_with_spaces() {
+        let shadow = convert_to_bevy_box_shadow("2px 4px 6px rgba(192, 198, 210, 0.95)".into())
+            .expect("shadow");
+        let layer = shadow.0.first().expect("shadow layer");
+
+        assert_eq!(layer.x_offset, Val::Px(2.0));
+        assert_eq!(layer.y_offset, Val::Px(4.0));
+        assert_eq!(layer.blur_radius, Val::Px(6.0));
+        assert_eq!(
+            layer.color,
             convert_to_color("rgba(192, 198, 210, 0.95)".to_string()).expect("color")
         );
     }

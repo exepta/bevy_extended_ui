@@ -1,0 +1,12 @@
+[package]
+name = "bevy_extended_ui_local_examples"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+bevy = "0.18.1"
+bevy_extended_ui = { path = "../..", features = ["svg"] }
+bevy_extended_ui_macros = { path = "../bevy_extended_ui_macros" }

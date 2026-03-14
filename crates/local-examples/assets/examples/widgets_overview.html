@@ -1,0 +1,239 @@
+<html>
+<head>
+  <meta name="widgets-demo" />
+  <link rel="stylesheet" href="widget_overview.css" />
+</head>
+<body>
+<div class="page-head">
+  <h3>Extended UI Widget Gallery</h3>
+  <p>All widgets in a display flex row</p>
+</div>
+
+<div class="widget-grid">
+  <div class="widget-card button-card">
+    <h5>Button</h5>
+    <button>Default Button</button>
+  </div>
+
+  <div class="widget-card">
+    <h5>Dialog</h5>
+    <button id="open-dialog-bevy">Open BevyApp Dialog</button>
+    <button id="open-dialog-system">Open System Dialog</button>
+
+    <dialog trigger="open-dialog-system" renderer="system">
+      Content Text by system type.
+    </dialog>
+
+    <dialog trigger="open-dialog-bevy" renderer="bevy-app">
+      <div class="dialog-demo-content">
+        <p>Hello World from HTML dialog content.</p>
+        <img src="/extended_ui/icons/color.png" class="demo-image" alt="dialog icon" />
+      </div>
+    </dialog>
+  </div>
+
+  <div class="widget-card">
+    <h5>CheckBox</h5>
+    <checkbox>Newsletter subscription</checkbox>
+  </div>
+
+  <div class="widget-card">
+    <h5>ChoiceBox</h5>
+    <select>
+      <option value="a">Option A</option>
+      <option value="b" selected>Option B</option>
+      <option value="c">Option C</option>
+      <option value="d">Option D</option>
+      <option value="e">Option E</option>
+    </select>
+  </div>
+
+  <div class="widget-card">
+    <h5>ColorPicker</h5>
+    <colorpicker value="#4b7cff"></colorpicker>
+  </div>
+
+  <div class="widget-card">
+    <h5>DatePicker</h5>
+    <label for="demo-date">Date</label>
+    <date-picker id="demo-date" format="dd.mm.yyyy"></date-picker>
+  </div>
+
+  <div class="widget-card">
+    <h5>InputField (File)</h5>
+    <label for="demo-file-basic">File</label>
+    <input id="demo-file-basic" type="file" extensions="[json, js, png]" />
+  </div>
+
+  <div class="widget-card">
+    <h5>InputField Preview</h5>
+    <label for="demo-preview-file">Image File</label>
+    <input
+      id="demo-preview-file"
+      type="file"
+      max-size="2MB"
+      extensions="[jpg, jpeg, png]"
+      show-size="true"
+    />
+    <img
+      id="demo-preview-image"
+      src="/extended_ui/icons/color.png"
+      preview="demo-preview-file"
+      class="demo-image input-preview-image"
+      alt="selected image preview"
+    />
+  </div>
+
+  <div class="widget-card">
+    <h5>ProgressBar</h5>
+    <progressbar value="68" min="0" max="100"></progressbar>
+  </div>
+
+  <div class="widget-card">
+    <h5>Slider</h5>
+    <slider value="35" min="0" max="100" step="1"></slider>
+    <slider value="0" min="0" max="100" step="1" dots="4" show-labels="true" tip="false"></slider>
+  </div>
+
+  <div class="widget-card">
+    <h5>Slider (range)</h5>
+    <slider id="range-slider-demo" type="range" value="20 - 40" dots="4" show-labels="true" dot-anchor="bottom"></slider>
+    <p id="range-slider-debug">Range: 20 - 40</p>
+  </div>
+
+  <div class="widget-card">
+    <h5>SwitchButton</h5>
+    <switch>Live Preview</switch>
+  </div>
+
+  <div class="widget-card">
+    <h5>ToggleButton</h5>
+    <toggle selected>Toggle</toggle>
+  </div>
+
+  <div class="widget-card">
+    <h5>RadioButtons / FieldSet</h5>
+    <fieldset mode="single">
+      <radio value="small" selected>Small</radio>
+      <radio value="medium">Medium</radio>
+      <radio value="large">Large</radio>
+    </fieldset>
+  </div>
+
+  <div class="widget-card">
+    <h5>Divider</h5>
+    <divider alignment="horizontal" class="full-divider"></divider>
+  </div>
+
+  <div class="widget-card">
+    <h5>Scrollbar Vert</h5>
+    <div class="scroll-div">
+      <h6>Entry 01</h6>
+      <h6>Entry 02</h6>
+      <h6>Entry 03</h6>
+      <h6>Entry 04</h6>
+      <h6>Entry 05</h6>
+      <h6>Entry 06</h6>
+    </div>
+  </div>
+
+  <div class="widget-card">
+    <h5>Scrollbar Hori</h5>
+    <div class="scroll-hori-div">
+      <h6>Entry 01</h6>
+      <h6>Entry 02</h6>
+      <h6>Entry 03</h6>
+      <h6>Entry 04</h6>
+      <h6>Entry 05</h6>
+      <h6>Entry 06</h6>
+    </div>
+  </div>
+
+  <div class="widget-card">
+    <h5>Event Test</h5>
+    <div
+      class="event-pad"
+      onmousedown="event_mouse_down"
+      onmouseup="event_mouse_up"
+      onwheel="event_wheel"
+      ontouchstart="event_touch_start"
+      ontouchmove="event_touch_move"
+      ontouchend="event_touch_end"
+    >
+      <div class="event-pad-content">
+        <h6>Use mouse or touch here</h6>
+        <h6>Wheel / Touch Move is enabled</h6>
+        <h6>Entry 01</h6>
+        <h6>Entry 02</h6>
+        <h6>Entry 03</h6>
+        <h6>Entry 04</h6>
+      </div>
+    </div>
+    <p id="event-debug-log">Event: waiting for input...</p>
+  </div>
+
+  <div class="widget-card">
+    <h5>Image</h5>
+    <img src="/extended_ui/icons/color.png" class="demo-image" alt="color icon" />
+  </div>
+
+  <div class="widget-card">
+    <h5>Image (SVG)</h5>
+    <img src="/examples/ui-spectrum-badge.svg" class="demo-image demo-svg-image" alt="colorful svg badge" />
+  </div>
+
+  <div class="widget-card">
+    <h5>ToolTip</h5>
+    <button id="tooltip-target">Hover me</button>
+    <tool-tip for="#tooltip-target" alignment="top">This is a tooltip</tool-tip>
+    <button>Over me</button>
+  </div>
+
+  <div class="widget-card">
+    <h5>Badge</h5>
+    <div class="notification-target">
+      <button id="inbox-button">Inbox</button>
+    </div>
+    <badge for="inbox-button" value="112" max="99" anchor="top right"></badge>
+  </div>
+
+  <div class="widget-card">
+    <h5>Form</h5>
+    <form validate="manual">
+      <label for="form-name">Name</label>
+      <input id="form-name" type="text" placeholder="Dein Name" />
+      <button type="submit">Submit</button>
+    </form>
+  </div>
+
+  <div class="widget-card">
+    <h5>HyperLinks</h5>
+    <a href="https://bevy.org" browsers="[firefox]" open-modal="true">Open Bevy (Browser List)</a>
+    <a href="https://docs.rs/bevy_extended_ui">Open docs.rs (System)</a>
+  </div>
+
+  <div class="widget-card">
+    <h5>Paragraph & Headline</h5>
+    <h6>Small Headline</h6>
+    <p>This is a paragraph rendered text.</p>
+  </div>
+
+  <div class="widget-card text-style-card">
+    <h5>Text Shadow & Transform</h5>
+    <p class="text-shadow-demo">Shadowed Label</p>
+    <p class="text-transform-upper">Mixed Case Example</p>
+    <p class="text-transform-lower">MIXED CASE EXAMPLE</p>
+    <p class="text-transform-cap">multi word title from css</p>
+    <p class="line-height-demo">line-height demo<br />second line<br />third line</p>
+  </div>
+
+  <div class="widget-card">
+    <h5>Div</h5>
+    <div class="demo-div">
+      <p>Block A</p>
+      <p>Block B</p>
+    </div>
+  </div>
+</div>
+</body>
+</html>

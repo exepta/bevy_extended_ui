@@ -1,12 +1,14 @@
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use once_cell::sync::Lazy;
+use std::collections::hash_map::DefaultHasher;
 use std::collections::{HashMap, HashSet};
+use std::hash::{Hash, Hasher};
 use std::sync::RwLock;
 
 use crate::io::CssAsset;
 use crate::styles::components::UiStyle;
-use crate::styles::parser::load_css;
+use crate::styles::parser::{collect_root_css_vars, load_css, load_css_with_root_vars};
 use crate::styles::{
     AnimationKeyframe, CssClass, CssID, CssSource, ExistingCssIDs, ParsedCss, StylePair, TagName,
 };
@@ -16,6 +18,16 @@ use crate::html::reload::CssDirty;
 
 static PARSED_CSS_CACHE: Lazy<RwLock<HashMap<AssetId<CssAsset>, ParsedCss>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
+static ROOT_CSS_VARS_CACHE: Lazy<RwLock<HashMap<AssetId<CssAsset>, HashMap<String, String>>>> =
+    Lazy::new(|| RwLock::new(HashMap::new()));
+static PARSED_CSS_WITH_VARS_CACHE: Lazy<RwLock<HashMap<ParsedCssWithVarsKey, ParsedCss>>> =
+    Lazy::new(|| RwLock::new(HashMap::new()));
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+struct ParsedCssWithVarsKey {
+    asset_id: AssetId<CssAsset>,
+    vars_hash: u64,
+}
 
 /// Tracks which entities reference which CSS assets.
 #[derive(Resource, Default)]
@@ -77,9 +89,15 @@ impl Plugin for CssService {
 fn invalidate_css_cache_on_asset_change(mut ev: MessageReader<AssetEvent<CssAsset>>) {
     for e in ev.read() {
         match e {
-            AssetEvent::Modified { id } | AssetEvent::Removed { id } => {
+            AssetEvent::Added { id } | AssetEvent::Modified { id } | AssetEvent::Removed { id } => {
                 if let Ok(mut cache) = PARSED_CSS_CACHE.write() {
                     cache.remove(id);
+                }
+                if let Ok(mut cache) = ROOT_CSS_VARS_CACHE.write() {
+                    cache.remove(id);
+                }
+                if let Ok(mut cache) = PARSED_CSS_WITH_VARS_CACHE.write() {
+                    cache.retain(|key, _| key.asset_id != *id);
                 }
             }
             _ => {}
@@ -104,6 +122,93 @@ fn get_or_parse_css(handle: &Handle<CssAsset>, css_assets: &Assets<CssAsset>) ->
         cache.insert(asset_id, parsed.clone());
     }
     Some(parsed)
+}
+
+fn hash_root_vars(root_vars: &HashMap<String, String>) -> u64 {
+    let mut entries: Vec<(&String, &String)> = root_vars.iter().collect();
+    entries.sort_unstable_by(|(left_key, _), (right_key, _)| left_key.cmp(right_key));
+
+    let mut hasher = DefaultHasher::new();
+    for (key, value) in entries {
+        key.hash(&mut hasher);
+        value.hash(&mut hasher);
+    }
+    hasher.finish()
+}
+
+fn get_or_collect_root_vars(
+    handle: &Handle<CssAsset>,
+    css_assets: &Assets<CssAsset>,
+) -> Option<HashMap<String, String>> {
+    let asset_id = handle.id();
+
+    if let Some(cached) = ROOT_CSS_VARS_CACHE
+        .read()
+        .ok()
+        .and_then(|cache| cache.get(&asset_id).cloned())
+    {
+        return Some(cached);
+    }
+
+    let css_asset = css_assets.get(handle)?;
+    let vars = collect_root_css_vars(&css_asset.text);
+
+    if let Ok(mut cache) = ROOT_CSS_VARS_CACHE.write() {
+        cache.insert(asset_id, vars.clone());
+    }
+
+    Some(vars)
+}
+
+fn get_or_parse_css_with_root_vars(
+    handle: &Handle<CssAsset>,
+    css_assets: &Assets<CssAsset>,
+    root_vars: &HashMap<String, String>,
+) -> Option<ParsedCss> {
+    if root_vars.is_empty() {
+        return get_or_parse_css(handle, css_assets);
+    }
+
+    let vars_hash = hash_root_vars(root_vars);
+    let cache_key = ParsedCssWithVarsKey {
+        asset_id: handle.id(),
+        vars_hash,
+    };
+
+    if let Some(cached) = PARSED_CSS_WITH_VARS_CACHE
+        .read()
+        .ok()
+        .and_then(|cache| cache.get(&cache_key).cloned())
+    {
+        return Some(cached);
+    }
+
+    let css_asset = css_assets.get(handle)?;
+    let parsed = load_css_with_root_vars(&css_asset.text, root_vars);
+
+    if let Ok(mut cache) = PARSED_CSS_WITH_VARS_CACHE.write() {
+        cache.insert(cache_key, parsed.clone());
+    }
+
+    Some(parsed)
+}
+
+fn collect_global_root_vars_for_sources(
+    sources: &[Handle<CssAsset>],
+    css_assets: &Assets<CssAsset>,
+) -> HashMap<String, String> {
+    let mut vars = HashMap::new();
+
+    for handle in sources {
+        let Some(extracted) = get_or_collect_root_vars(handle, css_assets) else {
+            continue;
+        };
+        for (name, value) in extracted {
+            vars.insert(name, value);
+        }
+    }
+
+    vars
 }
 
 /// Updates the reverse index of entities using each CSS asset.
@@ -183,10 +288,12 @@ fn resolve_breakpoint_viewport(
 }
 
 #[cfg(all(feature = "wasm-breakpoints", not(target_arch = "wasm32")))]
-fn resolve_breakpoint_viewport(
-    _window_query: &Query<&Window, With<PrimaryWindow>>,
-) -> Option<Vec2> {
-    None
+fn resolve_breakpoint_viewport(window_query: &Query<&Window, With<PrimaryWindow>>) -> Option<Vec2> {
+    let window = window_query.single().ok()?;
+    Some(Vec2::new(
+        window.resolution.width(),
+        window.resolution.height(),
+    ))
 }
 
 #[cfg(all(not(feature = "wasm-breakpoints"), feature = "css-breakpoints"))]
@@ -296,7 +403,9 @@ fn apply_css_to_entities(
     // Entities affected by CssAsset events (via CssUsers index)
     for ev in css_events.read() {
         let id = match ev {
-            AssetEvent::Modified { id } | AssetEvent::Removed { id } => Some(*id),
+            AssetEvent::Added { id } | AssetEvent::Modified { id } | AssetEvent::Removed { id } => {
+                Some(*id)
+            }
             _ => None,
         };
         let Some(id) = id else { continue };
@@ -382,15 +491,7 @@ fn apply_css_to_entities_legacy(
     mut css_events: MessageReader<AssetEvent<CssAsset>>,
     css_users: Res<CssUsers>,
     query_changed_source: Query<
-        (
-            Entity,
-            &CssSource,
-            Option<&CssID>,
-            Option<&CssClass>,
-            Option<&TagName>,
-            Option<&ChildOf>,
-            Option<&CssDirty>,
-        ),
+        (Entity, Option<&CssDirty>),
         Or<(
             Changed<CssSource>,
             Added<CssSource>,
@@ -400,6 +501,18 @@ fn apply_css_to_entities_legacy(
             Changed<TagName>,
             Changed<ChildOf>,
         )>,
+    >,
+    query_all_source: Query<
+        (
+            Entity,
+            &CssSource,
+            Option<&CssID>,
+            Option<&CssClass>,
+            Option<&TagName>,
+            Option<&ChildOf>,
+            Option<&CssDirty>,
+        ),
+        With<CssSource>,
     >,
     parent_query: Query<(
         Option<&CssID>,
@@ -411,13 +524,15 @@ fn apply_css_to_entities_legacy(
 ) {
     let mut dirty: HashSet<Entity> = HashSet::new();
 
-    for (e, _, _, _, _, _, _) in query_changed_source.iter() {
+    for (e, _) in query_changed_source.iter() {
         dirty.insert(e);
     }
 
     for ev in css_events.read() {
         let id = match ev {
-            AssetEvent::Modified { id } | AssetEvent::Removed { id } => Some(*id),
+            AssetEvent::Added { id } | AssetEvent::Modified { id } | AssetEvent::Removed { id } => {
+                Some(*id)
+            }
             _ => None,
         };
         let Some(id) = id else { continue };
@@ -432,8 +547,8 @@ fn apply_css_to_entities_legacy(
     }
 
     for entity in dirty {
-        let Ok((_, css_source, id, class, tag, parent, _dirty_marker)) =
-            query_changed_source.get(entity)
+        let Ok((_, css_source, id, class, tag, parent, dirty_marker)) =
+            query_all_source.get(entity)
         else {
             continue;
         };
@@ -457,7 +572,10 @@ fn apply_css_to_entities_legacy(
         };
 
         match style_query.get(entity) {
-            Ok(Some(existing)) if existing.styles != final_style.styles => {
+            Ok(Some(existing))
+                if existing.styles != final_style.styles
+                    || existing.keyframes != final_style.keyframes =>
+            {
                 commands
                     .entity(entity)
                     .queue_silenced(move |mut ew: EntityWorldMut| {
@@ -473,7 +591,15 @@ fn apply_css_to_entities_legacy(
                         ew.remove::<CssDirty>();
                     });
             }
-            _ => {}
+            _ => {
+                if dirty_marker.is_some() {
+                    commands
+                        .entity(entity)
+                        .queue_silenced(|mut ew: EntityWorldMut| {
+                            ew.remove::<CssDirty>();
+                        });
+                }
+            }
         }
     }
 }
@@ -496,9 +622,12 @@ fn load_and_merge_styles_from_assets(
 ) -> ParsedCss {
     let mut merged_styles: HashMap<String, StylePair> = HashMap::new();
     let mut merged_keyframes: HashMap<String, Vec<AnimationKeyframe>> = HashMap::new();
+    let global_root_vars = collect_global_root_vars_for_sources(sources, css_assets);
 
     for (index, handle) in sources.iter().enumerate() {
-        let Some(parsed_map) = get_or_parse_css(handle, css_assets) else {
+        let Some(parsed_map) =
+            get_or_parse_css_with_root_vars(handle, css_assets, &global_root_vars)
+        else {
             continue;
         };
 
@@ -560,9 +689,12 @@ fn load_and_merge_styles_from_assets_legacy(
 ) -> ParsedCss {
     let mut merged_styles: HashMap<String, StylePair> = HashMap::new();
     let mut merged_keyframes: HashMap<String, Vec<AnimationKeyframe>> = HashMap::new();
+    let global_root_vars = collect_global_root_vars_for_sources(sources, css_assets);
 
     for (index, handle) in sources.iter().enumerate() {
-        let Some(parsed_map) = get_or_parse_css(handle, css_assets) else {
+        let Some(parsed_map) =
+            get_or_parse_css_with_root_vars(handle, css_assets, &global_root_vars)
+        else {
             continue;
         };
 

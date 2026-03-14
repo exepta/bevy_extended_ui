@@ -1,0 +1,46 @@
+<html>
+<head>
+  <meta name="theme-provider-demo-single" />
+  <link rel="stylesheet" href="theming_provider.css" />
+</head>
+<theme-provider default="light">
+  <body class="theme-demo">
+  <div class="demo-shell">
+    <h3>Theme Provider Demo</h3>
+    <p class="subtitle">Single HTML. Click button to switch to the next discovered theme.</p>
+    <button class="switch-theme" onclick="toggle_theme">Toggle Theme</button>
+
+    <div class="demo-grid">
+      <div class="panel">
+        <label for="demo-name">Name</label>
+        <input id="demo-name" type="text" value="Ada Lovelace" />
+      </div>
+
+      <div class="panel">
+        <label for="demo-role">Role</label>
+        <select id="demo-role">
+          <option value="eng" selected>Engineering</option>
+          <option value="design">Design</option>
+          <option value="qa">Quality Assurance</option>
+        </select>
+      </div>
+
+      <div class="panel">
+        <label for="demo-date">Release Date</label>
+        <date-picker id="demo-date" value="21.03.2026" format="dd.mm.yyyy"></date-picker>
+      </div>
+
+      <div class="panel">
+        <p>Live Preview</p>
+        <switch icon="/extended_ui/icons/color.png">Enabled</switch>
+      </div>
+
+      <div class="panel">
+        <p>Deployment Progress</p>
+        <progressbar value="72" min="0" max="100"></progressbar>
+      </div>
+    </div>
+  </div>
+  </body>
+</theme-provider>
+</html>

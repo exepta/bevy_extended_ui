@@ -6,6 +6,7 @@
 [![Downloads](https://img.shields.io/crates/d/bevy_extended_ui.svg)](https://crates.io/crates/bevy_extended_ui)
 [![license](https://img.shields.io/badge/license-Apache-blue.svg)](./LICENSE)
 [![Build](https://github.com/exepta/bevy_extended_ui/actions/workflows/build.yml/badge.svg)](https://github.com/exepta/bevy_extended_ui/actions/workflows/build.yml)
+[![codecov](https://codecov.io/gh/exepta/bevy_extended_ui/graph/badge.svg?token=WZ4KSN111U)](https://codecov.io/gh/exepta/bevy_extended_ui)
 
 Since I've been writing a game in the [_Bevy_](https://bevyengine.org/) engine lately,
 I created this crate. In my game,
@@ -33,6 +34,7 @@ Available features:
 - [x] CSS `*` support.
 - [x] Custom Cursor or system cursor support.
 - [x] Form Widget for validation and submission.
+- [x] Dialog system with Bevy modals and native system dialogs.
 - [ ] Customizable theme.
 
 There are many other things, but currently you can use the core (HTML / CSS) features.
@@ -51,20 +53,23 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-bevy_extended_ui = "1.4.0"
-bevy_extended_ui_macros = "1.4.0"
+bevy_extended_ui = "1.4.2"
+bevy_extended_ui_macros = "1.4.2"
 ```
 
 #### Features
 | Feature            | Description                                                                                          |
 |--------------------|------------------------------------------------------------------------------------------------------|
-| `default`          | Enables `css-breakpoints`.                                                                           |
+| `default`          | Enables `css-breakpoints`, `fluent`, `providers`, `svg`, and `extended-dialog`.                     |
 | `wasm-default`     | Web preset: `wasm-breakpoints` + `clipboard-wasm` with legacy WASM CSS/style pipeline compatibility. |
 | `css-breakpoints`  | Desktop breakpoints via primary window.                                                              |
 | `wasm-breakpoints` | WASM breakpoints via browser viewport.                                                               |
 | `fluent`           | Enables Fluent Language support.                                                                     |
 | `properties-lang`  | Enables Java Properties Language support.                                                            |
 | `clipboard-wasm`   | Enables WASM clipboard support web.                                                                  |
+| `svg`              | Optional SVG image support for UI images/icons (rasterized to Bevy `Image`); not enabled by default. |
+| `providers`        | Enables custom HTML providers (e.g. theme-provider).                                                 |
+| `extended-dialog`  | Enables the dialog system with `BevyApp` and desktop `System` providers.                            |
 
 Then, you add the plugin to your `main.rs` or on any point at a build function:
 
@@ -124,6 +129,38 @@ Note that currently you can use this binding:
 - `ondragstart`
 - `ondrag`
 - `ondragstop`
+
+### Dialog system
+
+`extended-dialog` is enabled by default. It provides:
+
+- `DialogProvider::BevyApp` for in-window modals (floating panel or bottom sheet)
+- `DialogProvider::System` for native desktop dialogs (Linux/macOS/Windows)
+- Modal types: `Default`, `Failure`, `Question`, `Blank`
+
+HTML dialog widget usage:
+
+```html
+<button id="open-system-dialog">Open System Dialog</button>
+<button id="open-bevy-dialog">Open Bevy Dialog</button>
+
+<dialog trigger="open-system-dialog" renderer="system" type="error">
+  Error message text for system dialog.
+</dialog>
+
+<dialog trigger="open-bevy-dialog" renderer="bevy-app" type="info">
+  <div>
+    <p>Hello World</p>
+    <img src="/extended_ui/icons/color.png" />
+  </div>
+</dialog>
+```
+
+Supported dialog attributes:
+
+- `renderer`: `bevy-app | system`
+- `type`: `warn | error | info | blank`
+- `trigger` (alias: `triggger`): id of the widget that opens the dialog
 
 ### WASM support
 
@@ -238,6 +275,18 @@ Basic `@keyframes` usage example:
 }
 ```
 
+### Template data (reactive bindings)
+
+There is no built-in loop/templating engine. Instead, the HTML parser collects `{{...}}` placeholders
+into `HtmlInnerContent`, and you replace them in Rust based on your own model.
+
+See:
+- `examples/reactive_binding.rs`
+- `examples/template_iteration.rs`
+
+The iteration example renders a list by joining items into a single string (with `\n` line breaks)
+and substituting `{{inventory.list}}` at runtime.
+
 You can now use `@keyframes` in your CSS. There is now a limit tested; this means that you can use any CSS property.
 
 ### Breakpoint support
@@ -274,9 +323,12 @@ If anyone has any ideas, I'd be happy to hear them.
 
 | `Bevy` version | `bevy_extended_ui` version |
 |----------------|----------------------------|
-| 0.18.0         | 1.2.0 - 1.4.0              |
+| 0.18.0         | 1.2.0 - 1.4.2              |
 | 0.17.0         | 1.0.0 - 1.1.0              |
 | 0.16.0         | 0.1.0 - 0.2.2              |
+
+> _Note:_ WASM is not correctly supported in version 1.4.0 there is a layout bug. I'm working on this bug, but this needs time!
+> Version 1.4.1 and above ar fixed for WASM.
 
 > _Note:_ Version 0.1.0–0.3.0 are deprecated and will not be supported. If you’re interested in a version for bevy 0.16, then create an issue!
 

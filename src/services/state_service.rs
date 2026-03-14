@@ -9,7 +9,7 @@ impl Plugin for StateService {
     /// Registers widget state systems.
     fn build(&self, app: &mut App) {
         app.register_type::<Pickable>();
-        app.add_systems(Update, update_widget_states);
+        app.add_systems(PostUpdate, update_widget_states);
         app.add_systems(
             Update,
             (
@@ -107,10 +107,12 @@ fn internal_state_check(
 fn handle_tab_focus(
     mut query: Query<(Entity, &mut UIWidgetState, &UIGenID)>,
     keyboard: Res<ButtonInput<KeyCode>>,
+    mut current_state: ResMut<CurrentWidgetState>,
 ) {
     if !keyboard.just_pressed(KeyCode::Tab) {
         return;
     }
+    let reverse = keyboard.pressed(KeyCode::ShiftLeft) || keyboard.pressed(KeyCode::ShiftRight);
 
     let mut elems: Vec<_> = query
         .iter_mut()
@@ -135,11 +137,18 @@ fn handle_tab_focus(
     match focused_idx {
         Some(i) => {
             elems[i].1.focused = false;
-            let next = (i + 1) % len;
+            let next = if reverse {
+                (i + len - 1) % len
+            } else {
+                (i + 1) % len
+            };
             elems[next].1.focused = true;
+            current_state.widget_id = elems[next].2.get();
         }
         None => {
-            elems[0].1.focused = true;
+            let next = if reverse { len - 1 } else { 0 };
+            elems[next].1.focused = true;
+            current_state.widget_id = elems[next].2.get();
         }
     }
 }

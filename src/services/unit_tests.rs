@@ -5,15 +5,17 @@ mod tests {
     use super::super::state_service::{StateService, update_widget_states};
     use super::super::style_service::{
         LastUiTransform, StyleTransition, propagate_style_inheritance, sync_last_ui_transform,
+        update_widget_styles_system,
     };
     use crate::io::CssAsset;
     use crate::styles::components::UiStyle;
-    use crate::styles::{CssSource, FontVal, Style, TransitionSpec};
+    use crate::styles::{CssSource, FontVal, Style, StylePair, TextTransform, TransitionSpec};
     use crate::widgets::{BindToID, UIGenID, UIWidgetState};
     use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
     use bevy::asset::AssetPlugin;
     use bevy::input::ButtonInput;
     use bevy::prelude::*;
+    use bevy::text::LineHeight;
     use std::collections::HashMap;
     use std::fs;
     use std::path::PathBuf;
@@ -260,6 +262,49 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "svg")]
+    #[test]
+    fn get_or_load_image_rasterizes_svg_into_image_asset() {
+        let folder = unique_assets_folder("service_svg_image");
+        fs::create_dir_all(&folder).expect("failed to create svg test folder");
+
+        let svg_file = folder.join("icon.svg");
+        fs::write(
+            &svg_file,
+            r#"<svg xmlns="http://www.w3.org/2000/svg" width="4" height="5"><rect width="4" height="5" fill="red"/></svg>"#,
+        )
+        .expect("failed to write svg");
+
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, AssetPlugin::default()));
+        app.init_asset::<Image>();
+        app.insert_resource(ImageCache::default());
+
+        let asset_server = app.world().resource::<AssetServer>().clone();
+        let asset_path = svg_file
+            .strip_prefix("assets")
+            .expect("svg path not in assets")
+            .to_string_lossy()
+            .trim_start_matches('/')
+            .to_string();
+
+        let handle = app
+            .world_mut()
+            .resource_scope(|world, mut cache: Mut<ImageCache>| {
+                let mut images = world.resource_mut::<Assets<Image>>();
+                get_or_load_image(asset_path.as_str(), &mut cache, &mut images, &asset_server)
+            });
+
+        let images = app.world().resource::<Assets<Image>>();
+        let image = images
+            .get(handle.id())
+            .expect("svg image handle was not inserted");
+        assert_eq!(image.texture_descriptor.size.width, 4);
+        assert_eq!(image.texture_descriptor.size.height, 5);
+
+        fs::remove_dir_all(&folder).expect("failed to clean up svg test folder");
+    }
+
     #[test]
     fn pre_load_assets_does_nothing_for_missing_folder() {
         let mut app = App::new();
@@ -285,6 +330,13 @@ mod tests {
         fs::write(folder.join("a.png"), []).expect("failed to write png");
         fs::write(folder.join("b.jpg"), []).expect("failed to write jpg");
         fs::write(folder.join("c.jpeg"), []).expect("failed to write jpeg");
+        fs::write(folder.join("d.webp"), []).expect("failed to write webp");
+        #[cfg(feature = "svg")]
+        fs::write(
+            folder.join("e.svg"),
+            r#"<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2"><rect width="2" height="2" fill="black"/></svg>"#,
+        )
+        .expect("failed to write svg");
         fs::write(folder.join("ignore.txt"), []).expect("failed to write txt");
 
         let mut app = App::new();
@@ -309,6 +361,9 @@ mod tests {
         assert!(keys.iter().any(|k| k.ends_with("a.png")));
         assert!(keys.iter().any(|k| k.ends_with("b.jpg")));
         assert!(keys.iter().any(|k| k.ends_with("c.jpeg")));
+        assert!(keys.iter().any(|k| k.ends_with("d.webp")));
+        #[cfg(feature = "svg")]
+        assert!(keys.iter().any(|k| k.ends_with("e.svg")));
         assert!(!keys.iter().any(|k| k.ends_with("ignore.txt")));
 
         fs::remove_dir_all(&folder).expect("failed to clean up test assets folder");
@@ -556,5 +611,255 @@ mod tests {
             .get::<TextColor>(child)
             .expect("missing TextColor");
         assert_eq!(child_text.0, Color::srgb(0.0, 1.0, 0.0));
+    }
+
+    #[test]
+    fn update_widget_styles_system_does_not_tint_image_nodes_from_color() {
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, AssetPlugin::default()));
+        app.init_asset::<Image>();
+        app.insert_resource(ImageCache::default());
+        app.add_systems(Update, update_widget_styles_system);
+
+        let mut style = Style::default();
+        style.color = Some(Color::srgb(1.0, 0.0, 0.0));
+
+        let mut styles = HashMap::new();
+        styles.insert(
+            "*".to_string(),
+            StylePair {
+                normal: style,
+                selector: "*".to_string(),
+                ..default()
+            },
+        );
+
+        let entity = app
+            .world_mut()
+            .spawn((
+                UiStyle {
+                    css: Handle::default(),
+                    styles,
+                    keyframes: HashMap::new(),
+                    active_style: None,
+                },
+                Node::default(),
+                TextColor(Color::NONE),
+                ImageNode {
+                    color: Color::srgb(0.2, 0.3, 0.4),
+                    ..default()
+                },
+            ))
+            .id();
+
+        app.update();
+
+        let text_color = app
+            .world()
+            .get::<TextColor>(entity)
+            .expect("missing TextColor");
+        let image_node = app
+            .world()
+            .get::<ImageNode>(entity)
+            .expect("missing ImageNode");
+
+        assert_eq!(text_color.0, Color::srgb(1.0, 0.0, 0.0));
+        assert_eq!(image_node.color, Color::srgb(0.2, 0.3, 0.4));
+    }
+
+    #[test]
+    fn update_widget_styles_system_applies_line_height_from_css() {
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, AssetPlugin::default()));
+        app.init_asset::<Image>();
+        app.insert_resource(ImageCache::default());
+        app.add_systems(Update, update_widget_styles_system);
+
+        let mut style = Style::default();
+        style.line_height = Some(LineHeight::RelativeToFont(1.65));
+
+        let mut styles = HashMap::new();
+        styles.insert(
+            "*".to_string(),
+            StylePair {
+                normal: style,
+                selector: "*".to_string(),
+                ..default()
+            },
+        );
+
+        let entity = app
+            .world_mut()
+            .spawn((
+                UiStyle {
+                    css: Handle::default(),
+                    styles,
+                    keyframes: HashMap::new(),
+                    active_style: None,
+                },
+                Node::default(),
+                Text::new("line height"),
+                LineHeight::default(),
+            ))
+            .id();
+
+        app.update();
+
+        let line_height = app
+            .world()
+            .get::<LineHeight>(entity)
+            .expect("missing line height");
+        assert_eq!(*line_height, LineHeight::RelativeToFont(1.65));
+    }
+
+    #[test]
+    fn update_widget_styles_system_inserts_and_resets_outline_from_css() {
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, AssetPlugin::default()));
+        app.init_asset::<Image>();
+        app.insert_resource(ImageCache::default());
+        app.add_systems(Update, update_widget_styles_system);
+
+        let mut style = Style::default();
+        style.outline_width = Some(Val::Px(2.0));
+        style.outline_offset = Some(Val::Px(4.0));
+        style.outline_color = Some(Color::srgb(0.3, 0.6, 1.0));
+
+        let mut styles = HashMap::new();
+        styles.insert(
+            "*".to_string(),
+            StylePair {
+                normal: style,
+                selector: "*".to_string(),
+                ..default()
+            },
+        );
+
+        let entity = app
+            .world_mut()
+            .spawn((
+                UiStyle {
+                    css: Handle::default(),
+                    styles,
+                    keyframes: HashMap::new(),
+                    active_style: None,
+                },
+                Node::default(),
+            ))
+            .id();
+
+        app.update();
+
+        let outline = app.world().get::<Outline>(entity).expect("missing outline");
+        assert_eq!(outline.width, Val::Px(2.0));
+        assert_eq!(outline.offset, Val::Px(4.0));
+        assert_eq!(outline.color, Color::srgb(0.3, 0.6, 1.0));
+
+        let mut reset_styles = HashMap::new();
+        reset_styles.insert(
+            "*".to_string(),
+            StylePair {
+                normal: Style::default(),
+                selector: "*".to_string(),
+                ..default()
+            },
+        );
+        if let Some(mut ui_style) = app.world_mut().entity_mut(entity).get_mut::<UiStyle>() {
+            ui_style.styles = reset_styles;
+        } else {
+            panic!("missing UiStyle");
+        }
+
+        app.update();
+
+        let outline_after = app
+            .world()
+            .get::<Outline>(entity)
+            .expect("missing outline after reset");
+        let default_outline = Outline::default();
+        assert_eq!(outline_after.width, default_outline.width);
+        assert_eq!(outline_after.offset, default_outline.offset);
+        assert_eq!(outline_after.color, default_outline.color);
+    }
+
+    #[test]
+    fn text_shadow_and_transform_apply_and_reset_with_css_changes() {
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, AssetPlugin::default()));
+        app.init_asset::<Image>();
+        app.insert_resource(ImageCache::default());
+        app.add_systems(
+            Update,
+            (update_widget_styles_system, propagate_style_inheritance).chain(),
+        );
+
+        let mut styled = Style::default();
+        styled.text_transform = Some(TextTransform::Uppercase);
+        styled.text_shadow = Some(TextShadow {
+            offset: Vec2::new(3.0, 2.0),
+            color: Color::srgba(0.0, 0.0, 0.0, 0.7),
+        });
+
+        let mut styles = HashMap::new();
+        styles.insert(
+            "*".to_string(),
+            StylePair {
+                normal: styled,
+                selector: "*".to_string(),
+                ..default()
+            },
+        );
+
+        let entity = app
+            .world_mut()
+            .spawn((
+                UiStyle {
+                    css: Handle::default(),
+                    styles,
+                    keyframes: HashMap::new(),
+                    active_style: None,
+                },
+                Node::default(),
+                Text::new("MiXeD Case"),
+            ))
+            .id();
+
+        app.update();
+
+        let text = app.world().get::<Text>(entity).expect("missing text");
+        let shadow = app
+            .world()
+            .get::<TextShadow>(entity)
+            .expect("missing text shadow");
+        assert_eq!(text.0, "MIXED CASE");
+        assert_eq!(shadow.offset, Vec2::new(3.0, 2.0));
+
+        let mut base = Style::default();
+        base.text_transform = Some(TextTransform::None);
+        let mut reset_styles = HashMap::new();
+        reset_styles.insert(
+            "*".to_string(),
+            StylePair {
+                normal: base,
+                selector: "*".to_string(),
+                ..default()
+            },
+        );
+
+        if let Some(mut ui_style) = app.world_mut().entity_mut(entity).get_mut::<UiStyle>() {
+            ui_style.styles = reset_styles;
+        } else {
+            panic!("missing UiStyle");
+        }
+
+        app.update();
+
+        let text_after = app.world().get::<Text>(entity).expect("missing text");
+        let shadow_after = app.world().get::<TextShadow>(entity);
+        assert_eq!(text_after.0, "MiXeD Case");
+        assert!(
+            shadow_after.is_none(),
+            "text shadow should be removed after css reset"
+        );
     }
 }
