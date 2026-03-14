@@ -9,12 +9,13 @@ mod tests {
     };
     use crate::io::CssAsset;
     use crate::styles::components::UiStyle;
-    use crate::styles::{CssSource, FontVal, Style, StylePair, TransitionSpec};
+    use crate::styles::{CssSource, FontVal, Style, StylePair, TextTransform, TransitionSpec};
     use crate::widgets::{BindToID, UIGenID, UIWidgetState};
     use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
     use bevy::asset::AssetPlugin;
     use bevy::input::ButtonInput;
     use bevy::prelude::*;
+    use bevy::text::LineHeight;
     use std::collections::HashMap;
     use std::fs;
     use std::path::PathBuf;
@@ -664,5 +665,131 @@ mod tests {
 
         assert_eq!(text_color.0, Color::srgb(1.0, 0.0, 0.0));
         assert_eq!(image_node.color, Color::srgb(0.2, 0.3, 0.4));
+    }
+
+    #[test]
+    fn update_widget_styles_system_applies_line_height_from_css() {
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, AssetPlugin::default()));
+        app.init_asset::<Image>();
+        app.insert_resource(ImageCache::default());
+        app.add_systems(Update, update_widget_styles_system);
+
+        let mut style = Style::default();
+        style.line_height = Some(LineHeight::RelativeToFont(1.65));
+
+        let mut styles = HashMap::new();
+        styles.insert(
+            "*".to_string(),
+            StylePair {
+                normal: style,
+                selector: "*".to_string(),
+                ..default()
+            },
+        );
+
+        let entity = app
+            .world_mut()
+            .spawn((
+                UiStyle {
+                    css: Handle::default(),
+                    styles,
+                    keyframes: HashMap::new(),
+                    active_style: None,
+                },
+                Node::default(),
+                Text::new("line height"),
+                LineHeight::default(),
+            ))
+            .id();
+
+        app.update();
+
+        let line_height = app
+            .world()
+            .get::<LineHeight>(entity)
+            .expect("missing line height");
+        assert_eq!(*line_height, LineHeight::RelativeToFont(1.65));
+    }
+
+    #[test]
+    fn text_shadow_and_transform_apply_and_reset_with_css_changes() {
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, AssetPlugin::default()));
+        app.init_asset::<Image>();
+        app.insert_resource(ImageCache::default());
+        app.add_systems(
+            Update,
+            (update_widget_styles_system, propagate_style_inheritance).chain(),
+        );
+
+        let mut styled = Style::default();
+        styled.text_transform = Some(TextTransform::Uppercase);
+        styled.text_shadow = Some(TextShadow {
+            offset: Vec2::new(3.0, 2.0),
+            color: Color::srgba(0.0, 0.0, 0.0, 0.7),
+        });
+
+        let mut styles = HashMap::new();
+        styles.insert(
+            "*".to_string(),
+            StylePair {
+                normal: styled,
+                selector: "*".to_string(),
+                ..default()
+            },
+        );
+
+        let entity = app
+            .world_mut()
+            .spawn((
+                UiStyle {
+                    css: Handle::default(),
+                    styles,
+                    keyframes: HashMap::new(),
+                    active_style: None,
+                },
+                Node::default(),
+                Text::new("MiXeD Case"),
+            ))
+            .id();
+
+        app.update();
+
+        let text = app.world().get::<Text>(entity).expect("missing text");
+        let shadow = app
+            .world()
+            .get::<TextShadow>(entity)
+            .expect("missing text shadow");
+        assert_eq!(text.0, "MIXED CASE");
+        assert_eq!(shadow.offset, Vec2::new(3.0, 2.0));
+
+        let mut base = Style::default();
+        base.text_transform = Some(TextTransform::None);
+        let mut reset_styles = HashMap::new();
+        reset_styles.insert(
+            "*".to_string(),
+            StylePair {
+                normal: base,
+                selector: "*".to_string(),
+                ..default()
+            },
+        );
+
+        if let Some(mut ui_style) = app.world_mut().entity_mut(entity).get_mut::<UiStyle>() {
+            ui_style.styles = reset_styles;
+        } else {
+            panic!("missing UiStyle");
+        }
+
+        app.update();
+
+        let text_after = app.world().get::<Text>(entity).expect("missing text");
+        let shadow_after = app.world().get::<TextShadow>(entity);
+        assert_eq!(text_after.0, "MiXeD Case");
+        assert!(
+            shadow_after.is_none(),
+            "text shadow should be removed after css reset"
+        );
     }
 }

@@ -4,9 +4,11 @@ use crate::styles::{
     BackgroundAttachment, BackgroundPosition, BackgroundPositionValue, BackgroundSize,
     BackgroundSizeValue, CalcExpr, CalcUnit, CalcValue, CursorStyle, FontFamily, FontVal,
     FontWeight, GradientStop, GradientStopPosition, LinearGradient, MediaQueryCondition, ParsedCss,
-    Radius, Style, StylePair, TransformStyle, TransitionProperty, TransitionSpec, TransitionTiming,
+    Radius, Style, StylePair, TextTransform, TransformStyle, TransitionProperty, TransitionSpec,
+    TransitionTiming,
 };
 use bevy::prelude::*;
+use bevy::text::LineHeight;
 use bevy::ui::Val2;
 use bevy::window::SystemCursorIcon;
 use lightningcss::media_query::{
@@ -673,7 +675,7 @@ fn split_var_args(input: &str) -> (&str, Option<&str>) {
 /// - Colors: `color`, `background-color`, `border-color`
 /// - Flex/grid layout: `display`, `position`, `flex-grow`, `flex-direction`, `grid-template-columns`, etc.
 /// - Visuals: `background`, `background-image`, `box-shadow`, `z-index`, `overflow`, etc.
-/// - Typography: `font-size`, `text-wrap`, `text-align`
+/// - Typography: `font-size`, `line-height`, `text-wrap`, `text-align`, `text-transform`, `text-shadow`
 ///
 /// # Behavior
 /// - If a property or value is unsupported or invalid, it is silently ignored.
@@ -797,6 +799,7 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
         }
 
         "font-size" => style.font_size = convert_to_font_size(value.to_string()),
+        "line-height" => style.line_height = convert_to_bevy_line_height(value.to_string()),
         "font-family" => {
             style.font_family = Some(FontFamily(
                 value
@@ -846,6 +849,7 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
         "border-width" => style.border = convert_to_ui_rect(value.to_string()),
 
         "box-shadow" => style.box_shadow = convert_to_bevy_box_shadow(value.to_string()),
+        "text-shadow" => style.text_shadow = convert_to_bevy_text_shadow(value.to_string()),
 
         "overflow" => style.overflow = convert_overflow(value.to_string(), "all"),
         "overflow-y" => apply_overflow_axis(style, value, OverflowAxisSelector::Y),
@@ -853,6 +857,9 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
 
         "text-wrap" => style.text_wrap = convert_to_bevy_line_break(value.to_string()),
         "text-align" => style.text_align = convert_to_bevy_text_align(value.to_string()),
+        "text-transform" | "text-transfrom" => {
+            style.text_transform = convert_to_bevy_text_transform(value.to_string())
+        }
         "z-index" => style.z_index = convert_to_i32(value.to_string()),
         "pointer-events" => style.pointer_events = convert_to_bevy_pick_able(value.to_string()),
         "cursor" => style.cursor = convert_to_cursor_style(value.to_string()),
@@ -2663,6 +2670,139 @@ pub fn convert_to_ui_rect(value: String) -> Option<UiRect> {
     })
 }
 
+fn split_css_whitespace_tokens(input: &str) -> Vec<&str> {
+    let mut tokens = Vec::new();
+    let mut start: Option<usize> = None;
+    let mut depth = 0u32;
+
+    for (idx, ch) in input.char_indices() {
+        match ch {
+            '(' => {
+                if start.is_none() {
+                    start = Some(idx);
+                }
+                depth = depth.saturating_add(1);
+            }
+            ')' => {
+                depth = depth.saturating_sub(1);
+            }
+            _ if ch.is_whitespace() && depth == 0 => {
+                if let Some(token_start) = start {
+                    let token = input[token_start..idx].trim();
+                    if !token.is_empty() {
+                        tokens.push(token);
+                    }
+                    start = None;
+                }
+            }
+            _ => {
+                if start.is_none() {
+                    start = Some(idx);
+                }
+            }
+        }
+    }
+
+    if let Some(token_start) = start {
+        let token = input[token_start..].trim();
+        if !token.is_empty() {
+            tokens.push(token);
+        }
+    }
+
+    tokens
+}
+
+fn split_css_top_level_commas(input: &str) -> Vec<&str> {
+    let mut out = Vec::new();
+    let mut depth = 0u32;
+    let mut start = 0usize;
+
+    for (idx, ch) in input.char_indices() {
+        match ch {
+            '(' => depth = depth.saturating_add(1),
+            ')' => depth = depth.saturating_sub(1),
+            ',' if depth == 0 => {
+                let part = input[start..idx].trim();
+                if !part.is_empty() {
+                    out.push(part);
+                }
+                start = idx + 1;
+            }
+            _ => {}
+        }
+    }
+
+    let tail = input[start..].trim();
+    if !tail.is_empty() {
+        out.push(tail);
+    }
+
+    out
+}
+
+fn parse_text_shadow_length_px(input: &str) -> Option<f32> {
+    let parsed = parse_math_value(input.trim())?;
+    match parsed.unit {
+        CalcUnit::Px => Some(parsed.value),
+        CalcUnit::None if parsed.value == 0.0 => Some(0.0),
+        _ => None,
+    }
+}
+
+/// Converts a CSS-like `text-shadow` string into Bevy [`TextShadow`].
+///
+/// Supported format:
+/// - `OFFSET_X OFFSET_Y [BLUR] [COLOR]`
+///
+/// Notes:
+/// - Only the first shadow from comma-separated lists is applied.
+/// - Blur is accepted but ignored (Bevy UI `TextShadow` does not expose blur radius).
+/// - Offsets currently require `px` or `0`.
+pub fn convert_to_bevy_text_shadow(value: String) -> Option<TextShadow> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("none") {
+        return None;
+    }
+
+    let segment = split_css_top_level_commas(trimmed)
+        .into_iter()
+        .next()
+        .unwrap_or(trimmed);
+    let tokens = split_css_whitespace_tokens(segment);
+    if tokens.is_empty() {
+        return None;
+    }
+
+    let mut lengths: Vec<f32> = Vec::new();
+    let mut color: Option<Color> = None;
+
+    for token in tokens {
+        if token.eq_ignore_ascii_case("inset") {
+            continue;
+        }
+        if let Some(px) = parse_text_shadow_length_px(token) {
+            lengths.push(px);
+            continue;
+        }
+        if let Some(parsed_color) = convert_to_color(token.to_string()) {
+            color = Some(parsed_color);
+        }
+    }
+
+    let (x, y) = match lengths.len() {
+        0 => return None,
+        1 => (lengths[0], lengths[0]),
+        _ => (lengths[0], lengths[1]),
+    };
+
+    let default_shadow = TextShadow::default();
+    Some(TextShadow {
+        offset: Vec2::new(x, y),
+        color: color.unwrap_or(default_shadow.color),
+    })
+}
+
 /// Converts a CSS-like box-shadow string into a Bevy [`BoxShadow`] struct.
 ///
 /// Parses shadow offset (x, y), blur radius, spread radius, and color from the input string.
@@ -2686,7 +2826,7 @@ pub fn convert_to_ui_rect(value: String) -> Option<UiRect> {
 /// - `None` on failure.
 ///
 pub fn convert_to_bevy_box_shadow(value: String) -> Option<BoxShadow> {
-    let parts: Vec<&str> = value.split_whitespace().collect();
+    let parts = split_css_whitespace_tokens(value.as_str());
     let mut vals = vec![];
     let mut color = Colored::TRANSPARENT;
 
@@ -2879,7 +3019,20 @@ pub fn convert_to_bevy_text_align(value: String) -> Option<Justify> {
         "left" | "start" | "flex-start" => Some(Justify::Left),
         "center" => Some(Justify::Center),
         "right" | "end" | "flex-end" => Some(Justify::Right),
+        "justify" => Some(Justify::Justified),
         _ => Some(Justify::default()),
+    }
+}
+
+/// Converts a string into a text transform value.
+pub fn convert_to_bevy_text_transform(value: String) -> Option<TextTransform> {
+    let lower = value.trim().to_ascii_lowercase();
+    match lower.as_str() {
+        "none" => Some(TextTransform::None),
+        "uppercase" => Some(TextTransform::Uppercase),
+        "lowercase" => Some(TextTransform::Lowercase),
+        "capitalize" => Some(TextTransform::Capitalize),
+        _ => None,
     }
 }
 
@@ -2900,6 +3053,34 @@ pub fn convert_to_bevy_line_break(value: String) -> Option<LineBreak> {
         "pretty" | "balance" => Some(LineBreak::WordBoundary),
         "unset" => Some(LineBreak::AnyCharacter),
         _ => Some(LineBreak::default()),
+    }
+}
+
+/// Converts a CSS-like `line-height` value into Bevy [`LineHeight`].
+///
+/// Supported values:
+/// - `normal`
+/// - unitless number (relative to font size)
+/// - percentage (relative to font size)
+/// - px value (absolute)
+pub fn convert_to_bevy_line_height(value: String) -> Option<LineHeight> {
+    let trimmed = value.trim();
+    if trimmed.eq_ignore_ascii_case("normal") {
+        return Some(LineHeight::default());
+    }
+
+    if let Ok(unitless) = trimmed.parse::<f32>() {
+        if unitless > 0.0 {
+            return Some(LineHeight::RelativeToFont(unitless));
+        }
+    }
+
+    let parsed = parse_math_value(trimmed)?;
+    match parsed.unit {
+        CalcUnit::Percent => Some(LineHeight::RelativeToFont(parsed.value / 100.0)),
+        CalcUnit::Px => Some(LineHeight::Px(parsed.value)),
+        CalcUnit::None if parsed.value > 0.0 => Some(LineHeight::RelativeToFont(parsed.value)),
+        _ => None,
     }
 }
 
@@ -3563,5 +3744,74 @@ mod tests {
 
         apply_property_to_style(&mut style, "text-align", "right");
         assert_eq!(style.text_align, Some(Justify::Right));
+
+        apply_property_to_style(&mut style, "text-align", "justify");
+        assert_eq!(style.text_align, Some(Justify::Justified));
+    }
+
+    #[test]
+    fn text_shadow_property_maps_to_bevy_text_shadow() {
+        let mut style = Style::default();
+        apply_property_to_style(
+            &mut style,
+            "text-shadow",
+            "3px 2px 8px rgba(10, 20, 30, 0.5)",
+        );
+
+        let shadow = style.text_shadow.expect("missing text shadow");
+        assert_eq!(shadow.offset, Vec2::new(3.0, 2.0));
+        assert_eq!(
+            shadow.color,
+            convert_to_color("rgba(10, 20, 30, 0.5)".to_string()).expect("color")
+        );
+    }
+
+    #[test]
+    fn text_transform_property_supports_upper_lower_capitalize_and_none() {
+        let mut style = Style::default();
+
+        apply_property_to_style(&mut style, "text-transform", "uppercase");
+        assert_eq!(style.text_transform, Some(TextTransform::Uppercase));
+
+        apply_property_to_style(&mut style, "text-transform", "lowercase");
+        assert_eq!(style.text_transform, Some(TextTransform::Lowercase));
+
+        apply_property_to_style(&mut style, "text-transform", "capitalize");
+        assert_eq!(style.text_transform, Some(TextTransform::Capitalize));
+
+        apply_property_to_style(&mut style, "text-transform", "none");
+        assert_eq!(style.text_transform, Some(TextTransform::None));
+    }
+
+    #[test]
+    fn text_transfrom_alias_is_supported() {
+        let mut style = Style::default();
+        apply_property_to_style(&mut style, "text-transfrom", "lowercase");
+        assert_eq!(style.text_transform, Some(TextTransform::Lowercase));
+    }
+
+    #[test]
+    fn line_height_property_maps_to_bevy_line_height() {
+        let mut style = Style::default();
+        apply_property_to_style(&mut style, "line-height", "150%");
+        assert_eq!(style.line_height, Some(LineHeight::RelativeToFont(1.5)));
+
+        apply_property_to_style(&mut style, "line-height", "20px");
+        assert_eq!(style.line_height, Some(LineHeight::Px(20.0)));
+    }
+
+    #[test]
+    fn box_shadow_parses_rgba_with_spaces() {
+        let shadow = convert_to_bevy_box_shadow("2px 4px 6px rgba(192, 198, 210, 0.95)".into())
+            .expect("shadow");
+        let layer = shadow.0.first().expect("shadow layer");
+
+        assert_eq!(layer.x_offset, Val::Px(2.0));
+        assert_eq!(layer.y_offset, Val::Px(4.0));
+        assert_eq!(layer.blur_radius, Val::Px(6.0));
+        assert_eq!(
+            layer.color,
+            convert_to_color("rgba(192, 198, 210, 0.95)".to_string()).expect("color")
+        );
     }
 }

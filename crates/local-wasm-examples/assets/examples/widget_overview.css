@@ -247,3 +247,38 @@ dialog.dialog-renderer-bevy-app.dialog-type-error > .dialog-panel {
 #range-slider-debug {
     margin-top: 20px;
 }
+
+.text-style-card {
+    gap: 6px;
+}
+
+.text-style-card > p {
+    margin: 0;
+}
+
+.text-shadow-demo {
+    font-size: 20px;
+    font-weight: 700;
+    color: #f2f6ff;
+    text-shadow: 6px 5px 0px rgb(162, 78, 159);
+}
+
+.text-transform-upper {
+    color: #9dc7ff;
+    text-transform: uppercase;
+}
+
+.text-transform-lower {
+    color: #c4ffd1;
+    text-transfrom: lowercase;
+}
+
+.text-transform-cap {
+    color: #ffd0a3;
+    text-transform: capitalize;
+}
+
+.line-height-demo {
+    line-height: 175%;
+    color: #9eb0d4;
+}
