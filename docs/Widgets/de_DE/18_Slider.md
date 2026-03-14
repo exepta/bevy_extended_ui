@@ -7,6 +7,7 @@ title: Slider (Schieberegler)
 ## Überblick
 
 Numerisches Zieh-Widget mit Min-, Max-, Wert- und Schritt-Eigenschaften.
+Unterstützt `default` (ein Thumb) und `range` (zwei Thumbs).
 
 - Rust-Komponente: Slider
 - HTML-Tag: slider
@@ -14,7 +15,19 @@ Numerisches Zieh-Widget mit Min-, Max-, Wert- und Schritt-Eigenschaften.
 
 ## Wichtige Attribute und Verhalten
 
-- min, max, value, step steuern die Zahleninteraktion.
+- `min`, `max`, `step`: Zahlenbereich und Schrittweite.
+- `type`: `default | range` (Standard: `default`).
+- `value`:
+  - `default`: einzelner Zahlenwert (z. B. `35`)
+  - `range`: Bereich im Format `start - end` (z. B. `20 - 40`)
+- `dots`: Anzahl der Segmente/Ticks. Beispiel `dots="5"` bei `0..100` erzeugt Ticks bei `0, 20, 40, 60, 80, 100`.
+  - Wenn `dots` gesetzt ist und `<= 1` (auch `0` oder negativ), werden nur Min/Max-Ticks genutzt (wie `dots="1"`).
+  - Interner Schutz: Mindestabstand zwischen Nachbar-Ticks ist 10 Werteinheiten.
+- `show-labels`: `true | false` (Standard: `false`). Zeigt Tick-Labels.
+- `dot-anchor`: `top | bottom` (Standard: `top`). Position der Tick-Labels relativ zum Track.
+- `tip`: `true | false` (Standard: `true`). Zeigt/verbirgt Thumb-Tooltip.
+- Track reagiert auf Klick und Drag.
+- Im `range`-Modus zeigt der Tooltip den Wert des jeweils gehoverten Thumbs.
 - Funktioniert mit onchange/oninput-Handlern.
 - Aktueller Wert liegt in der Slider-Komponente.
 
@@ -22,6 +35,20 @@ Numerisches Zieh-Widget mit Min-, Max-, Wert- und Schritt-Eigenschaften.
 
 ```html
 <slider min="0" max="100" value="25" step="1" onchange="log_slider"></slider>
+```
+
+```html
+<slider
+  type="range"
+  min="0"
+  max="100"
+  value="20 - 40"
+  step="1"
+  dots="5"
+  show-labels="true"
+  dot-anchor="top"
+  tip="true">
+</slider>
 ```
 
 ## Bevy-Beispiel

@@ -20,7 +20,7 @@ struct DivScrollContent;
 
 /// Component storing the root content entity for a div.
 #[derive(Component, Deref)]
-struct DivContentRoot(Entity);
+pub(crate) struct DivContentRoot(pub(crate) Entity);
 
 /// Component storing the vertical scrollbar entity for a div.
 #[derive(Component, Deref)]

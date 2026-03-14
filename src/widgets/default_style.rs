@@ -104,6 +104,18 @@ div {
     }
 }
 
+body {
+    > scroll {
+        position: absolute;
+        right: 0;
+    }
+
+    > .scroll-horizontal {
+        bottom: 0;
+        left: 0;
+    }
+}
+
 /* Divider */
 
 divider {
@@ -1070,6 +1082,11 @@ slider {
     justify-content: center;
     align-items: center;
     transition: all 0.3s;
+    --slider-tooltip-bg: var(--primary);
+    --slider-tooltip-color: #ffffff;
+    --slider-tooltip-size: 30px;
+    --slider-dot-color: var(--text-color);
+    --slider-dot-label-color: var(--text-color);
 
     > .slider-track {
         width: 100%;
@@ -1083,6 +1100,63 @@ slider {
         align-items: center;
         transition: all 0.3s;
 
+        > .slider-dots {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: stretch;
+            pointer-events: none;
+            z-index: 3;
+
+            > .slider-dot-item {
+                position: relative;
+                width: 0;
+                height: 100%;
+                overflow: visible;
+
+                > .slider-dot-label {
+                    position: absolute;
+                    left: 0;
+                    transform: translateX(-50%);
+                    font-size: 10px;
+                    text-wrap: nowrap;
+                    color: var(--slider-dot-label-color);
+                    text-align: center;
+                }
+
+                > .slider-dot {
+                    position: absolute;
+                    left: -1px;
+                    width: 2px;
+                    height: 7px;
+                    background: var(--slider-dot-color);
+                }
+            }
+
+        }
+
+        > .slider-dots-top > .slider-dot-item > .slider-dot {
+            bottom: 100%;
+        }
+
+        > .slider-dots-top > .slider-dot-item > .slider-dot-label {
+            bottom: 100%;
+            transform: translate(-50% -5px);
+        }
+
+        > .slider-dots-bottom > .slider-dot-item > .slider-dot {
+            top: 100%;
+        }
+
+        > .slider-dots-bottom > .slider-dot-item > .slider-dot-label {
+            top: 100%;
+            transform: translate(-50% 5px);
+        }
+
         > .track-fill {
             position: absolute;
             left: 0;
@@ -1092,6 +1166,7 @@ slider {
             background: var(--primary);
             border-radius: 5px;
             transition: all 0.3s;
+            z-index: 2;
         }
 
         > .thumb {
@@ -1102,6 +1177,40 @@ slider {
             position: absolute;
             box-shadow: 0 0 1px 1px #303033;
             transition: all 0.3s;
+            z-index: 4;
+
+            > .slider-thumb-tooltip {
+                position: absolute;
+                left: 50%;
+                bottom: 22px;
+                min-width: var(--slider-tooltip-size);
+                height: var(--slider-tooltip-size);
+                padding: 0 8px;
+                border-radius: 999px;
+                background: var(--slider-tooltip-bg);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                transform: translateX(-50%);
+                pointer-events: none;
+
+                > .slider-thumb-tooltip-text {
+                    color: var(--slider-tooltip-color);
+                    font-size: 11px;
+                    text-wrap: nowrap;
+                    text-align: center;
+                }
+
+                > .slider-thumb-tooltip-nose {
+                    position: absolute;
+                    width: 10px;
+                    height: 10px;
+                    left: 50%;
+                    bottom: -4px;
+                    background: var(--slider-tooltip-bg);
+                    transform: translateX(-50%) rotate(45deg);
+                }
+            }
         }
     }
 

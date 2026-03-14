@@ -20,7 +20,9 @@ fn configure_linux_window_backend() {
     unsafe {
         std::env::set_var("WINIT_UNIX_BACKEND", "x11");
     }
-    eprintln!("bevy_extended_ui local-example: forcing WINIT_UNIX_BACKEND=x11 for linux stability.");
+    eprintln!(
+        "bevy_extended_ui local-example: forcing WINIT_UNIX_BACKEND=x11 for linux stability."
+    );
 }
 
 #[cfg(not(target_os = "linux"))]

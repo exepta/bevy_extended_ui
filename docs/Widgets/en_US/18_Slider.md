@@ -7,6 +7,7 @@ title: Slider
 ## Overview
 
 Numeric drag control widget with min, max, value and step properties.
+Supports `default` (single thumb) and `range` (two thumbs).
 
 - Rust component: Slider
 - HTML tag: slider
@@ -14,7 +15,19 @@ Numeric drag control widget with min, max, value and step properties.
 
 ## Important Attributes and Behavior
 
-- min, max, value, step control numeric interaction.
+- `min`, `max`, `step`: numeric bounds and step size.
+- `type`: `default | range` (default: `default`).
+- `value`:
+  - `default`: single numeric value (for example `35`)
+  - `range`: `start - end` format (for example `20 - 40`)
+- `dots`: number of segments/ticks. Example `dots="5"` for `0..100` creates ticks at `0, 20, 40, 60, 80, 100`.
+  - If `dots` is present and `<= 1` (including `0` or negative), only min/max ticks are used (same as `dots="1"`).
+  - Internal safeguard: minimum value gap between neighboring ticks is 10 units.
+- `show-labels`: `true | false` (default: `false`). Shows tick labels.
+- `dot-anchor`: `top | bottom` (default: `top`). Places tick labels above or below the track.
+- `tip`: `true | false` (default: `true`). Enables/disables thumb tooltips.
+- Track reacts to click and drag.
+- In `range` mode, tooltip text is per-thumb (hovered thumb value).
 - Works with onchange/oninput style handlers.
 - Current value is stored in Slider component.
 
@@ -22,6 +35,20 @@ Numeric drag control widget with min, max, value and step properties.
 
 ```html
 <slider min="0" max="100" value="25" step="1" onchange="log_slider"></slider>
+```
+
+```html
+<slider
+  type="range"
+  min="0"
+  max="100"
+  value="20 - 40"
+  step="1"
+  dots="5"
+  show-labels="true"
+  dot-anchor="top"
+  tip="true">
+</slider>
 ```
 
 ## Bevy Example

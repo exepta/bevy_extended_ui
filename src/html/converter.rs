@@ -29,6 +29,10 @@ pub const DEFAULT_UI_CSS: &str = "embedded/default_style";
 
 static INNER_BINDING_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?s)\{\{\s*([^{}]+?)\s*\}\}").unwrap());
+static SLIDER_RANGE_VALUE_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^\s*([+-]?(?:\d+(?:\.\d+)?|\.\d+))\s*-\s*([+-]?(?:\d+(?:\.\d+)?|\.\d+))\s*$")
+        .unwrap()
+});
 
 /// Plugin that parses HTML assets into widget trees.
 pub struct HtmlConverterSystem;
@@ -1064,32 +1068,67 @@ fn parse_html_node(
         }
 
         "slider" => {
-            let min = attributes
+            let min_raw = attributes
                 .get("min")
                 .and_then(|v| v.parse::<f32>().ok())
                 .unwrap_or(0.0);
 
-            let max = attributes
+            let max_raw = attributes
                 .get("max")
                 .and_then(|v| v.parse::<f32>().ok())
                 .unwrap_or(100.0);
 
-            let value = attributes
-                .get("value")
-                .and_then(|v| v.parse::<f32>().ok())
-                .unwrap_or(min);
+            let (min, max) = if max_raw >= min_raw {
+                (min_raw, max_raw)
+            } else {
+                (max_raw, min_raw)
+            };
 
             let step = attributes
                 .get("step")
                 .and_then(|v| v.parse::<f32>().ok())
                 .unwrap_or(1.0);
 
+            let slider_type = attributes
+                .get("type")
+                .and_then(SliderType::from_str)
+                .unwrap_or_default();
+
+            let dots = attributes
+                .get("dots")
+                .and_then(|v| v.trim().parse::<i32>().ok())
+                .map(|v| if v <= 1 { 1 } else { v as u32 });
+
+            let show_labels = parse_bool_attribute(&attributes, "show-labels");
+            let show_tip = attributes
+                .get("tip")
+                .map(|value| {
+                    let normalized = value.trim().to_ascii_lowercase();
+                    normalized.is_empty() || normalized == "true"
+                })
+                .unwrap_or(true);
+
+            let dot_anchor = attributes
+                .get("dot-anchor")
+                .and_then(SliderDotAnchor::from_str)
+                .unwrap_or_default();
+
+            let (value, range_start, range_end) =
+                parse_slider_values(attributes.get("value"), min, max, slider_type);
+
             Some(HtmlWidgetNode::Slider(
                 Slider {
+                    slider_type,
                     value,
+                    range_start,
+                    range_end,
                     min,
                     max,
                     step,
+                    dots,
+                    show_labels,
+                    show_tip,
+                    dot_anchor,
                     ..default()
                 },
                 meta,
@@ -1177,6 +1216,50 @@ fn bind_html_func(attributes: &Attributes) -> HtmlEventBindings {
             .or_else(|| attributes.get("ondragend"))
             .map(|s| s.to_string()),
     }
+}
+
+/// Parses slider values from the `value` attribute.
+fn parse_slider_values(
+    raw_value: Option<&str>,
+    min: f32,
+    max: f32,
+    slider_type: SliderType,
+) -> (f32, f32, f32) {
+    let single = raw_value
+        .and_then(|v| v.trim().parse::<f32>().ok())
+        .unwrap_or(min)
+        .clamp(min, max);
+
+    if slider_type != SliderType::Range {
+        return (single, min, max);
+    }
+
+    let (start_raw, end_raw) = match raw_value.and_then(parse_slider_range_attribute) {
+        Some((start, end)) => (start, end),
+        None => {
+            if raw_value.is_some() {
+                (min, single)
+            } else {
+                (min, max)
+            }
+        }
+    };
+
+    let mut start = start_raw.clamp(min, max);
+    let mut end = end_raw.clamp(min, max);
+    if start > end {
+        std::mem::swap(&mut start, &mut end);
+    }
+
+    (single, start, end)
+}
+
+/// Parses a `start - end` slider range value pair.
+fn parse_slider_range_attribute(raw: &str) -> Option<(f32, f32)> {
+    let captures = SLIDER_RANGE_VALUE_RE.captures(raw.trim())?;
+    let start = captures.get(1)?.as_str().parse::<f32>().ok()?;
+    let end = captures.get(2)?.as_str().parse::<f32>().ok()?;
+    Some((start, end))
 }
 
 /// Parses validation rules from element attributes.
@@ -1297,15 +1380,24 @@ fn collect_labels_by_for(node: &NodeRef) -> HashMap<String, String> {
 fn select_primary_body_node(document: &NodeRef) -> Option<NodeRef> {
     let mut best: Option<NodeRef> = None;
     let mut best_score = 0usize;
+    let mut count = 0usize;
 
     let selected = document.select("body").ok()?;
     for body in selected {
+        count += 1;
         let node = body.as_node().clone();
         let score = node.descendants().count();
         if score >= best_score {
             best_score = score;
             best = Some(node);
         }
+    }
+
+    if count > 1 {
+        warn!(
+            "HTML contains {} <body> tags. Only one body is supported; using the most content-rich one.",
+            count
+        );
     }
 
     best
