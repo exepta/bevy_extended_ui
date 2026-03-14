@@ -14,8 +14,9 @@ mod tests {
     use crate::styles::{CssClass, CssID, CssSource, IconPlace};
     use crate::widgets::{
         BadgeAnchor, Body, Button, ButtonType, DateFormat, FieldMode, FormValidationMode, InputCap,
-        InputField, InputType, Paragraph, RadioButton, Scrollbar, ToggleButton, ToolTipAlignment,
-        ToolTipPriority, ToolTipTrigger, ToolTipVariant, UIWidgetState,
+        InputField, InputType, Paragraph, RadioButton, Scrollbar, Slider, SliderDotAnchor,
+        SliderType, ToggleButton, ToolTipAlignment, ToolTipPriority, ToolTipTrigger,
+        ToolTipVariant, UIWidgetState,
     };
     use bevy::asset::{AssetEvent, AssetPlugin};
     use bevy::ecs::message::Messages;
@@ -615,6 +616,32 @@ mod tests {
 
         assert!(all.iter().any(|node| matches!(
             node,
+            HtmlWidgetNode::Slider(
+                Slider {
+                    slider_type: SliderType::Default,
+                    value,
+                    min,
+                    max,
+                    step,
+                    dots: None,
+                    show_labels: false,
+                    show_tip: true,
+                    dot_anchor: SliderDotAnchor::Top,
+                    ..
+                },
+                _,
+                _,
+                _,
+                _,
+                _
+            ) if (*value - 4.0).abs() < f32::EPSILON
+                && (*min - 1.0).abs() < f32::EPSILON
+                && (*max - 9.0).abs() < f32::EPSILON
+                && (*step - 0.5).abs() < f32::EPSILON
+        )));
+
+        assert!(all.iter().any(|node| matches!(
+            node,
             HtmlWidgetNode::Button(
                 Button {
                     button_type: ButtonType::Submit,
@@ -698,6 +725,85 @@ mod tests {
 
         let lang = app.world().resource::<UILang>();
         assert_eq!(lang.forced.as_deref(), Some("de-de"));
+    }
+
+    #[test]
+    fn converter_parses_range_slider_attributes_and_dots_clamp() {
+        let mut app = setup_converter_app();
+        let html = r#"
+        <html>
+          <head>
+            <meta name="range-key" />
+          </head>
+          <body>
+            <slider id="r1" type="range" min="0" max="100" value="20 - 40" dots="0" show-labels="true" tip="false" dot-anchor="bottom"></slider>
+            <slider id="r2" type="range" min="0" max="100" value="60 - 30"></slider>
+          </body>
+        </html>
+        "#;
+
+        add_html_source(
+            &mut app,
+            "examples/range_slider_test.html",
+            html,
+            "range-key",
+            None,
+        );
+        app.update();
+
+        let structure_map = app.world().resource::<HtmlStructureMap>();
+        let nodes = structure_map
+            .html_map
+            .get("range-key")
+            .or_else(|| structure_map.html_map.values().next())
+            .expect("expected parsed html structure for range slider test");
+
+        let mut all = Vec::new();
+        collect_nodes(nodes, &mut all);
+
+        assert!(all.iter().any(|node| matches!(
+            node,
+            HtmlWidgetNode::Slider(
+                Slider {
+                    slider_type: SliderType::Range,
+                    range_start,
+                    range_end,
+                    dots: Some(1),
+                    show_labels: true,
+                    show_tip: false,
+                    dot_anchor: SliderDotAnchor::Bottom,
+                    ..
+                },
+                _,
+                _,
+                _,
+                _,
+                _
+            ) if (*range_start - 20.0).abs() < f32::EPSILON
+                && (*range_end - 40.0).abs() < f32::EPSILON
+        )));
+
+        // Range values are normalized so start <= end.
+        assert!(all.iter().any(|node| matches!(
+            node,
+            HtmlWidgetNode::Slider(
+                Slider {
+                    slider_type: SliderType::Range,
+                    range_start,
+                    range_end,
+                    show_tip: true,
+                    show_labels: false,
+                    dot_anchor: SliderDotAnchor::Top,
+                    ..
+                },
+                _,
+                _,
+                _,
+                _,
+                _
+            ) if (*range_start - 30.0).abs() < f32::EPSILON
+                && (*range_end - 60.0).abs() < f32::EPSILON
+        )));
     }
 
     #[test]

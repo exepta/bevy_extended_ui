@@ -67,6 +67,13 @@ struct PreviousSliderState {
     step: f32,
 }
 
+/// Caches last measured layout extents for re-sync on resize/reflow.
+#[derive(Component, Default, Clone, Copy, Debug)]
+struct SliderLayoutCache {
+    track_width: f32,
+    thumb_width: f32,
+}
+
 impl PreviousSliderState {
     fn from_slider(slider: &Slider) -> Self {
         Self {
@@ -98,6 +105,7 @@ impl Plugin for SliderWidget {
                 internal_node_creation_system,
                 detect_change_slider_values,
                 initialize_slider_visual_state,
+                sync_slider_layout_changes,
                 update_thumb_tooltips,
             )
                 .chain(),
@@ -132,6 +140,7 @@ fn internal_node_creation_system(
                 ZIndex::default(),
                 css_source.clone(),
                 PreviousSliderState::from_slider(slider),
+                SliderLayoutCache::default(),
                 TagName(String::from("slider")),
                 RenderLayers::layer(layer),
                 SliderNeedInit,
@@ -898,6 +907,7 @@ fn detect_change_slider_values(
             &UIWidgetState,
             &UIGenID,
             &mut PreviousSliderState,
+            &mut SliderLayoutCache,
         ),
         With<Slider>,
     >,
@@ -927,7 +937,7 @@ fn detect_change_slider_values(
 
     let shift = keyboard.pressed(KeyCode::ShiftLeft) || keyboard.pressed(KeyCode::ShiftRight);
 
-    for (mut slider, state, ui_id, mut prev) in slider_q.iter_mut() {
+    for (mut slider, state, ui_id, mut prev, mut layout_cache) in slider_q.iter_mut() {
         sanitize_slider(&mut slider);
 
         if state.focused && !state.disabled {
@@ -982,13 +992,24 @@ fn detect_change_slider_values(
             &mut fill_q,
             &mut thumb_q,
         );
+        layout_cache.track_width = track_width;
+        layout_cache.thumb_width = thumb_width;
     }
 }
 
 /// Initializes slider visuals after layout is available.
 fn initialize_slider_visual_state(
     mut commands: Commands,
-    mut slider_q: Query<(Entity, &mut Slider, &UIGenID, Option<&SliderNeedInit>), With<Slider>>,
+    mut slider_q: Query<
+        (
+            Entity,
+            &mut Slider,
+            &UIGenID,
+            Option<&SliderNeedInit>,
+            &mut SliderLayoutCache,
+        ),
+        With<Slider>,
+    >,
     track_q: Query<(&ComputedNode, &BindToID), With<SliderTrackContainer>>,
     thumb_size_q: Query<(&ComputedNode, &BindToID), With<SliderThumb>>,
     mut fill_q: Query<
@@ -1013,7 +1034,7 @@ fn initialize_slider_visual_state(
     };
     let sf = window.scale_factor() * ui_scale.0;
 
-    for (entity, mut slider, ui_id, needs) in slider_q.iter_mut() {
+    for (entity, mut slider, ui_id, needs, mut layout_cache) in slider_q.iter_mut() {
         if needs.is_none() {
             continue;
         }
@@ -1036,8 +1057,66 @@ fn initialize_slider_visual_state(
             &mut fill_q,
             &mut thumb_q,
         );
+        layout_cache.track_width = track_width;
+        layout_cache.thumb_width = thumb_width;
 
         commands.entity(entity).remove::<SliderNeedInit>();
+    }
+}
+
+/// Re-applies thumb/fill placement when layout size changes (important for WASM reflow/resize).
+fn sync_slider_layout_changes(
+    mut slider_q: Query<(&mut Slider, &UIGenID, &mut SliderLayoutCache), With<Slider>>,
+    track_q: Query<(&ComputedNode, &BindToID), With<SliderTrackContainer>>,
+    thumb_size_q: Query<(&ComputedNode, &BindToID), With<SliderThumb>>,
+    mut fill_q: Query<
+        (&mut Node, &BindToID, &mut UiStyle),
+        (With<SliderTrackFill>, Without<SliderThumb>),
+    >,
+    mut thumb_q: Query<
+        (
+            &mut Node,
+            &mut SliderThumb,
+            &BindToID,
+            &mut UiStyle,
+            &mut Visibility,
+        ),
+        (With<SliderThumb>, Without<SliderTrackFill>),
+    >,
+    window_q: Query<&Window, With<PrimaryWindow>>,
+    ui_scale: Res<UiScale>,
+) {
+    let Ok(window) = window_q.single() else {
+        return;
+    };
+    let sf = window.scale_factor() * ui_scale.0;
+
+    for (mut slider, ui_id, mut layout_cache) in slider_q.iter_mut() {
+        let track_width = find_bound_width(ui_id.0, &track_q, sf).unwrap_or(0.0);
+        let Some(thumb_width) = find_bound_width(ui_id.0, &thumb_size_q, sf) else {
+            continue;
+        };
+        if track_width <= 1.0 || thumb_width <= 1.0 {
+            continue;
+        }
+
+        let changed = (layout_cache.track_width - track_width).abs() > 0.25
+            || (layout_cache.thumb_width - thumb_width).abs() > 0.25;
+        if !changed {
+            continue;
+        }
+
+        apply_slider_visual_state(
+            ui_id,
+            &mut slider,
+            track_width,
+            thumb_width,
+            &mut fill_q,
+            &mut thumb_q,
+        );
+
+        layout_cache.track_width = track_width;
+        layout_cache.thumb_width = thumb_width;
     }
 }
 

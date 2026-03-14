@@ -1380,15 +1380,24 @@ fn collect_labels_by_for(node: &NodeRef) -> HashMap<String, String> {
 fn select_primary_body_node(document: &NodeRef) -> Option<NodeRef> {
     let mut best: Option<NodeRef> = None;
     let mut best_score = 0usize;
+    let mut count = 0usize;
 
     let selected = document.select("body").ok()?;
     for body in selected {
+        count += 1;
         let node = body.as_node().clone();
         let score = node.descendants().count();
         if score >= best_score {
             best_score = score;
             best = Some(node);
         }
+    }
+
+    if count > 1 {
+        warn!(
+            "HTML contains {} <body> tags. Only one body is supported; using the most content-rich one.",
+            count
+        );
     }
 
     best

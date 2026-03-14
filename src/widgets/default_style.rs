@@ -104,6 +104,18 @@ div {
     }
 }
 
+body {
+    > scroll {
+        position: absolute;
+        right: 0;
+    }
+
+    > .scroll-horizontal {
+        bottom: 0;
+        left: 0;
+    }
+}
+
 /* Divider */
 
 divider {
