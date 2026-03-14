@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use crate::html::HtmlStyle;
 use crate::registry::UiRegistry;
 use crate::styles::{CssClass, CssSource, Style, TagName};
+use crate::widgets::controls::choice_box::ChoiceLayoutBoxBase;
 use crate::widgets::div::DivContentRoot;
 use crate::widgets::widget_util::wheel_delta_y;
 use crate::widgets::{
@@ -47,6 +48,26 @@ struct BodyScrollbarOwner(Entity);
 struct HoveredBodyTracker {
     body_ref: HashMap<Entity, u32>,
     last_body: Option<Entity>,
+}
+
+/// Returns true for dialog overlays/panels that must not be nested into scroll-content.
+fn is_dialog_overlay_node(tag_opt: Option<&TagName>, class_opt: Option<&CssClass>) -> bool {
+    if let Some(tag) = tag_opt {
+        let tag_name = tag.0.trim();
+        if tag_name.eq_ignore_ascii_case("dialog")
+            || tag_name.eq_ignore_ascii_case("dialog-overlay")
+        {
+            return true;
+        }
+    }
+
+    class_opt.is_some_and(|classes| {
+        classes.0.iter().any(|class_name| {
+            class_name == "dialog-widget"
+                || class_name == "dialog-renderer-bevy-app"
+                || class_name == "dialog-overlay"
+        })
+    })
 }
 
 /// Plugin that wires up body widget behavior.
@@ -168,6 +189,8 @@ fn ensure_body_scroll_structure(
     parent_q: Query<&ChildOf>,
     mut content_node_q: Query<&mut Node, (With<BodyScrollContent>, Without<BodyBase>)>,
     mut content_style_q: Query<&mut HtmlStyle, (With<BodyScrollContent>, Without<Body>)>,
+    content_children_q: Query<&Children, With<BodyScrollContent>>,
+    child_meta_q: Query<(Option<&TagName>, Option<&CssClass>)>,
     has_scroll_pos_q: Query<(), With<ScrollPosition>>,
 ) {
     for (
@@ -371,7 +394,18 @@ fn ensure_body_scroll_structure(
             sb_x_entity = Some(sb_entity);
         }
 
-        // 3) Reparent body children under content (only if needed)
+        // 3a) Move dialog overlays back to body root if they were previously nested in content.
+        if let Ok(content_children) = content_children_q.get(content_entity) {
+            for child in content_children.iter() {
+                if let Ok((tag_opt, class_opt)) = child_meta_q.get(child)
+                    && is_dialog_overlay_node(tag_opt, class_opt)
+                {
+                    commands.entity(child).set_parent_in_place(body_entity);
+                }
+            }
+        }
+
+        // 3b) Reparent regular body children under content (only if needed)
         if let Some(children) = children_opt {
             let sb_y = sb_y_opt.map(|s| **s);
             let sb_x = sb_x_opt.map(|s| **s);
@@ -382,6 +416,11 @@ fn ensure_body_scroll_structure(
                     continue;
                 }
                 if Some(child) == sb_y || Some(child) == sb_x {
+                    continue;
+                }
+                if let Ok((tag_opt, class_opt)) = child_meta_q.get(child)
+                    && is_dialog_overlay_node(tag_opt, class_opt)
+                {
                     continue;
                 }
 
@@ -395,15 +434,28 @@ fn ensure_body_scroll_structure(
             }
         }
 
-        // 3b) Ensure the body's direct children order keeps scroll-content first.
+        // 3c) Ensure the body's direct children order keeps scroll-content first.
         if let Some(children) = children_opt {
-            let mut desired = Vec::with_capacity(3);
+            let mut desired = Vec::with_capacity(children.len());
             desired.push(content_entity);
             if let Some(sb) = sb_y_entity {
                 desired.push(sb);
             }
             if let Some(sb) = sb_x_entity {
                 desired.push(sb);
+            }
+            for child in children.iter().clone() {
+                if child == content_entity
+                    || Some(child) == sb_y_opt.map(|s| **s)
+                    || Some(child) == sb_x_opt.map(|s| **s)
+                {
+                    continue;
+                }
+                if let Ok((tag_opt, class_opt)) = child_meta_q.get(child)
+                    && is_dialog_overlay_node(tag_opt, class_opt)
+                {
+                    desired.push(child);
+                }
             }
 
             if !children.iter().clone().eq(desired.iter().copied()) {
@@ -605,6 +657,11 @@ fn handle_body_scroll_wheel(
         (&Node, &ComputedNode),
         (With<ScrollPosition>, Without<BodyScrollContent>),
     >,
+    choice_overlay_q: Query<
+        (&UIWidgetState, &Node, &ComputedNode, &Visibility),
+        With<ChoiceLayoutBoxBase>,
+    >,
+    dialog_overlay_q: Query<(Option<&TagName>, Option<&CssClass>, &Visibility)>,
 ) {
     // Scrollable div under the pointer has priority over body scrolling.
     let has_hovered_scrollable_div = div_q.iter().any(|(state, root)| {
@@ -628,6 +685,44 @@ fn handle_body_scroll_wheel(
         max_scroll > 0.5
     });
     if has_hovered_scrollable_div {
+        return;
+    }
+
+    // Open ChoiceBox overlays should keep wheel focus while hovered.
+    let has_hovered_scrollable_choice_overlay =
+        choice_overlay_q
+            .iter()
+            .any(|(state, node, computed, visibility)| {
+                if !state.hovered {
+                    return false;
+                }
+                if !matches!(*visibility, Visibility::Visible | Visibility::Inherited) {
+                    return false;
+                }
+                if node.overflow.y != OverflowAxis::Scroll {
+                    return false;
+                }
+
+                let inv_sf = computed.inverse_scale_factor.max(f32::EPSILON);
+                let viewport_h = (computed.size().y * inv_sf).max(1.0);
+                let content_h = (computed.content_size.y * inv_sf).max(viewport_h);
+                let max_scroll = (content_h - viewport_h).max(0.0);
+
+                max_scroll > 0.5
+            });
+    if has_hovered_scrollable_choice_overlay {
+        return;
+    }
+
+    // Block body wheel while any bevy-app dialog overlay is visible.
+    let has_visible_dialog_overlay =
+        dialog_overlay_q
+            .iter()
+            .any(|(tag_opt, class_opt, visibility)| {
+                matches!(*visibility, Visibility::Visible | Visibility::Inherited)
+                    && is_dialog_overlay_node(tag_opt, class_opt)
+            });
+    if has_visible_dialog_overlay {
         return;
     }
 
@@ -904,6 +999,47 @@ mod tests {
             .id()
     }
 
+    fn spawn_choice_overlay(
+        world: &mut World,
+        viewport_h: f32,
+        content_h: f32,
+        hovered: bool,
+    ) -> Entity {
+        let mut node = Node::default();
+        node.overflow = Overflow {
+            x: OverflowAxis::Hidden,
+            y: OverflowAxis::Scroll,
+        };
+
+        world
+            .spawn((
+                ChoiceLayoutBoxBase,
+                UIWidgetState {
+                    hovered,
+                    ..default()
+                },
+                node,
+                computed_node(Vec2::new(220.0, viewport_h), Vec2::new(220.0, content_h)),
+                ScrollPosition::default(),
+                Visibility::Inherited,
+            ))
+            .id()
+    }
+
+    fn spawn_dialog_overlay_marker(world: &mut World, visible: bool) -> Entity {
+        world
+            .spawn((
+                TagName("dialog-overlay".to_string()),
+                CssClass(vec!["dialog-overlay".to_string()]),
+                if visible {
+                    Visibility::Inherited
+                } else {
+                    Visibility::Hidden
+                },
+            ))
+            .id()
+    }
+
     #[test]
     fn body_wheel_scroll_moves_body_content_when_no_div_is_hovered() {
         let mut app = App::new();
@@ -1076,5 +1212,67 @@ mod tests {
             .expect("scrollbar entity should have Scrollbar component");
         assert!(scrollbar.vertical);
         assert_eq!(scrollbar.entity, Some(content_entity));
+    }
+
+    #[test]
+    fn body_wheel_scroll_is_blocked_by_hovered_scrollable_choice_overlay() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
+        app.init_resource::<Messages<MouseWheel>>();
+        app.insert_resource(HoveredBodyTracker::default());
+        app.add_systems(Update, handle_body_scroll_wheel);
+
+        let body_content_entity = spawn_body_scroll_content(app.world_mut(), 100.0, 300.0);
+        let body_entity = app
+            .world_mut()
+            .spawn((Body::default(), BodyContentRoot(body_content_entity)))
+            .id();
+        app.world_mut()
+            .resource_mut::<HoveredBodyTracker>()
+            .last_body = Some(body_entity);
+
+        let _overlay = spawn_choice_overlay(app.world_mut(), 90.0, 240.0, true);
+
+        app.world_mut()
+            .resource_mut::<Messages<MouseWheel>>()
+            .write(line_wheel(-2.0));
+        app.update();
+
+        let pos = app
+            .world()
+            .get::<ScrollPosition>(body_content_entity)
+            .expect("body scroll content is missing ScrollPosition");
+        assert_eq!(pos.y, 0.0);
+    }
+
+    #[test]
+    fn body_wheel_scroll_is_blocked_by_visible_dialog_overlay() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
+        app.init_resource::<Messages<MouseWheel>>();
+        app.insert_resource(HoveredBodyTracker::default());
+        app.add_systems(Update, handle_body_scroll_wheel);
+
+        let body_content_entity = spawn_body_scroll_content(app.world_mut(), 100.0, 300.0);
+        let body_entity = app
+            .world_mut()
+            .spawn((Body::default(), BodyContentRoot(body_content_entity)))
+            .id();
+        app.world_mut()
+            .resource_mut::<HoveredBodyTracker>()
+            .last_body = Some(body_entity);
+
+        let _overlay = spawn_dialog_overlay_marker(app.world_mut(), true);
+
+        app.world_mut()
+            .resource_mut::<Messages<MouseWheel>>()
+            .write(line_wheel(-2.0));
+        app.update();
+
+        let pos = app
+            .world()
+            .get::<ScrollPosition>(body_content_entity)
+            .expect("body scroll content is missing ScrollPosition");
+        assert_eq!(pos.y, 0.0);
     }
 }

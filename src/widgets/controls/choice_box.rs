@@ -38,7 +38,7 @@ struct OverlayLabel;
 
 /// Marker component for the dropdown content layout box.
 #[derive(Component)]
-struct ChoiceLayoutBoxBase;
+pub(crate) struct ChoiceLayoutBoxBase;
 
 /// Plugin that registers choice box widget behavior.
 pub struct ChoiceBoxWidget;
@@ -185,6 +185,8 @@ fn internal_node_creation_system(
                         ChoiceLayoutBoxBase,
                         BindToID(id.0),
                     ))
+                    .observe(on_layout_cursor_entered)
+                    .observe(on_layout_cursor_leave)
                     .insert(GlobalZIndex::default())
                     .insert(ScrollPosition::default())
                     .with_children(|builder| {
@@ -571,6 +573,26 @@ fn on_internal_cursor_leave(
     }
 
     trigger.propagate(false);
+}
+
+/// Tracks hover state directly on the dropdown overlay.
+fn on_layout_cursor_entered(
+    trigger: On<Pointer<Over>>,
+    mut query: Query<&mut UIWidgetState, With<ChoiceLayoutBoxBase>>,
+) {
+    if let Ok(mut state) = query.get_mut(trigger.entity) {
+        state.hovered = true;
+    }
+}
+
+/// Clears hover state when the cursor leaves the dropdown overlay.
+fn on_layout_cursor_leave(
+    trigger: On<Pointer<Out>>,
+    mut query: Query<&mut UIWidgetState, With<ChoiceLayoutBoxBase>>,
+) {
+    if let Ok(mut state) = query.get_mut(trigger.entity) {
+        state.hovered = false;
+    }
 }
 
 // Option Component
