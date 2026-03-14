@@ -719,6 +719,19 @@ p {
     color: var(--text-color);
 }
 
+/* HyperLink */
+
+a {
+    margin: 8px;
+    font-size: 12px;
+    color: #6ea7ff;
+    cursor: pointer;
+}
+
+a:hover {
+    color: #8fb9ff;
+}
+
 /* Badge */
 
 badge {

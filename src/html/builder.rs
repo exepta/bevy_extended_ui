@@ -170,6 +170,7 @@ fn collect_html_ids(nodes: &Vec<HtmlWidgetNode>, ids: &mut Vec<HtmlID>) {
             | HtmlWidgetNode::DatePicker(_, _, _, _, _, id)
             | HtmlWidgetNode::Divider(_, _, _, _, _, id)
             | HtmlWidgetNode::Headline(_, _, _, _, _, id)
+            | HtmlWidgetNode::HyperLink(_, _, _, _, _, id)
             | HtmlWidgetNode::Img(_, _, _, _, _, id)
             | HtmlWidgetNode::Input(_, _, _, _, _, id)
             | HtmlWidgetNode::Paragraph(_, _, _, _, _, id)
@@ -341,6 +342,17 @@ fn spawn_widget_node(
             widget,
             id,
         ),
+        HtmlWidgetNode::HyperLink(hyper_link, meta, states, functions, widget, id) => {
+            spawn_with_meta(
+                commands,
+                hyper_link.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+            )
+        }
         HtmlWidgetNode::Img(img, meta, states, functions, widget, id) => {
             spawn_with_meta(commands, img.clone(), meta, states, functions, widget, id)
         }
