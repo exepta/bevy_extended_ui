@@ -243,6 +243,7 @@ type UiStyleComponents<'w, 's> = (
     Option<Mut<'w, Pickable>>,
     Option<Mut<'w, UiTransform>>,
     Option<Mut<'w, LineHeight>>,
+    Option<Mut<'w, Outline>>,
 );
 
 /// Updates the OS cursor icon based on hovered widget styles.
@@ -419,6 +420,19 @@ pub fn update_widget_styles_system(
         let has_changed = previous_style.as_ref() != Some(&final_style);
         if has_changed {
             ui_style.active_style = Some(final_style.clone());
+        }
+
+        if style_requests_outline(&final_style) {
+            let mut has_outline_component = false;
+            if let Ok(components) = qs.p0().get_mut(entity) {
+                has_outline_component = components.12.is_some();
+            }
+
+            if !has_outline_component {
+                commands
+                    .entity(entity)
+                    .insert(build_outline_from_style(&final_style));
+            }
         }
 
         update_style_animation_state(
@@ -2092,6 +2106,11 @@ fn apply_style_components(
         }
     }
 
+    // Outline
+    if let Some(outline) = components.12.as_mut() {
+        **outline = build_outline_from_style(style);
+    }
+
     // TextLayout
     if let Some(tl) = components.6.as_mut() {
         if let Some(text_align) = style.text_align {
@@ -2177,6 +2196,7 @@ fn blend_style(from: &Style, to: &Style, t: f32, spec: &TransitionSpec) -> Style
     if transition_allows_color(spec) {
         blended.color = blend_color(from.color, to.color, t);
         blended.border_color = blend_color(from.border_color, to.border_color, t);
+        blended.outline_color = blend_color(from.outline_color, to.outline_color, t);
     }
 
     if transition_allows_background(spec) {
@@ -2191,6 +2211,7 @@ fn blend_animation_style(from: &Style, to: &Style, t: f32) -> Style {
     let mut blended = to.clone();
     blended.color = blend_color(from.color, to.color, t);
     blended.border_color = blend_color(from.border_color, to.border_color, t);
+    blended.outline_color = blend_color(from.outline_color, to.outline_color, t);
     blended.background = blend_background(from.background.clone(), to.background.clone(), t);
     blended.transform = blend_transform_style(&from.transform, &to.transform, t);
     blended.width = blend_val_opt(from.width.clone(), to.width.clone(), t);
@@ -2204,6 +2225,20 @@ fn blend_animation_style(from: &Style, to: &Style, t: f32) -> Style {
     blended.font_size = blend_font_val_opt(&from.font_size, &to.font_size, t);
     blended.border_radius = blend_radius_opt(&from.border_radius, &to.border_radius, t);
     blended
+}
+
+fn style_requests_outline(style: &Style) -> bool {
+    style.outline_width.is_some() || style.outline_offset.is_some() || style.outline_color.is_some()
+}
+
+fn build_outline_from_style(style: &Style) -> Outline {
+    let default_outline = Outline::default();
+
+    Outline {
+        width: style.outline_width.unwrap_or(default_outline.width),
+        offset: style.outline_offset.unwrap_or(default_outline.offset),
+        color: style.outline_color.unwrap_or(default_outline.color),
+    }
 }
 
 /// Resolves transform blending with optional cached transforms.

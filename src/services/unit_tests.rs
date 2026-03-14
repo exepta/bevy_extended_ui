@@ -713,6 +713,76 @@ mod tests {
     }
 
     #[test]
+    fn update_widget_styles_system_inserts_and_resets_outline_from_css() {
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, AssetPlugin::default()));
+        app.init_asset::<Image>();
+        app.insert_resource(ImageCache::default());
+        app.add_systems(Update, update_widget_styles_system);
+
+        let mut style = Style::default();
+        style.outline_width = Some(Val::Px(2.0));
+        style.outline_offset = Some(Val::Px(4.0));
+        style.outline_color = Some(Color::srgb(0.3, 0.6, 1.0));
+
+        let mut styles = HashMap::new();
+        styles.insert(
+            "*".to_string(),
+            StylePair {
+                normal: style,
+                selector: "*".to_string(),
+                ..default()
+            },
+        );
+
+        let entity = app
+            .world_mut()
+            .spawn((
+                UiStyle {
+                    css: Handle::default(),
+                    styles,
+                    keyframes: HashMap::new(),
+                    active_style: None,
+                },
+                Node::default(),
+            ))
+            .id();
+
+        app.update();
+
+        let outline = app.world().get::<Outline>(entity).expect("missing outline");
+        assert_eq!(outline.width, Val::Px(2.0));
+        assert_eq!(outline.offset, Val::Px(4.0));
+        assert_eq!(outline.color, Color::srgb(0.3, 0.6, 1.0));
+
+        let mut reset_styles = HashMap::new();
+        reset_styles.insert(
+            "*".to_string(),
+            StylePair {
+                normal: Style::default(),
+                selector: "*".to_string(),
+                ..default()
+            },
+        );
+        if let Some(mut ui_style) = app.world_mut().entity_mut(entity).get_mut::<UiStyle>() {
+            ui_style.styles = reset_styles;
+        } else {
+            panic!("missing UiStyle");
+        }
+
+        app.update();
+
+        let outline_after = app
+            .world()
+            .get::<Outline>(entity)
+            .expect("missing outline after reset");
+        let default_outline = Outline::default();
+        assert_eq!(outline_after.width, default_outline.width);
+        assert_eq!(outline_after.offset, default_outline.offset);
+        assert_eq!(outline_after.color, default_outline.color);
+    }
+
+    #[test]
     fn text_shadow_and_transform_apply_and_reset_with_css_changes() {
         let mut app = App::new();
         app.add_plugins((MinimalPlugins, AssetPlugin::default()));

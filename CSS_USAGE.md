@@ -75,6 +75,10 @@ properties or values are ignored silently.
 - `background-image`
 - `backdrop-filter` (`blur(<px>)`, `none`)
 - `border-color`
+- `outline`
+- `outline-width`
+- `outline-color`
+- `outline-offset`
 - `box-shadow`
 - `text-shadow`
 
@@ -153,6 +157,14 @@ Note: `gap` sets both row and column gaps. `row-gap` and `column-gap` override t
 - `border-width`: shorthand like `padding` (1-4 values)
 - `border-color`: color only
 - `border-radius`: 1-4 values in `px` or `%`
+
+### Outline
+
+- `outline`: expects `WIDTH [COLOR]` (style keywords are ignored)
+- `outline-width`: single width value
+- `outline-color`: color only
+- `outline-offset`: single length value (`px`, `%`, viewport units, or `0`)
+- `outline: none` hides outline by setting transparent color and zero width
 
 ### Padding / Margin Shorthand
 
