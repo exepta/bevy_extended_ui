@@ -671,8 +671,8 @@ fn split_var_args(input: &str) -> (&str, Option<&str>) {
 /// - `value`: The CSS value as a string (e.g. `"100px"`, `"red"`, `"center"`).
 ///
 /// # Supported Properties
-/// - Box model: `width`, `height`, `padding`, `margin`, `border`, `border-radius`
-/// - Colors: `color`, `background-color`, `border-color`
+/// - Box model: `width`, `height`, `padding`, `margin`, `border`, `border-radius`, `outline`
+/// - Colors: `color`, `background-color`, `border-color`, `outline-color`
 /// - Flex/grid layout: `display`, `position`, `flex-grow`, `flex-direction`, `grid-template-columns`, etc.
 /// - Visuals: `background`, `background-image`, `box-shadow`, `z-index`, `overflow`, etc.
 /// - Typography: `font-size`, `line-height`, `text-wrap`, `text-align`, `text-transform`, `text-shadow`
@@ -847,6 +847,15 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
         "border-radius" => style.border_radius = convert_to_radius(value.to_string()),
         "border-color" => style.border_color = convert_to_color(value.to_string()),
         "border-width" => style.border = convert_to_ui_rect(value.to_string()),
+        "outline" => {
+            if let Some((width, color)) = convert_css_outline(value.to_string()) {
+                style.outline_width = Some(width);
+                style.outline_color = Some(color);
+            }
+        }
+        "outline-width" => style.outline_width = convert_to_val(value.to_string()),
+        "outline-color" => style.outline_color = convert_to_color(value.to_string()),
+        "outline-offset" => style.outline_offset = convert_to_val(value.to_string()),
 
         "box-shadow" => style.box_shadow = convert_to_bevy_box_shadow(value.to_string()),
         "text-shadow" => style.text_shadow = convert_to_bevy_text_shadow(value.to_string()),
@@ -2923,6 +2932,55 @@ pub fn convert_css_border(value: String) -> Option<(UiRect, Color)> {
     Some((rect, color))
 }
 
+/// Parses a CSS outline shorthand into width and color.
+///
+/// Supports values such as:
+/// - `"2px #ccd2de"`
+/// - `"2px solid rgba(192, 198, 210, 0.95)"`
+/// - `"none"`
+///
+/// The first parsable length token is used as width. Color is optional and defaults to transparent.
+pub fn convert_css_outline(value: String) -> Option<(Val, Color)> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    if trimmed.eq_ignore_ascii_case("none") {
+        return Some((Val::Px(0.0), Colored::TRANSPARENT));
+    }
+
+    let parts: Vec<&str> = trimmed.split_whitespace().collect();
+    if parts.is_empty() {
+        return None;
+    }
+
+    let mut width: Option<Val> = None;
+    let mut color: Option<Color> = None;
+
+    for (index, part) in parts.iter().enumerate() {
+        if width.is_none() {
+            width = convert_to_val((*part).to_string());
+            if width.is_some() {
+                continue;
+            }
+        }
+
+        if color.is_none() {
+            let color_candidate = parts[index..].join(" ");
+            if let Some(parsed_color) = convert_to_color(color_candidate) {
+                color = Some(parsed_color);
+                break;
+            }
+        }
+    }
+
+    let width = width?;
+    let color = color.unwrap_or(Colored::TRANSPARENT);
+
+    Some((width, color))
+}
+
 /**
  * Converts a string into a `JustifyContent` enum value.
  *
@@ -3734,6 +3792,51 @@ mod tests {
             parsed.1,
             convert_to_color("rgba(192, 198, 210, 0.95)".to_string()).expect("color")
         );
+    }
+
+    #[test]
+    fn parses_outline_shorthand_with_style_token() {
+        let (width, color) = convert_css_outline("3px solid rgba(192, 198, 210, 0.95)".to_string())
+            .expect("outline");
+
+        assert_eq!(width, Val::Px(3.0));
+        assert_eq!(
+            color,
+            convert_to_color("rgba(192, 198, 210, 0.95)".to_string()).expect("color")
+        );
+    }
+
+    #[test]
+    fn outline_and_outline_offset_properties_map_to_style_fields() {
+        let mut style = Style::default();
+
+        apply_property_to_style(&mut style, "outline", "2px #7ea2ff");
+        apply_property_to_style(&mut style, "outline-offset", "5px");
+
+        assert_eq!(style.outline_width, Some(Val::Px(2.0)));
+        assert_eq!(style.outline_color, convert_to_color("#7ea2ff".to_string()));
+        assert_eq!(style.outline_offset, Some(Val::Px(5.0)));
+    }
+
+    #[test]
+    fn outline_none_hides_outline() {
+        let mut style = Style::default();
+
+        apply_property_to_style(&mut style, "outline", "none");
+
+        assert_eq!(style.outline_width, Some(Val::Px(0.0)));
+        assert_eq!(style.outline_color, Some(Color::NONE));
+    }
+
+    #[test]
+    fn outline_width_and_color_longhands_are_supported() {
+        let mut style = Style::default();
+
+        apply_property_to_style(&mut style, "outline-width", "4px");
+        apply_property_to_style(&mut style, "outline-color", "#4f83ff");
+
+        assert_eq!(style.outline_width, Some(Val::Px(4.0)));
+        assert_eq!(style.outline_color, convert_to_color("#4f83ff".to_string()));
     }
 
     #[test]

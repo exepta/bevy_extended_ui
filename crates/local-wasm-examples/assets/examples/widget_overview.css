@@ -146,6 +146,11 @@ body {
     font-size: 12px;
 }
 
+.button-card > button {
+    outline: 2px rgba(138, 166, 255, 0.45);
+    outline-offset: 2px;
+}
+
 .notification-target {
     position: relative;
     width: 100%;

@@ -853,6 +853,9 @@ pub struct Style {
     pub border_color: Option<Color>,
     pub border_width: Option<Val>,
     pub border_radius: Option<Radius>,
+    pub outline_width: Option<Val>,
+    pub outline_offset: Option<Val>,
+    pub outline_color: Option<Color>,
     pub font_size: Option<FontVal>,
     pub font_family: Option<FontFamily>,
     pub font_weight: Option<FontWeight>,
@@ -989,6 +992,9 @@ impl Style {
         merge_opt(&mut self.border_color, &other.border_color);
         merge_opt(&mut self.border_width, &other.border_width);
         merge_opt(&mut self.border_radius, &other.border_radius);
+        merge_opt(&mut self.outline_width, &other.outline_width);
+        merge_opt(&mut self.outline_offset, &other.outline_offset);
+        merge_opt(&mut self.outline_color, &other.outline_color);
 
         merge_opt(&mut self.font_size, &other.font_size);
         merge_opt(&mut self.font_family, &other.font_family);
