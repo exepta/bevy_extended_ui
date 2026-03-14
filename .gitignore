@@ -4,5 +4,6 @@
 /libs
 /logs
 /log
+/build
 coverage.lcov
 AGENTS.md
