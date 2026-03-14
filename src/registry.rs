@@ -15,6 +15,7 @@ pub static CHOICE_BOX_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdP
 pub static DIVIDER_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
 pub static FIELDSET_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
 pub static HEADLINE_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
+pub static HYPER_LINK_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
 pub static IMAGE_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
 pub static INPUT_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
 pub static DATE_PICKER_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
@@ -424,6 +425,7 @@ fn despawn_widget_ids(
                 WidgetKind::Div => DIV_ID_POOL.lock().unwrap().release(widget_id.id),
                 WidgetKind::Form => FORM_ID_POOL.lock().unwrap().release(widget_id.id),
                 WidgetKind::Headline => HEADLINE_ID_POOL.lock().unwrap().release(widget_id.id),
+                WidgetKind::HyperLink => HYPER_LINK_ID_POOL.lock().unwrap().release(widget_id.id),
                 WidgetKind::Paragraph => PARAGRAPH_ID_POOL.lock().unwrap().release(widget_id.id),
                 WidgetKind::ToolTip => TOOL_TIP_ID_POOL.lock().unwrap().release(widget_id.id),
                 WidgetKind::Badge => BADGE_ID_POOL.lock().unwrap().release(widget_id.id),

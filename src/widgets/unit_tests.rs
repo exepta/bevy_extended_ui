@@ -207,6 +207,30 @@ mod tests {
     }
 
     #[test]
+    fn hyperlink_browser_parser_works() {
+        assert_eq!(
+            HyperLinkBrowsers::from_str("system"),
+            Some(HyperLinkBrowsers::System)
+        );
+        assert_eq!(
+            HyperLinkBrowsers::from_str("firefox"),
+            Some(HyperLinkBrowsers::Custom(vec!["firefox".to_string()]))
+        );
+        assert_eq!(
+            HyperLinkBrowsers::from_str("[firefox, brave, chrome]"),
+            Some(HyperLinkBrowsers::Custom(vec![
+                "firefox".to_string(),
+                "brave".to_string(),
+                "chrome".to_string(),
+            ]))
+        );
+        assert_eq!(
+            HyperLinkBrowsers::from_str(""),
+            Some(HyperLinkBrowsers::System)
+        );
+    }
+
+    #[test]
     fn color_picker_conversions_and_formatters_work() {
         let mut picker = ColorPicker::from_rgba_u8(255, 0, 0, 128);
         assert_eq!(picker.hex(), "#FF0000");

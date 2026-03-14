@@ -1,6 +1,7 @@
 use crate::widgets::content::badge::BadgeWidget;
 use crate::widgets::content::divider::DividerWidget;
 use crate::widgets::content::headline::HeadlineWidget;
+use crate::widgets::content::hyper_link::HyperLinkWidget;
 use crate::widgets::content::image::ImageWidget;
 use crate::widgets::content::paragraph::ParagraphWidget;
 use crate::widgets::content::tooltip::ToolTipWidget;
@@ -9,6 +10,7 @@ use bevy::prelude::*;
 pub mod badge;
 pub mod divider;
 pub mod headline;
+pub mod hyper_link;
 pub mod image;
 pub mod paragraph;
 pub mod tooltip;
@@ -23,6 +25,7 @@ impl Plugin for ExtendedContentWidgets {
             BadgeWidget,
             DividerWidget,
             HeadlineWidget,
+            HyperLinkWidget,
             ImageWidget,
             ParagraphWidget,
             ToolTipWidget,

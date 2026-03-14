@@ -13,10 +13,10 @@ mod tests {
     use crate::providers::{ThemeProvider, UiProviderRegistry};
     use crate::styles::{CssClass, CssID, CssSource, IconPlace};
     use crate::widgets::{
-        BadgeAnchor, Body, Button, ButtonType, DateFormat, FieldMode, FormValidationMode, InputCap,
-        InputField, InputType, Paragraph, RadioButton, Scrollbar, Slider, SliderDotAnchor,
-        SliderType, ToggleButton, ToolTipAlignment, ToolTipPriority, ToolTipTrigger,
-        ToolTipVariant, UIWidgetState,
+        BadgeAnchor, Body, Button, ButtonType, DateFormat, FieldMode, FormValidationMode,
+        HyperLinkBrowsers, InputCap, InputField, InputType, Paragraph, RadioButton, Scrollbar,
+        Slider, SliderDotAnchor, SliderType, ToggleButton, ToolTipAlignment, ToolTipPriority,
+        ToolTipTrigger, ToolTipVariant, UIWidgetState,
     };
     use bevy::asset::{AssetEvent, AssetPlugin};
     use bevy::ecs::message::Messages;
@@ -246,6 +246,7 @@ mod tests {
               <date-picker id="birthday" for="#email" placeholder="Datum" value="2026-02-20" min="2025-01-01" max="2027-01-01" format="yyyy-mm-dd"></date-picker>
               <tool-tip for="#email" variant="point" prio="top" alignment="vertical" trigger="hover | click, drag">  Tip text  </tool-tip>
               <badge for="#email" value="143" max="99" anchor="top right"></badge>
+              <a href="https://example.com" browsers="[firefox, brave, chrome]" open-modal="true">Docs</a>
               <p>{{ user.name }}</p>
               <img src="./images/avatar.png" alt="avatar" preview="#json-file" />
               <divider alignment="horizontal"></divider>
@@ -582,6 +583,19 @@ mod tests {
                     && badge.value == 143
                     && badge.max == 99
                     && badge.anchor == BadgeAnchor::TopRight
+        )));
+
+        assert!(all.iter().any(|node| matches!(
+            node,
+            HtmlWidgetNode::HyperLink(link, _, _, _, _, _)
+                if link.text == "Docs"
+                    && link.href == "https://example.com"
+                    && link.open_modal
+                    && link.browsers == HyperLinkBrowsers::Custom(vec![
+                        "firefox".to_string(),
+                        "brave".to_string(),
+                        "chrome".to_string(),
+                    ])
         )));
 
         assert!(all.iter().any(|node| matches!(

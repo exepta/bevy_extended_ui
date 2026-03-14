@@ -199,6 +199,7 @@ pub enum WidgetKind {
     Form,
     FieldSet,
     Headline,
+    HyperLink,
     Img,
     InputField,
     Paragraph,
@@ -874,6 +875,97 @@ impl InputCap {
 #[derive(Component, Reflect, Debug, Clone, Default)]
 #[reflect(Component)]
 pub struct InputValue(pub String);
+
+// ===============================================
+//                     HyperLink
+// ===============================================
+
+/// Browser launch configuration for hyperlink widgets.
+#[derive(Reflect, Debug, Clone, Eq, PartialEq, Default)]
+pub enum HyperLinkBrowsers {
+    #[default]
+    System,
+    Custom(Vec<String>),
+}
+
+impl HyperLinkBrowsers {
+    /// Parses the hyperlink `browsers` attribute.
+    ///
+    /// Supported forms:
+    /// - `system`
+    /// - `firefox`
+    /// - `[firefox, brave, chrome]`
+    pub fn from_str(value: &str) -> Option<Self> {
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            return Some(Self::System);
+        }
+
+        if trimmed.eq_ignore_ascii_case("system") {
+            return Some(Self::System);
+        }
+
+        let parsed = if let Some(inner) = trimmed
+            .strip_prefix('[')
+            .and_then(|raw| raw.strip_suffix(']'))
+        {
+            inner
+                .split(',')
+                .map(|entry| normalize_browser_name(entry))
+                .filter(|entry| !entry.is_empty())
+                .collect::<Vec<_>>()
+        } else {
+            let single = normalize_browser_name(trimmed);
+            if single.is_empty() {
+                Vec::new()
+            } else if single.eq_ignore_ascii_case("system") {
+                return Some(Self::System);
+            } else {
+                vec![single]
+            }
+        };
+
+        if parsed.is_empty() {
+            Some(Self::System)
+        } else {
+            Some(Self::Custom(parsed))
+        }
+    }
+}
+
+fn normalize_browser_name(value: &str) -> String {
+    value
+        .trim()
+        .trim_matches('"')
+        .trim_matches('\'')
+        .trim()
+        .to_ascii_lowercase()
+}
+
+/// Hyperlink widget mapped from HTML `<a>`.
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+#[require(UIGenID, UIWidgetState, Widget)]
+pub struct HyperLink {
+    pub entry: usize,
+    pub text: String,
+    pub href: String,
+    pub browsers: HyperLinkBrowsers,
+    pub open_modal: bool,
+}
+
+impl Default for HyperLink {
+    fn default() -> Self {
+        let entry = HYPER_LINK_ID_POOL.lock().unwrap().acquire();
+        Self {
+            entry,
+            text: String::new(),
+            href: String::new(),
+            browsers: HyperLinkBrowsers::default(),
+            open_modal: false,
+        }
+    }
+}
 
 // ===============================================
 //                     Paragraph

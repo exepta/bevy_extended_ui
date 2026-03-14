@@ -68,6 +68,7 @@ body {
 }
 
 .widget-card > button,
+.widget-card > a,
 .widget-card > select,
 .widget-card > input,
 .widget-card > slider,

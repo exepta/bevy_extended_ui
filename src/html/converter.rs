@@ -706,6 +706,38 @@ fn parse_html_node(
             ))
         }
 
+        "a" => {
+            let text = node.text_contents().trim().to_string();
+            let href = attributes
+                .get("href")
+                .map(str::trim)
+                .unwrap_or_default()
+                .to_string();
+            let open_modal = parse_bool_attribute(&attributes, "open-modal");
+            let browsers = match attributes.get("browsers") {
+                Some(raw) => HyperLinkBrowsers::from_str(raw).unwrap_or_else(|| {
+                    warn!("Invalid hyperlink browsers attribute; falling back to system.");
+                    HyperLinkBrowsers::System
+                }),
+                None => HyperLinkBrowsers::System,
+            };
+
+            Some(HtmlWidgetNode::HyperLink(
+                HyperLink {
+                    text,
+                    href,
+                    browsers,
+                    open_modal,
+                    ..default()
+                },
+                meta,
+                states,
+                functions,
+                widget.clone(),
+                HtmlID::default(),
+            ))
+        }
+
         "img" => {
             let src_raw = attributes.get("src").unwrap_or("").to_string();
             let alt = attributes.get("alt").unwrap_or("").to_string();
