@@ -1,24 +1,19 @@
 {
   "category": [
     {
-      "name": "body",
-      "examples": [
-        {
-          "id": "body",
-          "iframe_src": "{base.url}/examples/body",
-          "html": "",
-          "css": ""
-        }
-      ]
-    },
-    {
       "name": "button",
       "examples": [
         {
           "id": "button",
-          "iframe_src": "{base.url}/examples/button",
-          "html": "",
-          "css": ""
+          "iframe_src": "{base.url}/examples/base",
+          "html": "<button>Button</button><button>Disabled</button><button><icon src=\"icons/check-mark.png\"></icon>Icon</button>",
+          "css": "column, gap:15px"
+        },
+        {
+          "id": "button-icon-only",
+          "iframe_src": "{base.url}/examples/base",
+          "html": "<button style=\"width: 50px; height: 50px; border-radius: 50%;\"><icon src=\"icons/check-mark.png\"></icon></button>",
+          "css": "column, gap:15px"
         }
       ]
     },

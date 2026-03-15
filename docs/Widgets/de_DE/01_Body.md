@@ -73,6 +73,6 @@ fn on_body_init(In(event): In<HtmlInit>, query: Query<&Body>) {
   />
   <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
     <strong>exepta</strong>
-    <a href="https://github.com/exepta" style="margin-top: 10px;">Link to GitHub</a>
+    <a href="https://github.com/exepta" style="margin-top: 10px; color: #5658db;">Link to GitHub</a>
   </div>
 </div>
