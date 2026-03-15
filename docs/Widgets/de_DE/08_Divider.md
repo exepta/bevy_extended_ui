@@ -1,9 +1,8 @@
 ---
-title: Divider (Trennlinie)
+title: Divider
 ---
 
-# Divider (Trennlinie)
-
+# Divider
 ## Überblick
 
 Visuelles Trenn-Widget mit horizontaler oder vertikaler Ausrichtung.
@@ -12,19 +11,19 @@ Visuelles Trenn-Widget mit horizontaler oder vertikaler Ausrichtung.
 - HTML-Tag: divider
 - Empfohlene Quellreferenz: src/widgets/mod.rs
 
-## Wichtige Attribute und Verhalten
+## Attributes
 
 - alignment akzeptiert horizontal oder vertical.
 - Kurze Aliase wie h und v werden geparst.
 - Gedacht als reine visuelle Trennung.
 
-## HTML-Beispiel
+## Html Beispiel
 
 ```html
 <divider alignment="horizontal" oninit="log_divider"></divider>
 ```
 
-## Bevy-Beispiel
+## Rust Beispiel
 
 ```rust
 use bevy::prelude::*;
@@ -56,9 +55,10 @@ fn log_divider(In(event): In<HtmlEvent>, query: Query<&Divider>) {
 }
 ```
 
-## Beispiel
+## WASM Vorschau
 
 <iframe
+  id="divider"
   title="Bevy WASM Vorschau - Divider"
   src="{base.url}/examples/divider"
   width="100%"
@@ -71,3 +71,19 @@ fn log_divider(In(event): In<HtmlEvent>, query: Query<&Divider>) {
 - Schreibe den HTML-Tag exakt (divider), damit der Converter korrekt mappt.
 - Registriere Handler-Namen mit html_fn exakt wie im HTML-Attribut.
 - Verlinke diese Seite später auf einen echten Demo-Build.
+
+## Ersteller vom Widget
+
+<div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
+  <img
+    src="https://avatars.githubusercontent.com/u/84874606?v=4"
+    alt="exepta avatar"
+    width="64"
+    height="64"
+    style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;"
+  />
+  <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
+    <strong>exepta</strong>
+    <a href="https://github.com/exepta" style="margin-top: 10px;">Link to GitHub</a>
+  </div>
+</div>

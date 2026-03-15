@@ -12,14 +12,14 @@ Image widget that renders a referenced asset path and stores alternative text me
 - HTML tag: img
 - Recommended source reference: src/widgets/mod.rs
 
-## Important Attributes and Behavior
+## Attributes
 
 - src resolves relative to HTML asset path.
 - alt stores fallback text metadata.
 - preview can bind image source updates to an `input type="file"` id (e.g. `preview="avatar-file"`).
 - Works as a lightweight content image widget.
 
-## HTML Example
+## Html Example
 
 ```html
 <img src="ui/logo.png" alt="Project logo" oninit="log_img" />
@@ -30,7 +30,7 @@ Image widget that renders a referenced asset path and stores alternative text me
 <img preview="avatar-file" alt="Avatar preview" />
 ```
 
-## Bevy Example
+## Rust Example
 
 ```rust
 use bevy::prelude::*;
@@ -62,9 +62,10 @@ fn log_img(In(event): In<HtmlEvent>, query: Query<&Img>) {
 }
 ```
 
-## Example
+## WASM Preview
 
 <iframe
+  id="img"
   title="Bevy WASM Preview - Img"
   src="{base.url}/examples/img"
   width="100%"
@@ -77,3 +78,19 @@ fn log_img(In(event): In<HtmlEvent>, query: Query<&Img>) {
 - Keep the HTML tag spelling exact (img) so the converter maps to the correct widget.
 - Register handler names with html_fn exactly as used in HTML attributes.
 - Link this page to a real demo build once your WASM preview is deployed.
+
+## Widget Creator
+
+<div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
+  <img
+    src="https://avatars.githubusercontent.com/u/84874606?v=4"
+    alt="exepta avatar"
+    width="64"
+    height="64"
+    style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;"
+  />
+  <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
+    <strong>exepta</strong>
+    <a href="https://github.com/exepta" style="margin-top: 10px;">Link to GitHub</a>
+  </div>
+</div>

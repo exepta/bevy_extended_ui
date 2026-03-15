@@ -1,9 +1,8 @@
 ---
-title: Slider (Schieberegler)
+title: Slider
 ---
 
-# Slider (Schieberegler)
-
+# Slider
 ## Überblick
 
 Numerisches Zieh-Widget mit Min-, Max-, Wert- und Schritt-Eigenschaften.
@@ -13,7 +12,7 @@ Unterstützt `default` (ein Thumb) und `range` (zwei Thumbs).
 - HTML-Tag: slider
 - Empfohlene Quellreferenz: src/widgets/mod.rs
 
-## Wichtige Attribute und Verhalten
+## Attributes
 
 - `min`, `max`, `step`: Zahlenbereich und Schrittweite.
 - `type`: `default | range` (Standard: `default`).
@@ -31,7 +30,7 @@ Unterstützt `default` (ein Thumb) und `range` (zwei Thumbs).
 - Funktioniert mit onchange/oninput-Handlern.
 - Aktueller Wert liegt in der Slider-Komponente.
 
-## HTML-Beispiel
+## Html Beispiel
 
 ```html
 <slider min="0" max="100" value="25" step="1" onchange="log_slider"></slider>
@@ -51,7 +50,7 @@ Unterstützt `default` (ein Thumb) und `range` (zwei Thumbs).
 </slider>
 ```
 
-## Bevy-Beispiel
+## Rust Beispiel
 
 ```rust
 use bevy::prelude::*;
@@ -83,9 +82,10 @@ fn log_slider(In(event): In<HtmlEvent>, query: Query<&Slider>) {
 }
 ```
 
-## Beispiel
+## WASM Vorschau
 
 <iframe
+  id="slider"
   title="Bevy WASM Vorschau - Slider"
   src="{base.url}/examples/slider"
   width="100%"
@@ -98,3 +98,19 @@ fn log_slider(In(event): In<HtmlEvent>, query: Query<&Slider>) {
 - Schreibe den HTML-Tag exakt (slider), damit der Converter korrekt mappt.
 - Registriere Handler-Namen mit html_fn exakt wie im HTML-Attribut.
 - Verlinke diese Seite später auf einen echten Demo-Build.
+
+## Ersteller vom Widget
+
+<div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
+  <img
+    src="https://avatars.githubusercontent.com/u/84874606?v=4"
+    alt="exepta avatar"
+    width="64"
+    height="64"
+    style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;"
+  />
+  <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
+    <strong>exepta</strong>
+    <a href="https://github.com/exepta" style="margin-top: 10px;">Link to GitHub</a>
+  </div>
+</div>

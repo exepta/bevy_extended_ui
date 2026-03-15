@@ -12,13 +12,13 @@ Generic layout container for grouping and structuring nested widgets.
 - HTML tag: div
 - Recommended source reference: src/widgets/mod.rs
 
-## Important Attributes and Behavior
+## Attributes
 
 - Generic grouping container.
 - Ideal for CSS classes and layout composition.
 - Supports nested widgets and event attributes.
 
-## HTML Example
+## Html Example
 
 ```html
 <div id="card" class="panel" oninit="log_div">
@@ -26,7 +26,7 @@ Generic layout container for grouping and structuring nested widgets.
 </div>
 ```
 
-## Bevy Example
+## Rust Example
 
 ```rust
 use bevy::prelude::*;
@@ -58,8 +58,35 @@ fn log_div(In(event): In<HtmlEvent>, query: Query<&Div>) {
 }
 ```
 
+## WASM Preview
+
+<iframe
+  id="div"
+  title="Bevy WASM Preview - Div"
+  src="{base.url}/examples/div"
+  width="100%"
+  height="420"
+  loading="lazy">
+</iframe>
+
 ## Notes
 
 - Keep the HTML tag spelling exact (div) so the converter maps to the correct widget.
 - Register handler names with html_fn exactly as used in HTML attributes.
 - Link this page to a real demo build once your WASM preview is deployed.
+
+## Widget Creator
+
+<div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
+  <img
+    src="https://avatars.githubusercontent.com/u/84874606?v=4"
+    alt="exepta avatar"
+    width="64"
+    height="64"
+    style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;"
+  />
+  <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
+    <strong>exepta</strong>
+    <a href="https://github.com/exepta" style="margin-top: 10px;">Link to GitHub</a>
+  </div>
+</div>

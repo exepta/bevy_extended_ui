@@ -1,9 +1,8 @@
 ---
-title: Badge (Benachrichtigung)
+title: Badge
 ---
 
-# Badge (Benachrichtigung)
-
+# Badge
 ## Überblick
 
 Kleines Benachrichtigungs-Widget, das in der Regel an ein anderes Ziel-Widget gebunden wird.
@@ -12,7 +11,7 @@ Kleines Benachrichtigungs-Widget, das in der Regel an ein anderes Ziel-Widget ge
 - HTML-Tag: badge
 - Empfohlene Quellreferenz: src/widgets/mod.rs
 
-## Wichtige Attribute und Verhalten
+## Attributes
 
 - Unterstützt `for`, `value` (Alias: `count`), `max`, `anchor`.
 - Wenn `value > max`, wird das Label als `+{max}` gerendert (z. B. `+99`).
@@ -22,14 +21,14 @@ Kleines Benachrichtigungs-Widget, das in der Regel an ein anderes Ziel-Widget ge
 - Wenn kein Ziel gefunden wird, bleibt das Badge verborgen.
 - Anchor-Werte: `top right` (Standard), `top left`, `bottom right`, `bottom left`.
 
-## HTML-Beispiel
+## Html Beispiel
 
 ```html
 <button id="inbox-button">Inbox</button>
 <badge for="inbox-button" value="112" max="99" anchor="top right"></badge>
 ```
 
-## Bevy-Beispiel
+## Rust Beispiel
 
 ```rust
 use bevy::prelude::*;
@@ -60,9 +59,10 @@ fn tick_badges(mut query: Query<&mut Badge>) {
 }
 ```
 
-## Beispiel
+## WASM Vorschau
 
 <iframe
+  id="badge"
   title="Bevy WASM Vorschau - Badge"
   src="{base.url}/examples/badge"
   width="100%"
@@ -75,3 +75,19 @@ fn tick_badges(mut query: Query<&mut Badge>) {
 - Schreibe den HTML-Tag exakt (`badge`), damit der Converter korrekt mappt.
 - Nutze `for`, wenn das Badge außerhalb einer Parent-Child-Struktur gebunden werden soll.
 - Für das Styling verwende die CSS-Selektoren `badge` und `.badge-text`.
+
+## Ersteller vom Widget
+
+<div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
+  <img
+    src="https://avatars.githubusercontent.com/u/84874606?v=4"
+    alt="exepta avatar"
+    width="64"
+    height="64"
+    style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;"
+  />
+  <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
+    <strong>exepta</strong>
+    <a href="https://github.com/exepta" style="margin-top: 10px;">Link to GitHub</a>
+  </div>
+</div>

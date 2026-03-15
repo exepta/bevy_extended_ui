@@ -1,9 +1,8 @@
 ---
-title: ToggleButton (Umschaltknopf)
+title: ToggleButton
 ---
 
-# ToggleButton (Umschaltknopf)
-
+# ToggleButton
 ## Überblick
 
 Auswählbares Button-Widget für Einzel- oder Mehrfachauswahl, oft im FieldSet.
@@ -12,13 +11,13 @@ Auswählbares Button-Widget für Einzel- oder Mehrfachauswahl, oft im FieldSet.
 - HTML-Tag: toggle
 - Empfohlene Quellreferenz: src/widgets/mod.rs
 
-## Wichtige Attribute und Verhalten
+## Attributes
 
 - Unterstützt value und selected Attribute.
 - Optionales Icon-Kind für Toolbar-artige UIs.
 - Häufig in fieldset mode=multi eingesetzt.
 
-## HTML-Beispiel
+## Html Beispiel
 
 ```html
 <toggle value="bold" selected onclick="log_togglebutton">
@@ -26,7 +25,7 @@ Auswählbares Button-Widget für Einzel- oder Mehrfachauswahl, oft im FieldSet.
 </toggle>
 ```
 
-## Bevy-Beispiel
+## Rust Beispiel
 
 ```rust
 use bevy::prelude::*;
@@ -58,9 +57,10 @@ fn log_togglebutton(In(event): In<HtmlEvent>, query: Query<&ToggleButton>) {
 }
 ```
 
-## Beispiel
+## WASM Vorschau
 
 <iframe
+  id="togglebutton"
   title="Bevy WASM Vorschau - ToggleButton"
   src="{base.url}/examples/togglebutton"
   width="100%"
@@ -73,3 +73,19 @@ fn log_togglebutton(In(event): In<HtmlEvent>, query: Query<&ToggleButton>) {
 - Schreibe den HTML-Tag exakt (toggle), damit der Converter korrekt mappt.
 - Registriere Handler-Namen mit html_fn exakt wie im HTML-Attribut.
 - Verlinke diese Seite später auf einen echten Demo-Build.
+
+## Ersteller vom Widget
+
+<div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
+  <img
+    src="https://avatars.githubusercontent.com/u/84874606?v=4"
+    alt="exepta avatar"
+    width="64"
+    height="64"
+    style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;"
+  />
+  <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
+    <strong>exepta</strong>
+    <a href="https://github.com/exepta" style="margin-top: 10px;">Link to GitHub</a>
+  </div>
+</div>

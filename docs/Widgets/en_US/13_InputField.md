@@ -12,7 +12,7 @@ Text-like input widget for text, email, date, number, password and file workflow
 - HTML tag: input
 - Recommended source reference: src/widgets/mod.rs
 
-## Important Attributes and Behavior
+## Attributes
 
 - Supports id, name, type, value, placeholder, icon, maxlength, format, folder, extensions, show-size, max-size.
 - Input types include text/email/date/password/number/file.
@@ -23,13 +23,13 @@ Text-like input widget for text, email, date, number, password and file workflow
   - `max-size="1KB|1MB|1GB"` to reject files larger than the configured limit
 - Validation attributes required and validation are supported.
 
-## HTML Example
+## Html Example
 
 ```html
 <input id="username" name="username" type="text" maxlength="32" placeholder="Your name" onchange="log_inputfield" />
 ```
 
-## Bevy Example
+## Rust Example
 
 ```rust
 use bevy::prelude::*;
@@ -61,9 +61,10 @@ fn log_inputfield(In(event): In<HtmlEvent>, query: Query<&InputField>) {
 }
 ```
 
-## Example
+## WASM Preview
 
 <iframe
+  id="inputfield"
   title="Bevy WASM Preview - InputField"
   src="{base.url}/examples/inputfield"
   width="100%"
@@ -76,3 +77,19 @@ fn log_inputfield(In(event): In<HtmlEvent>, query: Query<&InputField>) {
 - Keep the HTML tag spelling exact (input) so the converter maps to the correct widget.
 - Register handler names with html_fn exactly as used in HTML attributes.
 - Link this page to a real demo build once your WASM preview is deployed.
+
+## Widget Creator
+
+<div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
+  <img
+    src="https://avatars.githubusercontent.com/u/84874606?v=4"
+    alt="exepta avatar"
+    width="64"
+    height="64"
+    style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;"
+  />
+  <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
+    <strong>exepta</strong>
+    <a href="https://github.com/exepta" style="margin-top: 10px;">Link to GitHub</a>
+  </div>
+</div>

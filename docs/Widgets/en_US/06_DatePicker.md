@@ -12,20 +12,20 @@ Calendar picker widget that can be standalone or bound to an input via the for a
 - HTML tag: date-picker
 - Recommended source reference: src/widgets/mod.rs
 
-## Important Attributes and Behavior
+## Attributes
 
 - Supports for, name, label, placeholder, value, min, max, format.
 - Works standalone or bound to an input.
 - Useful with onchange handlers for date-driven UI.
 
-## HTML Example
+## Html Example
 
 ```html
 <input id="birthday" type="date" />
 <date-picker for="birthday" min="1990-01-01" max="2030-12-31" format="dmy" onchange="log_datepicker"></date-picker>
 ```
 
-## Bevy Example
+## Rust Example
 
 ```rust
 use bevy::prelude::*;
@@ -57,9 +57,10 @@ fn log_datepicker(In(event): In<HtmlEvent>, query: Query<&DatePicker>) {
 }
 ```
 
-## Example
+## WASM Preview
 
 <iframe
+  id="datepicker"
   title="Bevy WASM Preview - DatePicker"
   src="{base.url}/examples/datepicker"
   width="100%"
@@ -72,3 +73,19 @@ fn log_datepicker(In(event): In<HtmlEvent>, query: Query<&DatePicker>) {
 - Keep the HTML tag spelling exact (date-picker) so the converter maps to the correct widget.
 - Register handler names with html_fn exactly as used in HTML attributes.
 - Link this page to a real demo build once your WASM preview is deployed.
+
+## Widget Creator
+
+<div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
+  <img
+    src="https://avatars.githubusercontent.com/u/84874606?v=4"
+    alt="exepta avatar"
+    width="64"
+    height="64"
+    style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;"
+  />
+  <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
+    <strong>exepta</strong>
+    <a href="https://github.com/exepta" style="margin-top: 10px;">Link to GitHub</a>
+  </div>
+</div>

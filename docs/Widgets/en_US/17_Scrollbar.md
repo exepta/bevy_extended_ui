@@ -12,19 +12,19 @@ Scroll helper widget rendered from the scroll tag for vertical or horizontal scr
 - HTML tag: scroll
 - Recommended source reference: src/widgets/mod.rs
 
-## Important Attributes and Behavior
+## Attributes
 
 - Tag is scroll, not scrollbar.
 - alignment toggles vertical/horizontal behavior.
 - Useful in custom scroll interaction regions.
 
-## HTML Example
+## Html Example
 
 ```html
 <scroll alignment="vertical" onscroll="log_scrollbar"></scroll>
 ```
 
-## Bevy Example
+## Rust Example
 
 ```rust
 use bevy::prelude::*;
@@ -56,9 +56,10 @@ fn log_scrollbar(In(event): In<HtmlEvent>, query: Query<&Scrollbar>) {
 }
 ```
 
-## Example
+## WASM Preview
 
 <iframe
+  id="scrollbar"
   title="Bevy WASM Preview - Scrollbar"
   src="{base.url}/examples/scrollbar"
   width="100%"
@@ -71,3 +72,19 @@ fn log_scrollbar(In(event): In<HtmlEvent>, query: Query<&Scrollbar>) {
 - Keep the HTML tag spelling exact (scroll) so the converter maps to the correct widget.
 - Register handler names with html_fn exactly as used in HTML attributes.
 - Link this page to a real demo build once your WASM preview is deployed.
+
+## Widget Creator
+
+<div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
+  <img
+    src="https://avatars.githubusercontent.com/u/84874606?v=4"
+    alt="exepta avatar"
+    width="64"
+    height="64"
+    style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;"
+  />
+  <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
+    <strong>exepta</strong>
+    <a href="https://github.com/exepta" style="margin-top: 10px;">Link to GitHub</a>
+  </div>
+</div>

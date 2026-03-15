@@ -1,9 +1,8 @@
 ---
-title: ColorPicker (Farbwähler)
+title: ColorPicker
 ---
 
-# ColorPicker (Farbwähler)
-
+# ColorPicker
 ## Überblick
 
 Interaktives Farb-Widget für RGB/RGBA/HEX-Workflows inklusive Änderungs-Events.
@@ -12,19 +11,19 @@ Interaktives Farb-Widget für RGB/RGBA/HEX-Workflows inklusive Änderungs-Events
 - HTML-Tag: colorpicker
 - Empfohlene Quellreferenz: src/widgets/mod.rs
 
-## Wichtige Attribute und Verhalten
+## Attributes
 
 - value definiert die Startfarbe; alpha ist konfigurierbar.
 - Change-Events erlauben Live-Updates in der UI.
 - Komponente liefert rgb/hsv/hex Hilfswerte.
 
-## HTML-Beispiel
+## Html Beispiel
 
 ```html
 <colorpicker value="#4285f4" alpha="255" onchange="log_colorpicker"></colorpicker>
 ```
 
-## Bevy-Beispiel
+## Rust Beispiel
 
 ```rust
 use bevy::prelude::*;
@@ -56,9 +55,10 @@ fn log_colorpicker(In(event): In<HtmlEvent>, query: Query<&ColorPicker>) {
 }
 ```
 
-## Beispiel
+## WASM Vorschau
 
 <iframe
+  id="colorpicker"
   title="Bevy WASM Vorschau - ColorPicker"
   src="{base.url}/examples/colorpicker"
   width="100%"
@@ -71,3 +71,19 @@ fn log_colorpicker(In(event): In<HtmlEvent>, query: Query<&ColorPicker>) {
 - Schreibe den HTML-Tag exakt (colorpicker), damit der Converter korrekt mappt.
 - Registriere Handler-Namen mit html_fn exakt wie im HTML-Attribut.
 - Verlinke diese Seite später auf einen echten Demo-Build.
+
+## Ersteller vom Widget
+
+<div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
+  <img
+    src="https://avatars.githubusercontent.com/u/84874606?v=4"
+    alt="exepta avatar"
+    width="64"
+    height="64"
+    style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;"
+  />
+  <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
+    <strong>exepta</strong>
+    <a href="https://github.com/exepta" style="margin-top: 10px;">Link to GitHub</a>
+  </div>
+</div>

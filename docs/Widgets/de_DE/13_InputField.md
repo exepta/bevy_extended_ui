@@ -1,9 +1,8 @@
 ---
-title: InputField (Eingabefeld)
+title: InputField
 ---
 
-# InputField (Eingabefeld)
-
+# InputField
 ## Überblick
 
 Textbasiertes Eingabe-Widget für Text-, E-Mail-, Datum-, Zahl-, Passwort- und Datei-Felder.
@@ -12,7 +11,7 @@ Textbasiertes Eingabe-Widget für Text-, E-Mail-, Datum-, Zahl-, Passwort- und D
 - HTML-Tag: input
 - Empfohlene Quellreferenz: src/widgets/mod.rs
 
-## Wichtige Attribute und Verhalten
+## Attributes
 
 - Unterstützt id, name, type, value, placeholder, icon, maxlength, format, folder, extensions, show-size, max-size.
 - Eingabetypen: text/email/date/password/number/file.
@@ -23,13 +22,13 @@ Textbasiertes Eingabe-Widget für Text-, E-Mail-, Datum-, Zahl-, Passwort- und D
   - `max-size="1KB|1MB|1GB"` weist Dateien zurück, die größer als das Limit sind
 - Validierungsattribute required und validation werden unterstützt.
 
-## HTML-Beispiel
+## Html Beispiel
 
 ```html
 <input id="username" name="username" type="text" maxlength="32" placeholder="Your name" onchange="log_inputfield" />
 ```
 
-## Bevy-Beispiel
+## Rust Beispiel
 
 ```rust
 use bevy::prelude::*;
@@ -61,9 +60,10 @@ fn log_inputfield(In(event): In<HtmlEvent>, query: Query<&InputField>) {
 }
 ```
 
-## Beispiel
+## WASM Vorschau
 
 <iframe
+  id="inputfield"
   title="Bevy WASM Vorschau - InputField"
   src="{base.url}/examples/inputfield"
   width="100%"
@@ -76,3 +76,19 @@ fn log_inputfield(In(event): In<HtmlEvent>, query: Query<&InputField>) {
 - Schreibe den HTML-Tag exakt (input), damit der Converter korrekt mappt.
 - Registriere Handler-Namen mit html_fn exakt wie im HTML-Attribut.
 - Verlinke diese Seite später auf einen echten Demo-Build.
+
+## Ersteller vom Widget
+
+<div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
+  <img
+    src="https://avatars.githubusercontent.com/u/84874606?v=4"
+    alt="exepta avatar"
+    width="64"
+    height="64"
+    style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;"
+  />
+  <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
+    <strong>exepta</strong>
+    <a href="https://github.com/exepta" style="margin-top: 10px;">Link to GitHub</a>
+  </div>
+</div>

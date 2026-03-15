@@ -1,9 +1,8 @@
 ---
-title: FieldSet (Feldgruppe)
+title: FieldSet
 ---
 
-# FieldSet (Feldgruppe)
-
+# FieldSet
 ## Überblick
 
 Gruppen-Widget für auswählbare Kinder wie Radio- und Toggle-Elemente mit Selektionsregeln.
@@ -12,13 +11,13 @@ Gruppen-Widget für auswählbare Kinder wie Radio- und Toggle-Elemente mit Selek
 - HTML-Tag: fieldset
 - Empfohlene Quellreferenz: src/widgets/mod.rs
 
-## Wichtige Attribute und Verhalten
+## Attributes
 
 - mode unterstützt single, multi, count.
 - allow-none steuert leere Auswahlzustände.
 - Gruppiert radio/toggle Kinder mit gemeinsamem Selektionszustand.
 
-## HTML-Beispiel
+## Html Beispiel
 
 ```html
 <fieldset mode="single" allow-none="false" onchange="log_fieldset">
@@ -27,7 +26,7 @@ Gruppen-Widget für auswählbare Kinder wie Radio- und Toggle-Elemente mit Selek
 </fieldset>
 ```
 
-## Bevy-Beispiel
+## Rust Beispiel
 
 ```rust
 use bevy::prelude::*;
@@ -59,9 +58,10 @@ fn log_fieldset(In(event): In<HtmlEvent>, query: Query<&FieldSet>) {
 }
 ```
 
-## Beispiel
+## WASM Vorschau
 
 <iframe
+  id="fieldset"
   title="Bevy WASM Vorschau - FieldSet"
   src="{base.url}/examples/fieldset"
   width="100%"
@@ -74,3 +74,19 @@ fn log_fieldset(In(event): In<HtmlEvent>, query: Query<&FieldSet>) {
 - Schreibe den HTML-Tag exakt (fieldset), damit der Converter korrekt mappt.
 - Registriere Handler-Namen mit html_fn exakt wie im HTML-Attribut.
 - Verlinke diese Seite später auf einen echten Demo-Build.
+
+## Ersteller vom Widget
+
+<div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
+  <img
+    src="https://avatars.githubusercontent.com/u/84874606?v=4"
+    alt="exepta avatar"
+    width="64"
+    height="64"
+    style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;"
+  />
+  <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
+    <strong>exepta</strong>
+    <a href="https://github.com/exepta" style="margin-top: 10px;">Link to GitHub</a>
+  </div>
+</div>

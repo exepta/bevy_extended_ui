@@ -1,0 +1,257 @@
+{
+  "category": [
+    {
+      "name": "body",
+      "examples": [
+        {
+          "id": "body",
+          "iframe_src": "{base.url}/examples/body",
+          "html": "",
+          "css": ""
+        }
+      ]
+    },
+    {
+      "name": "button",
+      "examples": [
+        {
+          "id": "button",
+          "iframe_src": "{base.url}/examples/button",
+          "html": "",
+          "css": ""
+        }
+      ]
+    },
+    {
+      "name": "checkbox",
+      "examples": [
+        {
+          "id": "checkbox",
+          "iframe_src": "{base.url}/examples/checkbox",
+          "html": "",
+          "css": ""
+        }
+      ]
+    },
+    {
+      "name": "choicebox",
+      "examples": [
+        {
+          "id": "choicebox",
+          "iframe_src": "{base.url}/examples/choicebox",
+          "html": "",
+          "css": ""
+        }
+      ]
+    },
+    {
+      "name": "colorpicker",
+      "examples": [
+        {
+          "id": "colorpicker",
+          "iframe_src": "{base.url}/examples/colorpicker",
+          "html": "",
+          "css": ""
+        }
+      ]
+    },
+    {
+      "name": "datepicker",
+      "examples": [
+        {
+          "id": "datepicker",
+          "iframe_src": "{base.url}/examples/datepicker",
+          "html": "",
+          "css": ""
+        }
+      ]
+    },
+    {
+      "name": "div",
+      "examples": [
+        {
+          "id": "div",
+          "iframe_src": "{base.url}/examples/div",
+          "html": "",
+          "css": ""
+        }
+      ]
+    },
+    {
+      "name": "divider",
+      "examples": [
+        {
+          "id": "divider",
+          "iframe_src": "{base.url}/examples/divider",
+          "html": "",
+          "css": ""
+        }
+      ]
+    },
+    {
+      "name": "fieldset",
+      "examples": [
+        {
+          "id": "fieldset",
+          "iframe_src": "{base.url}/examples/fieldset",
+          "html": "",
+          "css": ""
+        }
+      ]
+    },
+    {
+      "name": "form",
+      "examples": [
+        {
+          "id": "form",
+          "iframe_src": "{base.url}/examples/form",
+          "html": "",
+          "css": ""
+        }
+      ]
+    },
+    {
+      "name": "headline",
+      "examples": [
+        {
+          "id": "headline",
+          "iframe_src": "{base.url}/examples/headline",
+          "html": "",
+          "css": ""
+        }
+      ]
+    },
+    {
+      "name": "img",
+      "examples": [
+        {
+          "id": "img",
+          "iframe_src": "{base.url}/examples/img",
+          "html": "",
+          "css": ""
+        }
+      ]
+    },
+    {
+      "name": "inputfield",
+      "examples": [
+        {
+          "id": "inputfield",
+          "iframe_src": "{base.url}/examples/inputfield",
+          "html": "",
+          "css": ""
+        }
+      ]
+    },
+    {
+      "name": "paragraph",
+      "examples": [
+        {
+          "id": "paragraph",
+          "iframe_src": "{base.url}/examples/paragraph",
+          "html": "",
+          "css": ""
+        }
+      ]
+    },
+    {
+      "name": "progressbar",
+      "examples": [
+        {
+          "id": "progressbar",
+          "iframe_src": "{base.url}/examples/progressbar",
+          "html": "",
+          "css": ""
+        }
+      ]
+    },
+    {
+      "name": "radiobutton",
+      "examples": [
+        {
+          "id": "radiobutton",
+          "iframe_src": "{base.url}/examples/radiobutton",
+          "html": "",
+          "css": ""
+        }
+      ]
+    },
+    {
+      "name": "scrollbar",
+      "examples": [
+        {
+          "id": "scrollbar",
+          "iframe_src": "{base.url}/examples/scrollbar",
+          "html": "",
+          "css": ""
+        }
+      ]
+    },
+    {
+      "name": "slider",
+      "examples": [
+        {
+          "id": "slider",
+          "iframe_src": "{base.url}/examples/slider",
+          "html": "",
+          "css": ""
+        }
+      ]
+    },
+    {
+      "name": "switchbutton",
+      "examples": [
+        {
+          "id": "switchbutton",
+          "iframe_src": "{base.url}/examples/switchbutton",
+          "html": "",
+          "css": ""
+        }
+      ]
+    },
+    {
+      "name": "togglebutton",
+      "examples": [
+        {
+          "id": "togglebutton",
+          "iframe_src": "{base.url}/examples/togglebutton",
+          "html": "",
+          "css": ""
+        }
+      ]
+    },
+    {
+      "name": "tooltip",
+      "examples": [
+        {
+          "id": "tooltip",
+          "iframe_src": "{base.url}/examples/tooltip",
+          "html": "",
+          "css": ""
+        }
+      ]
+    },
+    {
+      "name": "badge",
+      "examples": [
+        {
+          "id": "badge",
+          "iframe_src": "{base.url}/examples/badge",
+          "html": "",
+          "css": ""
+        }
+      ]
+    },
+    {
+      "name": "hyperlink",
+      "examples": [
+        {
+          "id": "hyperlink",
+          "iframe_src": "{base.url}/examples/widgets-overview",
+          "html": "",
+          "css": ""
+        }
+      ]
+    }
+  ]
+}

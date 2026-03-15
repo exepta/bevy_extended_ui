@@ -12,19 +12,19 @@ Switch-like binary control widget with label and optional icon.
 - HTML tag: switch
 - Recommended source reference: src/widgets/mod.rs
 
-## Important Attributes and Behavior
+## Attributes
 
 - Label text is taken from inner content.
 - Optional icon attribute supported.
 - Checked-like state can be read via UIWidgetState.
 
-## HTML Example
+## Html Example
 
 ```html
 <switch icon="extended_ui/icons/drop-arrow.png" onclick="log_switchbutton">Dark mode</switch>
 ```
 
-## Bevy Example
+## Rust Example
 
 ```rust
 use bevy::prelude::*;
@@ -56,9 +56,10 @@ fn log_switchbutton(In(event): In<HtmlEvent>, query: Query<&SwitchButton>) {
 }
 ```
 
-## Example
+## WASM Preview
 
 <iframe
+  id="switchbutton"
   title="Bevy WASM Preview - SwitchButton"
   src="{base.url}/examples/switchbutton"
   width="100%"
@@ -71,3 +72,19 @@ fn log_switchbutton(In(event): In<HtmlEvent>, query: Query<&SwitchButton>) {
 - Keep the HTML tag spelling exact (switch) so the converter maps to the correct widget.
 - Register handler names with html_fn exactly as used in HTML attributes.
 - Link this page to a real demo build once your WASM preview is deployed.
+
+## Widget Creator
+
+<div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
+  <img
+    src="https://avatars.githubusercontent.com/u/84874606?v=4"
+    alt="exepta avatar"
+    width="64"
+    height="64"
+    style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;"
+  />
+  <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
+    <strong>exepta</strong>
+    <a href="https://github.com/exepta" style="margin-top: 10px;">Link to GitHub</a>
+  </div>
+</div>

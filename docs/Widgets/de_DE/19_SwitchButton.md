@@ -1,9 +1,8 @@
 ---
-title: SwitchButton (Schalter)
+title: SwitchButton
 ---
 
-# SwitchButton (Schalter)
-
+# SwitchButton
 ## Überblick
 
 Schalterartiges Binär-Widget mit Textlabel und optionalem Icon.
@@ -12,19 +11,19 @@ Schalterartiges Binär-Widget mit Textlabel und optionalem Icon.
 - HTML-Tag: switch
 - Empfohlene Quellreferenz: src/widgets/mod.rs
 
-## Wichtige Attribute und Verhalten
+## Attributes
 
 - Label-Text kommt aus dem InnerContent.
 - Optionales icon-Attribut wird unterstützt.
 - Checked-ähnlicher Zustand über UIWidgetState lesbar.
 
-## HTML-Beispiel
+## Html Beispiel
 
 ```html
 <switch icon="extended_ui/icons/drop-arrow.png" onclick="log_switchbutton">Dark mode</switch>
 ```
 
-## Bevy-Beispiel
+## Rust Beispiel
 
 ```rust
 use bevy::prelude::*;
@@ -56,9 +55,10 @@ fn log_switchbutton(In(event): In<HtmlEvent>, query: Query<&SwitchButton>) {
 }
 ```
 
-## Beispiel
+## WASM Vorschau
 
 <iframe
+  id="switchbutton"
   title="Bevy WASM Vorschau - SwitchButton"
   src="{base.url}/examples/switchbutton"
   width="100%"
@@ -71,3 +71,19 @@ fn log_switchbutton(In(event): In<HtmlEvent>, query: Query<&SwitchButton>) {
 - Schreibe den HTML-Tag exakt (switch), damit der Converter korrekt mappt.
 - Registriere Handler-Namen mit html_fn exakt wie im HTML-Attribut.
 - Verlinke diese Seite später auf einen echten Demo-Build.
+
+## Ersteller vom Widget
+
+<div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
+  <img
+    src="https://avatars.githubusercontent.com/u/84874606?v=4"
+    alt="exepta avatar"
+    width="64"
+    height="64"
+    style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;"
+  />
+  <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
+    <strong>exepta</strong>
+    <a href="https://github.com/exepta" style="margin-top: 10px;">Link to GitHub</a>
+  </div>
+</div>

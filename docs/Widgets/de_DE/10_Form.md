@@ -1,9 +1,8 @@
 ---
-title: Form (Formular)
+title: Form
 ---
 
-# Form (Formular)
-
+# Form
 ## Überblick
 
 Formular-Container, der Kinder validiert und Submit-Aktionen mit gesammelten Daten auslöst.
@@ -12,13 +11,13 @@ Formular-Container, der Kinder validiert und Submit-Aktionen mit gesammelten Dat
 - HTML-Tag: form
 - Empfohlene Quellreferenz: src/widgets/mod.rs
 
-## Wichtige Attribute und Verhalten
+## Attributes
 
 - action-Handler erhält gesammelte Submit-Daten.
 - validate-Modus: Always, Send, Interact.
 - Submit-Button triggert Validierung und HtmlSubmit-Event.
 
-## HTML-Beispiel
+## Html Beispiel
 
 ```html
 <form action="log_form" validate="Send">
@@ -27,7 +26,7 @@ Formular-Container, der Kinder validiert und Submit-Aktionen mit gesammelten Dat
 </form>
 ```
 
-## Bevy-Beispiel
+## Rust Beispiel
 
 ```rust
 use bevy::prelude::*;
@@ -59,9 +58,10 @@ fn log_form(In(event): In<HtmlEvent>, query: Query<&Form>) {
 }
 ```
 
-## Beispiel
+## WASM Vorschau
 
 <iframe
+  id="form"
   title="Bevy WASM Vorschau - Form"
   src="{base.url}/examples/form"
   width="100%"
@@ -74,3 +74,19 @@ fn log_form(In(event): In<HtmlEvent>, query: Query<&Form>) {
 - Schreibe den HTML-Tag exakt (form), damit der Converter korrekt mappt.
 - Registriere Handler-Namen mit html_fn exakt wie im HTML-Attribut.
 - Verlinke diese Seite später auf einen echten Demo-Build.
+
+## Ersteller vom Widget
+
+<div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
+  <img
+    src="https://avatars.githubusercontent.com/u/84874606?v=4"
+    alt="exepta avatar"
+    width="64"
+    height="64"
+    style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;"
+  />
+  <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
+    <strong>exepta</strong>
+    <a href="https://github.com/exepta" style="margin-top: 10px;">Link to GitHub</a>
+  </div>
+</div>

@@ -1,9 +1,8 @@
 ---
-title: CheckBox (Kontrollkästchen)
+title: CheckBox
 ---
 
-# CheckBox (Kontrollkästchen)
-
+# CheckBox
 ## Überblick
 
 Boolesches Eingabe-Widget mit Label und optionalem Icon für Ja/Nein-Zustände.
@@ -12,13 +11,13 @@ Boolesches Eingabe-Widget mit Label und optionalem Icon für Ja/Nein-Zustände.
 - HTML-Tag: checkbox
 - Empfohlene Quellreferenz: src/widgets/mod.rs
 
-## Wichtige Attribute und Verhalten
+## Attributes
 
 - Haupt-Tag ist checkbox mit Label-Text.
 - Optionales icon-Attribut für das Häkchen.
 - Checked-Zustand ist über Laufzeit-State auslesbar.
 
-## HTML-Beispiel
+## Html Beispiel
 
 ```html
 <checkbox icon="extended_ui/icons/check-mark.png" onclick="log_checkbox">
@@ -26,7 +25,7 @@ Boolesches Eingabe-Widget mit Label und optionalem Icon für Ja/Nein-Zustände.
 </checkbox>
 ```
 
-## Bevy-Beispiel
+## Rust Beispiel
 
 ```rust
 use bevy::prelude::*;
@@ -58,9 +57,10 @@ fn log_checkbox(In(event): In<HtmlEvent>, query: Query<&CheckBox>) {
 }
 ```
 
-## Beispiel
+## WASM Vorschau
 
 <iframe
+  id="checkbox"
   title="Bevy WASM Vorschau - CheckBox"
   src="{base.url}/examples/checkbox"
   width="100%"
@@ -73,3 +73,19 @@ fn log_checkbox(In(event): In<HtmlEvent>, query: Query<&CheckBox>) {
 - Schreibe den HTML-Tag exakt (checkbox), damit der Converter korrekt mappt.
 - Registriere Handler-Namen mit html_fn exakt wie im HTML-Attribut.
 - Verlinke diese Seite später auf einen echten Demo-Build.
+
+## Ersteller vom Widget
+
+<div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
+  <img
+    src="https://avatars.githubusercontent.com/u/84874606?v=4"
+    alt="exepta avatar"
+    width="64"
+    height="64"
+    style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;"
+  />
+  <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
+    <strong>exepta</strong>
+    <a href="https://github.com/exepta" style="margin-top: 10px;">Link to GitHub</a>
+  </div>
+</div>

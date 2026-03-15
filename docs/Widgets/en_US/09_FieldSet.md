@@ -12,13 +12,13 @@ Grouping widget for selectable children such as radio and toggle items with sele
 - HTML tag: fieldset
 - Recommended source reference: src/widgets/mod.rs
 
-## Important Attributes and Behavior
+## Attributes
 
 - mode supports single, multi, count.
 - allow-none controls empty selection behavior.
 - Groups radio/toggle children with shared selection state.
 
-## HTML Example
+## Html Example
 
 ```html
 <fieldset mode="single" allow-none="false" onchange="log_fieldset">
@@ -27,7 +27,7 @@ Grouping widget for selectable children such as radio and toggle items with sele
 </fieldset>
 ```
 
-## Bevy Example
+## Rust Example
 
 ```rust
 use bevy::prelude::*;
@@ -59,9 +59,10 @@ fn log_fieldset(In(event): In<HtmlEvent>, query: Query<&FieldSet>) {
 }
 ```
 
-## Example
+## WASM Preview
 
 <iframe
+  id="fieldset"
   title="Bevy WASM Preview - FieldSet"
   src="{base.url}/examples/fieldset"
   width="100%"
@@ -74,3 +75,19 @@ fn log_fieldset(In(event): In<HtmlEvent>, query: Query<&FieldSet>) {
 - Keep the HTML tag spelling exact (fieldset) so the converter maps to the correct widget.
 - Register handler names with html_fn exactly as used in HTML attributes.
 - Link this page to a real demo build once your WASM preview is deployed.
+
+## Widget Creator
+
+<div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
+  <img
+    src="https://avatars.githubusercontent.com/u/84874606?v=4"
+    alt="exepta avatar"
+    width="64"
+    height="64"
+    style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;"
+  />
+  <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
+    <strong>exepta</strong>
+    <a href="https://github.com/exepta" style="margin-top: 10px;">Link to GitHub</a>
+  </div>
+</div>

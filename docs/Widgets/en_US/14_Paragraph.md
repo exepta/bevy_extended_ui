@@ -12,19 +12,19 @@ Basic text block widget for descriptive content and inline placeholder rendering
 - HTML tag: p
 - Recommended source reference: src/widgets/mod.rs
 
-## Important Attributes and Behavior
+## Attributes
 
 - Plain text content widget using p tag.
 - Works with reactive placeholders in inner content.
 - Useful for status and descriptive text blocks.
 
-## HTML Example
+## Html Example
 
 ```html
 <p oninit="log_paragraph">Welcome {{player.name}}</p>
 ```
 
-## Bevy Example
+## Rust Example
 
 ```rust
 use bevy::prelude::*;
@@ -56,9 +56,10 @@ fn log_paragraph(In(event): In<HtmlEvent>, query: Query<&Paragraph>) {
 }
 ```
 
-## Example
+## WASM Preview
 
 <iframe
+  id="paragraph"
   title="Bevy WASM Preview - Paragraph"
   src="{base.url}/examples/paragraph"
   width="100%"
@@ -71,3 +72,19 @@ fn log_paragraph(In(event): In<HtmlEvent>, query: Query<&Paragraph>) {
 - Keep the HTML tag spelling exact (p) so the converter maps to the correct widget.
 - Register handler names with html_fn exactly as used in HTML attributes.
 - Link this page to a real demo build once your WASM preview is deployed.
+
+## Widget Creator
+
+<div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
+  <img
+    src="https://avatars.githubusercontent.com/u/84874606?v=4"
+    alt="exepta avatar"
+    width="64"
+    height="64"
+    style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;"
+  />
+  <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
+    <strong>exepta</strong>
+    <a href="https://github.com/exepta" style="margin-top: 10px;">Link to GitHub</a>
+  </div>
+</div>
