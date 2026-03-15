@@ -1,9 +1,8 @@
 ---
-title: Scrollbar (Bildlaufleiste)
+title: Scrollbar
 ---
 
-# Scrollbar (Bildlaufleiste)
-
+# Scrollbar
 ## Überblick
 
 Scroll-Helfer-Widget aus dem scroll-Tag für vertikales oder horizontales Scrollen.
@@ -12,19 +11,19 @@ Scroll-Helfer-Widget aus dem scroll-Tag für vertikales oder horizontales Scroll
 - HTML-Tag: scroll
 - Empfohlene Quellreferenz: src/widgets/mod.rs
 
-## Wichtige Attribute und Verhalten
+## Attributes
 
 - Tag ist scroll, nicht scrollbar.
 - alignment schaltet vertikal/horizontal.
 - Nützlich für benutzerdefinierte Scroll-Bereiche.
 
-## HTML-Beispiel
+## Html Beispiel
 
 ```html
 <scroll alignment="vertical" onscroll="log_scrollbar"></scroll>
 ```
 
-## Bevy-Beispiel
+## Rust Beispiel
 
 ```rust
 use bevy::prelude::*;
@@ -56,9 +55,10 @@ fn log_scrollbar(In(event): In<HtmlEvent>, query: Query<&Scrollbar>) {
 }
 ```
 
-## Beispiel
+## WASM Vorschau
 
 <iframe
+  id="scrollbar"
   title="Bevy WASM Vorschau - Scrollbar"
   src="{base.url}/examples/scrollbar"
   width="100%"
@@ -71,3 +71,19 @@ fn log_scrollbar(In(event): In<HtmlEvent>, query: Query<&Scrollbar>) {
 - Schreibe den HTML-Tag exakt (scroll), damit der Converter korrekt mappt.
 - Registriere Handler-Namen mit html_fn exakt wie im HTML-Attribut.
 - Verlinke diese Seite später auf einen echten Demo-Build.
+
+## Ersteller vom Widget
+
+<div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
+  <img
+    src="https://avatars.githubusercontent.com/u/84874606?v=4"
+    alt="exepta avatar"
+    width="64"
+    height="64"
+    style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;"
+  />
+  <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
+    <strong>exepta</strong>
+    <a href="https://github.com/exepta" style="margin-top: 10px;">Link to GitHub</a>
+  </div>
+</div>

@@ -12,13 +12,13 @@ Form container that validates child fields and emits submit actions with collect
 - HTML tag: form
 - Recommended source reference: src/widgets/mod.rs
 
-## Important Attributes and Behavior
+## Attributes
 
 - action handler receives collected submit data.
 - validate mode: Always, Send, Interact.
 - Submit button triggers validation and HtmlSubmit event.
 
-## HTML Example
+## Html Example
 
 ```html
 <form action="log_form" validate="Send">
@@ -27,7 +27,7 @@ Form container that validates child fields and emits submit actions with collect
 </form>
 ```
 
-## Bevy Example
+## Rust Example
 
 ```rust
 use bevy::prelude::*;
@@ -59,9 +59,10 @@ fn log_form(In(event): In<HtmlEvent>, query: Query<&Form>) {
 }
 ```
 
-## Example
+## WASM Preview
 
 <iframe
+  id="form"
   title="Bevy WASM Preview - Form"
   src="{base.url}/examples/form"
   width="100%"
@@ -74,3 +75,19 @@ fn log_form(In(event): In<HtmlEvent>, query: Query<&Form>) {
 - Keep the HTML tag spelling exact (form) so the converter maps to the correct widget.
 - Register handler names with html_fn exactly as used in HTML attributes.
 - Link this page to a real demo build once your WASM preview is deployed.
+
+## Widget Creator
+
+<div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
+  <img
+    src="https://avatars.githubusercontent.com/u/84874606?v=4"
+    alt="exepta avatar"
+    width="64"
+    height="64"
+    style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;"
+  />
+  <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
+    <strong>exepta</strong>
+    <a href="https://github.com/exepta" style="margin-top: 10px;">Link to GitHub</a>
+  </div>
+</div>

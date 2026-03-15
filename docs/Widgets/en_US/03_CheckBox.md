@@ -12,13 +12,13 @@ Boolean input widget with label text and optional icon, used for yes/no state to
 - HTML tag: checkbox
 - Recommended source reference: src/widgets/mod.rs
 
-## Important Attributes and Behavior
+## Attributes
 
 - Main tag is checkbox with label text.
 - Optional icon attribute for check mark style.
 - Checked state is readable through runtime widget state.
 
-## HTML Example
+## Html Example
 
 ```html
 <checkbox icon="extended_ui/icons/check-mark.png" onclick="log_checkbox">
@@ -26,7 +26,7 @@ Boolean input widget with label text and optional icon, used for yes/no state to
 </checkbox>
 ```
 
-## Bevy Example
+## Rust Example
 
 ```rust
 use bevy::prelude::*;
@@ -58,9 +58,10 @@ fn log_checkbox(In(event): In<HtmlEvent>, query: Query<&CheckBox>) {
 }
 ```
 
-## Example
+## WASM Preview
 
 <iframe
+  id="checkbox"
   title="Bevy WASM Preview - CheckBox"
   src="{base.url}/examples/checkbox"
   width="100%"
@@ -73,3 +74,19 @@ fn log_checkbox(In(event): In<HtmlEvent>, query: Query<&CheckBox>) {
 - Keep the HTML tag spelling exact (checkbox) so the converter maps to the correct widget.
 - Register handler names with html_fn exactly as used in HTML attributes.
 - Link this page to a real demo build once your WASM preview is deployed.
+
+## Widget Creator
+
+<div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
+  <img
+    src="https://avatars.githubusercontent.com/u/84874606?v=4"
+    alt="exepta avatar"
+    width="64"
+    height="64"
+    style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;"
+  />
+  <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
+    <strong>exepta</strong>
+    <a href="https://github.com/exepta" style="margin-top: 10px;">Link to GitHub</a>
+  </div>
+</div>

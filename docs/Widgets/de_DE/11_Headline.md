@@ -1,9 +1,8 @@
 ---
-title: Headline (Überschrift)
+title: Headline
 ---
 
-# Headline (Überschrift)
-
+# Headline
 ## Überblick
 
 Überschriften-Widget aus h1 bis h6 für Kapitelstruktur und semantische Titel.
@@ -12,19 +11,19 @@ title: Headline (Überschrift)
 - HTML-Tag: h1-h6
 - Empfohlene Quellreferenz: src/widgets/mod.rs
 
-## Wichtige Attribute und Verhalten
+## Attributes
 
 - h1 bis h6 werden auf eine Headline-Komponente gemappt.
 - Speichert Text und Überschriftenstufe.
 - Kann dynamisch per System umgestylt werden.
 
-## HTML-Beispiel
+## Html Beispiel
 
 ```html
 <h2 oninit="log_headline">Settings</h2>
 ```
 
-## Bevy-Beispiel
+## Rust Beispiel
 
 ```rust
 use bevy::prelude::*;
@@ -56,9 +55,10 @@ fn log_headline(In(event): In<HtmlEvent>, query: Query<&Headline>) {
 }
 ```
 
-## Beispiel
+## WASM Vorschau
 
 <iframe
+  id="headline"
   title="Bevy WASM Vorschau - Headline"
   src="{base.url}/examples/headline"
   width="100%"
@@ -71,3 +71,19 @@ fn log_headline(In(event): In<HtmlEvent>, query: Query<&Headline>) {
 - Schreibe den HTML-Tag exakt (h1-h6), damit der Converter korrekt mappt.
 - Registriere Handler-Namen mit html_fn exakt wie im HTML-Attribut.
 - Verlinke diese Seite später auf einen echten Demo-Build.
+
+## Ersteller vom Widget
+
+<div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
+  <img
+    src="https://avatars.githubusercontent.com/u/84874606?v=4"
+    alt="exepta avatar"
+    width="64"
+    height="64"
+    style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;"
+  />
+  <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
+    <strong>exepta</strong>
+    <a href="https://github.com/exepta" style="margin-top: 10px;">Link to GitHub</a>
+  </div>
+</div>

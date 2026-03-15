@@ -1,9 +1,8 @@
 ---
-title: ToolTip (Kurzinfo)
+title: ToolTip
 ---
 
-# ToolTip (Kurzinfo)
-
+# ToolTip
 ## Überblick
 
 Kontext-Hinweis-Widget, das dem Cursor folgt oder auf ein Ziel zeigt.
@@ -12,13 +11,13 @@ Kontext-Hinweis-Widget, das dem Cursor folgt oder auf ein Ziel zeigt.
 - HTML-Tag: tool-tip
 - Empfohlene Quellreferenz: src/widgets/mod.rs
 
-## Wichtige Attribute und Verhalten
+## Attributes
 
 - Unterstützt for, variant, prio, alignment, trigger.
 - Modi: follow (Cursor) und point (verankert).
 - Bindung implizit über Parent oder explizit per for=id.
 
-## HTML-Beispiel
+## Html Beispiel
 
 ```html
 <button id="help">?</button>
@@ -27,7 +26,7 @@ Kontext-Hinweis-Widget, das dem Cursor folgt oder auf ein Ziel zeigt.
 </tool-tip>
 ```
 
-## Bevy-Beispiel
+## Rust Beispiel
 
 ```rust
 use bevy::prelude::*;
@@ -59,9 +58,10 @@ fn log_tooltip(In(event): In<HtmlEvent>, query: Query<&ToolTip>) {
 }
 ```
 
-## Beispiel
+## WASM Vorschau
 
 <iframe
+  id="tooltip"
   title="Bevy WASM Vorschau - ToolTip"
   src="{base.url}/examples/tooltip"
   width="100%"
@@ -74,3 +74,19 @@ fn log_tooltip(In(event): In<HtmlEvent>, query: Query<&ToolTip>) {
 - Schreibe den HTML-Tag exakt (tool-tip), damit der Converter korrekt mappt.
 - Registriere Handler-Namen mit html_fn exakt wie im HTML-Attribut.
 - Verlinke diese Seite später auf einen echten Demo-Build.
+
+## Ersteller vom Widget
+
+<div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
+  <img
+    src="https://avatars.githubusercontent.com/u/84874606?v=4"
+    alt="exepta avatar"
+    width="64"
+    height="64"
+    style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;"
+  />
+  <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
+    <strong>exepta</strong>
+    <a href="https://github.com/exepta" style="margin-top: 10px;">Link to GitHub</a>
+  </div>
+</div>

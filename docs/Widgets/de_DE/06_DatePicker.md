@@ -1,9 +1,8 @@
 ---
-title: DatePicker (Datumswähler)
+title: DatePicker
 ---
 
-# DatePicker (Datumswähler)
-
+# DatePicker
 ## Überblick
 
 Kalender-Widget, das alleine oder über das Attribut for an ein Input gebunden werden kann.
@@ -12,20 +11,20 @@ Kalender-Widget, das alleine oder über das Attribut for an ein Input gebunden w
 - HTML-Tag: date-picker
 - Empfohlene Quellreferenz: src/widgets/mod.rs
 
-## Wichtige Attribute und Verhalten
+## Attributes
 
 - Unterstützt for, name, label, placeholder, value, min, max, format.
 - Funktioniert allein oder gebunden an ein Input.
 - Praktisch mit onchange-Handlern für datumsabhängige UIs.
 
-## HTML-Beispiel
+## Html Beispiel
 
 ```html
 <input id="birthday" type="date" />
 <date-picker for="birthday" min="1990-01-01" max="2030-12-31" format="dmy" onchange="log_datepicker"></date-picker>
 ```
 
-## Bevy-Beispiel
+## Rust Beispiel
 
 ```rust
 use bevy::prelude::*;
@@ -57,9 +56,10 @@ fn log_datepicker(In(event): In<HtmlEvent>, query: Query<&DatePicker>) {
 }
 ```
 
-## Beispiel
+## WASM Vorschau
 
 <iframe
+  id="datepicker"
   title="Bevy WASM Vorschau - DatePicker"
   src="{base.url}/examples/datepicker"
   width="100%"
@@ -72,3 +72,19 @@ fn log_datepicker(In(event): In<HtmlEvent>, query: Query<&DatePicker>) {
 - Schreibe den HTML-Tag exakt (date-picker), damit der Converter korrekt mappt.
 - Registriere Handler-Namen mit html_fn exakt wie im HTML-Attribut.
 - Verlinke diese Seite später auf einen echten Demo-Build.
+
+## Ersteller vom Widget
+
+<div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
+  <img
+    src="https://avatars.githubusercontent.com/u/84874606?v=4"
+    alt="exepta avatar"
+    width="64"
+    height="64"
+    style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;"
+  />
+  <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
+    <strong>exepta</strong>
+    <a href="https://github.com/exepta" style="margin-top: 10px;">Link to GitHub</a>
+  </div>
+</div>

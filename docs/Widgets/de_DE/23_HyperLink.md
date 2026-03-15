@@ -1,9 +1,8 @@
 ---
-title: HyperLink (Link)
+title: HyperLink
 ---
 
-# HyperLink (Link)
-
+# HyperLink
 ## Überblick
 
 Klickbares Text-Link-Widget, das auf den HTML-Tag `<a>` gemappt wird.
@@ -12,7 +11,7 @@ Klickbares Text-Link-Widget, das auf den HTML-Tag `<a>` gemappt wird.
 - HTML-Tag: a
 - Empfohlene Quellreferenz: src/widgets/mod.rs
 
-## Wichtige Attribute und Verhalten
+## Attributes
 
 - `href` definiert die Ziel-URL.
 - `browsers` ist optional (Standard: `system`).
@@ -23,14 +22,14 @@ Klickbares Text-Link-Widget, das auf den HTML-Tag `<a>` gemappt wird.
 - Unter `wasm32` werden `browsers` und `open-modal` ignoriert.
 - Es gibt keinen System-Browser-Fallback, wenn explizite `browsers` konfiguriert sind und keiner installiert ist.
 
-## HTML-Beispiel
+## Html Beispiel
 
 ```html
 <a href="https://bevy.org">Mit System-Browser öffnen</a>
 <a href="https://bevy.org" browsers="[chrome]" open-modal="true">Mit konfiguriertem Browser öffnen</a>
 ```
 
-## Bevy-Beispiel
+## Rust Beispiel
 
 ```rust
 use bevy::prelude::*;
@@ -63,9 +62,10 @@ fn update_link_target(mut query: Query<&mut HyperLink>) {
 }
 ```
 
-## Beispiel
+## WASM Vorschau
 
 <iframe
+  id="hyperlink"
   title="Bevy WASM Vorschau - HyperLink"
   src="{base.url}/examples/widgets-overview"
   width="100%"
@@ -78,3 +78,19 @@ fn update_link_target(mut query: Query<&mut HyperLink>) {
 - Schreibe den HTML-Tag exakt (`a`), damit der Converter korrekt mappt.
 - Nutze `open-modal="true"` nur dann, wenn du bei fehlenden konfigurierten Browsern den Install-Dialogfluss möchtest.
 - Style Links über den CSS-Selektor `a`.
+
+## Ersteller vom Widget
+
+<div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
+  <img
+    src="https://avatars.githubusercontent.com/u/84874606?v=4"
+    alt="exepta avatar"
+    width="64"
+    height="64"
+    style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;"
+  />
+  <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
+    <strong>exepta</strong>
+    <a href="https://github.com/exepta" style="margin-top: 10px;">Link to GitHub</a>
+  </div>
+</div>

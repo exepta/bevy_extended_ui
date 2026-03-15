@@ -1,9 +1,8 @@
 ---
-title: Div (Container)
+title: Div
 ---
 
-# Div (Container)
-
+# Div
 ## Überblick
 
 Generischer Layout-Container zum Gruppieren und Strukturieren verschachtelter Widgets.
@@ -12,13 +11,13 @@ Generischer Layout-Container zum Gruppieren und Strukturieren verschachtelter Wi
 - HTML-Tag: div
 - Empfohlene Quellreferenz: src/widgets/mod.rs
 
-## Wichtige Attribute und Verhalten
+## Attributes
 
 - Generischer Gruppen-Container.
 - Ideal für CSS-Klassen und Layout-Komposition.
 - Unterstützt verschachtelte Widgets und Event-Attribute.
 
-## HTML-Beispiel
+## Html Beispiel
 
 ```html
 <div id="card" class="panel" oninit="log_div">
@@ -26,7 +25,7 @@ Generischer Layout-Container zum Gruppieren und Strukturieren verschachtelter Wi
 </div>
 ```
 
-## Bevy-Beispiel
+## Rust Beispiel
 
 ```rust
 use bevy::prelude::*;
@@ -58,8 +57,35 @@ fn log_div(In(event): In<HtmlEvent>, query: Query<&Div>) {
 }
 ```
 
+## WASM Vorschau
+
+<iframe
+  id="div"
+  title="Bevy WASM Vorschau - Div"
+  src="{base.url}/examples/div"
+  width="100%"
+  height="420"
+  loading="lazy">
+</iframe>
+
 ## Hinweise
 
 - Schreibe den HTML-Tag exakt (div), damit der Converter korrekt mappt.
 - Registriere Handler-Namen mit html_fn exakt wie im HTML-Attribut.
 - Verlinke diese Seite später auf einen echten Demo-Build.
+
+## Ersteller vom Widget
+
+<div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
+  <img
+    src="https://avatars.githubusercontent.com/u/84874606?v=4"
+    alt="exepta avatar"
+    width="64"
+    height="64"
+    style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;"
+  />
+  <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
+    <strong>exepta</strong>
+    <a href="https://github.com/exepta" style="margin-top: 10px;">Link to GitHub</a>
+  </div>
+</div>

@@ -1,9 +1,8 @@
 ---
-title: Img (Bild)
+title: Img
 ---
 
-# Img (Bild)
-
+# Img
 ## Überblick
 
 Bild-Widget für eine Asset-Quelle inklusive Alternativtext.
@@ -12,14 +11,14 @@ Bild-Widget für eine Asset-Quelle inklusive Alternativtext.
 - HTML-Tag: img
 - Empfohlene Quellreferenz: src/widgets/mod.rs
 
-## Wichtige Attribute und Verhalten
+## Attributes
 
 - src wird relativ zum HTML-Asset-Pfad aufgelöst.
 - alt speichert Fallback-/Metadaten-Text.
 - preview kann die Bildquelle an die id eines `input type="file"` binden (z. B. `preview="avatar-file"`).
 - Leichtgewichtiges Bild-Widget für Inhalte.
 
-## HTML-Beispiel
+## Html Beispiel
 
 ```html
 <img src="ui/logo.png" alt="Project logo" oninit="log_img" />
@@ -30,7 +29,7 @@ Bild-Widget für eine Asset-Quelle inklusive Alternativtext.
 <img preview="avatar-file" alt="Avatar Vorschau" />
 ```
 
-## Bevy-Beispiel
+## Rust Beispiel
 
 ```rust
 use bevy::prelude::*;
@@ -62,9 +61,10 @@ fn log_img(In(event): In<HtmlEvent>, query: Query<&Img>) {
 }
 ```
 
-## Beispiel
+## WASM Vorschau
 
 <iframe
+  id="img"
   title="Bevy WASM Vorschau - Img"
   src="{base.url}/examples/img"
   width="100%"
@@ -77,3 +77,19 @@ fn log_img(In(event): In<HtmlEvent>, query: Query<&Img>) {
 - Schreibe den HTML-Tag exakt (img), damit der Converter korrekt mappt.
 - Registriere Handler-Namen mit html_fn exakt wie im HTML-Attribut.
 - Verlinke diese Seite später auf einen echten Demo-Build.
+
+## Ersteller vom Widget
+
+<div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
+  <img
+    src="https://avatars.githubusercontent.com/u/84874606?v=4"
+    alt="exepta avatar"
+    width="64"
+    height="64"
+    style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;"
+  />
+  <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
+    <strong>exepta</strong>
+    <a href="https://github.com/exepta" style="margin-top: 10px;">Link to GitHub</a>
+  </div>
+</div>

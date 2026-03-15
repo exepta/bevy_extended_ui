@@ -1,65 +1,78 @@
 ---
-title: Body (Seitenkörper)
+title: Body
 ---
 
-# Body (Seitenkörper)
+# Body
 
 ## Überblick
 
-Wurzel-Widget für den HTML-Seitenkörper, das einen kompletten geparsten UI-Baum verankert.
+`Body` ist das zentrale Wurzel-Widget der UI-Struktur und repräsentiert den HTML-Tag `<body>` innerhalb des Parsers. Alle untergeordneten Widgets werden unter diesem Knoten aufgebaut, wodurch `Body` die Grundlage für Layout, Scroll-Verhalten, Event-Weiterleitung und die Verknüpfung zur geladenen UI-Quelle (`html_key`) bildet.
 
 - Rust-Komponente: Body
 - HTML-Tag: body
 - Empfohlene Quellreferenz: src/widgets/mod.rs
 
-## Wichtige Attribute und Verhalten
+## Attributes
 
-- Wurzel-Elternteil für geparste Kinder-Widgets.
-- Speichert html_key für den aktiven UI-Eintrag.
-- Akzeptiert globale id/class/style/event Attribute.
+Keine extra attributes!
 
-## HTML-Beispiel
+Unterstützte globale HTML-Attribute (ausführlich):
+
+- `id`: Vergibt eine eindeutige Element-ID und ermöglicht gezieltes Ansprechen über Selektoren, Skripte und Widget-Bindings.
+- `class`: Übergibt mehrere CSS-Klassen für Zustands- und Theme-Styling; die Klassen werden als Liste in die Bevy-Style-Pipeline übernommen.
+- `style`: Übergibt Inline-CSS; die Werte werden in `HtmlStyle` geparsed und mit anderen Styles zusammengeführt.
+- `hidden`: Markiert das Widget initial als versteckt, damit es nicht sichtbar gerendert wird.
+- `disabled`: Setzt den interaktiven Zustand auf deaktiviert und blockiert entsprechende Nutzerinteraktionen.
+- `readonly`: Markiert das Widget als nur lesbar; relevant für konsistentes Zustands-Handling in der Widget-State-Logik.
+- Event-Attribute wie `onclick`, `oninit`, `onmouseover`, `onmouseout`, `onfocus`, `onscroll`, `onwheel`, `onkeydown`, `onkeyup`: Binden Handler-Namen direkt an das Event-System und werden als `HtmlEventBindings` registriert.
+
+## WASM Vorschau
+
+<iframe
+  id="body"
+  title="Bevy WASM Vorschau - Body"
+  src="{base.url}/examples/body"
+  width="100%"
+  height="420"
+  loading="lazy">
+</iframe>
+
+## Html Beispiel
 
 ```html
-<body oninit="log_body">
-  <div class="screen-root">...</div>
+<body id="main-body" class="screen-root app-layout" oninit="on_body_init">
+  <div class="content">...</div>
 </body>
 ```
 
-## Bevy-Beispiel
+## Rust Beispiel
 
 ```rust
-use bevy::prelude::*;
-use bevy_extended_ui::ExtendedUiPlugin;
-use bevy_extended_ui::html::{HtmlEvent, HtmlSource};
-use bevy_extended_ui::io::HtmlAsset;
-use bevy_extended_ui::registry::UiRegistry;
-use bevy_extended_ui::widgets::Body;
-use bevy_extended_ui_macros::html_fn;
-
-fn main() {
-    App::new()
-        .add_plugins(DefaultPlugins)
-        .add_plugins(ExtendedUiPlugin)
-        .add_systems(Startup, load_ui)
-        .run();
-}
-
 fn load_ui(mut reg: ResMut<UiRegistry>, asset_server: Res<AssetServer>) {
     let handle: Handle<HtmlAsset> = asset_server.load("ui/body.html");
     reg.add_and_use("body-demo".to_string(), HtmlSource::from_handle(handle));
 }
 
-#[html_fn("log_body")]
-fn log_body(In(event): In<HtmlEvent>, query: Query<&Body>) {
+#[html_fn("on_body_init")]
+fn on_body_init(In(event): In<HtmlInit>, query: Query<&Body>) {
     if let Ok(widget) = query.get(event.entity) {
-        info!("Body event entity={:?} data={:?}", event.entity, widget);
+        info!("Body geladen: entry={} html_key={:?}", widget.entry, widget.html_key);
     }
 }
 ```
 
-## Hinweise
+## Ersteller vom Widget
 
-- Schreibe den HTML-Tag exakt (body), damit der Converter korrekt mappt.
-- Registriere Handler-Namen mit html_fn exakt wie im HTML-Attribut.
-- Verlinke diese Seite später auf einen echten Demo-Build.
+<div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
+  <img
+    src="https://avatars.githubusercontent.com/u/84874606?v=4"
+    alt="exepta avatar"
+    width="64"
+    height="64"
+    style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;"
+  />
+  <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
+    <strong>exepta</strong>
+    <a href="https://github.com/exepta" style="margin-top: 10px;">Link to GitHub</a>
+  </div>
+</div>

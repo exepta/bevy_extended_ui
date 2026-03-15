@@ -1,9 +1,8 @@
 ---
-title: ProgressBar (Fortschrittsbalken)
+title: ProgressBar
 ---
 
-# ProgressBar (Fortschrittsbalken)
-
+# ProgressBar
 ## Überblick
 
 Bereichsbasiertes Anzeige-Widget für Fortschritt zwischen Min- und Max-Wert.
@@ -12,19 +11,19 @@ Bereichsbasiertes Anzeige-Widget für Fortschritt zwischen Min- und Max-Wert.
 - HTML-Tag: progressbar
 - Empfohlene Quellreferenz: src/widgets/mod.rs
 
-## Wichtige Attribute und Verhalten
+## Attributes
 
 - Bereichswerte über min, max, value.
 - Wird idealerweise über App-/Spielzustand aktualisiert.
 - Gut für XP, Laden, Leben und Cooldowns.
 
-## HTML-Beispiel
+## Html Beispiel
 
 ```html
 <progressbar id="xp" min="0" max="100" value="42" oninit="log_progressbar"></progressbar>
 ```
 
-## Bevy-Beispiel
+## Rust Beispiel
 
 ```rust
 use bevy::prelude::*;
@@ -56,9 +55,10 @@ fn log_progressbar(In(event): In<HtmlEvent>, query: Query<&ProgressBar>) {
 }
 ```
 
-## Beispiel
+## WASM Vorschau
 
 <iframe
+  id="progressbar"
   title="Bevy WASM Vorschau - ProgressBar"
   src="{base.url}/examples/progressbar"
   width="100%"
@@ -71,3 +71,19 @@ fn log_progressbar(In(event): In<HtmlEvent>, query: Query<&ProgressBar>) {
 - Schreibe den HTML-Tag exakt (progressbar), damit der Converter korrekt mappt.
 - Registriere Handler-Namen mit html_fn exakt wie im HTML-Attribut.
 - Verlinke diese Seite später auf einen echten Demo-Build.
+
+## Ersteller vom Widget
+
+<div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
+  <img
+    src="https://avatars.githubusercontent.com/u/84874606?v=4"
+    alt="exepta avatar"
+    width="64"
+    height="64"
+    style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;"
+  />
+  <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
+    <strong>exepta</strong>
+    <a href="https://github.com/exepta" style="margin-top: 10px;">Link to GitHub</a>
+  </div>
+</div>

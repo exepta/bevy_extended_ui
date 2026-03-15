@@ -1,9 +1,8 @@
 ---
-title: RadioButton (Optionsfeld)
+title: RadioButton
 ---
 
-# RadioButton (Optionsfeld)
-
+# RadioButton
 ## Überblick
 
 Einzelauswahl-Widget, das typischerweise innerhalb einer FieldSet-Gruppe verwendet wird.
@@ -12,19 +11,19 @@ Einzelauswahl-Widget, das typischerweise innerhalb einer FieldSet-Gruppe verwend
 - HTML-Tag: radio
 - Empfohlene Quellreferenz: src/widgets/mod.rs
 
-## Wichtige Attribute und Verhalten
+## Attributes
 
 - value trägt den semantischen Auswahlwert.
 - selected markiert den initial aktiven Eintrag.
 - Typischerweise in einem fieldset verwaltet.
 
-## HTML-Beispiel
+## Html Beispiel
 
 ```html
 <radio value="de" selected onchange="log_radiobutton">Deutsch</radio>
 ```
 
-## Bevy-Beispiel
+## Rust Beispiel
 
 ```rust
 use bevy::prelude::*;
@@ -56,9 +55,10 @@ fn log_radiobutton(In(event): In<HtmlEvent>, query: Query<&RadioButton>) {
 }
 ```
 
-## Beispiel
+## WASM Vorschau
 
 <iframe
+  id="radiobutton"
   title="Bevy WASM Vorschau - RadioButton"
   src="{base.url}/examples/radiobutton"
   width="100%"
@@ -71,3 +71,19 @@ fn log_radiobutton(In(event): In<HtmlEvent>, query: Query<&RadioButton>) {
 - Schreibe den HTML-Tag exakt (radio), damit der Converter korrekt mappt.
 - Registriere Handler-Namen mit html_fn exakt wie im HTML-Attribut.
 - Verlinke diese Seite später auf einen echten Demo-Build.
+
+## Ersteller vom Widget
+
+<div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
+  <img
+    src="https://avatars.githubusercontent.com/u/84874606?v=4"
+    alt="exepta avatar"
+    width="64"
+    height="64"
+    style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;"
+  />
+  <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
+    <strong>exepta</strong>
+    <a href="https://github.com/exepta" style="margin-top: 10px;">Link to GitHub</a>
+  </div>
+</div>

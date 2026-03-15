@@ -12,13 +12,13 @@ Selectable button widget for single or multi-selection scenarios, often inside f
 - HTML tag: toggle
 - Recommended source reference: src/widgets/mod.rs
 
-## Important Attributes and Behavior
+## Attributes
 
 - Supports value and selected attributes.
 - Optional icon child for toolbar-like UI.
 - Commonly used inside fieldset mode=multi.
 
-## HTML Example
+## Html Example
 
 ```html
 <toggle value="bold" selected onclick="log_togglebutton">
@@ -26,7 +26,7 @@ Selectable button widget for single or multi-selection scenarios, often inside f
 </toggle>
 ```
 
-## Bevy Example
+## Rust Example
 
 ```rust
 use bevy::prelude::*;
@@ -58,9 +58,10 @@ fn log_togglebutton(In(event): In<HtmlEvent>, query: Query<&ToggleButton>) {
 }
 ```
 
-## Example
+## WASM Preview
 
 <iframe
+  id="togglebutton"
   title="Bevy WASM Preview - ToggleButton"
   src="{base.url}/examples/togglebutton"
   width="100%"
@@ -73,3 +74,19 @@ fn log_togglebutton(In(event): In<HtmlEvent>, query: Query<&ToggleButton>) {
 - Keep the HTML tag spelling exact (toggle) so the converter maps to the correct widget.
 - Register handler names with html_fn exactly as used in HTML attributes.
 - Link this page to a real demo build once your WASM preview is deployed.
+
+## Widget Creator
+
+<div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
+  <img
+    src="https://avatars.githubusercontent.com/u/84874606?v=4"
+    alt="exepta avatar"
+    width="64"
+    height="64"
+    style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;"
+  />
+  <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
+    <strong>exepta</strong>
+    <a href="https://github.com/exepta" style="margin-top: 10px;">Link to GitHub</a>
+  </div>
+</div>

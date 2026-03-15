@@ -12,19 +12,19 @@ Heading widget generated from h1 to h6 tags for section titles and semantic stru
 - HTML tag: h1-h6
 - Recommended source reference: src/widgets/mod.rs
 
-## Important Attributes and Behavior
+## Attributes
 
 - h1 to h6 map to one Headline component type.
 - Stores text and heading level metadata.
 - Can be restyled dynamically via systems.
 
-## HTML Example
+## Html Example
 
 ```html
 <h2 oninit="log_headline">Settings</h2>
 ```
 
-## Bevy Example
+## Rust Example
 
 ```rust
 use bevy::prelude::*;
@@ -56,9 +56,10 @@ fn log_headline(In(event): In<HtmlEvent>, query: Query<&Headline>) {
 }
 ```
 
-## Example
+## WASM Preview
 
 <iframe
+  id="headline"
   title="Bevy WASM Preview - Headline"
   src="{base.url}/examples/headline"
   width="100%"
@@ -71,3 +72,19 @@ fn log_headline(In(event): In<HtmlEvent>, query: Query<&Headline>) {
 - Keep the HTML tag spelling exact (h1-h6) so the converter maps to the correct widget.
 - Register handler names with html_fn exactly as used in HTML attributes.
 - Link this page to a real demo build once your WASM preview is deployed.
+
+## Widget Creator
+
+<div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
+  <img
+    src="https://avatars.githubusercontent.com/u/84874606?v=4"
+    alt="exepta avatar"
+    width="64"
+    height="64"
+    style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;"
+  />
+  <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
+    <strong>exepta</strong>
+    <a href="https://github.com/exepta" style="margin-top: 10px;">Link to GitHub</a>
+  </div>
+</div>

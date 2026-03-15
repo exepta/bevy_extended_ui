@@ -12,7 +12,7 @@ Clickable text link widget mapped from the HTML `<a>` tag.
 - HTML tag: a
 - Recommended source reference: src/widgets/mod.rs
 
-## Important Attributes and Behavior
+## Attributes
 
 - `href` defines the target URL.
 - `browsers` is optional (default: `system`).
@@ -23,14 +23,14 @@ Clickable text link widget mapped from the HTML `<a>` tag.
 - On `wasm32`, `browsers` and `open-modal` are ignored.
 - No system-browser fallback is used when explicit `browsers` are configured and none are installed.
 
-## HTML Example
+## Html Example
 
 ```html
 <a href="https://bevy.org">Open with system browser</a>
 <a href="https://bevy.org" browsers="[chrome]" open-modal="true">Open with configured browser</a>
 ```
 
-## Bevy Example
+## Rust Example
 
 ```rust
 use bevy::prelude::*;
@@ -63,9 +63,10 @@ fn update_link_target(mut query: Query<&mut HyperLink>) {
 }
 ```
 
-## Example
+## WASM Preview
 
 <iframe
+  id="hyperlink"
   title="Bevy WASM Preview - HyperLink"
   src="{base.url}/examples/widgets-overview"
   width="100%"
@@ -78,3 +79,19 @@ fn update_link_target(mut query: Query<&mut HyperLink>) {
 - Keep the HTML tag spelling exact (`a`) so the converter maps to the correct widget.
 - Use `open-modal="true"` only when you want an install prompt flow for missing configured browsers.
 - Style links with the `a` selector in CSS.
+
+## Widget Creator
+
+<div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
+  <img
+    src="https://avatars.githubusercontent.com/u/84874606?v=4"
+    alt="exepta avatar"
+    width="64"
+    height="64"
+    style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;"
+  />
+  <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
+    <strong>exepta</strong>
+    <a href="https://github.com/exepta" style="margin-top: 10px;">Link to GitHub</a>
+  </div>
+</div>
