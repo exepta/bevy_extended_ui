@@ -35,18 +35,19 @@ Zusätzlich relevant:
 
 - `<icon src="..."></icon>`: Kein Attribut, sondern ein Kind-Element. Der Parser erkennt das Icon automatisch und setzt die Platzierung abhängig von der Textposition (`links` oder `rechts`).
 
-## WASM Vorschau
+## WASM Vorschauen
 
+### Button states
 <iframe
-  id="button"
-  title="Bevy WASM Vorschau - Button"
-  src="{base.url}/examples/button"
-  width="100%"
-  height="420"
-  loading="lazy">
+id="button"
+title="Button States"
+src="{base.url}/examples/base"
+width="50%"
+height="250px"
+loading="lazy">
 </iframe>
 
-## Html Beispiel
+#### Html Example
 
 ```html
 <button id="save-btn" class="cta" type="submit" onclick="on_save_click">
@@ -55,7 +56,7 @@ Zusätzlich relevant:
 </button>
 ```
 
-## Rust Beispiel
+## Rust Example
 
 ```rust
 fn load_ui(mut reg: ResMut<UiRegistry>, asset_server: Res<AssetServer>) {
@@ -67,12 +68,40 @@ fn load_ui(mut reg: ResMut<UiRegistry>, asset_server: Res<AssetServer>) {
 fn on_save_click(In(event): In<HtmlClick>, query: Query<&Button>) {
     if let Ok(widget) = query.get(event.entity) {
         info!(
-            "Button geklickt: text='{}' type={:?} icon={:?}",
+            "Button clicked: text='{}' type={:?} icon={:?}",
             widget.text,
             widget.button_type,
             widget.icon_path
         );
     }
+}
+```
+
+### Icon Button
+
+<iframe
+id="button-icon-only"
+title="Icon Button"
+src="{base.url}/examples/base"
+width="50%"
+height="250px"
+loading="lazy">
+</iframe>
+
+#### Html Example
+
+```html
+<button style="width: 50px; height: 50px; border-radius: 50%;">
+  <icon src="icons/check-mark.png"></icon>
+</button>
+```
+
+## Rust Example
+
+```rust
+fn load_ui(mut reg: ResMut<UiRegistry>, asset_server: Res<AssetServer>) {
+  let handle: Handle<HtmlAsset> = asset_server.load("ui/button.html");
+  reg.add_and_use("button-demo".to_string(), HtmlSource::from_handle(handle));
 }
 ```
 
