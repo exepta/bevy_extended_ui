@@ -114,9 +114,9 @@ loading="lazy">
 #### Html Example
 
 ```html
-<checkbox icon="{custom.png}">Checkbox</checkbox>
-<checkbox icon="{custom.png}" checked>Checked</checkbox>
-<checkbox icon="{custom.png}" disabled>Disabled</checkbox>
+<checkbox icon="extended_ui/icons/custom.png">Checkbox</checkbox>
+<checkbox icon="extended_ui/icons/custom.png" checked>Checked</checkbox>
+<checkbox icon="extended_ui/icons/custom.png" disabled>Disabled</checkbox>
 ```
 
 #### Rust Example

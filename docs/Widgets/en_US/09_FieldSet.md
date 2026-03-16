@@ -32,9 +32,9 @@ Supported global HTML attributes:
 
 ### WASM Previews
 
-### FieldSet Example
+### FieldSet Single
 <iframe
-  id="fieldset"
+  id="fieldset-single"
   title="FieldSet"
   src="{base.url}/examples/base"
   width="100%"
@@ -45,7 +45,7 @@ Supported global HTML attributes:
 #### Html Example
 
 ```html
-<fieldset mode="single" allow-none="false" onchange="log_fieldset">
+<fieldset mode="single" allow-none="false" class="con-column">
   <radio value="easy">Easy</radio>
   <radio value="hard" selected>Hard</radio>
 </fieldset>
@@ -79,6 +79,152 @@ fn spawn_fieldset_widget(mut commands: Commands) {
                     label: "Hard".to_string(),
                     value: "hard".to_string(),
                     selected: true,
+                    ..default()
+                },
+                Node::default(),
+            ));
+        });
+}
+```
+
+### FieldSet Multiple
+<iframe
+id="fieldset-multiple"
+title="FieldSet"
+src="{base.url}/examples/base"
+width="100%"
+height="420"
+loading="lazy">
+</iframe>
+
+#### Html Example
+
+```html
+<fieldset mode="multi" allow-none="true" class="con-column">
+  <toggle value="easy">Easy</toggle>
+  <toggle value="medium">Medium</toggle>
+  <toggle value="hard" selected>Hard</toggle>
+</fieldset>
+```
+
+#### Rust Example
+
+```rust
+fn spawn_fieldset_widget(mut commands: Commands) {
+    commands
+        .spawn((
+            FieldSet {
+                field_mode: FieldMode::Multi,
+                allow_none: true,
+                ..default()
+            },
+            Node::default(),
+        ))
+        .with_children(|parent| {
+            parent.spawn((
+                ToggleButton {
+                    label: "Easy".to_string(),
+                    value: "easy".to_string(),
+                    selected: false,
+                    ..default()
+                },
+                Node::default(),
+            ));
+            parent.spawn((
+                ToggleButton {
+                    label: "Medium".to_string(),
+                    value: "medium".to_string(),
+                    selected: false,
+                    ..default()
+                },
+                Node::default(),
+            ));
+            parent.spawn((
+                ToggleButton {
+                    label: "Hard".to_string(),
+                    value: "hard".to_string(),
+                    selected: true,
+                    ..default()
+                },
+                Node::default(),
+            ));
+        });
+}
+```
+
+### FieldSet Count
+<iframe
+id="fieldset-count"
+title="FieldSet"
+src="{base.url}/examples/base"
+width="100%"
+height="420"
+loading="lazy">
+</iframe>
+
+#### Html Example
+
+```html
+<fieldset mode="count(2)" allow-none="false" class="con-column">
+  <toggle value="very-easy">Very Easy</toggle>
+  <toggle value="easy">Easy</toggle>
+  <toggle value="medium">Medium</toggle>
+  <toggle value="hard" selected>Hard</toggle>
+  <toggle value="very-hard">Very Hard</toggle>
+</fieldset>
+```
+
+#### Rust Example
+
+```rust
+fn spawn_fieldset_widget(mut commands: Commands) {
+    commands
+        .spawn((
+            FieldSet {
+                field_mode: FieldMode::Count(2),
+                allow_none: false,
+                ..default()
+            },
+            Node::default(),
+        ))
+        .with_children(|parent| {
+            parent.spawn((
+                ToggleButton {
+                    label: "Very Easy".to_string(),
+                    value: "very-easy".to_string(),
+                    ..default()
+                },
+                Node::default(),
+            ));
+            parent.spawn((
+                ToggleButton {
+                    label: "Easy".to_string(),
+                    value: "easy".to_string(),
+                    ..default()
+                },
+                Node::default(),
+            ));
+            parent.spawn((
+                ToggleButton {
+                    label: "Medium".to_string(),
+                    value: "medium".to_string(),
+                    ..default()
+                },
+                Node::default(),
+            ));
+            parent.spawn((
+                ToggleButton {
+                    label: "Hard".to_string(),
+                    value: "hard".to_string(),
+                    selected: true,
+                    ..default()
+                },
+                Node::default(),
+            ));
+            parent.spawn((
+                ToggleButton {
+                    label: "Very Hard".to_string(),
+                    value: "very-hard".to_string(),
                     ..default()
                 },
                 Node::default(),

@@ -45,7 +45,7 @@ Unterstützte globale HTML-Attribute:
 #### Html Example
 
 ```html
-<fieldset mode="single" allow-none="false">
+<fieldset mode="single" allow-none="false" class="con-column">
   <radio value="black">Black</radio>
   <radio value="green">Green</radio>
   <radio value="white">White</radio>
