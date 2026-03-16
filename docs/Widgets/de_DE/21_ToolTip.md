@@ -32,9 +32,9 @@ Unterstützte globale HTML-Attribute:
 
 ### WASM Vorschauen
 
-### ToolTip Example
+### ToolTip Hover
 <iframe
-  id="tooltip"
+  id="tooltip-hover"
   title="ToolTip"
   src="{base.url}/examples/base"
   width="100%"
@@ -45,8 +45,8 @@ Unterstützte globale HTML-Attribute:
 #### Html Example
 
 ```html
-<button id="help">?</button>
-<tool-tip for="help" variant="point" prio="right" alignment="horizontal" trigger="hover | click" oninit="log_tooltip">
+<button id="help">Hover Me</button>
+<tool-tip for="help" variant="point" prio="right" alignment="horizontal" trigger="hover">
   More information
 </tool-tip>
 ```
@@ -56,7 +56,67 @@ Unterstützte globale HTML-Attribute:
 ```rust
 fn spawn_tooltip_widget(mut commands: Commands) {
     commands.spawn((
-        ToolTip::default(),
+        Button {
+            text: "Hover Me".to_string(),
+            ..default()
+        },
+        Node::default(),
+    ));
+    commands.spawn((
+        ToolTip {
+            text: "More information".to_string(),
+            for_id: Some("help".to_string()),
+            variant: ToolTipVariant::Point,
+            prio: ToolTipPriority::Right,
+            alignment: ToolTipAlignment::Horizontal,
+            trigger: vec![ToolTipTrigger::Hover],
+            ..default()
+        },
+        Node::default(),
+    ));
+}
+```
+
+### ToolTip Click
+<iframe
+id="tooltip-click"
+title="ToolTip"
+src="{base.url}/examples/base"
+width="100%"
+height="420"
+loading="lazy">
+</iframe>
+
+#### Html Example
+
+```html
+<button id="help">Click Me</button>
+<tool-tip for="help" variant="point" prio="top" alignment="vertical" trigger="click">
+  More information
+</tool-tip>
+```
+
+#### Rust Example
+
+```rust
+fn spawn_tooltip_widget(mut commands: Commands) {
+    commands.spawn((
+        Button {
+            text: "Click Me".to_string(),
+            ..default()
+        },
+        Node::default(),
+    ));
+    commands.spawn((
+        ToolTip {
+            text: "More information".to_string(),
+            for_id: Some("help".to_string()),
+            variant: ToolTipVariant::Point,
+            prio: ToolTipPriority::Top,
+            alignment: ToolTipAlignment::Vertical,
+            trigger: vec![ToolTipTrigger::Click],
+            ..default()
+        },
         Node::default(),
     ));
 }

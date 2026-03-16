@@ -53,7 +53,14 @@ Supported global HTML attributes:
 ```rust
 fn spawn_scrollbar_widget(mut commands: Commands) {
     commands.spawn((
-        Scrollbar::default(),
+        Scrollbar {
+            vertical: true,
+            min: 0.0,
+            max: 1000.0,
+            value: 0.0,
+            step: 10.0,
+            ..default()
+        },
         Node::default(),
     ));
 }

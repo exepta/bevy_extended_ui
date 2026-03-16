@@ -54,7 +54,11 @@ Supported global HTML attributes:
 ```rust
 fn spawn_img_widget(mut commands: Commands) {
     commands.spawn((
-        Img::default(),
+        Img {
+            src: Some("ui/logo.png".to_string()),
+            alt: "Project logo".to_string(),
+            ..default()
+        },
         Node::default(),
     ));
 }

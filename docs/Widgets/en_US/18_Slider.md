@@ -66,7 +66,13 @@ Supported global HTML attributes:
 ```rust
 fn spawn_slider_widget(mut commands: Commands) {
     commands.spawn((
-        Slider::default(),
+        Slider {
+            min: 0.0,
+            max: 100.0,
+            value: 25.0,
+            step: 1.0,
+            ..default()
+        },
         Node::default(),
     ));
 }

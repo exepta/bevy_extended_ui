@@ -576,7 +576,20 @@ pub enum FieldMode {
 impl FieldMode {
     /// Parses a field mode from a string.
     pub fn from_str(s: &str) -> Option<Self> {
-        match s.trim().to_ascii_lowercase().as_str() {
+        let normalized = s.trim().to_ascii_lowercase();
+
+        if let Some(inner) = normalized
+            .strip_prefix("count(")
+            .and_then(|rest| rest.strip_suffix(')'))
+        {
+            let value = inner.trim();
+            if value.is_empty() {
+                return Some(Self::Count(0));
+            }
+            return value.parse::<u8>().ok().map(Self::Count);
+        }
+
+        match normalized.as_str() {
             "single" | "solo" | "one" => Some(Self::Single),
             "multi" | "more" => Some(Self::Multi),
             "count" => Some(Self::Count(0)),

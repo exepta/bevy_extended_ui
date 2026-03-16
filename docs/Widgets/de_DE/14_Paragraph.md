@@ -32,7 +32,7 @@ Unterstützte globale HTML-Attribute:
 
 ### WASM Vorschauen
 
-### Paragraph Example
+### Paragraph
 <iframe
   id="paragraph"
   title="Paragraph"
@@ -45,7 +45,7 @@ Unterstützte globale HTML-Attribute:
 #### Html Example
 
 ```html
-<p oninit="log_paragraph">Welcome {{player.name}}</p>
+<p>Welcome {{player.name}}</p>
 ```
 
 #### Rust Example
@@ -53,7 +53,10 @@ Unterstützte globale HTML-Attribute:
 ```rust
 fn spawn_paragraph_widget(mut commands: Commands) {
     commands.spawn((
-        Paragraph::default(),
+        Paragraph {
+            text: "Welcome {{player.name}}".to_string(),
+            ..default()
+        },
         Node::default(),
     ));
 }

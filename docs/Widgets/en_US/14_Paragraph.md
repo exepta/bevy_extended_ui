@@ -53,7 +53,10 @@ Supported global HTML attributes:
 ```rust
 fn spawn_paragraph_widget(mut commands: Commands) {
     commands.spawn((
-        Paragraph::default(),
+        Paragraph {
+            text: "Welcome {{player.name}}".to_string(),
+            ..default()
+        },
         Node::default(),
     ));
 }

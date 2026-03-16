@@ -32,7 +32,7 @@ Unterstützte globale HTML-Attribute:
 
 ### WASM Vorschauen
 
-### SwitchButton Example
+### SwitchButton
 <iframe
   id="switchbutton"
   title="SwitchButton"
@@ -45,7 +45,9 @@ Unterstützte globale HTML-Attribute:
 #### Html Example
 
 ```html
-<switch icon="extended_ui/icons/drop-arrow.png" onclick="log_switchbutton">Dark mode</switch>
+<switch>Switch</switch>
+<switch disabled>Switch Disabled</switch>
+<switch icon="{custom.png}" checked>Switch Icon</switch>
 ```
 
 #### Rust Example
@@ -53,7 +55,33 @@ Unterstützte globale HTML-Attribute:
 ```rust
 fn spawn_switchbutton_widget(mut commands: Commands) {
     commands.spawn((
-        SwitchButton::default(),
+        SwitchButton {
+            label: "Switch".to_string(),
+            ..default()
+        },
+        Node::default(),
+    ));
+    commands.spawn((
+        SwitchButton {
+            label: "Switch Disabled".to_string(),
+            ..default()
+        },
+        UIWidgetState {
+            disabled: true,
+            ..default()
+        },
+        Node::default(),
+    ));
+    commands.spawn((
+        SwitchButton {
+            label: "Switch Icon".to_string(),
+            icon: Some("custom.png".to_string()),
+            ..default()
+        },
+        UIWidgetState {
+            checked: true,
+            ..default()
+        },
         Node::default(),
     ));
 }

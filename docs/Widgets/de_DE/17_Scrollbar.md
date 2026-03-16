@@ -32,9 +32,9 @@ Unterstützte globale HTML-Attribute:
 
 ### WASM Vorschauen
 
-### Scrollbar Example
+### Scrollbar Vertical
 <iframe
-  id="scrollbar"
+  id="scrollbar-vertical"
   title="Scrollbar"
   src="{base.url}/examples/base"
   width="100%"
@@ -45,7 +45,18 @@ Unterstützte globale HTML-Attribute:
 #### Html Example
 
 ```html
-<scroll alignment="vertical" onscroll="log_scrollbar"></scroll>
+<div style="width: 200px; height: 200px; overflow-y: scroll; display: flex; flex-direction: column; gap: 10px;">
+  <p>Line 1</p>
+  <p>Line 2</p>
+  <p>Line 3</p>
+  <p>Line 4</p>
+  <p>Line 5</p>
+  <p>Line 6</p>
+  <p>Line 7</p>
+  <p>Line 8</p>
+  <p>Line 9</p>
+  <p>Line 10</p>
+</div>
 ```
 
 #### Rust Example
@@ -53,7 +64,57 @@ Unterstützte globale HTML-Attribute:
 ```rust
 fn spawn_scrollbar_widget(mut commands: Commands) {
     commands.spawn((
-        Scrollbar::default(),
+        Scrollbar {
+            vertical: true,
+            min: 0.0,
+            max: 1000.0,
+            value: 0.0,
+            step: 10.0,
+            ..default()
+        },
+        Node::default(),
+    ));
+}
+```
+
+### Scrollbar Horizontal
+<iframe
+id="scrollbar-horizontal"
+title="Scrollbar"
+src="{base.url}/examples/base"
+width="100%"
+height="420"
+loading="lazy">
+</iframe>
+
+#### Html Example
+
+```html
+<div style="width: 200px; height: 100px; overflow-y: scroll; display: flex; flex-direction: row; gap: 10px;">
+  <p>Line 1</p>
+  <p>Line 2</p>
+  <p>Line 3</p>
+  <p>Line 4</p>
+  <p>Line 5</p>
+  <p>Line 6</p>
+  <p>Line 7</p>
+  <p>Line 8</p>
+</div>
+```
+
+#### Rust Example
+
+```rust
+fn spawn_scrollbar_widget(mut commands: Commands) {
+    commands.spawn((
+        Scrollbar {
+            vertical: false,
+            min: 0.0,
+            max: 1000.0,
+            value: 0.0,
+            step: 10.0,
+            ..default()
+        },
         Node::default(),
     ));
 }

@@ -32,7 +32,7 @@ Unterstützte globale HTML-Attribute:
 
 ### WASM Vorschauen
 
-### RadioButton Example
+### RadioButton
 <iframe
   id="radiobutton"
   title="RadioButton"
@@ -45,17 +45,52 @@ Unterstützte globale HTML-Attribute:
 #### Html Example
 
 ```html
-<radio value="de" selected onchange="log_radiobutton">Deutsch</radio>
+<fieldset mode="single" allow-none="false">
+  <radio value="black">Black</radio>
+  <radio value="green">Green</radio>
+  <radio value="white">White</radio>
+</fieldset>
 ```
 
 #### Rust Example
 
 ```rust
 fn spawn_radiobutton_widget(mut commands: Commands) {
-    commands.spawn((
-        RadioButton::default(),
-        Node::default(),
-    ));
+    commands
+        .spawn((
+            FieldSet {
+                field_mode: FieldMode::Single,
+                allow_none: false,
+                ..default()
+            },
+            Node::default(),
+        ))
+        .with_children(|parent| {
+            parent.spawn((
+                RadioButton {
+                    label: "Black".to_string(),
+                    value: "black".to_string(),
+                    ..default()
+                },
+                Node::default(),
+            ));
+            parent.spawn((
+                RadioButton {
+                    label: "Green".to_string(),
+                    value: "green".to_string(),
+                    ..default()
+                },
+                Node::default(),
+            ));
+            parent.spawn((
+                RadioButton {
+                    label: "White".to_string(),
+                    value: "white".to_string(),
+                    ..default()
+                },
+                Node::default(),
+            ));
+        });
 }
 ```
 

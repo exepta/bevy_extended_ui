@@ -37,7 +37,7 @@ Unterstützte globale HTML-Attribute:
 
 ### WASM Vorschauen
 
-### HyperLink Example
+### HyperLink
 <iframe
   id="hyperlink"
   title="HyperLink"
@@ -50,8 +50,7 @@ Unterstützte globale HTML-Attribute:
 #### Html Example
 
 ```html
-<a href="https://bevy.org">Mit System-Browser öffnen</a>
-<a href="https://bevy.org" browsers="[chrome]" open-modal="true">Mit konfiguriertem Browser öffnen</a>
+<a href="https://bevy.org">To Bevy Website</a>
 ```
 
 #### Rust Example
@@ -59,7 +58,11 @@ Unterstützte globale HTML-Attribute:
 ```rust
 fn spawn_hyperlink_widget(mut commands: Commands) {
     commands.spawn((
-        HyperLink::default(),
+        HyperLink {
+            text: "To Bevy Website".to_string(),
+            href: "https://bevy.org".to_string(),
+            ..default()
+        },
         Node::default(),
     ));
 }

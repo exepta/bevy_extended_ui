@@ -36,7 +36,7 @@ Unterstützte globale HTML-Attribute:
 
 ### WASM Vorschauen
 
-### Badge Example
+### Badge
 <iframe
   id="badge"
   title="Badge"
@@ -50,7 +50,7 @@ Unterstützte globale HTML-Attribute:
 
 ```html
 <button id="inbox-button">Inbox</button>
-<badge for="inbox-button" value="112" max="99" anchor="top right"></badge>
+<badge for="inbox-button" value="70" max="99" anchor="top right"></badge>
 ```
 
 #### Rust Example
@@ -58,7 +58,20 @@ Unterstützte globale HTML-Attribute:
 ```rust
 fn spawn_badge_widget(mut commands: Commands) {
     commands.spawn((
-        Badge::default(),
+        Button {
+            text: "Inbox".to_string(),
+            ..default()
+        },
+        Node::default(),
+    ));
+    commands.spawn((
+        Badge {
+            for_id: Some("inbox-button".to_string()),
+            value: 70,
+            max: 99,
+            anchor: BadgeAnchor::TopRight,
+            ..default()
+        },
         Node::default(),
     ));
 }

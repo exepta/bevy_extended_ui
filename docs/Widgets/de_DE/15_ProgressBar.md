@@ -32,7 +32,7 @@ Unterstützte globale HTML-Attribute:
 
 ### WASM Vorschauen
 
-### ProgressBar Example
+### ProgressBar
 <iframe
   id="progressbar"
   title="ProgressBar"
@@ -45,7 +45,7 @@ Unterstützte globale HTML-Attribute:
 #### Html Example
 
 ```html
-<progressbar id="xp" min="0" max="100" value="42" oninit="log_progressbar"></progressbar>
+<progressbar id="xp" min="0" max="100" value="42"></progressbar>
 ```
 
 #### Rust Example
@@ -53,7 +53,12 @@ Unterstützte globale HTML-Attribute:
 ```rust
 fn spawn_progressbar_widget(mut commands: Commands) {
     commands.spawn((
-        ProgressBar::default(),
+        ProgressBar {
+            min: 0.0,
+            max: 100.0,
+            value: 42.0,
+            ..default()
+        },
         Node::default(),
     ));
 }

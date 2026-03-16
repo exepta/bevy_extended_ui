@@ -53,7 +53,12 @@ Supported global HTML attributes:
 ```rust
 fn spawn_progressbar_widget(mut commands: Commands) {
     commands.spawn((
-        ProgressBar::default(),
+        ProgressBar {
+            min: 0.0,
+            max: 100.0,
+            value: 42.0,
+            ..default()
+        },
         Node::default(),
     ));
 }

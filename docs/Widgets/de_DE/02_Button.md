@@ -57,7 +57,13 @@ loading="lazy">
 ```rust
 fn spawn_button_widget(mut commands: Commands) {
     commands.spawn((
-        Button::default(),
+        Button {
+            text: "Save".to_string(),
+            icon_path: Some("extended_ui/icons/check-mark.png".to_string()),
+            icon_place: IconPlace::Right,
+            button_type: ButtonType::Submit,
+            ..default()
+        },
         Node::default(),
     ));
 }
@@ -87,7 +93,13 @@ loading="lazy">
 ```rust
 fn spawn_button_widget(mut commands: Commands) {
     commands.spawn((
-        Button::default(),
+        Button {
+            text: String::new(),
+            icon_path: Some("icons/check-mark.png".to_string()),
+            icon_place: IconPlace::Left,
+            button_type: ButtonType::Button,
+            ..default()
+        },
         Node::default(),
     ));
 }

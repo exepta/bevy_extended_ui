@@ -32,7 +32,7 @@ Unterstützte globale HTML-Attribute:
 
 ### WASM Vorschauen
 
-### ToggleButton Example
+### ToggleButton
 <iframe
   id="togglebutton"
   title="ToggleButton"
@@ -45,19 +45,52 @@ Unterstützte globale HTML-Attribute:
 #### Html Example
 
 ```html
-<toggle value="bold" selected onclick="log_togglebutton">
-  <icon src="extended_ui/icons/bold.png"></icon>
-</toggle>
+<fieldset mode="multi" allow-none="true" class="con-column">
+  <toggle value="black">Black</toggle>
+  <toggle value="green">Green</toggle>
+  <toggle value="white">White</toggle>
+</fieldset>
 ```
 
 #### Rust Example
 
 ```rust
 fn spawn_togglebutton_widget(mut commands: Commands) {
-    commands.spawn((
-        ToggleButton::default(),
-        Node::default(),
-    ));
+    commands
+        .spawn((
+            FieldSet {
+                field_mode: FieldMode::Multi,
+                allow_none: true,
+                ..default()
+            },
+            Node::default(),
+        ))
+        .with_children(|parent| {
+            parent.spawn((
+                ToggleButton {
+                    label: "Black".to_string(),
+                    value: "black".to_string(),
+                    ..default()
+                },
+                Node::default(),
+            ));
+            parent.spawn((
+                ToggleButton {
+                    label: "Green".to_string(),
+                    value: "green".to_string(),
+                    ..default()
+                },
+                Node::default(),
+            ));
+            parent.spawn((
+                ToggleButton {
+                    label: "White".to_string(),
+                    value: "white".to_string(),
+                    ..default()
+                },
+                Node::default(),
+            ));
+        });
 }
 ```
 
