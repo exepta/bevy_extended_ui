@@ -4,21 +4,45 @@ title: Form
 
 # Form
 
-## Overview
+### Overview
 
-Form container that validates child fields and emits submit actions with collected input data.
+Form container that validates children and triggers submit actions with collected data.
 
 - Rust component: Form
 - HTML tag: form
 - Recommended source reference: src/widgets/mod.rs
 
-## Important Attributes and Behavior
+### Attributes
+
+Important widget-specific attributes (detailed):
 
 - action handler receives collected submit data.
 - validate mode: Always, Send, Interact.
 - Submit button triggers validation and HtmlSubmit event.
 
-## HTML Example
+Supported global HTML attributes:
+
+- `id`: Unique id for CSS selectors, event mapping, and widget references.
+- `class`: Passes CSS classes for visual styling and state-dependent rules.
+- `style`: Passes inline CSS that is parsed into `HtmlStyle` and applied in the style pipeline.
+- `hidden`: Renders the widget initially hidden.
+- `disabled`: Disables interactions; clicks and focus changes are blocked.
+- `readonly`: Is applied as widget state to keep interaction behavior consistent.
+- Event attributes like `onclick`, `onmousedown`, `onmouseup`, `onmouseover`, `onmouseout`, `onfocus`, `oninit`, `onchange`, `onscroll`, `onwheel`, `onkeydown`, and `onkeyup`: Bind handler functions directly to the event binding system.
+
+### WASM Previews
+
+### Form Example
+<iframe
+  id="form"
+  title="Form"
+  src="{base.url}/examples/base"
+  width="100%"
+  height="420"
+  loading="lazy">
+</iframe>
+
+#### Html Example
 
 ```html
 <form action="log_form" validate="Send">
@@ -27,50 +51,56 @@ Form container that validates child fields and emits submit actions with collect
 </form>
 ```
 
-## Bevy Example
+#### Rust Example
 
 ```rust
-use bevy::prelude::*;
-use bevy_extended_ui::ExtendedUiPlugin;
-use bevy_extended_ui::html::{HtmlEvent, HtmlSource};
-use bevy_extended_ui::io::HtmlAsset;
-use bevy_extended_ui::registry::UiRegistry;
-use bevy_extended_ui::widgets::Form;
-use bevy_extended_ui_macros::html_fn;
-
-fn main() {
-    App::new()
-        .add_plugins(DefaultPlugins)
-        .add_plugins(ExtendedUiPlugin)
-        .add_systems(Startup, load_ui)
-        .run();
-}
-
-fn load_ui(mut reg: ResMut<UiRegistry>, asset_server: Res<AssetServer>) {
-    let handle: Handle<HtmlAsset> = asset_server.load("ui/form.html");
-    reg.add_and_use("form-demo".to_string(), HtmlSource::from_handle(handle));
-}
-
-#[html_fn("log_form")]
-fn log_form(In(event): In<HtmlEvent>, query: Query<&Form>) {
-    if let Ok(widget) = query.get(event.entity) {
-        info!("Form event entity={:?} data={:?}", event.entity, widget);
-    }
+fn spawn_form_widget(mut commands: Commands) {
+    commands
+        .spawn((
+            Form {
+                action: Some("log_form".to_string()),
+                validate_mode: FormValidationMode::Send,
+                ..default()
+            },
+            Node::default(),
+        ))
+        .with_children(|parent| {
+            parent.spawn((
+                InputField {
+                    name: "email".to_string(),
+                    input_type: InputType::Email,
+                    ..default()
+                },
+                ValidationRules {
+                    required: true,
+                    ..default()
+                },
+                Node::default(),
+            ));
+            parent.spawn((
+                Button {
+                    text: "Send".to_string(),
+                    button_type: ButtonType::Submit,
+                    ..default()
+                },
+                Node::default(),
+            ));
+        });
 }
 ```
 
-## Example
+### Widget Creator
 
-<iframe
-  title="Bevy WASM Preview - Form"
-  src="{base.url}/examples/form"
-  width="100%"
-  height="420"
-  loading="lazy">
-</iframe>
-
-## Notes
-
-- Keep the HTML tag spelling exact (form) so the converter maps to the correct widget.
-- Register handler names with html_fn exactly as used in HTML attributes.
-- Link this page to a real demo build once your WASM preview is deployed.
+<div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
+  <img
+    src="https://avatars.githubusercontent.com/u/84874606?v=4"
+    alt="exepta avatar"
+    width="64"
+    height="64"
+    style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;"
+  />
+  <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
+    <strong>exepta</strong>
+    <a href="https://github.com/exepta" style="margin-top: 10px; color: #5658db;">Link to GitHub</a>
+  </div>
+</div>

@@ -4,70 +4,77 @@ title: SwitchButton
 
 # SwitchButton
 
-## Overview
+### Overview
 
-Switch-like binary control widget with label and optional icon.
+Switch-like binary widget with text label and optional icon.
 
 - Rust component: SwitchButton
 - HTML tag: switch
 - Recommended source reference: src/widgets/mod.rs
 
-## Important Attributes and Behavior
+### Attributes
 
-- Label text is taken from inner content.
-- Optional icon attribute supported.
-- Checked-like state can be read via UIWidgetState.
+Important widget-specific attributes (detailed):
 
-## HTML Example
+- Label text comes from the InnerContent.
+- Optional icon attribute is supported.
+- Checked-like state readable via UIWidgetState.
 
-```html
-<switch icon="extended_ui/icons/drop-arrow.png" onclick="log_switchbutton">Dark mode</switch>
-```
+Supported global HTML attributes:
 
-## Bevy Example
+- `id`: Unique id for CSS selectors, event mapping, and widget references.
+- `class`: Passes CSS classes for visual styling and state-dependent rules.
+- `style`: Passes inline CSS that is parsed into `HtmlStyle` and applied in the style pipeline.
+- `hidden`: Renders the widget initially hidden.
+- `disabled`: Disables interactions; clicks and focus changes are blocked.
+- `readonly`: Is applied as widget state to keep interaction behavior consistent.
+- Event attributes like `onclick`, `onmousedown`, `onmouseup`, `onmouseover`, `onmouseout`, `onfocus`, `oninit`, `onchange`, `onscroll`, `onwheel`, `onkeydown`, and `onkeyup`: Bind handler functions directly to the event binding system.
 
-```rust
-use bevy::prelude::*;
-use bevy_extended_ui::ExtendedUiPlugin;
-use bevy_extended_ui::html::{HtmlEvent, HtmlSource};
-use bevy_extended_ui::io::HtmlAsset;
-use bevy_extended_ui::registry::UiRegistry;
-use bevy_extended_ui::widgets::SwitchButton;
-use bevy_extended_ui_macros::html_fn;
+### WASM Previews
 
-fn main() {
-    App::new()
-        .add_plugins(DefaultPlugins)
-        .add_plugins(ExtendedUiPlugin)
-        .add_systems(Startup, load_ui)
-        .run();
-}
-
-fn load_ui(mut reg: ResMut<UiRegistry>, asset_server: Res<AssetServer>) {
-    let handle: Handle<HtmlAsset> = asset_server.load("ui/switchbutton.html");
-    reg.add_and_use("switchbutton-demo".to_string(), HtmlSource::from_handle(handle));
-}
-
-#[html_fn("log_switchbutton")]
-fn log_switchbutton(In(event): In<HtmlEvent>, query: Query<&SwitchButton>) {
-    if let Ok(widget) = query.get(event.entity) {
-        info!("SwitchButton event entity={:?} data={:?}", event.entity, widget);
-    }
-}
-```
-
-## Example
-
+### SwitchButton Example
 <iframe
-  title="Bevy WASM Preview - SwitchButton"
-  src="{base.url}/examples/switchbutton"
+  id="switchbutton"
+  title="SwitchButton"
+  src="{base.url}/examples/base"
   width="100%"
   height="420"
   loading="lazy">
 </iframe>
 
-## Notes
+#### Html Example
 
-- Keep the HTML tag spelling exact (switch) so the converter maps to the correct widget.
-- Register handler names with html_fn exactly as used in HTML attributes.
-- Link this page to a real demo build once your WASM preview is deployed.
+```html
+<switch icon="extended_ui/icons/drop-arrow.png" onclick="log_switchbutton">Dark mode</switch>
+```
+
+#### Rust Example
+
+```rust
+fn spawn_switchbutton_widget(mut commands: Commands) {
+    commands.spawn((
+        SwitchButton {
+            label: "Dark mode".to_string(),
+            icon: Some("extended_ui/icons/drop-arrow.png".to_string()),
+            ..default()
+        },
+        Node::default(),
+    ));
+}
+```
+
+### Widget Creator
+
+<div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
+  <img
+    src="https://avatars.githubusercontent.com/u/84874606?v=4"
+    alt="exepta avatar"
+    width="64"
+    height="64"
+    style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;"
+  />
+  <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
+    <strong>exepta</strong>
+    <a href="https://github.com/exepta" style="margin-top: 10px; color: #5658db;">Link to GitHub</a>
+  </div>
+</div>

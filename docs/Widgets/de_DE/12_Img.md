@@ -1,10 +1,10 @@
 ---
-title: Img (Bild)
+title: Img
 ---
 
-# Img (Bild)
+# Img
 
-## Überblick
+### Überblick
 
 Bild-Widget für eine Asset-Quelle inklusive Alternativtext.
 
@@ -12,68 +12,70 @@ Bild-Widget für eine Asset-Quelle inklusive Alternativtext.
 - HTML-Tag: img
 - Empfohlene Quellreferenz: src/widgets/mod.rs
 
-## Wichtige Attribute und Verhalten
+### Attributes
+
+Wichtige eigene Attributes (ausführlich):
 
 - src wird relativ zum HTML-Asset-Pfad aufgelöst.
 - alt speichert Fallback-/Metadaten-Text.
 - preview kann die Bildquelle an die id eines `input type="file"` binden (z. B. `preview="avatar-file"`).
 - Leichtgewichtiges Bild-Widget für Inhalte.
 
-## HTML-Beispiel
+Unterstützte globale HTML-Attribute:
 
-```html
-<img src="ui/logo.png" alt="Project logo" oninit="log_img" />
-```
+- `id`: Eindeutige ID für CSS-Selektoren, Event-Zuordnung und spätere Widget-Referenzierung.
+- `class`: Übergibt CSS-Klassen für visuelles Styling und zustandsabhängige Regeln.
+- `style`: Übergibt Inline-CSS, das in `HtmlStyle` geparsed und in die Style-Pipeline übernommen wird.
+- `hidden`: Rendert das Widget initial unsichtbar.
+- `disabled`: Deaktiviert Interaktionen; Klicks und Fokuswechsel werden entsprechend geblockt.
+- `readonly`: Wird als Widget-State übernommen, um ein konsistentes Zustandsmodell zu gewährleisten.
+- Event-Attribute wie `onclick`, `onmousedown`, `onmouseup`, `onmouseover`, `onmouseout`, `onfocus`, `oninit`, `onchange`, `onscroll`, `onwheel`, `onkeydown`, `onkeyup`: Verknüpfen Handler-Funktionen direkt mit dem Event-Binding-System.
 
-```html
-<input id="avatar-file" type="file" extensions="[jpg, jpeg, png]" show-size="true" />
-<img preview="avatar-file" alt="Avatar Vorschau" />
-```
+### WASM Vorschauen
 
-## Bevy-Beispiel
-
-```rust
-use bevy::prelude::*;
-use bevy_extended_ui::ExtendedUiPlugin;
-use bevy_extended_ui::html::{HtmlEvent, HtmlSource};
-use bevy_extended_ui::io::HtmlAsset;
-use bevy_extended_ui::registry::UiRegistry;
-use bevy_extended_ui::widgets::Img;
-use bevy_extended_ui_macros::html_fn;
-
-fn main() {
-    App::new()
-        .add_plugins(DefaultPlugins)
-        .add_plugins(ExtendedUiPlugin)
-        .add_systems(Startup, load_ui)
-        .run();
-}
-
-fn load_ui(mut reg: ResMut<UiRegistry>, asset_server: Res<AssetServer>) {
-    let handle: Handle<HtmlAsset> = asset_server.load("ui/img.html");
-    reg.add_and_use("img-demo".to_string(), HtmlSource::from_handle(handle));
-}
-
-#[html_fn("log_img")]
-fn log_img(In(event): In<HtmlEvent>, query: Query<&Img>) {
-    if let Ok(widget) = query.get(event.entity) {
-        info!("Img event entity={:?} data={:?}", event.entity, widget);
-    }
-}
-```
-
-## Beispiel
-
+### Img
 <iframe
-  title="Bevy WASM Vorschau - Img"
-  src="{base.url}/examples/img"
+  id="img"
+  title="Img"
+  src="{base.url}/examples/base"
   width="100%"
   height="420"
   loading="lazy">
 </iframe>
 
-## Hinweise
+#### Html Example
 
-- Schreibe den HTML-Tag exakt (img), damit der Converter korrekt mappt.
-- Registriere Handler-Namen mit html_fn exakt wie im HTML-Attribut.
-- Verlinke diese Seite später auf einen echten Demo-Build.
+```html
+<img src="{example_image}" alt="Displayed image" />
+```
+
+#### Rust Example
+
+```rust
+fn spawn_img_widget(mut commands: Commands) {
+    commands.spawn((
+        Img {
+            src: Some("{example_image}".to_string()),
+            alt: "Displayed image".to_string(),
+            ..default()
+        },
+        Node::default(),
+    ));
+}
+```
+
+### Ersteller vom Widget
+
+<div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
+  <img
+    src="https://avatars.githubusercontent.com/u/84874606?v=4"
+    alt="exepta avatar"
+    width="64"
+    height="64"
+    style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;"
+  />
+  <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
+    <strong>exepta</strong>
+    <a href="https://github.com/exepta" style="margin-top: 10px; color: #5658db;">Link to GitHub</a>
+  </div>
+</div>

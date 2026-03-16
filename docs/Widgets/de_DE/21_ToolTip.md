@@ -1,10 +1,10 @@
 ---
-title: ToolTip (Kurzinfo)
+title: ToolTip
 ---
 
-# ToolTip (Kurzinfo)
+# ToolTip
 
-## Überblick
+### Überblick
 
 Kontext-Hinweis-Widget, das dem Cursor folgt oder auf ein Ziel zeigt.
 
@@ -12,65 +12,128 @@ Kontext-Hinweis-Widget, das dem Cursor folgt oder auf ein Ziel zeigt.
 - HTML-Tag: tool-tip
 - Empfohlene Quellreferenz: src/widgets/mod.rs
 
-## Wichtige Attribute und Verhalten
+### Attributes
+
+Wichtige eigene Attributes (ausführlich):
 
 - Unterstützt for, variant, prio, alignment, trigger.
 - Modi: follow (Cursor) und point (verankert).
 - Bindung implizit über Parent oder explizit per for=id.
 
-## HTML-Beispiel
+Unterstützte globale HTML-Attribute:
 
-```html
-<button id="help">?</button>
-<tool-tip for="help" variant="point" prio="right" alignment="horizontal" trigger="hover | click" oninit="log_tooltip">
-  More information
-</tool-tip>
-```
+- `id`: Eindeutige ID für CSS-Selektoren, Event-Zuordnung und spätere Widget-Referenzierung.
+- `class`: Übergibt CSS-Klassen für visuelles Styling und zustandsabhängige Regeln.
+- `style`: Übergibt Inline-CSS, das in `HtmlStyle` geparsed und in die Style-Pipeline übernommen wird.
+- `hidden`: Rendert das Widget initial unsichtbar.
+- `disabled`: Deaktiviert Interaktionen; Klicks und Fokuswechsel werden entsprechend geblockt.
+- `readonly`: Wird als Widget-State übernommen, um ein konsistentes Zustandsmodell zu gewährleisten.
+- Event-Attribute wie `onclick`, `onmousedown`, `onmouseup`, `onmouseover`, `onmouseout`, `onfocus`, `oninit`, `onchange`, `onscroll`, `onwheel`, `onkeydown`, `onkeyup`: Verknüpfen Handler-Funktionen direkt mit dem Event-Binding-System.
 
-## Bevy-Beispiel
+### WASM Vorschauen
 
-```rust
-use bevy::prelude::*;
-use bevy_extended_ui::ExtendedUiPlugin;
-use bevy_extended_ui::html::{HtmlEvent, HtmlSource};
-use bevy_extended_ui::io::HtmlAsset;
-use bevy_extended_ui::registry::UiRegistry;
-use bevy_extended_ui::widgets::ToolTip;
-use bevy_extended_ui_macros::html_fn;
-
-fn main() {
-    App::new()
-        .add_plugins(DefaultPlugins)
-        .add_plugins(ExtendedUiPlugin)
-        .add_systems(Startup, load_ui)
-        .run();
-}
-
-fn load_ui(mut reg: ResMut<UiRegistry>, asset_server: Res<AssetServer>) {
-    let handle: Handle<HtmlAsset> = asset_server.load("ui/tooltip.html");
-    reg.add_and_use("tooltip-demo".to_string(), HtmlSource::from_handle(handle));
-}
-
-#[html_fn("log_tooltip")]
-fn log_tooltip(In(event): In<HtmlEvent>, query: Query<&ToolTip>) {
-    if let Ok(widget) = query.get(event.entity) {
-        info!("ToolTip event entity={:?} data={:?}", event.entity, widget);
-    }
-}
-```
-
-## Beispiel
-
+### ToolTip Hover
 <iframe
-  title="Bevy WASM Vorschau - ToolTip"
-  src="{base.url}/examples/tooltip"
+  id="tooltip-hover"
+  title="ToolTip"
+  src="{base.url}/examples/base"
   width="100%"
   height="420"
   loading="lazy">
 </iframe>
 
-## Hinweise
+#### Html Example
 
-- Schreibe den HTML-Tag exakt (tool-tip), damit der Converter korrekt mappt.
-- Registriere Handler-Namen mit html_fn exakt wie im HTML-Attribut.
-- Verlinke diese Seite später auf einen echten Demo-Build.
+```html
+<button id="help">Hover Me</button>
+<tool-tip for="help" variant="point" prio="right" alignment="horizontal" trigger="hover">
+  More information
+</tool-tip>
+```
+
+#### Rust Example
+
+```rust
+fn spawn_tooltip_widget(mut commands: Commands) {
+    commands.spawn((
+        Button {
+            text: "Hover Me".to_string(),
+            ..default()
+        },
+        Node::default(),
+    ));
+    commands.spawn((
+        ToolTip {
+            text: "More information".to_string(),
+            for_id: Some("help".to_string()),
+            variant: ToolTipVariant::Point,
+            prio: ToolTipPriority::Right,
+            alignment: ToolTipAlignment::Horizontal,
+            trigger: vec![ToolTipTrigger::Hover],
+            ..default()
+        },
+        Node::default(),
+    ));
+}
+```
+
+### ToolTip Click
+<iframe
+id="tooltip-click"
+title="ToolTip"
+src="{base.url}/examples/base"
+width="100%"
+height="420"
+loading="lazy">
+</iframe>
+
+#### Html Example
+
+```html
+<button id="help">Click Me</button>
+<tool-tip for="help" variant="point" prio="top" alignment="vertical" trigger="click">
+  More information
+</tool-tip>
+```
+
+#### Rust Example
+
+```rust
+fn spawn_tooltip_widget(mut commands: Commands) {
+    commands.spawn((
+        Button {
+            text: "Click Me".to_string(),
+            ..default()
+        },
+        Node::default(),
+    ));
+    commands.spawn((
+        ToolTip {
+            text: "More information".to_string(),
+            for_id: Some("help".to_string()),
+            variant: ToolTipVariant::Point,
+            prio: ToolTipPriority::Top,
+            alignment: ToolTipAlignment::Vertical,
+            trigger: vec![ToolTipTrigger::Click],
+            ..default()
+        },
+        Node::default(),
+    ));
+}
+```
+
+### Ersteller vom Widget
+
+<div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
+  <img
+    src="https://avatars.githubusercontent.com/u/84874606?v=4"
+    alt="exepta avatar"
+    width="64"
+    height="64"
+    style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;"
+  />
+  <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
+    <strong>exepta</strong>
+    <a href="https://github.com/exepta" style="margin-top: 10px; color: #5658db;">Link to GitHub</a>
+  </div>
+</div>

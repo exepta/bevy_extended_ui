@@ -326,10 +326,10 @@ mod tests {
                 <radio value="a">A</radio>
                 <radio value="b">B</radio>
               </fieldset>
-              <fieldset allow-none="true" mode="multi">
-                <radio value="m1" selected>M1</radio>
-                <radio value="m2" selected>M2</radio>
-                <radio value="m3">M3</radio>
+              <fieldset allow-none="true" mode="count(2)">
+                <toggle value="m1" selected>M1</toggle>
+                <toggle value="m2" selected>M2</toggle>
+                <toggle value="m3">M3</toggle>
               </fieldset>
               <unknown-tag>ignored</unknown-tag>
             </div>
@@ -786,8 +786,8 @@ mod tests {
             node,
             HtmlWidgetNode::FieldSet(fieldset, _, _, children, _, _, _)
                 if fieldset.allow_none
-                    && fieldset.field_mode == FieldMode::Multi
-                    && children.iter().filter(|n| matches!(n, HtmlWidgetNode::RadioButton(_, _, _, _, _, _))).count() == 3
+                    && fieldset.field_mode == FieldMode::Count(2)
+                    && children.iter().filter(|n| matches!(n, HtmlWidgetNode::ToggleButton(_, _, _, _, _, _))).count() == 3
         )));
 
         let first_single_fieldset_selected = all.iter().find_map(|node| {

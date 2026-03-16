@@ -4,21 +4,45 @@ title: ToggleButton
 
 # ToggleButton
 
-## Overview
+### Overview
 
-Selectable button widget for single or multi-selection scenarios, often inside fieldset.
+Selectable button widget for single or multiple selection, often in the FieldSet.
 
 - Rust component: ToggleButton
 - HTML tag: toggle
 - Recommended source reference: src/widgets/mod.rs
 
-## Important Attributes and Behavior
+### Attributes
+
+Important widget-specific attributes (detailed):
 
 - Supports value and selected attributes.
-- Optional icon child for toolbar-like UI.
-- Commonly used inside fieldset mode=multi.
+- Optional icon child for toolbar-like UIs.
+- Commonly used in fieldset mode=multi.
 
-## HTML Example
+Supported global HTML attributes:
+
+- `id`: Unique id for CSS selectors, event mapping, and widget references.
+- `class`: Passes CSS classes for visual styling and state-dependent rules.
+- `style`: Passes inline CSS that is parsed into `HtmlStyle` and applied in the style pipeline.
+- `hidden`: Renders the widget initially hidden.
+- `disabled`: Disables interactions; clicks and focus changes are blocked.
+- `readonly`: Is applied as widget state to keep interaction behavior consistent.
+- Event attributes like `onclick`, `onmousedown`, `onmouseup`, `onmouseover`, `onmouseout`, `onfocus`, `oninit`, `onchange`, `onscroll`, `onwheel`, `onkeydown`, and `onkeyup`: Bind handler functions directly to the event binding system.
+
+### WASM Previews
+
+### ToggleButton Example
+<iframe
+  id="togglebutton"
+  title="ToggleButton"
+  src="{base.url}/examples/base"
+  width="100%"
+  height="420"
+  loading="lazy">
+</iframe>
+
+#### Html Example
 
 ```html
 <toggle value="bold" selected onclick="log_togglebutton">
@@ -26,50 +50,36 @@ Selectable button widget for single or multi-selection scenarios, often inside f
 </toggle>
 ```
 
-## Bevy Example
+#### Rust Example
 
 ```rust
-use bevy::prelude::*;
-use bevy_extended_ui::ExtendedUiPlugin;
-use bevy_extended_ui::html::{HtmlEvent, HtmlSource};
-use bevy_extended_ui::io::HtmlAsset;
-use bevy_extended_ui::registry::UiRegistry;
-use bevy_extended_ui::widgets::ToggleButton;
-use bevy_extended_ui_macros::html_fn;
-
-fn main() {
-    App::new()
-        .add_plugins(DefaultPlugins)
-        .add_plugins(ExtendedUiPlugin)
-        .add_systems(Startup, load_ui)
-        .run();
-}
-
-fn load_ui(mut reg: ResMut<UiRegistry>, asset_server: Res<AssetServer>) {
-    let handle: Handle<HtmlAsset> = asset_server.load("ui/togglebutton.html");
-    reg.add_and_use("togglebutton-demo".to_string(), HtmlSource::from_handle(handle));
-}
-
-#[html_fn("log_togglebutton")]
-fn log_togglebutton(In(event): In<HtmlEvent>, query: Query<&ToggleButton>) {
-    if let Ok(widget) = query.get(event.entity) {
-        info!("ToggleButton event entity={:?} data={:?}", event.entity, widget);
-    }
+fn spawn_togglebutton_widget(mut commands: Commands) {
+    commands.spawn((
+        ToggleButton {
+            label: String::new(),
+            value: "bold".to_string(),
+            icon_path: Some("extended_ui/icons/bold.png".to_string()),
+            icon_place: IconPlace::Left,
+            selected: true,
+            ..default()
+        },
+        Node::default(),
+    ));
 }
 ```
 
-## Example
+### Widget Creator
 
-<iframe
-  title="Bevy WASM Preview - ToggleButton"
-  src="{base.url}/examples/togglebutton"
-  width="100%"
-  height="420"
-  loading="lazy">
-</iframe>
-
-## Notes
-
-- Keep the HTML tag spelling exact (toggle) so the converter maps to the correct widget.
-- Register handler names with html_fn exactly as used in HTML attributes.
-- Link this page to a real demo build once your WASM preview is deployed.
+<div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
+  <img
+    src="https://avatars.githubusercontent.com/u/84874606?v=4"
+    alt="exepta avatar"
+    width="64"
+    height="64"
+    style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;"
+  />
+  <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
+    <strong>exepta</strong>
+    <a href="https://github.com/exepta" style="margin-top: 10px; color: #5658db;">Link to GitHub</a>
+  </div>
+</div>

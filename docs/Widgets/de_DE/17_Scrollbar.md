@@ -1,10 +1,10 @@
 ---
-title: Scrollbar (Bildlaufleiste)
+title: Scrollbar
 ---
 
-# Scrollbar (Bildlaufleiste)
+# Scrollbar
 
-## Überblick
+### Überblick
 
 Scroll-Helfer-Widget aus dem scroll-Tag für vertikales oder horizontales Scrollen.
 
@@ -12,62 +12,126 @@ Scroll-Helfer-Widget aus dem scroll-Tag für vertikales oder horizontales Scroll
 - HTML-Tag: scroll
 - Empfohlene Quellreferenz: src/widgets/mod.rs
 
-## Wichtige Attribute und Verhalten
+### Attributes
+
+Wichtige eigene Attributes (ausführlich):
 
 - Tag ist scroll, nicht scrollbar.
 - alignment schaltet vertikal/horizontal.
 - Nützlich für benutzerdefinierte Scroll-Bereiche.
 
-## HTML-Beispiel
+Unterstützte globale HTML-Attribute:
 
-```html
-<scroll alignment="vertical" onscroll="log_scrollbar"></scroll>
-```
+- `id`: Eindeutige ID für CSS-Selektoren, Event-Zuordnung und spätere Widget-Referenzierung.
+- `class`: Übergibt CSS-Klassen für visuelles Styling und zustandsabhängige Regeln.
+- `style`: Übergibt Inline-CSS, das in `HtmlStyle` geparsed und in die Style-Pipeline übernommen wird.
+- `hidden`: Rendert das Widget initial unsichtbar.
+- `disabled`: Deaktiviert Interaktionen; Klicks und Fokuswechsel werden entsprechend geblockt.
+- `readonly`: Wird als Widget-State übernommen, um ein konsistentes Zustandsmodell zu gewährleisten.
+- Event-Attribute wie `onclick`, `onmousedown`, `onmouseup`, `onmouseover`, `onmouseout`, `onfocus`, `oninit`, `onchange`, `onscroll`, `onwheel`, `onkeydown`, `onkeyup`: Verknüpfen Handler-Funktionen direkt mit dem Event-Binding-System.
 
-## Bevy-Beispiel
+### WASM Vorschauen
 
-```rust
-use bevy::prelude::*;
-use bevy_extended_ui::ExtendedUiPlugin;
-use bevy_extended_ui::html::{HtmlEvent, HtmlSource};
-use bevy_extended_ui::io::HtmlAsset;
-use bevy_extended_ui::registry::UiRegistry;
-use bevy_extended_ui::widgets::Scrollbar;
-use bevy_extended_ui_macros::html_fn;
-
-fn main() {
-    App::new()
-        .add_plugins(DefaultPlugins)
-        .add_plugins(ExtendedUiPlugin)
-        .add_systems(Startup, load_ui)
-        .run();
-}
-
-fn load_ui(mut reg: ResMut<UiRegistry>, asset_server: Res<AssetServer>) {
-    let handle: Handle<HtmlAsset> = asset_server.load("ui/scrollbar.html");
-    reg.add_and_use("scrollbar-demo".to_string(), HtmlSource::from_handle(handle));
-}
-
-#[html_fn("log_scrollbar")]
-fn log_scrollbar(In(event): In<HtmlEvent>, query: Query<&Scrollbar>) {
-    if let Ok(widget) = query.get(event.entity) {
-        info!("Scrollbar event entity={:?} data={:?}", event.entity, widget);
-    }
-}
-```
-
-## Beispiel
-
+### Scrollbar Vertical
 <iframe
-  title="Bevy WASM Vorschau - Scrollbar"
-  src="{base.url}/examples/scrollbar"
+  id="scrollbar-vertical"
+  title="Scrollbar"
+  src="{base.url}/examples/base"
   width="100%"
   height="420"
   loading="lazy">
 </iframe>
 
-## Hinweise
+#### Html Example
 
-- Schreibe den HTML-Tag exakt (scroll), damit der Converter korrekt mappt.
-- Registriere Handler-Namen mit html_fn exakt wie im HTML-Attribut.
-- Verlinke diese Seite später auf einen echten Demo-Build.
+```html
+<div style="width: 200px; height: 200px; overflow-y: scroll; display: flex; flex-direction: column; gap: 10px;">
+  <p>Line 1</p>
+  <p>Line 2</p>
+  <p>Line 3</p>
+  <p>Line 4</p>
+  <p>Line 5</p>
+  <p>Line 6</p>
+  <p>Line 7</p>
+  <p>Line 8</p>
+  <p>Line 9</p>
+  <p>Line 10</p>
+</div>
+```
+
+#### Rust Example
+
+```rust
+fn spawn_scrollbar_widget(mut commands: Commands) {
+    commands.spawn((
+        Scrollbar {
+            vertical: true,
+            min: 0.0,
+            max: 1000.0,
+            value: 0.0,
+            step: 10.0,
+            ..default()
+        },
+        Node::default(),
+    ));
+}
+```
+
+### Scrollbar Horizontal
+<iframe
+id="scrollbar-horizontal"
+title="Scrollbar"
+src="{base.url}/examples/base"
+width="100%"
+height="420"
+loading="lazy">
+</iframe>
+
+#### Html Example
+
+```html
+<div style="width: 200px; height: 100px; overflow-y: scroll; display: flex; flex-direction: row; gap: 10px;">
+  <p>Line 1</p>
+  <p>Line 2</p>
+  <p>Line 3</p>
+  <p>Line 4</p>
+  <p>Line 5</p>
+  <p>Line 6</p>
+  <p>Line 7</p>
+  <p>Line 8</p>
+</div>
+```
+
+#### Rust Example
+
+```rust
+fn spawn_scrollbar_widget(mut commands: Commands) {
+    commands.spawn((
+        Scrollbar {
+            vertical: false,
+            min: 0.0,
+            max: 1000.0,
+            value: 0.0,
+            step: 10.0,
+            ..default()
+        },
+        Node::default(),
+    ));
+}
+```
+
+### Ersteller vom Widget
+
+<div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
+  <img
+    src="https://avatars.githubusercontent.com/u/84874606?v=4"
+    alt="exepta avatar"
+    width="64"
+    height="64"
+    style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;"
+  />
+  <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
+    <strong>exepta</strong>
+    <a href="https://github.com/exepta" style="margin-top: 10px; color: #5658db;">Link to GitHub</a>
+  </div>
+</div>

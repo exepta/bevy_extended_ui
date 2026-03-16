@@ -4,70 +4,77 @@ title: Headline
 
 # Headline
 
-## Overview
+### Overview
 
-Heading widget generated from h1 to h6 tags for section titles and semantic structure.
+Heading widget from h1 to h6 for chapter structure and semantic titles.
 
 - Rust component: Headline
 - HTML tag: h1-h6
 - Recommended source reference: src/widgets/mod.rs
 
-## Important Attributes and Behavior
+### Attributes
 
-- h1 to h6 map to one Headline component type.
-- Stores text and heading level metadata.
-- Can be restyled dynamically via systems.
+Important widget-specific attributes (detailed):
 
-## HTML Example
+- h1 to h6 are mapped to a headline component.
+- Saves text and heading level.
+- Can be dynamically restyled via system.
 
-```html
-<h2 oninit="log_headline">Settings</h2>
-```
+Supported global HTML attributes:
 
-## Bevy Example
+- `id`: Unique id for CSS selectors, event mapping, and widget references.
+- `class`: Passes CSS classes for visual styling and state-dependent rules.
+- `style`: Passes inline CSS that is parsed into `HtmlStyle` and applied in the style pipeline.
+- `hidden`: Renders the widget initially hidden.
+- `disabled`: Disables interactions; clicks and focus changes are blocked.
+- `readonly`: Is applied as widget state to keep interaction behavior consistent.
+- Event attributes like `onclick`, `onmousedown`, `onmouseup`, `onmouseover`, `onmouseout`, `onfocus`, `oninit`, `onchange`, `onscroll`, `onwheel`, `onkeydown`, and `onkeyup`: Bind handler functions directly to the event binding system.
 
-```rust
-use bevy::prelude::*;
-use bevy_extended_ui::ExtendedUiPlugin;
-use bevy_extended_ui::html::{HtmlEvent, HtmlSource};
-use bevy_extended_ui::io::HtmlAsset;
-use bevy_extended_ui::registry::UiRegistry;
-use bevy_extended_ui::widgets::Headline;
-use bevy_extended_ui_macros::html_fn;
+### WASM Previews
 
-fn main() {
-    App::new()
-        .add_plugins(DefaultPlugins)
-        .add_plugins(ExtendedUiPlugin)
-        .add_systems(Startup, load_ui)
-        .run();
-}
-
-fn load_ui(mut reg: ResMut<UiRegistry>, asset_server: Res<AssetServer>) {
-    let handle: Handle<HtmlAsset> = asset_server.load("ui/headline.html");
-    reg.add_and_use("headline-demo".to_string(), HtmlSource::from_handle(handle));
-}
-
-#[html_fn("log_headline")]
-fn log_headline(In(event): In<HtmlEvent>, query: Query<&Headline>) {
-    if let Ok(widget) = query.get(event.entity) {
-        info!("Headline event entity={:?} data={:?}", event.entity, widget);
-    }
-}
-```
-
-## Example
-
+### Headline Example
 <iframe
-  title="Bevy WASM Preview - Headline"
-  src="{base.url}/examples/headline"
+  id="headline"
+  title="Headline"
+  src="{base.url}/examples/base"
   width="100%"
   height="420"
   loading="lazy">
 </iframe>
 
-## Notes
+#### Html Example
 
-- Keep the HTML tag spelling exact (h1-h6) so the converter maps to the correct widget.
-- Register handler names with html_fn exactly as used in HTML attributes.
-- Link this page to a real demo build once your WASM preview is deployed.
+```html
+<h2 oninit="log_headline">Settings</h2>
+```
+
+#### Rust Example
+
+```rust
+fn spawn_headline_widget(mut commands: Commands) {
+    commands.spawn((
+        Headline {
+            text: "Settings".to_string(),
+            h_type: HeadlineType::H2,
+            ..default()
+        },
+        Node::default(),
+    ));
+}
+```
+
+### Widget Creator
+
+<div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
+  <img
+    src="https://avatars.githubusercontent.com/u/84874606?v=4"
+    alt="exepta avatar"
+    width="64"
+    height="64"
+    style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;"
+  />
+  <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
+    <strong>exepta</strong>
+    <a href="https://github.com/exepta" style="margin-top: 10px; color: #5658db;">Link to GitHub</a>
+  </div>
+</div>

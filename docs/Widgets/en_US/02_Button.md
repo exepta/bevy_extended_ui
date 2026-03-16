@@ -4,73 +4,119 @@ title: Button
 
 # Button
 
-## Overview
+### Overview
 
-Clickable action widget with optional icon and optional type behavior for form integration.
+`Button` is an interactive action widget for click and form flows. The widget text is read from inside the tag, an optional `<icon src="...">` can be automatically placed to the left or right of the text, and the widget directly controls the form behavior via the type (`button`, `submit`, `reset`).
 
 - Rust component: Button
 - HTML tag: button
 - Recommended source reference: src/widgets/mod.rs
 
-## Important Attributes and Behavior
+### Attributes
 
-- type=button|submit|reset controls form behavior.
-- Supports icon child nodes.
-- Typical events: onclick, onfocus, onmouseover, onmouseout, oninit.
+Important widget-specific attributes (detailed):
 
-## HTML Example
+- `type`: Controls the behavior mode of the button.
+  Allowed values:
+  `button` (normal click action without submit), `submit` (triggers form submit), `reset` (resets form values).
+  If not specified, the internal standard `Auto` is used.
+
+Supported global HTML attributes:
+
+- `id`: Unique id for CSS selectors, event mapping, and widget references.
+- `class`: Passes CSS classes for visual styling and state-dependent rules.
+- `style`: Passes inline CSS that is parsed into `HtmlStyle` and applied in the style pipeline.
+- `hidden`: Renders the widget initially hidden.
+- `disabled`: Disables interactions; clicks and focus changes are blocked.
+- `readonly`: Is applied as widget state to keep interaction behavior consistent.
+- Event attributes like `onclick`, `onmousedown`, `onmouseup`, `onmouseover`, `onmouseout`, `onfocus`, `oninit`, `onchange`, `onscroll`, `onwheel`, `onkeydown`, and `onkeyup`: Bind handler functions directly to the event binding system.
+
+### WASM Previews
+
+### Button states
+<iframe
+id="button"
+title="Button States"
+src="{base.url}/examples/base"
+width="50%"
+height="250px"
+loading="lazy">
+</iframe>
+
+#### Html Example
 
 ```html
-<button onclick="log_button" type="button">
+<button id="save-btn" class="cta" type="submit" onclick="on_save_click">
   Save
   <icon src="extended_ui/icons/check-mark.png"></icon>
 </button>
 ```
 
-## Bevy Example
+#### Rust Example
 
 ```rust
-use bevy::prelude::*;
-use bevy_extended_ui::ExtendedUiPlugin;
-use bevy_extended_ui::html::{HtmlEvent, HtmlSource};
-use bevy_extended_ui::io::HtmlAsset;
-use bevy_extended_ui::registry::UiRegistry;
-use bevy_extended_ui::widgets::Button;
-use bevy_extended_ui_macros::html_fn;
-
-fn main() {
-    App::new()
-        .add_plugins(DefaultPlugins)
-        .add_plugins(ExtendedUiPlugin)
-        .add_systems(Startup, load_ui)
-        .run();
-}
-
-fn load_ui(mut reg: ResMut<UiRegistry>, asset_server: Res<AssetServer>) {
-    let handle: Handle<HtmlAsset> = asset_server.load("ui/button.html");
-    reg.add_and_use("button-demo".to_string(), HtmlSource::from_handle(handle));
-}
-
-#[html_fn("log_button")]
-fn log_button(In(event): In<HtmlEvent>, query: Query<&Button>) {
-    if let Ok(widget) = query.get(event.entity) {
-        info!("Button event entity={:?} data={:?}", event.entity, widget);
-    }
+fn spawn_button_widget(mut commands: Commands) {
+    commands.spawn((
+        Button {
+            text: "Save".to_string(),
+            icon_path: Some("extended_ui/icons/check-mark.png".to_string()),
+            icon_place: IconPlace::Right,
+            button_type: ButtonType::Submit,
+            ..default()
+        },
+        Node::default(),
+    ));
 }
 ```
 
-## Example
+### Icon Button
 
 <iframe
-  title="Bevy WASM Preview - Button"
-  src="{base.url}/examples/button"
-  width="100%"
-  height="420"
-  loading="lazy">
+id="button-icon-only"
+title="Icon Button"
+src="{base.url}/examples/base"
+width="50%"
+height="250px"
+loading="lazy">
 </iframe>
 
-## Notes
+#### Html Example
 
-- Keep the HTML tag spelling exact (button) so the converter maps to the correct widget.
-- Register handler names with html_fn exactly as used in HTML attributes.
-- Link this page to a real demo build once your WASM preview is deployed.
+```html
+<button style="width: 50px; height: 50px; border-radius: 50%;">
+  <icon src="icons/check-mark.png"></icon>
+</button>
+```
+
+#### Rust Example
+
+```rust
+fn spawn_button_widget(mut commands: Commands) {
+    commands.spawn((
+        Button {
+            text: String::new(),
+            icon_path: Some("icons/check-mark.png".to_string()),
+            icon_place: IconPlace::Left,
+            button_type: ButtonType::Button,
+            ..default()
+        },
+        Node::default(),
+    ));
+}
+```
+
+### Widget Creator
+
+<div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
+  <img
+    src="https://avatars.githubusercontent.com/u/84874606?v=4"
+    alt="exepta avatar"
+    width="64"
+    height="64"
+    style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;"
+  />
+  <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
+    <strong>exepta</strong>
+    <a href="https://github.com/exepta" style="margin-top: 10px; color: #5658db;">Link to GitHub</a>
+  </div>
+</div>
