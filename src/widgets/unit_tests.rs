@@ -124,6 +124,12 @@ mod tests {
         assert_eq!(FieldMode::from_str("single"), Some(FieldMode::Single));
         assert_eq!(FieldMode::from_str("multi"), Some(FieldMode::Multi));
         assert_eq!(FieldMode::from_str("count"), Some(FieldMode::Count(0)));
+        assert_eq!(FieldMode::from_str("count(2)"), Some(FieldMode::Count(2)));
+        assert_eq!(
+            FieldMode::from_str("count( 12 )"),
+            Some(FieldMode::Count(12))
+        );
+        assert_eq!(FieldMode::from_str("count(x)"), None);
         assert_eq!(FieldMode::from_str("bad"), None);
     }
 

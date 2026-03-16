@@ -53,7 +53,11 @@ Supported global HTML attributes:
 ```rust
 fn spawn_headline_widget(mut commands: Commands) {
     commands.spawn((
-        Headline::default(),
+        Headline {
+            text: "Settings".to_string(),
+            h_type: HeadlineType::H2,
+            ..default()
+        },
         Node::default(),
     ));
 }

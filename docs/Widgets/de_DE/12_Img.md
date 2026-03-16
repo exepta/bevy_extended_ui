@@ -33,7 +33,7 @@ Unterstützte globale HTML-Attribute:
 
 ### WASM Vorschauen
 
-### Img Example
+### Img
 <iframe
   id="img"
   title="Img"
@@ -46,7 +46,7 @@ Unterstützte globale HTML-Attribute:
 #### Html Example
 
 ```html
-<img src="ui/logo.png" alt="Project logo" oninit="log_img" />
+<img src="{example_image}" alt="Displayed image" />
 ```
 
 #### Rust Example
@@ -54,7 +54,11 @@ Unterstützte globale HTML-Attribute:
 ```rust
 fn spawn_img_widget(mut commands: Commands) {
     commands.spawn((
-        Img::default(),
+        Img {
+            src: Some("{example_image}".to_string()),
+            alt: "Displayed image".to_string(),
+            ..default()
+        },
         Node::default(),
     ));
 }

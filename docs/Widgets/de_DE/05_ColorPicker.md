@@ -32,7 +32,7 @@ Unterstützte globale HTML-Attribute:
 
 ### WASM Vorschauen
 
-### ColorPicker Example
+### ColorPicker
 <iframe
   id="colorpicker"
   title="ColorPicker"
@@ -53,7 +53,7 @@ Unterstützte globale HTML-Attribute:
 ```rust
 fn spawn_colorpicker_widget(mut commands: Commands) {
     commands.spawn((
-        ColorPicker::default(),
+        ColorPicker::from_rgba_u8(0x42, 0x85, 0xF4, 255),
         Node::default(),
     ));
 }

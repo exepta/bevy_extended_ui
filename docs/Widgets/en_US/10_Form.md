@@ -55,10 +55,37 @@ Supported global HTML attributes:
 
 ```rust
 fn spawn_form_widget(mut commands: Commands) {
-    commands.spawn((
-        Form::default(),
-        Node::default(),
-    ));
+    commands
+        .spawn((
+            Form {
+                action: Some("log_form".to_string()),
+                validate_mode: FormValidationMode::Send,
+                ..default()
+            },
+            Node::default(),
+        ))
+        .with_children(|parent| {
+            parent.spawn((
+                InputField {
+                    name: "email".to_string(),
+                    input_type: InputType::Email,
+                    ..default()
+                },
+                ValidationRules {
+                    required: true,
+                    ..default()
+                },
+                Node::default(),
+            ));
+            parent.spawn((
+                Button {
+                    text: "Send".to_string(),
+                    button_type: ButtonType::Submit,
+                    ..default()
+                },
+                Node::default(),
+            ));
+        });
 }
 ```
 

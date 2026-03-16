@@ -54,7 +54,22 @@ Supported global HTML attributes:
 ```rust
 fn spawn_datepicker_widget(mut commands: Commands) {
     commands.spawn((
-        DatePicker::default(),
+        InputField {
+            name: "birthday".to_string(),
+            input_type: InputType::Date,
+            ..default()
+        },
+        Node::default(),
+    ));
+    commands.spawn((
+        DatePicker {
+            for_id: Some("birthday".to_string()),
+            min: Some("1990-01-01".to_string()),
+            max: Some("2030-12-31".to_string()),
+            format_pattern: Some("dmy".to_string()),
+            format: DateFormat::DayMonthYear,
+            ..default()
+        },
         Node::default(),
     ));
 }
@@ -82,7 +97,22 @@ loading="lazy">
 ```rust
 fn spawn_datepicker_widget(mut commands: Commands) {
     commands.spawn((
-        DatePicker::default(),
+        InputField {
+            name: "birthday".to_string(),
+            input_type: InputType::Range,
+            ..default()
+        },
+        Node::default(),
+    ));
+    commands.spawn((
+        DatePicker {
+            for_id: Some("birthday".to_string()),
+            min: Some("1990-01-01".to_string()),
+            max: Some("2030-12-31".to_string()),
+            format_pattern: Some("dmy".to_string()),
+            format: DateFormat::DayMonthYear,
+            ..default()
+        },
         Node::default(),
     ));
 }

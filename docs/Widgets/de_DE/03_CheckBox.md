@@ -57,7 +57,45 @@ Unterstützte globale HTML-Attribute:
 ```rust
 fn spawn_checkbox_widget(mut commands: Commands) {
     commands.spawn((
-        CheckBox::default(),
+        CheckBox {
+            label: "Checkbox".to_string(),
+            checked: false,
+            ..default()
+        },
+        Node::default(),
+    ));
+    commands.spawn((
+        CheckBox {
+            label: "Checked".to_string(),
+            checked: true,
+            ..default()
+        },
+        Node::default(),
+    ));
+    commands.spawn((
+        CheckBox {
+            label: "Disabled".to_string(),
+            ..default()
+        },
+        UIWidgetState {
+            disabled: true,
+            ..default()
+        },
+        Node::default(),
+    ));
+    commands.spawn((
+        CheckBox {
+            label: String::new(),
+            ..default()
+        },
+        Node::default(),
+    ));
+    commands.spawn((
+        CheckBox {
+            label: String::new(),
+            checked: true,
+            ..default()
+        },
         Node::default(),
     ));
 }
@@ -76,9 +114,9 @@ loading="lazy">
 #### Html Example
 
 ```html
-<checkbox icon="examples/icons/custom.png">Checkbox</checkbox>
-<checkbox icon="examples/icons/custom.png" checked>Checked</checkbox>
-<checkbox icon="examples/icons/custom.png" disabled>Disabled</checkbox>
+<checkbox icon="{custom.png}">Checkbox</checkbox>
+<checkbox icon="{custom.png}" checked>Checked</checkbox>
+<checkbox icon="{custom.png}" disabled>Disabled</checkbox>
 ```
 
 #### Rust Example
@@ -86,7 +124,33 @@ loading="lazy">
 ```rust
 fn spawn_checkbox_widget(mut commands: Commands) {
     commands.spawn((
-        CheckBox::default(),
+        CheckBox {
+            label: "Checkbox".to_string(),
+            icon_path: Some("custom.png".to_string()),
+            checked: false,
+            ..default()
+        },
+        Node::default(),
+    ));
+    commands.spawn((
+        CheckBox {
+            label: "Checked".to_string(),
+            icon_path: Some("custom.png".to_string()),
+            checked: true,
+            ..default()
+        },
+        Node::default(),
+    ));
+    commands.spawn((
+        CheckBox {
+            label: "Disabled".to_string(),
+            icon_path: Some("custom.png".to_string()),
+            ..default()
+        },
+        UIWidgetState {
+            disabled: true,
+            ..default()
+        },
         Node::default(),
     ));
 }

@@ -53,7 +53,11 @@ Supported global HTML attributes:
 ```rust
 fn spawn_switchbutton_widget(mut commands: Commands) {
     commands.spawn((
-        SwitchButton::default(),
+        SwitchButton {
+            label: "Dark mode".to_string(),
+            icon: Some("extended_ui/icons/drop-arrow.png".to_string()),
+            ..default()
+        },
         Node::default(),
     ));
 }

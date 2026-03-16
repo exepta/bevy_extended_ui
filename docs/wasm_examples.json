@@ -78,9 +78,9 @@
       "examples": [
         {
           "id": "divider",
-          "iframe_src": "{base.url}/examples/divider",
-          "html": "",
-          "css": ""
+          "iframe_src": "{base.url}/examples/base",
+          "html": "<divider alignment=\"horizontal\" oninit=\"log_divider\"></divider><divider alignment=\"vertical\" oninit=\"log_divider\"></divider>",
+          "css": "column, al:center"
         }
       ]
     },
@@ -88,10 +88,22 @@
       "name": "fieldset",
       "examples": [
         {
-          "id": "fieldset",
-          "iframe_src": "{base.url}/examples/fieldset",
-          "html": "",
-          "css": ""
+          "id": "fieldset-single",
+          "iframe_src": "{base.url}/examples/base",
+          "html": "<fieldset mode=\"single\" allow-none=\"false\" onchange=\"log_fieldset\"><radio value=\"easy\">Easy</radio><radio value=\"hard\" selected>Hard</radio></fieldset>",
+          "css": "column, al:center"
+        },
+        {
+          "id": "fieldset-multiple",
+          "iframe_src": "{base.url}/examples/base",
+          "html": "<fieldset mode=\"multi\" allow-none=\"true\"><toggle value=\"easy\">Easy</toggle><toggle value=\"medium\">Medium</toggle><toggle value=\"hard\" selected>Hard</toggle></fieldset>",
+          "css": "column, al:center"
+        },
+        {
+          "id": "fieldset-count",
+          "iframe_src": "{base.url}/examples/base",
+          "html": "<fieldset mode=\"count(2)\" allow-none=\"false\"><toggle value=\"very-easy\">Very Easy</toggle><toggle value=\"easy\">Easy</toggle><toggle value=\"medium\">Medium</toggle><toggle value=\"hard\" selected>Hard</toggle><toggle value=\"very-hard\">Very Hard</toggle></fieldset>",
+          "css": "column, al:center"
         }
       ]
     },
@@ -100,9 +112,9 @@
       "examples": [
         {
           "id": "form",
-          "iframe_src": "{base.url}/examples/form",
-          "html": "",
-          "css": ""
+          "iframe_src": "{base.url}/examples/base",
+          "html": "<form action=\"log_form\" validate=\"Send\"><input name=\"email\" type=\"email\" required /><button type=\"submit\">Send</button></form>",
+          "css": "column, center:center"
         }
       ]
     },
@@ -111,9 +123,9 @@
       "examples": [
         {
           "id": "headline",
-          "iframe_src": "{base.url}/examples/headline",
-          "html": "",
-          "css": ""
+          "iframe_src": "{base.url}/examples/base",
+          "html": "<h1>Ueberschrift</h1><h2>Ueberschrift</h2><h3>Ueberschrift</h3><h4>Ueberschrift</h4><h5>Ueberschrift</h5><h6>Ueberschrift</h6>",
+          "css": "column, center:center, gap:5px"
         }
       ]
     },
@@ -122,9 +134,9 @@
       "examples": [
         {
           "id": "img",
-          "iframe_src": "{base.url}/examples/img",
-          "html": "",
-          "css": ""
+          "iframe_src": "{base.url}/examples/base",
+          "html": "<img src=\"{example_image}\" alt=\"Displayed image\" />",
+          "css": "row, center:center"
         }
       ]
     },
@@ -133,9 +145,15 @@
       "examples": [
         {
           "id": "inputfield",
-          "iframe_src": "{base.url}/examples/inputfield",
-          "html": "",
-          "css": ""
+          "iframe_src": "{base.url}/examples/base",
+          "html": "<label for=\"username\">Text</label><input id=\"username\" name=\"username\" type=\"text\" maxlength=\"32\" placeholder=\"A Placeholder\" /><label for=\"password\">Password</label><input id=\"password\" name=\"password\" type=\"password\" maxlength=\"16\" /><label for=\"email\">Email</label><input id=\"email\" name=\"email\" type=\"email\" /><label for=\"number\">Number</label><input id=\"number\" name=\"number\" type=\"number\" maxlength=\"16\" />",
+          "css": "column, center:center, gap:10px"
+        },
+        {
+          "id": "inputfield-file",
+          "iframe_src": "{base.url}/examples/base",
+          "html": "<label for=\"file\">File</label><input id=\"file\" name=\"file\" type=\"file\" /><label for=\"file-size\">File With Size</label><input id=\"file-size\" name=\"file-size\" type=\"file\" max-size=\"2MB\" extensions=\"[jpg, jpeg, png]\" show-size=\"true\" />",
+          "css": "column, center:center, gap:10px"
         }
       ]
     },
@@ -144,9 +162,9 @@
       "examples": [
         {
           "id": "paragraph",
-          "iframe_src": "{base.url}/examples/paragraph",
-          "html": "",
-          "css": ""
+          "iframe_src": "{base.url}/examples/base",
+          "html": "<p>Welcome {{player.name}}</p>",
+          "css": "center:center"
         }
       ]
     },
@@ -155,9 +173,9 @@
       "examples": [
         {
           "id": "progressbar",
-          "iframe_src": "{base.url}/examples/progressbar",
-          "html": "",
-          "css": ""
+          "iframe_src": "{base.url}/examples/base",
+          "html": "<progressbar id=\"xp\" min=\"0\" max=\"100\" value=\"42\"></progressbar>",
+          "css": "center:center"
         }
       ]
     },
@@ -166,9 +184,9 @@
       "examples": [
         {
           "id": "radiobutton",
-          "iframe_src": "{base.url}/examples/radiobutton",
-          "html": "",
-          "css": ""
+          "iframe_src": "{base.url}/examples/base",
+          "html": "<fieldset mode=\"single\" allow-none=\"false\"><radio value=\"black\">Black</radio><radio value=\"green\">Green</radio><radio value=\"white\">White</radio></fieldset>",
+          "css": "column, al:center, gap:10px"
         }
       ]
     },
@@ -176,10 +194,16 @@
       "name": "scrollbar",
       "examples": [
         {
-          "id": "scrollbar",
-          "iframe_src": "{base.url}/examples/scrollbar",
-          "html": "",
-          "css": ""
+          "id": "scrollbar-vertical",
+          "iframe_src": "{base.url}/examples/base",
+          "html": "<div style=\"width: 200px; height: 200px; overflow-y: scroll; display: flex; flex-direction: column; gap: 10px;\"><p>Line 1</p><p>Line 2</p><p>Line 3</p><p>Line 4</p><p>Line 5</p><p>Line 6</p><p>Line 7</p><p>Line 8</p><p>Line 9</p><p>Line 10</p></div>",
+          "css": "column, center:center"
+        },
+        {
+          "id": "scrollbar-horizontal",
+          "iframe_src": "{base.url}/examples/base",
+          "html": "<div style=\"width: 200px; height: 100px; overflow-y: scroll; display: flex; flex-direction: row; gap: 10px;\"><p>Line 1</p><p>Line 2</p><p>Line 3</p><p>Line 4</p><p>Line 5</p><p>Line 6</p><p>Line 7</p><p>Line 8</p></div>",
+          "css": "column, center:center"
         }
       ]
     },
@@ -188,9 +212,15 @@
       "examples": [
         {
           "id": "slider",
-          "iframe_src": "{base.url}/examples/slider",
-          "html": "",
-          "css": ""
+          "iframe_src": "{base.url}/examples/base",
+          "html": "<slider min=\"0\" max=\"100\" value=\"25\" step=\"1\"></slider><slider value=\"0\" min=\"0\" max=\"100\" step=\"1\" dots=\"4\" show-labels=\"true\" tip=\"false\"></slider>",
+          "css": "column, center:center, gap:10px"
+        },
+        {
+          "id": "slider-range",
+          "iframe_src": "{base.url}/examples/base",
+          "html": "<slider id=\"range-slider-demo\" type=\"range\" value=\"20 - 40\" dots=\"4\" show-labels=\"true\" dot-anchor=\"bottom\"></slider>",
+          "css": "column, center:center, gap:10px"
         }
       ]
     },
@@ -199,9 +229,9 @@
       "examples": [
         {
           "id": "switchbutton",
-          "iframe_src": "{base.url}/examples/switchbutton",
-          "html": "",
-          "css": ""
+          "iframe_src": "{base.url}/examples/base",
+          "html": "<switch>Switch</switch><switch disabled>Switch Disabled</switch><switch icon=\"{custom.png}\" checked>Switch Icon</switch>",
+          "css": "column, center:center, gap:10px"
         }
       ]
     },
@@ -210,9 +240,9 @@
       "examples": [
         {
           "id": "togglebutton",
-          "iframe_src": "{base.url}/examples/togglebutton",
-          "html": "",
-          "css": ""
+          "iframe_src": "{base.url}/examples/base",
+          "html": "<fieldset mode=\"multi\" allow-none=\"true\" class=\"con-column\"><toggle value=\"black\">Black</toggle><toggle value=\"green\">Green</toggle><toggle value=\"white\">White</toggle></fieldset>",
+          "css": "column, al:center, gap:10px"
         }
       ]
     },
@@ -220,10 +250,16 @@
       "name": "tooltip",
       "examples": [
         {
-          "id": "tooltip",
-          "iframe_src": "{base.url}/examples/tooltip",
-          "html": "",
-          "css": ""
+          "id": "tooltip-hover",
+          "iframe_src": "{base.url}/examples/base",
+          "html": "<button id=\"help\">Hover Me</button><tool-tip for=\"help\" variant=\"point\" prio=\"right\" alignment=\"horizontal\" trigger=\"hover\">More information</tool-tip>",
+          "css": "column, center:center"
+        },
+        {
+          "id": "tooltip-click",
+          "iframe_src": "{base.url}/examples/base",
+          "html": "<button id=\"help\">Click Me</button><tool-tip for=\"help\" variant=\"point\" prio=\"top\" alignment=\"vertical\" trigger=\"click\">More information</tool-tip>",
+          "css": "column, center:center"
         }
       ]
     },
@@ -232,9 +268,9 @@
       "examples": [
         {
           "id": "badge",
-          "iframe_src": "{base.url}/examples/badge",
-          "html": "",
-          "css": ""
+          "iframe_src": "{base.url}/examples/base",
+          "html": "<button id=\"inbox-button\">Inbox</button><badge for=\"inbox-button\" value=\"70\" max=\"99\" anchor=\"top right\"></badge>",
+          "css": "column, center:center"
         }
       ]
     },
@@ -243,9 +279,9 @@
       "examples": [
         {
           "id": "hyperlink",
-          "iframe_src": "{base.url}/examples/widgets-overview",
-          "html": "",
-          "css": ""
+          "iframe_src": "{base.url}/examples/base",
+          "html": "<a href=\"https://bevy.org\">To Bevy Website</a>",
+          "css": "column, center:center"
         }
       ]
     }

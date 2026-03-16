@@ -32,7 +32,7 @@ Unterstützte globale HTML-Attribute:
 
 ### WASM Vorschauen
 
-### ChoiceBox Example
+### ChoiceBox
 <iframe
   id="choicebox"
   title="ChoiceBox"
@@ -59,7 +59,42 @@ Unterstützte globale HTML-Attribute:
 ```rust
 fn spawn_choicebox_widget(mut commands: Commands) {
     commands.spawn((
-        ChoiceBox::default(),
+        ChoiceBox {
+            label: "quality".to_string(),
+            value: ChoiceOption {
+                text: "High".to_string(),
+                internal_value: "high".to_string(),
+                icon_path: None,
+            },
+            options: vec![
+                ChoiceOption {
+                    text: "Potato".to_string(),
+                    internal_value: "potato".to_string(),
+                    icon_path: None,
+                },
+                ChoiceOption {
+                    text: "Low".to_string(),
+                    internal_value: "low".to_string(),
+                    icon_path: None,
+                },
+                ChoiceOption {
+                    text: "High".to_string(),
+                    internal_value: "high".to_string(),
+                    icon_path: None,
+                },
+                ChoiceOption {
+                    text: "Extreme".to_string(),
+                    internal_value: "extreme".to_string(),
+                    icon_path: None,
+                },
+                ChoiceOption {
+                    text: "Ultra".to_string(),
+                    internal_value: "ultra".to_string(),
+                    icon_path: None,
+                },
+            ],
+            ..default()
+        },
         Node::default(),
     ));
 }

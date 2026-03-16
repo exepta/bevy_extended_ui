@@ -58,7 +58,20 @@ Supported global HTML attributes:
 ```rust
 fn spawn_badge_widget(mut commands: Commands) {
     commands.spawn((
-        Badge::default(),
+        Button {
+            text: "Inbox".to_string(),
+            ..default()
+        },
+        Node::default(),
+    ));
+    commands.spawn((
+        Badge {
+            for_id: Some("inbox-button".to_string()),
+            value: 112,
+            max: 99,
+            anchor: BadgeAnchor::TopRight,
+            ..default()
+        },
         Node::default(),
     ));
 }

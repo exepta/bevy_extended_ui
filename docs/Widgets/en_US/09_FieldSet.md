@@ -55,10 +55,35 @@ Supported global HTML attributes:
 
 ```rust
 fn spawn_fieldset_widget(mut commands: Commands) {
-    commands.spawn((
-        FieldSet::default(),
-        Node::default(),
-    ));
+    commands
+        .spawn((
+            FieldSet {
+                field_mode: FieldMode::Single,
+                allow_none: false,
+                ..default()
+            },
+            Node::default(),
+        ))
+        .with_children(|parent| {
+            parent.spawn((
+                RadioButton {
+                    label: "Easy".to_string(),
+                    value: "easy".to_string(),
+                    selected: false,
+                    ..default()
+                },
+                Node::default(),
+            ));
+            parent.spawn((
+                RadioButton {
+                    label: "Hard".to_string(),
+                    value: "hard".to_string(),
+                    selected: true,
+                    ..default()
+                },
+                Node::default(),
+            ));
+        });
 }
 ```
 

@@ -40,10 +40,24 @@ Supported global HTML attributes:
 
 ```rust
 fn spawn_body_widget(mut commands: Commands) {
-    commands.spawn((
-        Body::default(),
-        Node::default(),
-    ));
+    commands
+        .spawn((
+            Body {
+                html_key: Some("main-body".to_string()),
+                ..default()
+            },
+            Node::default(),
+        ))
+        .with_children(|parent| {
+            parent.spawn((
+                Div::default(),
+                Node::default(),
+                Paragraph {
+                    text: "...".to_string(),
+                    ..default()
+                },
+            ));
+        });
 }
 ```
 

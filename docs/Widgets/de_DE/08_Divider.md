@@ -32,7 +32,7 @@ Unterstützte globale HTML-Attribute:
 
 ### WASM Vorschauen
 
-### Divider Example
+### Divider
 <iframe
   id="divider"
   title="Divider"
@@ -53,7 +53,10 @@ Unterstützte globale HTML-Attribute:
 ```rust
 fn spawn_divider_widget(mut commands: Commands) {
     commands.spawn((
-        Divider::default(),
+        Divider {
+            alignment: DividerAlignment::Horizontal,
+            ..default()
+        },
         Node::default(),
     ));
 }

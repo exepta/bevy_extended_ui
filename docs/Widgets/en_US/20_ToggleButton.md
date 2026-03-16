@@ -55,7 +55,14 @@ Supported global HTML attributes:
 ```rust
 fn spawn_togglebutton_widget(mut commands: Commands) {
     commands.spawn((
-        ToggleButton::default(),
+        ToggleButton {
+            label: String::new(),
+            value: "bold".to_string(),
+            icon_path: Some("extended_ui/icons/bold.png".to_string()),
+            icon_place: IconPlace::Left,
+            selected: true,
+            ..default()
+        },
         Node::default(),
     ));
 }

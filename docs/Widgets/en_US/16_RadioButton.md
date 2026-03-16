@@ -53,7 +53,12 @@ Supported global HTML attributes:
 ```rust
 fn spawn_radiobutton_widget(mut commands: Commands) {
     commands.spawn((
-        RadioButton::default(),
+        RadioButton {
+            label: "Deutsch".to_string(),
+            value: "de".to_string(),
+            selected: true,
+            ..default()
+        },
         Node::default(),
     ));
 }

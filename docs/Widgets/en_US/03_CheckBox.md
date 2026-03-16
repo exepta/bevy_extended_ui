@@ -57,7 +57,45 @@ Supported global HTML attributes:
 ```rust
 fn spawn_checkbox_widget(mut commands: Commands) {
     commands.spawn((
-        CheckBox::default(),
+        CheckBox {
+            label: "Checkbox".to_string(),
+            checked: false,
+            ..default()
+        },
+        Node::default(),
+    ));
+    commands.spawn((
+        CheckBox {
+            label: "Checked".to_string(),
+            checked: true,
+            ..default()
+        },
+        Node::default(),
+    ));
+    commands.spawn((
+        CheckBox {
+            label: "Disabled".to_string(),
+            ..default()
+        },
+        UIWidgetState {
+            disabled: true,
+            ..default()
+        },
+        Node::default(),
+    ));
+    commands.spawn((
+        CheckBox {
+            label: String::new(),
+            ..default()
+        },
+        Node::default(),
+    ));
+    commands.spawn((
+        CheckBox {
+            label: String::new(),
+            checked: true,
+            ..default()
+        },
         Node::default(),
     ));
 }
@@ -86,7 +124,33 @@ loading="lazy">
 ```rust
 fn spawn_checkbox_widget(mut commands: Commands) {
     commands.spawn((
-        CheckBox::default(),
+        CheckBox {
+            label: "Checkbox".to_string(),
+            icon_path: Some("examples/icons/custom.png".to_string()),
+            checked: false,
+            ..default()
+        },
+        Node::default(),
+    ));
+    commands.spawn((
+        CheckBox {
+            label: "Checked".to_string(),
+            icon_path: Some("examples/icons/custom.png".to_string()),
+            checked: true,
+            ..default()
+        },
+        Node::default(),
+    ));
+    commands.spawn((
+        CheckBox {
+            label: "Disabled".to_string(),
+            icon_path: Some("examples/icons/custom.png".to_string()),
+            ..default()
+        },
+        UIWidgetState {
+            disabled: true,
+            ..default()
+        },
         Node::default(),
     ));
 }

@@ -58,7 +58,13 @@ Supported global HTML attributes:
 ```rust
 fn spawn_inputfield_widget(mut commands: Commands) {
     commands.spawn((
-        InputField::default(),
+        InputField {
+            name: "username".to_string(),
+            input_type: InputType::Text,
+            cap_text_at: InputCap::CapAt(32),
+            placeholder: "Your name".to_string(),
+            ..default()
+        },
         Node::default(),
     ));
 }

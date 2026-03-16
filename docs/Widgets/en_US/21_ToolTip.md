@@ -56,7 +56,22 @@ Supported global HTML attributes:
 ```rust
 fn spawn_tooltip_widget(mut commands: Commands) {
     commands.spawn((
-        ToolTip::default(),
+        Button {
+            text: "?".to_string(),
+            ..default()
+        },
+        Node::default(),
+    ));
+    commands.spawn((
+        ToolTip {
+            text: "More information".to_string(),
+            for_id: Some("help".to_string()),
+            variant: ToolTipVariant::Point,
+            prio: ToolTipPriority::Right,
+            alignment: ToolTipAlignment::Horizontal,
+            trigger: vec![ToolTipTrigger::Hover, ToolTipTrigger::Click],
+            ..default()
+        },
         Node::default(),
     ));
 }

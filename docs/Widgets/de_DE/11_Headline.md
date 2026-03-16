@@ -32,7 +32,7 @@ Unterstützte globale HTML-Attribute:
 
 ### WASM Vorschauen
 
-### Headline Example
+### Headline
 <iframe
   id="headline"
   title="Headline"
@@ -45,7 +45,12 @@ Unterstützte globale HTML-Attribute:
 #### Html Example
 
 ```html
-<h2 oninit="log_headline">Settings</h2>
+<h1>Ueberschrift</h1>
+<h2>Ueberschrift</h2>
+<h3>Ueberschrift</h3>
+<h4>Ueberschrift</h4>
+<h5>Ueberschrift</h5>
+<h6>Ueberschrift</h6>
 ```
 
 #### Rust Example
@@ -53,7 +58,51 @@ Unterstützte globale HTML-Attribute:
 ```rust
 fn spawn_headline_widget(mut commands: Commands) {
     commands.spawn((
-        Headline::default(),
+        Headline {
+            text: "Ueberschrift".to_string(),
+            h_type: HeadlineType::H1,
+            ..default()
+        },
+        Node::default(),
+    ));
+    commands.spawn((
+        Headline {
+            text: "Ueberschrift".to_string(),
+            h_type: HeadlineType::H2,
+            ..default()
+        },
+        Node::default(),
+    ));
+    commands.spawn((
+        Headline {
+            text: "Ueberschrift".to_string(),
+            h_type: HeadlineType::H3,
+            ..default()
+        },
+        Node::default(),
+    ));
+    commands.spawn((
+        Headline {
+            text: "Ueberschrift".to_string(),
+            h_type: HeadlineType::H4,
+            ..default()
+        },
+        Node::default(),
+    ));
+    commands.spawn((
+        Headline {
+            text: "Ueberschrift".to_string(),
+            h_type: HeadlineType::H5,
+            ..default()
+        },
+        Node::default(),
+    ));
+    commands.spawn((
+        Headline {
+            text: "Ueberschrift".to_string(),
+            h_type: HeadlineType::H6,
+            ..default()
+        },
         Node::default(),
     ));
 }

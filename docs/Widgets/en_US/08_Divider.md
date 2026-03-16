@@ -53,7 +53,10 @@ Supported global HTML attributes:
 ```rust
 fn spawn_divider_widget(mut commands: Commands) {
     commands.spawn((
-        Divider::default(),
+        Divider {
+            alignment: DividerAlignment::Horizontal,
+            ..default()
+        },
         Node::default(),
     ));
 }

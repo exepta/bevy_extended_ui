@@ -42,10 +42,17 @@ Supported global HTML attributes:
 
 ```rust
 fn spawn_div_widget(mut commands: Commands) {
-    commands.spawn((
-        Div::default(),
-        Node::default(),
-    ));
+    commands
+        .spawn((Div::default(), Node::default()))
+        .with_children(|parent| {
+            parent.spawn((
+                Paragraph {
+                    text: "Panel content".to_string(),
+                    ..default()
+                },
+                Node::default(),
+            ));
+        });
 }
 ```
 

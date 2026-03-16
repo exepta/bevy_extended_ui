@@ -59,7 +59,21 @@ Supported global HTML attributes:
 ```rust
 fn spawn_hyperlink_widget(mut commands: Commands) {
     commands.spawn((
-        HyperLink::default(),
+        HyperLink {
+            text: "Open with system browser".to_string(),
+            href: "https://bevy.org".to_string(),
+            ..default()
+        },
+        Node::default(),
+    ));
+    commands.spawn((
+        HyperLink {
+            text: "Open with configured browser".to_string(),
+            href: "https://bevy.org".to_string(),
+            browsers: HyperLinkBrowsers::Custom(vec!["chrome".to_string()]),
+            open_modal: true,
+            ..default()
+        },
         Node::default(),
     ));
 }
