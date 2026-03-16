@@ -14,6 +14,7 @@ mod tests {
         mut commands: Commands,
         asset_server: Res<AssetServer>,
         mut image_cache: ResMut<ImageCache>,
+        mut images: ResMut<Assets<Image>>,
     ) {
         let parent = commands.spawn_empty().id();
         commands.entity(parent).with_children(|builder| {
@@ -26,6 +27,7 @@ mod tests {
                 42,
                 &asset_server,
                 &mut image_cache,
+                &mut images,
                 vec!["icon-class".to_string()],
                 777,
                 3,
@@ -40,6 +42,7 @@ mod tests {
                 42,
                 &asset_server,
                 &mut image_cache,
+                &mut images,
                 vec!["skip-class".to_string()],
                 888,
                 3,
@@ -121,6 +124,12 @@ mod tests {
         assert_eq!(FieldMode::from_str("single"), Some(FieldMode::Single));
         assert_eq!(FieldMode::from_str("multi"), Some(FieldMode::Multi));
         assert_eq!(FieldMode::from_str("count"), Some(FieldMode::Count(0)));
+        assert_eq!(FieldMode::from_str("count(2)"), Some(FieldMode::Count(2)));
+        assert_eq!(
+            FieldMode::from_str("count( 12 )"),
+            Some(FieldMode::Count(12))
+        );
+        assert_eq!(FieldMode::from_str("count(x)"), None);
         assert_eq!(FieldMode::from_str("bad"), None);
     }
 
@@ -153,7 +162,9 @@ mod tests {
         assert!(InputType::Date.is_valid_char('-'));
         assert!(!InputType::Date.is_valid_char('@'));
         assert!(InputType::Range.is_valid_char(' '));
+        assert!(!InputType::File.is_valid_char('a'));
         assert_eq!(InputType::from_str("password"), Some(InputType::Password));
+        assert_eq!(InputType::from_str("file"), Some(InputType::File));
         assert_eq!(InputType::from_str("bad"), None);
     }
 
@@ -189,6 +200,40 @@ mod tests {
             Some(ToolTipTrigger::Hover)
         );
         assert_eq!(ToolTipTrigger::from_str("x"), None);
+
+        assert_eq!(
+            BadgeAnchor::from_str("top right"),
+            Some(BadgeAnchor::TopRight)
+        );
+        assert_eq!(
+            BadgeAnchor::from_str("bottom-left"),
+            Some(BadgeAnchor::BottomLeft)
+        );
+        assert_eq!(BadgeAnchor::from_str("x"), None);
+    }
+
+    #[test]
+    fn hyperlink_browser_parser_works() {
+        assert_eq!(
+            HyperLinkBrowsers::from_str("system"),
+            Some(HyperLinkBrowsers::System)
+        );
+        assert_eq!(
+            HyperLinkBrowsers::from_str("firefox"),
+            Some(HyperLinkBrowsers::Custom(vec!["firefox".to_string()]))
+        );
+        assert_eq!(
+            HyperLinkBrowsers::from_str("[firefox, brave, chrome]"),
+            Some(HyperLinkBrowsers::Custom(vec![
+                "firefox".to_string(),
+                "brave".to_string(),
+                "chrome".to_string(),
+            ]))
+        );
+        assert_eq!(
+            HyperLinkBrowsers::from_str(""),
+            Some(HyperLinkBrowsers::System)
+        );
     }
 
     #[test]

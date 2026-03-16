@@ -1,13 +1,20 @@
 ## Patch Notes
-Thanks to `@lizhanyin` for this PATCH!
 
-### Version 1.4.2
+### Version 1.5.0
 
-- Fixed a bug where colors override backgrounds.
-- Fixed a bug where images destroy background colors.
-- Fixed a bug where `justify-content: flex-end` not work.
-- Fixed GPU Shader system load to heavy.
-- Fixed CSS border shortland not working correct.
-- Fixed TAB selection for backtrack selection via `SHIFT + TAB`.
-- Include aliases for HTML attributes `onmouseover` and `onmouseout`.
-- Fixed a bug where images wasn't scale correct after window resize.
+- Added `Badge` widget support with docs and local/WASM coverage.
+- Added `HyperLink` widget support.
+- Added file input widget support.
+- Added dialog system support via `<dialog>` with `bevy-app` and `system` renderers.
+- Added optional SVG image support.
+- Added outline CSS properties support.
+- Added extended text CSS support.
+- Added more HTML event bindings and validation in Linux/WASM workflows.
+- Improved slider behavior and scroll content ordering.
+- Improved theme provider flow and embedded default styles.
+- Added/updated local and WASM examples for theme-provider and widget-overview.
+- Updated docs for WASM and HyperLink usage.
+- Fixed Badge widget issues.
+- Fixed modal index handling in the dialog system.
+- Added `libsqlite3-sys` for better Windows compatibility.
+- Updated dependencies and version-related setup for the 1.5.0 release line.

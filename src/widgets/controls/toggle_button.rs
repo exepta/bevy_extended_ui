@@ -48,6 +48,7 @@ fn internal_node_creation_system(
     config: Res<ExtendedUiConfiguration>,
     asset_server: Res<AssetServer>,
     mut image_cache: ResMut<ImageCache>,
+    mut images: ResMut<Assets<Image>>,
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
     for (entity, id, mut toggle_button, source_opt, ui_state_opt) in query.iter_mut() {
@@ -126,6 +127,7 @@ fn internal_node_creation_system(
                     toggle_button.entry,
                     &asset_server,
                     &mut image_cache,
+                    &mut images,
                     vec!["button-text".to_string()],
                     id.0,
                     *layer,
@@ -156,6 +158,7 @@ fn internal_node_creation_system(
                     toggle_button.entry,
                     &asset_server,
                     &mut image_cache,
+                    &mut images,
                     vec!["button-text".to_string()],
                     id.0,
                     *layer,
@@ -188,7 +191,7 @@ fn ensure_fieldset_selection_system(
                         selection.0 = Some(toggle_entity);
                     }
                 }
-            } else if fieldset.field_mode == FieldMode::Multi {
+            } else if matches!(fieldset.field_mode, FieldMode::Multi | FieldMode::Count(_)) {
                 if let Some(mut selection) = selection_multi {
                     if !selection.0.contains(&toggle_entity) {
                         selection.0.push(toggle_entity);
@@ -240,6 +243,16 @@ fn on_internal_click(
         return;
     };
 
+    let checked_in_fieldset = toggles_q
+        .iter()
+        .filter(|(e, state, _, _)| {
+            if !state.checked {
+                return false;
+            }
+            find_fieldset_ancestor_optional(*e, &parents, &fieldset_tag_q) == Some(fs_entity)
+        })
+        .count();
+
     // Fetch clicked toggle
     let Ok((_e, mut st, gen_id, mut tb)) = toggles_q.get_mut(clicked) else {
         trigger.propagate(false);
@@ -270,13 +283,24 @@ fn on_internal_click(
                 should_check = true;
             }
         }
-        FieldMode::Multi | FieldMode::Count(_) => {
+        FieldMode::Multi => {
             st.checked = !st.checked;
             tb.selected = st.checked;
             if st.checked {
                 should_check = true;
             } else {
                 should_uncheck = true;
+            }
+        }
+        FieldMode::Count(limit) => {
+            if st.checked {
+                st.checked = false;
+                tb.selected = false;
+                should_uncheck = true;
+            } else if checked_in_fieldset < usize::from(limit) {
+                st.checked = true;
+                tb.selected = true;
+                should_check = true;
             }
         }
     }

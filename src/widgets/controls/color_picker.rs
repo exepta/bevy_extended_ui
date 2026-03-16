@@ -16,6 +16,8 @@ const SV_CANVAS_SIZE: u32 = 192;
 const TRACK_WIDTH: u32 = 256;
 const TRACK_HEIGHT: u32 = 14;
 const MODAL_FALLBACK_WIDTH: f32 = 340.0;
+const COLOR_PICKER_MODAL_ROOT_Z: i32 = 40_000;
+const COLOR_PICKER_MODAL_Z: i32 = 40_001;
 
 /// Marker component for initialized color picker widgets.
 #[derive(Component)]
@@ -143,6 +145,7 @@ fn internal_node_creation_system(
                 },
                 ColorPickerBase,
             ))
+            .insert(GlobalZIndex::default())
             .observe(on_internal_cursor_entered)
             .observe(on_internal_cursor_leave)
             .with_children(|builder| {
@@ -197,7 +200,7 @@ fn internal_node_creation_system(
                         BorderColor::default(),
                         ImageNode::default(),
                         Visibility::Hidden,
-                        ZIndex(20),
+                        ZIndex(COLOR_PICKER_MODAL_Z),
                         Pickable::IGNORE,
                         UIWidgetState::default(),
                         css_source.clone(),
@@ -206,6 +209,7 @@ fn internal_node_creation_system(
                         RenderLayers::layer(layer),
                         ColorPickerModal,
                     ))
+                    .insert(GlobalZIndex::default())
                     .with_children(|modal| {
                         modal
                             .spawn((
@@ -390,29 +394,45 @@ fn update_modal_visibility(
         (&mut UIWidgetState, &UIGenID),
         (With<ColorPicker>, Changed<UIWidgetState>),
     >,
-    mut modal_q: Query<(&mut Visibility, &BindToID), With<ColorPickerModal>>,
-    mut root_z_q: Query<(&mut ZIndex, &UIGenID), With<ColorPicker>>,
+    mut modal_q: Query<
+        (&mut Visibility, &mut ZIndex, &mut GlobalZIndex, &BindToID),
+        (With<ColorPickerModal>, Without<ColorPicker>),
+    >,
+    mut root_z_q: Query<
+        (&mut ZIndex, &mut GlobalZIndex, &UIGenID),
+        (With<ColorPicker>, Without<ColorPickerModal>),
+    >,
 ) {
     for (mut state, id) in picker_q.iter_mut() {
         if state.disabled || !state.focused {
             state.open = false;
         }
 
-        for (mut z, z_id) in root_z_q.iter_mut() {
+        for (mut z, mut global_z, z_id) in root_z_q.iter_mut() {
             if z_id.0 == id.0 {
-                z.0 = if state.open { 20 } else { 0 };
+                if state.open {
+                    z.0 = COLOR_PICKER_MODAL_ROOT_Z;
+                    global_z.0 = COLOR_PICKER_MODAL_ROOT_Z;
+                } else {
+                    z.0 = 0;
+                    global_z.0 = 0;
+                }
             }
         }
 
-        for (mut visibility, bind) in modal_q.iter_mut() {
+        for (mut visibility, mut modal_z, mut modal_global_z, bind) in modal_q.iter_mut() {
             if bind.0 != id.0 {
                 continue;
             }
-            *visibility = if state.open {
-                Visibility::Inherited
+            if state.open {
+                *visibility = Visibility::Inherited;
+                modal_z.0 = COLOR_PICKER_MODAL_Z;
+                modal_global_z.0 = COLOR_PICKER_MODAL_Z;
             } else {
-                Visibility::Hidden
-            };
+                *visibility = Visibility::Hidden;
+                modal_z.0 = 0;
+                modal_global_z.0 = 0;
+            }
         }
     }
 }

@@ -13,6 +13,9 @@ use bevy::ecs::relationship::RelatedSpawnerCommands;
 use bevy::input::mouse::MouseWheel;
 use bevy::prelude::*;
 
+const CHOICE_BOX_OVERLAY_ROOT_Z: i32 = 40_000;
+const CHOICE_BOX_OVERLAY_CONTENT_Z: i32 = 40_001;
+
 /// Marker component for initialized choice box widgets.
 #[derive(Component)]
 struct ChoiceBase;
@@ -35,7 +38,7 @@ struct OverlayLabel;
 
 /// Marker component for the dropdown content layout box.
 #[derive(Component)]
-struct ChoiceLayoutBoxBase;
+pub(crate) struct ChoiceLayoutBoxBase;
 
 /// Plugin that registers choice box widget behavior.
 pub struct ChoiceBoxWidget;
@@ -125,6 +128,7 @@ fn internal_node_creation_system(
                 RenderLayers::layer(*layer),
                 ChoiceBase,
             ))
+            .insert(GlobalZIndex::default())
             .observe(on_internal_click)
             .observe(on_internal_cursor_entered)
             .observe(on_internal_cursor_leave)
@@ -181,6 +185,9 @@ fn internal_node_creation_system(
                         ChoiceLayoutBoxBase,
                         BindToID(id.0),
                     ))
+                    .observe(on_layout_cursor_entered)
+                    .observe(on_layout_cursor_leave)
+                    .insert(GlobalZIndex::default())
                     .insert(ScrollPosition::default())
                     .with_children(|builder| {
                         let mut selected_assigned = false;
@@ -356,26 +363,53 @@ fn handle_overlay_label(
 /// Toggles dropdown visibility based on widget state.
 fn update_content_box_visibility(
     mut query: Query<(&mut UIWidgetState, &UIGenID), (With<ChoiceBox>, Changed<UIWidgetState>)>,
-    mut content_query: Query<(&mut Visibility, &BindToID), With<ChoiceLayoutBoxBase>>,
+    mut root_query: Query<
+        (&mut ZIndex, &mut GlobalZIndex, &UIGenID),
+        (With<ChoiceBox>, Without<ChoiceLayoutBoxBase>),
+    >,
+    mut content_query: Query<
+        (&mut Visibility, &mut ZIndex, &mut GlobalZIndex, &BindToID),
+        (With<ChoiceLayoutBoxBase>, Without<ChoiceBox>),
+    >,
 ) {
     for (mut state, gen_id) in query.iter_mut() {
-        for (mut visibility, bind_to_id) in content_query.iter_mut() {
+        if !state.disabled {
+            if !state.focused {
+                state.open = false;
+            }
+        } else {
+            state.open = false;
+        }
+
+        for (mut root_z, mut root_global_z, root_id) in root_query.iter_mut() {
+            if root_id.0 != gen_id.0 {
+                continue;
+            }
+
+            if state.open {
+                root_z.0 = CHOICE_BOX_OVERLAY_ROOT_Z;
+                root_global_z.0 = CHOICE_BOX_OVERLAY_ROOT_Z;
+            } else {
+                root_z.0 = 0;
+                root_global_z.0 = 0;
+            }
+        }
+
+        for (mut visibility, mut content_z, mut content_global_z, bind_to_id) in
+            content_query.iter_mut()
+        {
             if bind_to_id.0 != gen_id.0 {
                 continue;
             }
 
-            if !state.disabled {
-                if !state.focused {
-                    state.open = false;
-                }
-            } else {
-                state.open = false;
-            }
-
             if state.open {
                 *visibility = Visibility::Inherited;
+                content_z.0 = CHOICE_BOX_OVERLAY_CONTENT_Z;
+                content_global_z.0 = CHOICE_BOX_OVERLAY_CONTENT_Z;
             } else {
                 *visibility = Visibility::Hidden;
+                content_z.0 = 0;
+                content_global_z.0 = 0;
             }
         }
     }
@@ -539,6 +573,26 @@ fn on_internal_cursor_leave(
     }
 
     trigger.propagate(false);
+}
+
+/// Tracks hover state directly on the dropdown overlay.
+fn on_layout_cursor_entered(
+    trigger: On<Pointer<Over>>,
+    mut query: Query<&mut UIWidgetState, With<ChoiceLayoutBoxBase>>,
+) {
+    if let Ok(mut state) = query.get_mut(trigger.entity) {
+        state.hovered = true;
+    }
+}
+
+/// Clears hover state when the cursor leaves the dropdown overlay.
+fn on_layout_cursor_leave(
+    trigger: On<Pointer<Out>>,
+    mut query: Query<&mut UIWidgetState, With<ChoiceLayoutBoxBase>>,
+) {
+    if let Ok(mut state) = query.get_mut(trigger.entity) {
+        state.hovered = false;
+    }
 }
 
 // Option Component

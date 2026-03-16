@@ -391,7 +391,10 @@ mod tests {
         assert_eq!(position.x, BackgroundPositionValue::Percent(0.0));
         assert_eq!(position.y, BackgroundPositionValue::Percent(0.0));
         assert_eq!(BackgroundSize::default(), BackgroundSize::Auto);
-        assert_eq!(BackgroundAttachment::default(), BackgroundAttachment::Scroll);
+        assert_eq!(
+            BackgroundAttachment::default(),
+            BackgroundAttachment::Scroll
+        );
         assert_eq!(IconPlace::default(), IconPlace::Right);
         assert_eq!(FontVal::default(), FontVal::Px(12.0));
         assert_eq!(TransitionTiming::default(), TransitionTiming::EaseInOut);
@@ -668,7 +671,10 @@ mod tests {
 
         let sin_mul_right = CalcExpr::Sin(Box::new(CalcExpr::Mul(
             Box::new(CalcExpr::Value(CalcValue::new(2.0, CalcUnit::None))),
-            Box::new(CalcExpr::Value(CalcValue::new(std::f32::consts::FRAC_PI_4, CalcUnit::Rad))),
+            Box::new(CalcExpr::Value(CalcValue::new(
+                std::f32::consts::FRAC_PI_4,
+                CalcUnit::Rad,
+            ))),
         )));
         assert!((sin_mul_right.eval_unitless().expect("sin mul right") - 1.0).abs() < 0.0001);
 
@@ -704,13 +710,21 @@ mod tests {
 
         assert!(MediaQueryCondition::MinHeight(720.0).matches_viewport(Vec2::new(1000.0, 720.0)));
         assert!(!MediaQueryCondition::MaxHeight(300.0).matches_viewport(Vec2::new(1000.0, 400.0)));
-        assert!(MediaQueryCondition::OrientationLandscape.matches_viewport(Vec2::new(1200.0, 800.0)));
+        assert!(
+            MediaQueryCondition::OrientationLandscape.matches_viewport(Vec2::new(1200.0, 800.0))
+        );
 
         assert_eq!(MediaQueryCondition::Always.cache_key(), "always");
         assert_eq!(MediaQueryCondition::Never.cache_key(), "never");
         assert_eq!(MediaQueryCondition::Width(300.0).cache_key(), "w:300.000");
-        assert_eq!(MediaQueryCondition::MinHeight(300.0).cache_key(), "minh:300.000");
-        assert_eq!(MediaQueryCondition::MaxHeight(300.0).cache_key(), "maxh:300.000");
+        assert_eq!(
+            MediaQueryCondition::MinHeight(300.0).cache_key(),
+            "minh:300.000"
+        );
+        assert_eq!(
+            MediaQueryCondition::MaxHeight(300.0).cache_key(),
+            "maxh:300.000"
+        );
         assert_eq!(MediaQueryCondition::Height(300.0).cache_key(), "h:300.000");
         assert_eq!(
             MediaQueryCondition::OrientationLandscape.cache_key(),

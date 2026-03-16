@@ -1,3 +1,4 @@
+use crate::services::image_service::get_or_load_image;
 use crate::styles::paint::Colored;
 use crate::styles::{CssClass, CssSource, TagName};
 use crate::widgets::{BindToID, SwitchButton, UIGenID, UIWidgetState, WidgetId, WidgetKind};
@@ -41,6 +42,7 @@ fn internal_node_creation_system(
     config: Res<ExtendedUiConfiguration>,
     asset_server: Res<AssetServer>,
     mut image_cache: ResMut<ImageCache>,
+    mut images: ResMut<Assets<Image>>,
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
 
@@ -51,11 +53,7 @@ fn internal_node_creation_system(
         }
 
         let dot_icon = switch_button.icon.as_ref().map(|icon_path| {
-            image_cache
-                .map
-                .entry(icon_path.clone())
-                .or_insert_with(|| asset_server.load(icon_path.clone()))
-                .clone()
+            get_or_load_image(icon_path, &mut image_cache, &mut images, &asset_server)
         });
 
         commands

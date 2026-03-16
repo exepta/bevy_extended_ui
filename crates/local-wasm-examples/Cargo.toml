@@ -1,0 +1,21 @@
+[package]
+name = "bevy_extended_ui_local_wasm_examples"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[features]
+default = ["theme-provider"]
+theme-provider = []
+widget-overview = []
+
+[dependencies]
+bevy = "0.18.1"
+# Keep WASM example portable: avoid native-only default features (e.g. `fluent` -> `rusqlite`).
+bevy_extended_ui = { path = "../..", default-features = false, features = ["wasm-default", "providers", "svg", "extended-dialog"] }
+bevy_extended_ui_macros = { path = "../bevy_extended_ui_macros" }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+console_error_panic_hook = "0.1"

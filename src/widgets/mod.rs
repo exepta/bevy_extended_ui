@@ -1,6 +1,7 @@
 mod body;
 mod content;
 mod controls;
+pub(crate) mod default_style;
 mod div;
 mod form;
 mod unit_tests;
@@ -198,10 +199,12 @@ pub enum WidgetKind {
     Form,
     FieldSet,
     Headline,
+    HyperLink,
     Img,
     InputField,
     Paragraph,
     ToolTip,
+    Badge,
     ProgressBar,
     RadioButton,
     Scrollbar,
@@ -573,7 +576,20 @@ pub enum FieldMode {
 impl FieldMode {
     /// Parses a field mode from a string.
     pub fn from_str(s: &str) -> Option<Self> {
-        match s.trim().to_ascii_lowercase().as_str() {
+        let normalized = s.trim().to_ascii_lowercase();
+
+        if let Some(inner) = normalized
+            .strip_prefix("count(")
+            .and_then(|rest| rest.strip_suffix(')'))
+        {
+            let value = inner.trim();
+            if value.is_empty() {
+                return Some(Self::Count(0));
+            }
+            return value.parse::<u8>().ok().map(Self::Count);
+        }
+
+        match normalized.as_str() {
             "single" | "solo" | "one" => Some(Self::Single),
             "multi" | "more" => Some(Self::Multi),
             "count" => Some(Self::Count(0)),
@@ -660,6 +676,8 @@ pub struct Img {
     pub entry: usize,
     pub src: Option<String>,
     pub alt: String,
+    /// Optional input id to auto-preview selected files from `input type="file"`.
+    pub preview: Option<String>,
 }
 
 impl Default for Img {
@@ -671,6 +689,7 @@ impl Default for Img {
             entry,
             src: None,
             alt: String::from(""),
+            preview: None,
         }
     }
 }
@@ -768,6 +787,14 @@ pub struct InputField {
     pub input_type: InputType,
     /// Optional date format string used when `input_type="date"`.
     pub date_format: Option<String>,
+    /// Opens a folder picker instead of a file picker for `input_type="file"`.
+    pub folder: bool,
+    /// Allowed file extensions for `input_type="file"` (ignored when `folder=true`).
+    pub extensions: Vec<String>,
+    /// Displays the selected file size as a right-side suffix for `input_type="file"`.
+    pub show_size: bool,
+    /// Optional max file size in bytes for `input_type="file"` selections.
+    pub max_size_bytes: Option<u64>,
     pub cap_text_at: InputCap,
 }
 
@@ -788,6 +815,10 @@ impl Default for InputField {
             cap_text_at: InputCap::default(),
             input_type: InputType::default(),
             date_format: None,
+            folder: false,
+            extensions: Vec::new(),
+            show_size: false,
+            max_size_bytes: None,
         }
     }
 }
@@ -802,6 +833,7 @@ pub enum InputType {
     Range,
     Password,
     Number,
+    File,
 }
 
 impl InputType {
@@ -813,6 +845,7 @@ impl InputType {
             InputType::Email => c.is_ascii_alphanumeric() || c == '@' || c == '.' || c == '-',
             InputType::Date => c.is_ascii_digit() || c == '/' || c == '-' || c == '.',
             InputType::Range => c.is_ascii_digit() || c == '/' || c == '-' || c == '.' || c == ' ',
+            InputType::File => false,
         }
     }
 
@@ -825,6 +858,7 @@ impl InputType {
             "email" => Some(InputType::Email),
             "date" => Some(InputType::Date),
             "range" => Some(InputType::Range),
+            "file" => Some(InputType::File),
             _ => None,
         }
     }
@@ -856,6 +890,97 @@ impl InputCap {
 pub struct InputValue(pub String);
 
 // ===============================================
+//                     HyperLink
+// ===============================================
+
+/// Browser launch configuration for hyperlink widgets.
+#[derive(Reflect, Debug, Clone, Eq, PartialEq, Default)]
+pub enum HyperLinkBrowsers {
+    #[default]
+    System,
+    Custom(Vec<String>),
+}
+
+impl HyperLinkBrowsers {
+    /// Parses the hyperlink `browsers` attribute.
+    ///
+    /// Supported forms:
+    /// - `system`
+    /// - `firefox`
+    /// - `[firefox, brave, chrome]`
+    pub fn from_str(value: &str) -> Option<Self> {
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            return Some(Self::System);
+        }
+
+        if trimmed.eq_ignore_ascii_case("system") {
+            return Some(Self::System);
+        }
+
+        let parsed = if let Some(inner) = trimmed
+            .strip_prefix('[')
+            .and_then(|raw| raw.strip_suffix(']'))
+        {
+            inner
+                .split(',')
+                .map(|entry| normalize_browser_name(entry))
+                .filter(|entry| !entry.is_empty())
+                .collect::<Vec<_>>()
+        } else {
+            let single = normalize_browser_name(trimmed);
+            if single.is_empty() {
+                Vec::new()
+            } else if single.eq_ignore_ascii_case("system") {
+                return Some(Self::System);
+            } else {
+                vec![single]
+            }
+        };
+
+        if parsed.is_empty() {
+            Some(Self::System)
+        } else {
+            Some(Self::Custom(parsed))
+        }
+    }
+}
+
+fn normalize_browser_name(value: &str) -> String {
+    value
+        .trim()
+        .trim_matches('"')
+        .trim_matches('\'')
+        .trim()
+        .to_ascii_lowercase()
+}
+
+/// Hyperlink widget mapped from HTML `<a>`.
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+#[require(UIGenID, UIWidgetState, Widget)]
+pub struct HyperLink {
+    pub entry: usize,
+    pub text: String,
+    pub href: String,
+    pub browsers: HyperLinkBrowsers,
+    pub open_modal: bool,
+}
+
+impl Default for HyperLink {
+    fn default() -> Self {
+        let entry = HYPER_LINK_ID_POOL.lock().unwrap().acquire();
+        Self {
+            entry,
+            text: String::new(),
+            href: String::new(),
+            browsers: HyperLinkBrowsers::default(),
+            open_modal: false,
+        }
+    }
+}
+
+// ===============================================
 //                     Paragraph
 // ===============================================
 
@@ -876,6 +1001,88 @@ impl Default for Paragraph {
         Self {
             entry,
             text: String::from(""),
+        }
+    }
+}
+
+// ===============================================
+//                       Badge
+// ===============================================
+
+/// Corner anchor used to place a badge relative to its target widget.
+#[derive(Reflect, Default, Debug, Clone, Copy, Eq, PartialEq)]
+pub enum BadgeAnchor {
+    TopLeft,
+    #[default]
+    TopRight,
+    BottomLeft,
+    BottomRight,
+}
+
+impl BadgeAnchor {
+    /// Parses a badge anchor from values like `"top right"` or `"bottom-left"`.
+    pub fn from_str(value: &str) -> Option<Self> {
+        let normalized = value.to_ascii_lowercase().replace(['-', '_'], " ");
+
+        let mut vertical = None;
+        let mut horizontal = None;
+
+        for token in normalized.split([' ', ',', '|', '/']) {
+            let token = token.trim();
+            if token.is_empty() {
+                continue;
+            }
+
+            match token {
+                "top" => vertical = Some("top"),
+                "bottom" => vertical = Some("bottom"),
+                "left" => horizontal = Some("left"),
+                "right" => horizontal = Some("right"),
+                _ => {}
+            }
+        }
+
+        if vertical.is_none() && horizontal.is_none() {
+            return None;
+        }
+
+        Some(match (vertical, horizontal) {
+            (Some("top"), Some("left")) => Self::TopLeft,
+            (Some("top"), Some("right")) => Self::TopRight,
+            (Some("bottom"), Some("left")) => Self::BottomLeft,
+            (Some("bottom"), Some("right")) => Self::BottomRight,
+            (Some("top"), None) => Self::TopRight,
+            (Some("bottom"), None) => Self::BottomRight,
+            (None, Some("left")) => Self::TopLeft,
+            (None, Some("right")) => Self::TopRight,
+            _ => Self::TopRight,
+        })
+    }
+}
+
+/// Notification badge widget bound to a target via `for` or parent relationship.
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+#[require(UIGenID, UIWidgetState, Widget)]
+pub struct Badge {
+    pub entry: usize,
+    pub value: u32,
+    pub max: u32,
+    pub for_id: Option<String>,
+    pub anchor: BadgeAnchor,
+}
+
+impl Default for Badge {
+    /// Creates a default badge widget.
+    fn default() -> Self {
+        let entry = BADGE_ID_POOL.lock().unwrap().acquire();
+
+        Self {
+            entry,
+            value: 0,
+            max: 99,
+            for_id: None,
+            anchor: BadgeAnchor::default(),
         }
     }
 }
@@ -1098,16 +1305,61 @@ impl Default for Scrollbar {
 //                      Slider
 // ===============================================
 
+/// Slider behavior mode.
+#[derive(Reflect, Default, Debug, Clone, Copy, Eq, PartialEq)]
+pub enum SliderType {
+    #[default]
+    Default,
+    Range,
+}
+
+impl SliderType {
+    /// Parses slider type from string.
+    pub fn from_str(value: &str) -> Option<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "default" => Some(Self::Default),
+            "range" => Some(Self::Range),
+            _ => None,
+        }
+    }
+}
+
+/// Label anchor position for slider dots.
+#[derive(Reflect, Default, Debug, Clone, Copy, Eq, PartialEq)]
+pub enum SliderDotAnchor {
+    #[default]
+    Top,
+    Bottom,
+}
+
+impl SliderDotAnchor {
+    /// Parses dot anchor from string.
+    pub fn from_str(value: &str) -> Option<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "top" => Some(Self::Top),
+            "bottom" => Some(Self::Bottom),
+            _ => None,
+        }
+    }
+}
+
 /// Slider widget with numeric range.
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, Widget)]
 pub struct Slider {
     pub entry: usize,
+    pub slider_type: SliderType,
     pub value: f32,
+    pub range_start: f32,
+    pub range_end: f32,
     pub step: f32,
     pub min: f32,
     pub max: f32,
+    pub dots: Option<u32>,
+    pub show_labels: bool,
+    pub show_tip: bool,
+    pub dot_anchor: SliderDotAnchor,
 }
 
 impl Default for Slider {
@@ -1117,10 +1369,17 @@ impl Default for Slider {
 
         Self {
             entry,
+            slider_type: SliderType::Default,
             value: 0.0,
+            range_start: 20.0,
+            range_end: 40.0,
             step: 1.0,
             min: 0.0,
             max: 100.0,
+            dots: None,
+            show_labels: false,
+            show_tip: true,
+            dot_anchor: SliderDotAnchor::Top,
         }
     }
 }

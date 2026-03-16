@@ -1,0 +1,20 @@
+:root {
+    --primary: #8ea7ff;
+    --primary-hover: #7795ff;
+    --primary-disabled: #3c4c7d;
+    --primary-transparent-layer: rgba(142, 167, 255, 0.34);
+    --headline: #e4ecff;
+    --headline-sec: #c7d4f7;
+    --text-color: #e8efff;
+    --text-color-dark: #93a6d6;
+    --disabled-text: #49587f;
+    --disabled-text-darker: #3f4d71;
+    --gray-background: #1a2237;
+    --gray-background-disabled: #202944;
+
+    --demo-bg: #0f1422;
+    --demo-text: #e8efff;
+    --demo-muted: #95a7d5;
+    --demo-panel-bg: #1a2237;
+    --demo-panel-border: #2f3d63;
+}

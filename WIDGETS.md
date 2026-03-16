@@ -151,7 +151,10 @@ Inside a `<form>`, use `type="submit"` to submit the parent form without `onclic
 
 ## Image (`Img`)
 
-**Struct purpose:** Image widget with `src` and `alt` text.
+**Struct purpose:** Image widget with `src`, `alt`, and optional `preview` binding.
+
+`preview="input_id"` links an image to a file-input. When that input changes and the selected
+file extension is `jpg`, `jpeg`, or `png`, the image source is updated automatically.
 
 **HTML tag:**
 ```html
@@ -162,7 +165,12 @@ Inside a `<form>`, use `type="submit"` to submit the parent form without `onclic
 
 ## InputField (`InputField`)
 
-**Struct purpose:** Text input with `name`, label, placeholder, icon, type (text/email/date/password/number), and length limit.
+**Struct purpose:** Text input with `name`, label, placeholder, icon, type (text/email/date/password/number/file), and length limit.
+
+For `type="file"`:
+- `folder="true|false"` (default `false`)
+- `extensions="json"` or `extensions="[json, css, yaml, png]"` (ignored when `folder="true"`)
+- `show-size="true|false"` (default `false`)
 
 **HTML tag:**
 ```html

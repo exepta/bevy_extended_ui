@@ -10,6 +10,9 @@ use bevy::ui::{ComputedNode, UiGlobalTransform, UiScale};
 use bevy::window::PrimaryWindow;
 use std::collections::{HashMap, HashSet};
 
+const TOOLTIP_Z_INDEX: i32 = 60_000;
+const TOOLTIP_NOSE_Z_INDEX: i32 = 59_999;
+
 /// Marker component for initialized tooltip widgets.
 #[derive(Component)]
 struct ToolTipBase;
@@ -117,7 +120,7 @@ fn internal_node_creation_system(
                 // Visual style should come from CSS.
                 BackgroundColor::default(),
                 BorderColor::default(),
-                ZIndex(10_000),
+                ZIndex(TOOLTIP_Z_INDEX),
                 Pickable::IGNORE,
                 UiTransform::default(),
                 css_source.clone(),
@@ -128,6 +131,7 @@ fn internal_node_creation_system(
                 ToolTipBase,
                 ToolTipRuntime::default(),
             ))
+            .insert(GlobalZIndex(TOOLTIP_Z_INDEX))
             .with_children(|builder| {
                 builder.spawn((
                     Name::new(format!("ToolTip-Text-{}", tooltip.entry)),
@@ -154,23 +158,25 @@ fn internal_node_creation_system(
 
                 let nose_classes = vec!["tooltip-nose".to_string()];
 
-                builder.spawn((
-                    Name::new(format!("ToolTip-Nose-{}", tooltip.entry)),
-                    nose_node,
-                    BackgroundColor::default(),
-                    BorderColor::default(),
-                    UiTransform::default(),
-                    ZIndex(9_999),
-                    Pickable::IGNORE,
-                    css_source.clone(),
-                    CssClass(nose_classes.clone()),
-                    ToolTipNoseClassBase(nose_classes),
-                    BindToID(ui_id.get()),
-                    UIWidgetState::default(),
-                    RenderLayers::layer(*layer),
-                    Visibility::Hidden,
-                    ToolTipNose,
-                ));
+                builder
+                    .spawn((
+                        Name::new(format!("ToolTip-Nose-{}", tooltip.entry)),
+                        nose_node,
+                        BackgroundColor::default(),
+                        BorderColor::default(),
+                        UiTransform::default(),
+                        ZIndex(TOOLTIP_NOSE_Z_INDEX),
+                        Pickable::IGNORE,
+                        css_source.clone(),
+                        CssClass(nose_classes.clone()),
+                        ToolTipNoseClassBase(nose_classes),
+                        BindToID(ui_id.get()),
+                        UIWidgetState::default(),
+                        RenderLayers::layer(*layer),
+                        Visibility::Hidden,
+                        ToolTipNose,
+                    ))
+                    .insert(GlobalZIndex(TOOLTIP_NOSE_Z_INDEX));
             });
     }
 }

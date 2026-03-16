@@ -170,10 +170,12 @@ fn collect_html_ids(nodes: &Vec<HtmlWidgetNode>, ids: &mut Vec<HtmlID>) {
             | HtmlWidgetNode::DatePicker(_, _, _, _, _, id)
             | HtmlWidgetNode::Divider(_, _, _, _, _, id)
             | HtmlWidgetNode::Headline(_, _, _, _, _, id)
+            | HtmlWidgetNode::HyperLink(_, _, _, _, _, id)
             | HtmlWidgetNode::Img(_, _, _, _, _, id)
             | HtmlWidgetNode::Input(_, _, _, _, _, id)
             | HtmlWidgetNode::Paragraph(_, _, _, _, _, id)
             | HtmlWidgetNode::ToolTip(_, _, _, _, _, id)
+            | HtmlWidgetNode::Badge(_, _, _, _, _, id)
             | HtmlWidgetNode::ProgressBar(_, _, _, _, _, id)
             | HtmlWidgetNode::RadioButton(_, _, _, _, _, id)
             | HtmlWidgetNode::Scrollbar(_, _, _, _, _, id)
@@ -183,6 +185,11 @@ fn collect_html_ids(nodes: &Vec<HtmlWidgetNode>, ids: &mut Vec<HtmlID>) {
                 ids.push(id.clone());
             }
             HtmlWidgetNode::Div(_, _, _, children, _, _, id) => {
+                ids.push(id.clone());
+                collect_html_ids(children, ids);
+            }
+            #[cfg(feature = "extended-dialog")]
+            HtmlWidgetNode::Dialog(_, _, _, children, _, _, id) => {
                 ids.push(id.clone());
                 collect_html_ids(children, ids);
             }
@@ -284,6 +291,23 @@ fn spawn_widget_node(
             }
             entity
         }
+        #[cfg(feature = "extended-dialog")]
+        HtmlWidgetNode::Dialog(dialog, meta, states, children, functions, widget, id) => {
+            let entity = spawn_with_meta(
+                commands,
+                dialog.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+            );
+            for child in children {
+                let child_entity = spawn_widget_node(commands, child, asset_server, Some(entity));
+                commands.entity(entity).add_child(child_entity);
+            }
+            entity
+        }
         HtmlWidgetNode::Divider(divider, meta, states, functions, widget, id) => spawn_with_meta(
             commands,
             divider.clone(),
@@ -318,6 +342,17 @@ fn spawn_widget_node(
             widget,
             id,
         ),
+        HtmlWidgetNode::HyperLink(hyper_link, meta, states, functions, widget, id) => {
+            spawn_with_meta(
+                commands,
+                hyper_link.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+            )
+        }
         HtmlWidgetNode::Img(img, meta, states, functions, widget, id) => {
             spawn_with_meta(commands, img.clone(), meta, states, functions, widget, id)
         }
@@ -344,6 +379,9 @@ fn spawn_widget_node(
             widget,
             id,
         ),
+        HtmlWidgetNode::Badge(badge, meta, states, functions, widget, id) => {
+            spawn_with_meta(commands, badge.clone(), meta, states, functions, widget, id)
+        }
         HtmlWidgetNode::ProgressBar(progress_bar, meta, states, functions, widget, id) => {
             spawn_with_meta(
                 commands,
