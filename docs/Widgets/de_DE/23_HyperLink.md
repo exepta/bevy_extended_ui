@@ -3,7 +3,8 @@ title: HyperLink
 ---
 
 # HyperLink
-## Überblick
+
+### Überblick
 
 Klickbares Text-Link-Widget, das auf den HTML-Tag `<a>` gemappt wird.
 
@@ -11,7 +12,9 @@ Klickbares Text-Link-Widget, das auf den HTML-Tag `<a>` gemappt wird.
 - HTML-Tag: a
 - Empfohlene Quellreferenz: src/widgets/mod.rs
 
-## Attributes
+### Attributes
+
+Wichtige eigene Attributes (ausführlich):
 
 - `href` definiert die Ziel-URL.
 - `browsers` ist optional (Standard: `system`).
@@ -22,64 +25,47 @@ Klickbares Text-Link-Widget, das auf den HTML-Tag `<a>` gemappt wird.
 - Unter `wasm32` werden `browsers` und `open-modal` ignoriert.
 - Es gibt keinen System-Browser-Fallback, wenn explizite `browsers` konfiguriert sind und keiner installiert ist.
 
-## Html Beispiel
+Unterstützte globale HTML-Attribute:
+
+- `id`: Eindeutige ID für CSS-Selektoren, Event-Zuordnung und spätere Widget-Referenzierung.
+- `class`: Übergibt CSS-Klassen für visuelles Styling und zustandsabhängige Regeln.
+- `style`: Übergibt Inline-CSS, das in `HtmlStyle` geparsed und in die Style-Pipeline übernommen wird.
+- `hidden`: Rendert das Widget initial unsichtbar.
+- `disabled`: Deaktiviert Interaktionen; Klicks und Fokuswechsel werden entsprechend geblockt.
+- `readonly`: Wird als Widget-State übernommen, um ein konsistentes Zustandsmodell zu gewährleisten.
+- Event-Attribute wie `onclick`, `onmousedown`, `onmouseup`, `onmouseover`, `onmouseout`, `onfocus`, `oninit`, `onchange`, `onscroll`, `onwheel`, `onkeydown`, `onkeyup`: Verknüpfen Handler-Funktionen direkt mit dem Event-Binding-System.
+
+### WASM Vorschauen
+
+### HyperLink Example
+<iframe
+  id="hyperlink"
+  title="HyperLink"
+  src="{base.url}/examples/base"
+  width="100%"
+  height="420"
+  loading="lazy">
+</iframe>
+
+#### Html Example
 
 ```html
 <a href="https://bevy.org">Mit System-Browser öffnen</a>
 <a href="https://bevy.org" browsers="[chrome]" open-modal="true">Mit konfiguriertem Browser öffnen</a>
 ```
 
-## Rust Beispiel
+#### Rust Example
 
 ```rust
-use bevy::prelude::*;
-use bevy_extended_ui::ExtendedUiPlugin;
-use bevy_extended_ui::html::HtmlSource;
-use bevy_extended_ui::io::HtmlAsset;
-use bevy_extended_ui::registry::UiRegistry;
-use bevy_extended_ui::widgets::HyperLink;
-
-fn main() {
-    App::new()
-        .add_plugins(DefaultPlugins)
-        .add_plugins(ExtendedUiPlugin)
-        .add_systems(Startup, load_ui)
-        .add_systems(Update, update_link_target)
-        .run();
-}
-
-fn load_ui(mut reg: ResMut<UiRegistry>, asset_server: Res<AssetServer>) {
-    let handle: Handle<HtmlAsset> = asset_server.load("examples/widgets_overview.html");
-    reg.add_and_use("hyperlink-demo".to_string(), HtmlSource::from_handle(handle));
-}
-
-fn update_link_target(mut query: Query<&mut HyperLink>) {
-    for mut link in &mut query {
-        if link.href.is_empty() {
-            link.href = "https://bevyengine.org".to_string();
-        }
-    }
+fn spawn_hyperlink_widget(mut commands: Commands) {
+    commands.spawn((
+        HyperLink::default(),
+        Node::default(),
+    ));
 }
 ```
 
-## WASM Vorschau
-
-<iframe
-  id="hyperlink"
-  title="Bevy WASM Vorschau - HyperLink"
-  src="{base.url}/examples/widgets-overview"
-  width="100%"
-  height="420"
-  loading="lazy">
-</iframe>
-
-## Hinweise
-
-- Schreibe den HTML-Tag exakt (`a`), damit der Converter korrekt mappt.
-- Nutze `open-modal="true"` nur dann, wenn du bei fehlenden konfigurierten Browsern den Install-Dialogfluss möchtest.
-- Style Links über den CSS-Selektor `a`.
-
-## Ersteller vom Widget
+### Ersteller vom Widget
 
 <div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
   <img
@@ -91,6 +77,6 @@ fn update_link_target(mut query: Query<&mut HyperLink>) {
   />
   <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
     <strong>exepta</strong>
-    <a href="https://github.com/exepta" style="margin-top: 10px;">Link to GitHub</a>
+    <a href="https://github.com/exepta" style="margin-top: 10px; color: #5658db;">Link to GitHub</a>
   </div>
 </div>

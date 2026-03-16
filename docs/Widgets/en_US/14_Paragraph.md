@@ -4,76 +4,62 @@ title: Paragraph
 
 # Paragraph
 
-## Overview
+### Overview
 
-Basic text block widget for descriptive content and inline placeholder rendering.
+Simple text paragraph widget for descriptive content and placeholders.
 
 - Rust component: Paragraph
 - HTML tag: p
 - Recommended source reference: src/widgets/mod.rs
 
-## Attributes
+### Attributes
 
-- Plain text content widget using p tag.
-- Works with reactive placeholders in inner content.
-- Useful for status and descriptive text blocks.
+Important widget-specific attributes (detailed):
 
-## Html Example
+- Pure text content widget via p-tag.
+- Works with reactive placeholders in InnerContent.
+- Suitable for status and description texts.
 
-```html
-<p oninit="log_paragraph">Welcome {{player.name}}</p>
-```
+Supported global HTML attributes:
 
-## Rust Example
+- `id`: Unique id for CSS selectors, event mapping, and widget references.
+- `class`: Passes CSS classes for visual styling and state-dependent rules.
+- `style`: Passes inline CSS that is parsed into `HtmlStyle` and applied in the style pipeline.
+- `hidden`: Renders the widget initially hidden.
+- `disabled`: Disables interactions; clicks and focus changes are blocked.
+- `readonly`: Is applied as widget state to keep interaction behavior consistent.
+- Event attributes like `onclick`, `onmousedown`, `onmouseup`, `onmouseover`, `onmouseout`, `onfocus`, `oninit`, `onchange`, `onscroll`, `onwheel`, `onkeydown`, and `onkeyup`: Bind handler functions directly to the event binding system.
 
-```rust
-use bevy::prelude::*;
-use bevy_extended_ui::ExtendedUiPlugin;
-use bevy_extended_ui::html::{HtmlEvent, HtmlSource};
-use bevy_extended_ui::io::HtmlAsset;
-use bevy_extended_ui::registry::UiRegistry;
-use bevy_extended_ui::widgets::Paragraph;
-use bevy_extended_ui_macros::html_fn;
+### WASM Previews
 
-fn main() {
-    App::new()
-        .add_plugins(DefaultPlugins)
-        .add_plugins(ExtendedUiPlugin)
-        .add_systems(Startup, load_ui)
-        .run();
-}
-
-fn load_ui(mut reg: ResMut<UiRegistry>, asset_server: Res<AssetServer>) {
-    let handle: Handle<HtmlAsset> = asset_server.load("ui/paragraph.html");
-    reg.add_and_use("paragraph-demo".to_string(), HtmlSource::from_handle(handle));
-}
-
-#[html_fn("log_paragraph")]
-fn log_paragraph(In(event): In<HtmlEvent>, query: Query<&Paragraph>) {
-    if let Ok(widget) = query.get(event.entity) {
-        info!("Paragraph event entity={:?} data={:?}", event.entity, widget);
-    }
-}
-```
-
-## WASM Preview
-
+### Paragraph Example
 <iframe
   id="paragraph"
-  title="Bevy WASM Preview - Paragraph"
-  src="{base.url}/examples/paragraph"
+  title="Paragraph"
+  src="{base.url}/examples/base"
   width="100%"
   height="420"
   loading="lazy">
 </iframe>
 
-## Notes
+#### Html Example
 
-- Keep the HTML tag spelling exact (p) so the converter maps to the correct widget.
-- Register handler names with html_fn exactly as used in HTML attributes.
-- Link this page to a real demo build once your WASM preview is deployed.
+```html
+<p oninit="log_paragraph">Welcome {{player.name}}</p>
+```
 
-## Widget Creator
+#### Rust Example
+
+```rust
+fn spawn_paragraph_widget(mut commands: Commands) {
+    commands.spawn((
+        Paragraph::default(),
+        Node::default(),
+    ));
+}
+```
+
+### Widget Creator
 
 <div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
   <img
@@ -85,6 +71,6 @@ fn log_paragraph(In(event): In<HtmlEvent>, query: Query<&Paragraph>) {
   />
   <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
     <strong>exepta</strong>
-    <a href="https://github.com/exepta" style="margin-top: 10px;">Link to GitHub</a>
+    <a href="https://github.com/exepta" style="margin-top: 10px; color: #5658db;">Link to GitHub</a>
   </div>
 </div>

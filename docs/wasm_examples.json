@@ -7,13 +7,13 @@
           "id": "button",
           "iframe_src": "{base.url}/examples/base",
           "html": "<button>Button</button><button>Disabled</button><button><icon src=\"icons/check-mark.png\"></icon>Icon</button>",
-          "css": "column, gap:15px"
+          "css": "row, gap:15px al:center"
         },
         {
           "id": "button-icon-only",
           "iframe_src": "{base.url}/examples/base",
           "html": "<button style=\"width: 50px; height: 50px; border-radius: 50%;\"><icon src=\"icons/check-mark.png\"></icon></button>",
-          "css": "column, gap:15px"
+          "css": "row, gap:15px al:center"
         }
       ]
     },
@@ -22,9 +22,15 @@
       "examples": [
         {
           "id": "checkbox",
-          "iframe_src": "{base.url}/examples/checkbox",
-          "html": "",
-          "css": ""
+          "iframe_src": "{base.url}/examples/base",
+          "html": "<checkbox>Checkbox</checkbox><checkbox checked>Checked</checkbox><checkbox disabled>Disabled</checkbox><checkbox></checkbox><checkbox checked></checkbox>",
+          "css": "column, gap:15px center:center"
+        },
+        {
+          "id": "checkbox-custom-icon",
+          "iframe_src": "{base.url}/examples/base",
+          "html": "<checkbox>Checkbox</checkbox><checkbox checked>Checked</checkbox><checkbox disabled>Disabled</checkbox>",
+          "css": "column, gap:15px center:center"
         }
       ]
     },
@@ -33,9 +39,9 @@
       "examples": [
         {
           "id": "choicebox",
-          "iframe_src": "{base.url}/examples/choicebox",
-          "html": "",
-          "css": ""
+          "iframe_src": "{base.url}/examples/base",
+          "html": "<select id=\"quality\"><option value=\"potato\">Potato</option><option value=\"low\">Low</option><option selected value=\"high\">High</option><option value=\"extreme\">Extreme</option><option value=\"ultra\">Ultra</option></select>",
+          "css": "column, al:center"
         }
       ]
     },
@@ -44,9 +50,9 @@
       "examples": [
         {
           "id": "colorpicker",
-          "iframe_src": "{base.url}/examples/colorpicker",
-          "html": "",
-          "css": ""
+          "iframe_src": "{base.url}/examples/base",
+          "html": "<colorpicker value=\"#4285f4\" alpha=\"255\"></colorpicker>",
+          "css": "column, al:center"
         }
       ]
     },
@@ -55,20 +61,15 @@
       "examples": [
         {
           "id": "datepicker",
-          "iframe_src": "{base.url}/examples/datepicker",
-          "html": "",
-          "css": ""
-        }
-      ]
-    },
-    {
-      "name": "div",
-      "examples": [
+          "iframe_src": "{base.url}/examples/base",
+          "html": "<input id=\"birthday\" type=\"date\" /><date-picker for=\"birthday\" min=\"1990-01-01\" max=\"2030-12-31\" format=\"dmy\"></date-picker>",
+          "css": "column, al:center"
+        },
         {
-          "id": "div",
-          "iframe_src": "{base.url}/examples/div",
-          "html": "",
-          "css": ""
+          "id": "datepicker-range",
+          "iframe_src": "{base.url}/examples/base",
+          "html": "<input id=\"birthday\" type=\"range\" /><date-picker for=\"birthday\" min=\"1990-01-01\" max=\"2030-12-31\" format=\"dmy\"></date-picker>",
+          "css": "column, al:center"
         }
       ]
     },

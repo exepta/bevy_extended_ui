@@ -4,47 +4,43 @@ title: Button
 
 # Button
 
-## Overview
+### Overview
 
-`Button` is an interactive action widget for click flows and form integration. The widget text is read from tag content, an optional `<icon src="...">` child is detected automatically, and the `type` value (`button`, `submit`, `reset`) controls how the widget behaves in forms.
+`Button` is an interactive action widget for click and form flows. The widget text is read from inside the tag, an optional `<icon src="...">` can be automatically placed to the left or right of the text, and the widget directly controls the form behavior via the type (`button`, `submit`, `reset`).
 
 - Rust component: Button
 - HTML tag: button
 - Recommended source reference: src/widgets/mod.rs
 
-## Attributes
+### Attributes
 
 Important widget-specific attributes (detailed):
 
-- `type`: Controls the button behavior mode.
+- `type`: Controls the behavior mode of the button.
   Allowed values:
-  `button` (normal click action), `submit` (triggers form submit), `reset` (resets form values).
-  If omitted, the internal default mode `Auto` is used.
+  `button` (normal click action without submit), `submit` (triggers form submit), `reset` (resets form values).
+  If not specified, the internal standard `Auto` is used.
 
 Supported global HTML attributes:
 
-- `id`: Unique id for selectors, event mapping, and future widget references.
-- `class`: Assigns CSS classes used by style rules and state-based styling.
-- `style`: Inline declarations are parsed into `HtmlStyle` and merged in the style pipeline.
-- `hidden`: Makes the button initially invisible.
-- `disabled`: Disables interactions and blocks active click/focus behavior.
-- `readonly`: Carried into widget state handling to preserve consistent interaction logic.
-- Event attributes such as `onclick`, `onmousedown`, `onmouseup`, `onmouseover`, `onmouseout`, `onfocus`, and `oninit`: Bind function names into the event binding system.
+- `id`: Unique id for CSS selectors, event mapping, and widget references.
+- `class`: Passes CSS classes for visual styling and state-dependent rules.
+- `style`: Passes inline CSS that is parsed into `HtmlStyle` and applied in the style pipeline.
+- `hidden`: Renders the widget initially hidden.
+- `disabled`: Disables interactions; clicks and focus changes are blocked.
+- `readonly`: Is applied as widget state to keep interaction behavior consistent.
+- Event attributes like `onclick`, `onmousedown`, `onmouseup`, `onmouseover`, `onmouseout`, `onfocus`, `oninit`, `onchange`, `onscroll`, `onwheel`, `onkeydown`, and `onkeyup`: Bind handler functions directly to the event binding system.
 
-Also relevant:
-
-- `<icon src="..."></icon>`: This is not an attribute but a child element. It is parsed and placed before or after text depending on content order.
-
-## WASM Previews
+### WASM Previews
 
 ### Button states
 <iframe
-  id="button"
-  title="Button States"
-  src="{base.url}/examples/base"
-  width="50%"
-  height="250px"
-  loading="lazy">
+id="button"
+title="Button States"
+src="{base.url}/examples/base"
+width="50%"
+height="250px"
+loading="lazy">
 </iframe>
 
 #### Html Example
@@ -56,24 +52,14 @@ Also relevant:
 </button>
 ```
 
-## Rust Example
+#### Rust Example
 
 ```rust
-fn load_ui(mut reg: ResMut<UiRegistry>, asset_server: Res<AssetServer>) {
-    let handle: Handle<HtmlAsset> = asset_server.load("ui/button.html");
-    reg.add_and_use("button-demo".to_string(), HtmlSource::from_handle(handle));
-}
-
-#[html_fn("on_save_click")]
-fn on_save_click(In(event): In<HtmlClick>, query: Query<&Button>) {
-    if let Ok(widget) = query.get(event.entity) {
-        info!(
-            "Button clicked: text='{}' type={:?} icon={:?}",
-            widget.text,
-            widget.button_type,
-            widget.icon_path
-        );
-    }
+fn spawn_button_widget(mut commands: Commands) {
+    commands.spawn((
+        Button::default(),
+        Node::default(),
+    ));
 }
 ```
 
@@ -96,16 +82,18 @@ loading="lazy">
 </button>
 ```
 
-## Rust Example
+#### Rust Example
 
 ```rust
-fn load_ui(mut reg: ResMut<UiRegistry>, asset_server: Res<AssetServer>) {
-    let handle: Handle<HtmlAsset> = asset_server.load("ui/button.html");
-    reg.add_and_use("button-demo".to_string(), HtmlSource::from_handle(handle));
+fn spawn_button_widget(mut commands: Commands) {
+    commands.spawn((
+        Button::default(),
+        Node::default(),
+    ));
 }
 ```
 
-## Widget Creator
+### Widget Creator
 
 <div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
   <img
@@ -117,6 +105,6 @@ fn load_ui(mut reg: ResMut<UiRegistry>, asset_server: Res<AssetServer>) {
   />
   <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
     <strong>exepta</strong>
-    <a href="https://github.com/exepta" style="margin-top: 10px;">Link to GitHub</a>
+    <a href="https://github.com/exepta" style="margin-top: 10px; color: #5658db;">Link to GitHub</a>
   </div>
 </div>
