@@ -4,40 +4,31 @@ title: Body
 
 # Body
 
-## Overview
+### Overview
 
-`Body` is the root widget of the parsed UI tree and maps directly to the HTML `<body>` tag. It is the anchor for all child widgets and is responsible for important runtime behavior such as tree ownership, scroll structure setup, event routing, and source-key linking through `html_key`.
+`Body` is the central root widget of the UI structure and represents the HTML tag `<body>` within the parser. All child widgets are built under this node, making `Body` the basis for layout, scrolling behavior, event routing, and linking to the loaded UI source (`html_key`).
 
 - Rust component: Body
 - HTML tag: body
 - Recommended source reference: src/widgets/mod.rs
 
-## Attributes
+### Attributes
 
-Keine extra attributes!
+Important widget-specific attributes (detailed):
 
-Supported global HTML attributes (detailed):
+No extra attributes!
 
-- `id`: Sets a unique element id for selectors, binding references, and runtime lookup.
-- `class`: Adds one or many CSS classes that are forwarded into the Bevy styling pipeline.
-- `style`: Inline CSS declarations are parsed into `HtmlStyle` and merged with other style sources.
-- `hidden`: Marks the widget as initially hidden so it does not render visibly at start.
-- `disabled`: Marks the widget state as disabled and blocks relevant interactions.
-- `readonly`: Sets read-only state for consistent state propagation behavior.
-- Event attributes such as `onclick`, `oninit`, `onmouseover`, `onmouseout`, `onfocus`, `onscroll`, `onwheel`, `onkeydown`, and `onkeyup`: Register handler names via `HtmlEventBindings`.
+Supported global HTML attributes:
 
-## WASM Preview
+- `id`: Unique id for CSS selectors, event mapping, and widget references.
+- `class`: Passes CSS classes for visual styling and state-dependent rules.
+- `style`: Passes inline CSS that is parsed into `HtmlStyle` and applied in the style pipeline.
+- `hidden`: Renders the widget initially hidden.
+- `disabled`: Disables interactions; clicks and focus changes are blocked.
+- `readonly`: Is applied as widget state to keep interaction behavior consistent.
+- Event attributes like `onclick`, `onmousedown`, `onmouseup`, `onmouseover`, `onmouseout`, `onfocus`, `oninit`, `onchange`, `onscroll`, `onwheel`, `onkeydown`, and `onkeyup`: Bind handler functions directly to the event binding system.
 
-<iframe
-  id="body"
-  title="Bevy WASM Preview - Body"
-  src="{base.url}/examples/body"
-  width="100%"
-  height="420"
-  loading="lazy">
-</iframe>
-
-## Html Example
+#### Html Example
 
 ```html
 <body id="main-body" class="screen-root app-layout" oninit="on_body_init">
@@ -45,23 +36,18 @@ Supported global HTML attributes (detailed):
 </body>
 ```
 
-## Rust Example
+#### Rust Example
 
 ```rust
-fn load_ui(mut reg: ResMut<UiRegistry>, asset_server: Res<AssetServer>) {
-    let handle: Handle<HtmlAsset> = asset_server.load("ui/body.html");
-    reg.add_and_use("body-demo".to_string(), HtmlSource::from_handle(handle));
-}
-
-#[html_fn("on_body_init")]
-fn on_body_init(In(event): In<HtmlInit>, query: Query<&Body>) {
-    if let Ok(widget) = query.get(event.entity) {
-        info!("Body initialized: entry={} html_key={:?}", widget.entry, widget.html_key);
-    }
+fn spawn_body_widget(mut commands: Commands) {
+    commands.spawn((
+        Body::default(),
+        Node::default(),
+    ));
 }
 ```
 
-## Widget Creator
+### Widget Creator
 
 <div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
   <img
@@ -73,6 +59,6 @@ fn on_body_init(In(event): In<HtmlInit>, query: Query<&Body>) {
   />
   <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
     <strong>exepta</strong>
-    <a href="https://github.com/exepta" style="margin-top: 10px;">Link to GitHub</a>
+    <a href="https://github.com/exepta" style="margin-top: 10px; color: #5658db;">Link to GitHub</a>
   </div>
 </div>

@@ -3,7 +3,8 @@ title: Headline
 ---
 
 # Headline
-## Überblick
+
+### Überblick
 
 Überschriften-Widget aus h1 bis h6 für Kapitelstruktur und semantische Titel.
 
@@ -11,68 +12,54 @@ title: Headline
 - HTML-Tag: h1-h6
 - Empfohlene Quellreferenz: src/widgets/mod.rs
 
-## Attributes
+### Attributes
+
+Wichtige eigene Attributes (ausführlich):
 
 - h1 bis h6 werden auf eine Headline-Komponente gemappt.
 - Speichert Text und Überschriftenstufe.
 - Kann dynamisch per System umgestylt werden.
 
-## Html Beispiel
+Unterstützte globale HTML-Attribute:
 
-```html
-<h2 oninit="log_headline">Settings</h2>
-```
+- `id`: Eindeutige ID für CSS-Selektoren, Event-Zuordnung und spätere Widget-Referenzierung.
+- `class`: Übergibt CSS-Klassen für visuelles Styling und zustandsabhängige Regeln.
+- `style`: Übergibt Inline-CSS, das in `HtmlStyle` geparsed und in die Style-Pipeline übernommen wird.
+- `hidden`: Rendert das Widget initial unsichtbar.
+- `disabled`: Deaktiviert Interaktionen; Klicks und Fokuswechsel werden entsprechend geblockt.
+- `readonly`: Wird als Widget-State übernommen, um ein konsistentes Zustandsmodell zu gewährleisten.
+- Event-Attribute wie `onclick`, `onmousedown`, `onmouseup`, `onmouseover`, `onmouseout`, `onfocus`, `oninit`, `onchange`, `onscroll`, `onwheel`, `onkeydown`, `onkeyup`: Verknüpfen Handler-Funktionen direkt mit dem Event-Binding-System.
 
-## Rust Beispiel
+### WASM Vorschauen
 
-```rust
-use bevy::prelude::*;
-use bevy_extended_ui::ExtendedUiPlugin;
-use bevy_extended_ui::html::{HtmlEvent, HtmlSource};
-use bevy_extended_ui::io::HtmlAsset;
-use bevy_extended_ui::registry::UiRegistry;
-use bevy_extended_ui::widgets::Headline;
-use bevy_extended_ui_macros::html_fn;
-
-fn main() {
-    App::new()
-        .add_plugins(DefaultPlugins)
-        .add_plugins(ExtendedUiPlugin)
-        .add_systems(Startup, load_ui)
-        .run();
-}
-
-fn load_ui(mut reg: ResMut<UiRegistry>, asset_server: Res<AssetServer>) {
-    let handle: Handle<HtmlAsset> = asset_server.load("ui/headline.html");
-    reg.add_and_use("headline-demo".to_string(), HtmlSource::from_handle(handle));
-}
-
-#[html_fn("log_headline")]
-fn log_headline(In(event): In<HtmlEvent>, query: Query<&Headline>) {
-    if let Ok(widget) = query.get(event.entity) {
-        info!("Headline event entity={:?} data={:?}", event.entity, widget);
-    }
-}
-```
-
-## WASM Vorschau
-
+### Headline Example
 <iframe
   id="headline"
-  title="Bevy WASM Vorschau - Headline"
-  src="{base.url}/examples/headline"
+  title="Headline"
+  src="{base.url}/examples/base"
   width="100%"
   height="420"
   loading="lazy">
 </iframe>
 
-## Hinweise
+#### Html Example
 
-- Schreibe den HTML-Tag exakt (h1-h6), damit der Converter korrekt mappt.
-- Registriere Handler-Namen mit html_fn exakt wie im HTML-Attribut.
-- Verlinke diese Seite später auf einen echten Demo-Build.
+```html
+<h2 oninit="log_headline">Settings</h2>
+```
 
-## Ersteller vom Widget
+#### Rust Example
+
+```rust
+fn spawn_headline_widget(mut commands: Commands) {
+    commands.spawn((
+        Headline::default(),
+        Node::default(),
+    ));
+}
+```
+
+### Ersteller vom Widget
 
 <div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
   <img
@@ -84,6 +71,6 @@ fn log_headline(In(event): In<HtmlEvent>, query: Query<&Headline>) {
   />
   <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
     <strong>exepta</strong>
-    <a href="https://github.com/exepta" style="margin-top: 10px;">Link to GitHub</a>
+    <a href="https://github.com/exepta" style="margin-top: 10px; color: #5658db;">Link to GitHub</a>
   </div>
 </div>
