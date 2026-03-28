@@ -120,6 +120,12 @@ package = "properties"
 version = "0.1.1"
 optional = true
 
+[dependencies.serde]
+version = "1"
+
+[dependencies.serde_json]
+version = "1"
+
 [dependencies.libsqlite3-sys]
 version = "0.30.1"
 features = ["bundled"]

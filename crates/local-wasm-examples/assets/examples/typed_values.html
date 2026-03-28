@@ -1,0 +1,114 @@
+<html>
+<head>
+  <meta name="typed-values-demo" />
+  <link rel="stylesheet" href="typed_values.css" />
+</head>
+<body>
+<div class="page-head">
+  <h3>Typed Values Demo</h3>
+  <p>ChoiceBox and RadioButton with integer, boolean, enum, and object values</p>
+</div>
+
+<div class="demo-grid">
+
+  <!-- ChoiceBox: integer values -->
+  <div class="demo-card">
+    <h5>ChoiceBox — Integer</h5>
+    <p>Priority score (i32)</p>
+    <select id="choice-int" onchange="on_choice_int_change">
+      <option value="10"  internal-value-type="i32">Low (10)</option>
+      <option value="50"  internal-value-type="i32" selected>Medium (50)</option>
+      <option value="100" internal-value-type="i32">High (100)</option>
+    </select>
+    <p id="choice-int-result" class="result-label">Selected: 50</p>
+  </div>
+
+  <!-- ChoiceBox: boolean values -->
+  <div class="demo-card">
+    <h5>ChoiceBox — Boolean</h5>
+    <p>Feature toggle (bool)</p>
+    <select id="choice-bool" onchange="on_choice_bool_change">
+      <option value="true"  internal-value-type="bool" selected>Enabled</option>
+      <option value="false" internal-value-type="bool">Disabled</option>
+    </select>
+    <p id="choice-bool-result" class="result-label">Selected: true</p>
+  </div>
+
+  <!-- ChoiceBox: enum-like string values (Rust side maps to enum) -->
+  <div class="demo-card">
+    <h5>ChoiceBox — Enum</h5>
+    <p>Direction (string→enum)</p>
+    <select id="choice-enum" onchange="on_choice_enum_change">
+      <option value="North" selected>North</option>
+      <option value="South">South</option>
+      <option value="East">East</option>
+      <option value="West">West</option>
+    </select>
+    <p id="choice-enum-result" class="result-label">Selected: North</p>
+  </div>
+
+  <!-- ChoiceBox: object (f32 pair stored as two-field struct via Arc) -->
+  <div class="demo-card">
+    <h5>ChoiceBox — Object</h5>
+    <p>Resolution (custom struct)</p>
+    <select id="choice-obj" onchange="on_choice_obj_change">
+      <option value="1280x720"  selected>HD (1280×720)</option>
+      <option value="1920x1080">Full HD (1920×1080)</option>
+      <option value="2560x1440">2K (2560×1440)</option>
+      <option value="3840x2160">4K (3840×2160)</option>
+    </select>
+    <p id="choice-obj-result" class="result-label">Selected: 1280×720</p>
+  </div>
+
+  <!-- RadioButton: integer values -->
+  <div class="demo-card">
+    <h5>RadioButton — Integer</h5>
+    <p>Volume level (u32)</p>
+    <fieldset id="radio-int" onchange="on_radio_int_change">
+      <radio value="0"   internal-value-type="u32">Mute (0)</radio>
+      <radio value="25"  internal-value-type="u32" selected>Low (25)</radio>
+      <radio value="75"  internal-value-type="u32">High (75)</radio>
+      <radio value="100" internal-value-type="u32">Max (100)</radio>
+    </fieldset>
+    <p id="radio-int-result" class="result-label">Selected: 25</p>
+  </div>
+
+  <!-- RadioButton: boolean values -->
+  <div class="demo-card">
+    <h5>RadioButton — Boolean</h5>
+    <p>Notifications (bool)</p>
+    <fieldset id="radio-bool" onchange="on_radio_bool_change">
+      <radio value="true"  internal-value-type="bool" selected>On</radio>
+      <radio value="false" internal-value-type="bool">Off</radio>
+    </fieldset>
+    <p id="radio-bool-result" class="result-label">Selected: true</p>
+  </div>
+
+  <!-- RadioButton: enum-like string values -->
+  <div class="demo-card">
+    <h5>RadioButton — Enum</h5>
+    <p>Theme (string→enum)</p>
+    <fieldset id="radio-enum" onchange="on_radio_enum_change">
+      <radio value="Light" selected>Light</radio>
+      <radio value="Dark">Dark</radio>
+      <radio value="System">System</radio>
+    </fieldset>
+    <p id="radio-enum-result" class="result-label">Selected: Light</p>
+  </div>
+
+  <!-- RadioButton: f32 object values -->
+  <div class="demo-card">
+    <h5>RadioButton — Object</h5>
+    <p>Scale factor (f32)</p>
+    <fieldset id="radio-obj" onchange="on_radio_obj_change">
+      <radio value="0.75" internal-value-type="f32" selected>75%</radio>
+      <radio value="1.0"  internal-value-type="f32">100%</radio>
+      <radio value="1.5"  internal-value-type="f32">150%</radio>
+      <radio value="2.0"  internal-value-type="f32">200%</radio>
+    </fieldset>
+    <p id="radio-obj-result" class="result-label">Selected: 0.75</p>
+  </div>
+
+</div>
+</body>
+</html>

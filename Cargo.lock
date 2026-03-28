@@ -704,6 +704,8 @@ dependencies = [
  "regex",
  "resvg",
  "rfd",
+ "serde",
+ "serde_json",
  "unic-langid",
  "wasm-bindgen",
  "wasm-bindgen-futures",

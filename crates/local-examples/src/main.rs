@@ -1,9 +1,10 @@
 mod theming_provider_example;
+mod typed_values_example;
 mod widget_overview_example;
 
 fn main() {
     configure_linux_window_backend();
-    widget_overview_example::run();
+    typed_values_example::run();
 }
 
 #[cfg(target_os = "linux")]
