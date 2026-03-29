@@ -3,7 +3,9 @@ use std::collections::HashMap;
 use crate::styles::paint::Colored;
 use crate::styles::{CssClass, CssSource, TagName};
 use crate::widgets::widget_util::wheel_delta_y;
-use crate::widgets::{BindToID, Div, Scrollbar, UIGenID, UIWidgetState, WidgetId, WidgetKind};
+use crate::widgets::{
+    ActiveScrollTarget, BindToID, Div, Scrollbar, UIGenID, UIWidgetState, WidgetId, WidgetKind,
+};
 use crate::{CurrentWidgetState, ExtendedUiConfiguration};
 use bevy::camera::visibility::RenderLayers;
 use bevy::input::mouse::MouseWheel;
@@ -508,10 +510,16 @@ fn route_hover_from_pointer_messages(
 /// Handles mouse wheel scrolling for div content.
 fn handle_div_scroll_wheel(
     mut wheel_events: MessageReader<MouseWheel>,
+    active_scroll_target: Res<ActiveScrollTarget>,
     hovered: Res<HoveredDivTracker>,
     div_q: Query<(&DivContentRoot, &Visibility), With<Div>>,
     mut content_q: Query<(&Node, &ComputedNode, &mut ScrollPosition), With<DivScrollContent>>,
 ) {
+    if active_scroll_target.entity.is_some() {
+        wheel_events.clear();
+        return;
+    }
+
     let Some(active_div) = hovered.last_div else {
         wheel_events.clear();
         return;

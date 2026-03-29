@@ -3,13 +3,14 @@ use crate::styles::paint::Colored;
 use crate::styles::{CssClass, CssSource, TagName};
 use crate::widgets::widget_util::wheel_delta_y;
 use crate::widgets::{
-    BindToID, ChoiceOption, IgnoreParentState, ListBox, UIGenID, UIWidgetState, WidgetId,
-    WidgetKind,
+    ActiveScrollTarget, BindToID, ChoiceOption, IgnoreParentState, ListBox, UIGenID,
+    UIWidgetState, WidgetId, WidgetKind,
 };
 use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
 use bevy::camera::visibility::RenderLayers;
 use bevy::input::mouse::MouseWheel;
 use bevy::prelude::*;
+use bevy::ui::RelativeCursorPosition;
 
 /// Marker component for initialized list box widgets.
 #[derive(Component)]
@@ -82,6 +83,7 @@ fn internal_node_creation_system(
                 TagName("listbox".to_string()),
                 RenderLayers::layer(*layer),
                 ScrollPosition::default(),
+                RelativeCursorPosition::default(),
                 ListBoxBase,
             ))
             .insert(GlobalZIndex::default())
@@ -182,6 +184,7 @@ fn internal_node_creation_system(
 /// Enables mouse-wheel scrolling within a [`ListBox`].
 fn handle_scroll_events(
     mut scroll_events: MessageReader<MouseWheel>,
+    active_scroll_target: Res<ActiveScrollTarget>,
     mut layout_query: Query<
         (
             Entity,
@@ -189,6 +192,7 @@ fn handle_scroll_events(
             &Children,
             &mut ScrollPosition,
             &ComputedNode,
+            &RelativeCursorPosition,
         ),
         With<ListBoxBase>,
     >,
@@ -198,11 +202,15 @@ fn handle_scroll_events(
     let smooth_factor = 30.0;
 
     for event in scroll_events.read() {
-        for (layout_entity, visibility, children, mut scroll, layout_computed) in
+        for (layout_entity, visibility, children, mut scroll, layout_computed, cursor_pos) in
             layout_query.iter_mut()
         {
             let is_visible = matches!(*visibility, Visibility::Visible | Visibility::Inherited);
-            if !is_visible {
+            if !is_visible || cursor_pos.normalized.is_none() {
+                continue;
+            }
+
+            if active_scroll_target.entity != Some(layout_entity) {
                 continue;
             }
 
@@ -257,9 +265,11 @@ fn on_internal_click(
 fn on_internal_cursor_entered(
     mut trigger: On<Pointer<Over>>,
     mut query: Query<&mut UIWidgetState, With<ListBox>>,
+    mut active_scroll_target: ResMut<ActiveScrollTarget>,
 ) {
     if let Ok(mut state) = query.get_mut(trigger.entity) {
         state.hovered = true;
+        active_scroll_target.entity = Some(trigger.entity);
     }
 
     trigger.propagate(false);
@@ -269,9 +279,13 @@ fn on_internal_cursor_entered(
 fn on_internal_cursor_leave(
     mut trigger: On<Pointer<Out>>,
     mut query: Query<&mut UIWidgetState, With<ListBox>>,
+    mut active_scroll_target: ResMut<ActiveScrollTarget>,
 ) {
     if let Ok(mut state) = query.get_mut(trigger.entity) {
         state.hovered = false;
+        if active_scroll_target.entity == Some(trigger.entity) {
+            active_scroll_target.entity = None;
+        }
     }
 
     trigger.propagate(false);

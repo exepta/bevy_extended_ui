@@ -28,6 +28,12 @@ pub(crate) use validation::evaluate_validation_state;
 #[derive(Component)]
 pub struct IgnoreParentState;
 
+/// Tracks the currently hovered scrollable widget so wheel input is routed once.
+#[derive(Resource, Default)]
+pub(crate) struct ActiveScrollTarget {
+    pub entity: Option<Entity>,
+}
+
 /// Unique identifier for UI elements.
 ///
 /// Each UI element should have a unique `UIGenID` generated atomically.
@@ -222,6 +228,7 @@ pub struct ExtendedWidgetPlugin;
 impl Plugin for ExtendedWidgetPlugin {
     /// Registers widget components and systems.
     fn build(&self, app: &mut App) {
+        app.init_resource::<ActiveScrollTarget>();
         app.register_type::<UIGenID>();
         app.register_type::<BindToID>();
         app.register_type::<UIWidgetState>();

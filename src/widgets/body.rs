@@ -7,7 +7,8 @@ use crate::widgets::controls::choice_box::ChoiceLayoutBoxBase;
 use crate::widgets::div::DivContentRoot;
 use crate::widgets::widget_util::wheel_delta_y;
 use crate::widgets::{
-    BindToID, Body, Div, Scrollbar, UIGenID, UIWidgetState, WidgetId, WidgetKind,
+    ActiveScrollTarget, BindToID, Body, Div, Scrollbar, UIGenID, UIWidgetState, WidgetId,
+    WidgetKind,
 };
 use crate::{CurrentWidgetState, ExtendedUiConfiguration};
 use bevy::camera::visibility::RenderLayers;
@@ -649,6 +650,7 @@ fn route_hover_from_pointer_messages(
 /// Wheel scroll uses the "last hovered body" and scrolls its BodyScrollContent (Y only).
 fn handle_body_scroll_wheel(
     mut wheel_events: MessageReader<MouseWheel>,
+    active_scroll_target: Res<ActiveScrollTarget>,
     hovered: Res<HoveredBodyTracker>,
     body_q: Query<(Entity, &BodyContentRoot), With<Body>>,
     mut content_q: Query<(&Node, &ComputedNode, &mut ScrollPosition), With<BodyScrollContent>>,
@@ -663,6 +665,11 @@ fn handle_body_scroll_wheel(
     >,
     dialog_overlay_q: Query<(Option<&TagName>, Option<&CssClass>, &Visibility)>,
 ) {
+    if active_scroll_target.entity.is_some() {
+        wheel_events.clear();
+        return;
+    }
+
     // Scrollable div under the pointer has priority over body scrolling.
     let has_hovered_scrollable_div = div_q.iter().any(|(state, root)| {
         if !state.hovered {
