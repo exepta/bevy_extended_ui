@@ -8,6 +8,7 @@ use crate::widgets::controls::color_picker::ColorPickerWidget;
 use crate::widgets::controls::date_picker::DatePickerWidget;
 use crate::widgets::controls::fieldset::FieldSetWidget;
 use crate::widgets::controls::input::InputWidget;
+use crate::widgets::controls::list_box::ListBoxWidget;
 use crate::widgets::controls::progress_bar::ProgressBarWidget;
 use crate::widgets::controls::radio_button::RadioButtonWidget;
 use crate::widgets::controls::scroll_bar::ScrollWidget;
@@ -26,6 +27,7 @@ pub mod color_picker;
 pub mod date_picker;
 pub mod fieldset;
 pub mod input;
+pub mod list_box;
 mod progress_bar;
 pub mod radio_button;
 mod scroll_bar;
@@ -51,6 +53,7 @@ impl Plugin for ExtendedControlWidgets {
             DatePickerWidget,
             FieldSetWidget,
             InputWidget,
+            ListBoxWidget,
             ProgressBarWidget,
             RadioButtonWidget,
             ScrollWidget,

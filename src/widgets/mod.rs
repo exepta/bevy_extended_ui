@@ -213,6 +213,7 @@ pub enum WidgetKind {
     Slider,
     SwitchButton,
     ToggleButton,
+    ListBox,
 }
 
 /// Plugin that registers all built-in widget types.
@@ -543,6 +544,45 @@ impl ReflectedValue {
     /// if the type doesn't match.
     pub fn downcast_ref<T: 'static>(&self) -> Option<&T> {
         self.0.try_as_reflect()?.as_any().downcast_ref::<T>()
+    }
+}
+
+// ===============================================
+//                    ListBox
+// ===============================================
+
+/// List box widget displaying all options in a scrollable list.
+///
+/// Unlike [`ChoiceBox`], all options are always visible (no dropdown).
+/// Supports both single-select and multiselect modes via [`ListBox::multiselect`].
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+#[require(UIGenID, UIWidgetState, Widget)]
+pub struct ListBox {
+    pub entry: usize,
+    pub options: Vec<ChoiceOption>,
+    /// Currently selected options. In single-select mode this holds at most one entry.
+    pub values: Vec<ChoiceOption>,
+    /// When `true`, clicking options toggles their selection independently.
+    /// When `false`, only one option can be selected at a time.
+    pub multiselect: bool,
+}
+
+impl Default for ListBox {
+    /// Creates a default list box widget with no pre-selected options.
+    fn default() -> Self {
+        let entry = LIST_BOX_ID_POOL.lock().unwrap().acquire();
+
+        Self {
+            entry,
+            options: vec![
+                ChoiceOption::new("Option A"),
+                ChoiceOption::new("Option B"),
+                ChoiceOption::new("Option C"),
+            ],
+            values: Vec::new(),
+            multiselect: false,
+        }
     }
 }
 

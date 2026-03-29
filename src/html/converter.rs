@@ -1240,6 +1240,63 @@ fn parse_html_node(
             ))
         }
 
+        "listbox" => {
+            let mut options = Vec::new();
+            let mut selected_values = Vec::new();
+            let multiselect = attributes.contains("multiselect");
+
+            for child in node.children() {
+                if let Some(option_el) = child.as_element() {
+                    if option_el.name.local.eq("option") {
+                        let attrs = option_el.attributes.borrow();
+                        let value = attrs.get("value").unwrap_or("").to_string();
+                        let value_type = attrs
+                            .get("internal-value-type")
+                            .unwrap_or("")
+                            .trim()
+                            .to_ascii_lowercase();
+                        let icon = attrs.get("icon").unwrap_or("").to_string();
+                        let text = child.text_contents().trim().to_string();
+
+                        let icon_path = if icon.trim().is_empty() {
+                            None
+                        } else {
+                            Some(icon)
+                        };
+
+                        let internal_value =
+                            parse_option_internal_value(&value, &value_type, type_registry);
+
+                        let option = ChoiceOption {
+                            text: text.clone(),
+                            internal_value,
+                            icon_path,
+                        };
+
+                        if attrs.contains("selected") {
+                            selected_values.push(option.clone());
+                        }
+
+                        options.push(option);
+                    }
+                }
+            }
+
+            Some(HtmlWidgetNode::ListBox(
+                ListBox {
+                    options,
+                    values: selected_values,
+                    multiselect,
+                    ..default()
+                },
+                meta,
+                states,
+                functions,
+                widget.clone(),
+                HtmlID::default(),
+            ))
+        }
+
         _ => None,
     }
 }

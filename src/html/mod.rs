@@ -23,8 +23,8 @@ use crate::styles::Style;
 use crate::styles::parser::apply_property_to_style;
 use crate::widgets::{
     Badge, Body, Button, CheckBox, ChoiceBox, ColorPicker, DatePicker, Div, Divider, FieldSet,
-    Form, Headline, HyperLink, Img, InputField, Paragraph, ProgressBar, RadioButton, Scrollbar,
-    Slider, SwitchButton, ToggleButton, ToolTip, ValidationRules, Widget,
+    Form, Headline, HyperLink, Img, InputField, ListBox, Paragraph, ProgressBar, RadioButton,
+    Scrollbar, Slider, SwitchButton, ToggleButton, ToolTip, ValidationRules, Widget,
 };
 
 pub static HTML_ID_COUNTER: AtomicUsize = AtomicUsize::new(1);
@@ -429,6 +429,15 @@ pub enum HtmlWidgetNode {
     /// A toggle-button `<toggle>`.
     ToggleButton(
         ToggleButton,
+        HtmlMeta,
+        HtmlStates,
+        HtmlEventBindings,
+        Widget,
+        HtmlID,
+    ),
+    /// A list box `<listbox>`.
+    ListBox(
+        ListBox,
         HtmlMeta,
         HtmlStates,
         HtmlEventBindings,

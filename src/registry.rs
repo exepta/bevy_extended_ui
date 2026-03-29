@@ -29,6 +29,7 @@ pub static SLIDER_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool:
 pub static COLOR_PICKER_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
 pub static SWITCH_BUTTON_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
 pub static TOGGLE_BUTTON_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
+pub static LIST_BOX_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
 
 /// A pool that manages reusable integer IDs for widgets.
 /// It hands out new IDs or recycles freed IDs.
@@ -454,6 +455,7 @@ fn despawn_widget_ids(
                 WidgetKind::Scrollbar => SCROLL_ID_POOL.lock().unwrap().release(widget_id.id),
                 WidgetKind::Divider => DIVIDER_ID_POOL.lock().unwrap().release(widget_id.id),
                 WidgetKind::FieldSet => FIELDSET_ID_POOL.lock().unwrap().release(widget_id.id),
+                WidgetKind::ListBox => LIST_BOX_ID_POOL.lock().unwrap().release(widget_id.id),
             }
         }
     }

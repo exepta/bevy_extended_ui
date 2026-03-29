@@ -4,7 +4,7 @@ mod widget_overview_example;
 
 fn main() {
     configure_linux_window_backend();
-    typed_values_example::run();
+    widget_overview_example::run();
 }
 
 #[cfg(target_os = "linux")]

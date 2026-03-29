@@ -181,7 +181,8 @@ fn collect_html_ids(nodes: &Vec<HtmlWidgetNode>, ids: &mut Vec<HtmlID>) {
             | HtmlWidgetNode::Scrollbar(_, _, _, _, _, id)
             | HtmlWidgetNode::Slider(_, _, _, _, _, id)
             | HtmlWidgetNode::SwitchButton(_, _, _, _, _, id)
-            | HtmlWidgetNode::ToggleButton(_, _, _, _, _, id) => {
+            | HtmlWidgetNode::ToggleButton(_, _, _, _, _, id)
+            | HtmlWidgetNode::ListBox(_, _, _, _, _, id) => {
                 ids.push(id.clone());
             }
             HtmlWidgetNode::Div(_, _, _, children, _, _, id) => {
@@ -439,6 +440,17 @@ fn spawn_widget_node(
             spawn_with_meta(
                 commands,
                 toggle_button.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+            )
+        }
+        HtmlWidgetNode::ListBox(list_box, meta, states, functions, widget, id) => {
+            spawn_with_meta(
+                commands,
+                list_box.clone(),
                 meta,
                 states,
                 functions,
