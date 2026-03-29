@@ -13,7 +13,7 @@
 
   <!-- ChoiceBox: integer values -->
   <div class="demo-card">
-    <h5>ChoiceBox — Integer</h5>
+    <h5>ChoiceBox - Integer</h5>
     <p>Priority score (i32)</p>
     <select id="choice-int" onchange="on_choice_int_change">
       <option value="10"  internal-value-type="i32">Low (10)</option>
@@ -25,7 +25,7 @@
 
   <!-- ChoiceBox: boolean values -->
   <div class="demo-card">
-    <h5>ChoiceBox — Boolean</h5>
+    <h5>ChoiceBox - Boolean</h5>
     <p>Feature toggle (bool)</p>
     <select id="choice-bool" onchange="on_choice_bool_change">
       <option value="true"  internal-value-type="bool" selected>Enabled</option>
@@ -36,7 +36,7 @@
 
   <!-- ChoiceBox: enum-like string values (Rust side maps to enum) -->
   <div class="demo-card">
-    <h5>ChoiceBox — Enum</h5>
+    <h5>ChoiceBox - Enum</h5>
     <p>Direction (string→enum)</p>
     <select id="choice-enum" onchange="on_choice_enum_change">
       <option value="North" selected>North</option>
@@ -49,20 +49,20 @@
 
   <!-- ChoiceBox: object (f32 pair stored as two-field struct via Arc) -->
   <div class="demo-card">
-    <h5>ChoiceBox — Object</h5>
+    <h5>ChoiceBox - Object</h5>
     <p>Resolution (custom struct)</p>
     <select id="choice-obj" onchange="on_choice_obj_change">
-      <option value="1280x720"  selected>HD (1280×720)</option>
-      <option value="1920x1080">Full HD (1920×1080)</option>
-      <option value="2560x1440">2K (2560×1440)</option>
-      <option value="3840x2160">4K (3840×2160)</option>
+      <option value="1280x720"  selected>HD (1280x720)</option>
+      <option value="1920x1080">Full HD (1920x1080)</option>
+      <option value="2560x1440">2K (2560x1440)</option>
+      <option value="3840x2160">4K (3840x2160)</option>
     </select>
-    <p id="choice-obj-result" class="result-label">Selected: 1280×720</p>
+    <p id="choice-obj-result" class="result-label">Selected: 1280x720</p>
   </div>
 
   <!-- RadioButton: integer values -->
   <div class="demo-card">
-    <h5>RadioButton — Integer</h5>
+    <h5>RadioButton - Integer</h5>
     <p>Volume level (u32)</p>
     <fieldset id="radio-int" onchange="on_radio_int_change">
       <radio value="0"   internal-value-type="u32">Mute (0)</radio>
@@ -75,7 +75,7 @@
 
   <!-- RadioButton: boolean values -->
   <div class="demo-card">
-    <h5>RadioButton — Boolean</h5>
+    <h5>RadioButton - Boolean</h5>
     <p>Notifications (bool)</p>
     <fieldset id="radio-bool" onchange="on_radio_bool_change">
       <radio value="true"  internal-value-type="bool" selected>On</radio>
@@ -86,7 +86,7 @@
 
   <!-- RadioButton: enum-like string values -->
   <div class="demo-card">
-    <h5>RadioButton — Enum</h5>
+    <h5>RadioButton - Enum</h5>
     <p>Theme (string→enum)</p>
     <fieldset id="radio-enum" onchange="on_radio_enum_change">
       <radio value="Light" selected>Light</radio>
@@ -98,7 +98,7 @@
 
   <!-- RadioButton: f32 object values -->
   <div class="demo-card">
-    <h5>RadioButton — Object</h5>
+    <h5>RadioButton - Object</h5>
     <p>Scale factor (f32)</p>
     <fieldset id="radio-obj" onchange="on_radio_obj_change">
       <radio value="0.75" internal-value-type="f32" selected>75%</radio>

@@ -54,7 +54,7 @@ fn set_result(
 }
 
 // ---------------------------------------------------------------------------
-// ChoiceBox — integer (i32)
+// ChoiceBox - integer (i32)
 // ---------------------------------------------------------------------------
 
 #[html_fn("on_choice_int_change")]
@@ -75,7 +75,7 @@ fn on_choice_int_change(
 }
 
 // ---------------------------------------------------------------------------
-// ChoiceBox — boolean
+// ChoiceBox - boolean
 // ---------------------------------------------------------------------------
 
 #[html_fn("on_choice_bool_change")]
@@ -96,7 +96,7 @@ fn on_choice_bool_change(
 }
 
 // ---------------------------------------------------------------------------
-// ChoiceBox — enum-like (plain String, mapped to Direction on Rust side)
+// ChoiceBox - enum-like (plain String, mapped to Direction on Rust side)
 // ---------------------------------------------------------------------------
 
 #[derive(Debug)]
@@ -137,7 +137,7 @@ fn on_choice_enum_change(
 }
 
 // ---------------------------------------------------------------------------
-// ChoiceBox — object (resolution stored as plain String, parsed to struct)
+// ChoiceBox - object (resolution stored as plain String, parsed to struct)
 // ---------------------------------------------------------------------------
 
 #[derive(Debug)]
@@ -167,14 +167,14 @@ fn on_choice_obj_change(
     };
 
     let text = match cb.value.value_as_str().and_then(Resolution::from_str) {
-        Some(res) => format!("Selected: {}×{} (Resolution)", res.width, res.height),
+        Some(res) => format!("Selected: {}x{} (Resolution)", res.width, res.height),
         None => format!("Selected: {}", cb.value.text),
     };
     set_result("choice-obj-result", text, &mut paragraph_q);
 }
 
 // ---------------------------------------------------------------------------
-// RadioButton — integer (u32)  — fieldset emits HtmlChange on the FieldSet entity
+// RadioButton - integer (u32)  - fieldset emits HtmlChange on the FieldSet entity
 // ---------------------------------------------------------------------------
 
 #[html_fn("on_radio_int_change")]
@@ -200,7 +200,7 @@ fn on_radio_int_change(
 }
 
 // ---------------------------------------------------------------------------
-// RadioButton — boolean
+// RadioButton - boolean
 // ---------------------------------------------------------------------------
 
 #[html_fn("on_radio_bool_change")]
@@ -226,7 +226,7 @@ fn on_radio_bool_change(
 }
 
 // ---------------------------------------------------------------------------
-// RadioButton — enum-like (Theme, mapped from String)
+// RadioButton - enum-like (Theme, mapped from String)
 // ---------------------------------------------------------------------------
 
 #[derive(Debug)]
@@ -270,7 +270,7 @@ fn on_radio_enum_change(
 }
 
 // ---------------------------------------------------------------------------
-// RadioButton — object (f32 scale factor)
+// RadioButton - object (f32 scale factor)
 // ---------------------------------------------------------------------------
 
 #[html_fn("on_radio_obj_change")]
