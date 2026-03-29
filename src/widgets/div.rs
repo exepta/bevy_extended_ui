@@ -422,6 +422,7 @@ fn route_hover_from_pointer_messages(
     sb_owner_q: Query<&DivScrollbarOwner>,
     is_scroll_content_q: Query<(), With<DivScrollContent>>,
     mut div_state_q: Query<&mut UIWidgetState, With<Div>>,
+    div_with_scroll_q: Query<&DivContentRoot, With<Div>>,
     mut hovered: ResMut<HoveredDivTracker>,
 ) {
     /// Walks up the hierarchy to find the owning div entity.
@@ -456,6 +457,22 @@ fn route_hover_from_pointer_messages(
         }
     }
 
+    /// Finds all ancestor Div entities up the parent chain.
+    fn find_all_ancestor_divs(
+        mut e: Entity,
+        parents: &Query<&ChildOf>,
+        is_div_q: &Query<(), With<Div>>,
+    ) -> Vec<Entity> {
+        let mut ancestors = Vec::new();
+        while let Ok(p) = parents.get(e) {
+            e = p.parent();
+            if is_div_q.get(e).is_ok() {
+                ancestors.push(e);
+            }
+        }
+        ancestors
+    }
+
     for msg in over.read() {
         let Some(div) = find_owner_div(
             msg.entity,
@@ -470,11 +487,35 @@ fn route_hover_from_pointer_messages(
 
         let d = hovered.div_ref.entry(div).or_insert(0);
         *d = d.saturating_add(1);
-        hovered.last_div = Some(div);
 
         if let Ok(mut state) = div_state_q.get_mut(div) {
             state.hovered = true;
         }
+
+        // Also mark all ancestor divs as hovered for nested div support
+        let ancestors = find_all_ancestor_divs(div, &parents, &is_div_q);
+
+        // Find the closest (deepest/most recent) scrollable div in the hierarchy for last_div.
+        // Prefer scrollable ancestors over non-scrollable children for wheel event handling.
+        let mut scrollable_div = None;
+        if div_with_scroll_q.get(div).is_ok() {
+            scrollable_div = Some(div);
+        }
+        for ancestor_div in &ancestors {
+            let d = hovered.div_ref.entry(*ancestor_div).or_insert(0);
+            *d = d.saturating_add(1);
+
+            if let Ok(mut state) = div_state_q.get_mut(*ancestor_div) {
+                state.hovered = true;
+            }
+
+            // Use the first scrollable ancestor found (closest parent)
+            if scrollable_div.is_none() && div_with_scroll_q.get(*ancestor_div).is_ok() {
+                scrollable_div = Some(*ancestor_div);
+            }
+        }
+
+        hovered.last_div = scrollable_div.or(Some(div));
     }
 
     for msg in out.read() {
@@ -500,6 +541,25 @@ fn route_hover_from_pointer_messages(
 
                 if hovered.last_div == Some(div) {
                     hovered.last_div = hovered.div_ref.keys().next().copied();
+                }
+            }
+        }
+
+        // Also unmark ancestor divs
+        let ancestors = find_all_ancestor_divs(div, &parents, &is_div_q);
+        for ancestor_div in ancestors {
+            if let Some(d) = hovered.div_ref.get_mut(&ancestor_div) {
+                *d = d.saturating_sub(1);
+                if *d == 0 {
+                    hovered.div_ref.remove(&ancestor_div);
+
+                    if let Ok(mut state) = div_state_q.get_mut(ancestor_div) {
+                        state.hovered = false;
+                    }
+
+                    if hovered.last_div == Some(ancestor_div) {
+                        hovered.last_div = hovered.div_ref.keys().next().copied();
+                    }
                 }
             }
         }
