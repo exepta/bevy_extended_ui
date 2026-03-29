@@ -167,7 +167,7 @@ fn on_choice_obj_change(
     };
 
     let text = match cb.value.value_as_str().and_then(Resolution::from_str) {
-        Some(res) => format!("Selected: {}×{} (Resolution)", res.width, res.height),
+        Some(res) => format!("Selected: {}x{} (Resolution)", res.width, res.height),
         None => format!("Selected: {}", cb.value.text),
     };
     set_result("choice-obj-result", text, &mut paragraph_q);

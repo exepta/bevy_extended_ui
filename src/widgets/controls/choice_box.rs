@@ -601,7 +601,7 @@ fn on_layout_cursor_leave(
 ///
 /// This system:
 /// - Updates the selected state across all sibling options (only one is `checked = true`).
-/// - Updates the parent [`ChoiceBox`] value with the clicked option's text/icon.
+/// - Updates the parent [`ChoiceBox`] value with the full clicked option, including typed value.
 /// - Closes the dropdown (`open = false`).
 /// - Updates any [`SelectedOptionBase`] display widgets with the new value.
 /// - Optionally removes focus from the clicked option if no value was selected.
@@ -617,7 +617,7 @@ fn on_layout_cursor_leave(
 /// - Optional: `UIWidgetState::focused`
 /// Handles clicks on choice box options to update selection.
 fn on_internal_option_click(
-    trigger: On<Pointer<Click>>,
+    mut trigger: On<Pointer<Click>>,
     mut option_query: Query<
         (
             Entity,
@@ -638,16 +638,15 @@ fn on_internal_option_click(
 ) {
     let clicked_entity = trigger.entity;
 
-    let (clicked_parent_id, clicked_option_text, clicked_option_icon) =
+    let (clicked_parent_id, clicked_option) =
         if let Ok((_, _, option, bind_id, _)) = option_query.get(clicked_entity) {
-            (
-                bind_id.0.clone(),
-                option.text.clone(),
-                option.icon_path.clone(),
-            )
+            (bind_id.0, option.clone())
         } else {
             return;
         };
+
+    let clicked_option_text = clicked_option.text.clone();
+    let clicked_option_icon = clicked_option.icon_path.clone();
 
     for (entity, mut state, _, bind_id, children) in option_query.iter_mut() {
         if bind_id.0 == clicked_parent_id {
@@ -663,8 +662,7 @@ fn on_internal_option_click(
 
     for (_, mut parent_state, id, mut choice_box) in parent_query.iter_mut() {
         if id.0 == clicked_parent_id {
-            choice_box.value.text = clicked_option_text.clone();
-            choice_box.value.icon_path = clicked_option_icon.clone();
+            choice_box.value = clicked_option.clone();
             parent_state.open = false;
 
             if clicked_option_text.is_empty() && clicked_option_icon.is_none() {
@@ -684,6 +682,8 @@ fn on_internal_option_click(
             }
         }
     }
+
+    trigger.propagate(false);
 }
 
 /// Sets `hovered = true` on a [`ChoiceOptionBase`] and its visual children when hovered.
