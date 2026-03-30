@@ -766,12 +766,12 @@ mod tests {
         assert!(all.iter().any(|node| matches!(
             node,
             HtmlWidgetNode::ToggleButton(ToggleButton { value, icon_place: IconPlace::Right, selected: true, .. }, _, _, _, _, _)
-                if value == "t1"
+                if value.as_str() == Some("t1")
         )));
         assert!(all.iter().any(|node| matches!(
             node,
             HtmlWidgetNode::ToggleButton(ToggleButton { value, icon_place: IconPlace::Left, selected: false, .. }, _, _, _, _, _)
-                if value == "t2"
+                if value.as_str() == Some("t2")
         )));
 
         assert!(all.iter().any(|node| matches!(

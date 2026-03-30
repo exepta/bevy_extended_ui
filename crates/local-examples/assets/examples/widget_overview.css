@@ -275,7 +275,7 @@ dialog.dialog-renderer-bevy-app.dialog-type-error > .dialog-panel {
 
 .text-transform-lower {
     color: #c4ffd1;
-    text-transfrom: lowercase;
+    text-transform: lowercase;
 }
 
 .text-transform-cap {

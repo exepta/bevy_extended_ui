@@ -609,7 +609,7 @@ mod tests {
     fn choice_option_no_value_returns_none() {
         let opt = ChoiceOption {
             text: "empty".to_string(),
-            internal_value: None,
+            value: WidgetValue::default(),
             icon_path: None,
         };
 
@@ -678,7 +678,7 @@ mod tests {
     #[test]
     fn radio_button_value_as_str_only_for_string_values() {
         let string_rb = RadioButton {
-            value: Some(std::sync::Arc::new("option_a".to_string())),
+            value: WidgetValue::new("option_a".to_string()),
             ..RadioButton::default()
         };
         assert_eq!(string_rb.value_as_str(), Some("option_a"));
@@ -690,7 +690,7 @@ mod tests {
     #[test]
     fn radio_button_no_value_returns_none() {
         let rb = RadioButton {
-            value: None,
+            value: WidgetValue::default(),
             ..RadioButton::default()
         };
 

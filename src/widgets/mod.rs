@@ -465,7 +465,7 @@ pub struct ChoiceOption {
     /// [`ChoiceOption::get_value`] to recover it. Use [`ChoiceOption::value_as_str`]
     /// for the common `String` case.
     #[reflect(ignore)]
-    pub internal_value: Option<Arc<dyn Any + Send + Sync>>,
+    pub value: WidgetValue,
     pub icon_path: Option<String>,
 }
 
@@ -474,7 +474,7 @@ impl PartialEq for ChoiceOption {
         if self.text != other.text || self.icon_path != other.icon_path {
             return false;
         }
-        match (&self.internal_value, &other.internal_value) {
+        match (&self.value.0, &other.value.0) {
             (None, None) => true,
             (Some(a), Some(b)) => match (a.downcast_ref::<String>(), b.downcast_ref::<String>()) {
                 (Some(sa), Some(sb)) => sa == sb,
@@ -492,7 +492,7 @@ impl Default for ChoiceOption {
     fn default() -> Self {
         Self {
             text: String::from("Please Select"),
-            internal_value: Some(Arc::new(String::from("default"))),
+            value: WidgetValue::new(String::from("default")),
             icon_path: None,
         }
     }
@@ -503,31 +503,30 @@ impl ChoiceOption {
     pub fn new(text: &str) -> Self {
         Self {
             text: text.to_string(),
-            internal_value: Some(Arc::new(text.trim().to_string())),
+            value: WidgetValue::new(text.trim().to_string()),
             icon_path: None,
         }
     }
 
-    /// Replaces the internal value with an arbitrary typed value.
+    /// Sets a typed value for this option.
     pub fn with_value<T: Any + Send + Sync>(mut self, value: T) -> Self {
-        self.internal_value = Some(Arc::new(value));
+        self.value.set(value);
         self
     }
 
-    /// Downcasts the internal value to `T`, returning `None` if absent or the type mismatches.
+    /// Returns the typed value if it can be downcast to `T`.
     pub fn get_value<T: Any>(&self) -> Option<&T> {
-        self.internal_value.as_ref()?.downcast_ref::<T>()
+        self.value.get::<T>()
     }
 
-    /// Returns the internal value as a `&str` if it is a `String`, otherwise `None`.
+    /// Returns the internal value as `&str` when it holds a `String`.
     pub fn value_as_str(&self) -> Option<&str> {
-        self.internal_value.as_ref()?.downcast_ref::<String>().map(|s| s.as_str())
+        self.value.as_str()
     }
 
-    /// Returns the internal value as a [`ReflectedValue`] if it was deserialized via Bevy
-    /// reflection, allowing further downcasting with Bevy's reflect API.
+    /// Returns a reflected value when the option was created from reflection.
     pub fn get_reflected(&self) -> Option<&ReflectedValue> {
-        self.get_value::<ReflectedValue>()
+        self.value.reflect()
     }
 }
 
@@ -1367,7 +1366,7 @@ pub struct RadioButton {
     /// [`RadioButton::get_value`] to recover it. Use [`RadioButton::value_as_str`]
     /// for the common `String` case.
     #[reflect(ignore)]
-    pub value: Option<Arc<dyn Any + Send + Sync>>,
+    pub value: WidgetValue,
     pub selected: bool,
 }
 
@@ -1379,32 +1378,63 @@ impl Default for RadioButton {
         Self {
             entry,
             label: String::from("label"),
-            value: Some(Arc::new(String::from(""))),
+            value: WidgetValue::new(String::new()),
             selected: false,
         }
     }
 }
 
 impl RadioButton {
-    /// Replaces the value with an arbitrary typed value.
+    /// Sets a typed value for this radio button.
     pub fn with_value<T: Any + Send + Sync>(mut self, value: T) -> Self {
-        self.value = Some(Arc::new(value));
+        self.value.set(value);
         self
     }
 
-    /// Downcasts the value to `T`, returning `None` if absent or the type mismatches.
+    /// Returns the typed value if it can be downcast to `T`.
     pub fn get_value<T: Any>(&self) -> Option<&T> {
-        self.value.as_ref()?.downcast_ref::<T>()
+        self.value.get::<T>()
     }
 
-    /// Returns the value as a `&str` if it is a `String`, otherwise `None`.
+    /// Returns the internal value as `&str` when it holds a `String`.
     pub fn value_as_str(&self) -> Option<&str> {
-        self.value.as_ref()?.downcast_ref::<String>().map(|s| s.as_str())
+        self.value.as_str()
     }
 
-    /// Returns the value as a [`ReflectedValue`] if it was deserialized via Bevy reflection.
+    /// Returns a reflected value when the radio value was created from reflection.
     pub fn get_reflected(&self) -> Option<&ReflectedValue> {
-        self.get_value::<ReflectedValue>()
+        self.value.reflect()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct WidgetValue(Option<Arc<dyn Any + Send + Sync>>);
+
+impl Default for WidgetValue {
+    fn default() -> Self {
+        Self(None)
+    }
+}
+
+impl WidgetValue {
+    pub fn new<T: Any + Send + Sync>(value: T) -> Self {
+        Self(Some(Arc::new(value)))
+    }
+
+    pub fn get<T: Any>(&self) -> Option<&T> {
+        self.0.as_ref()?.downcast_ref::<T>()
+    }
+
+    pub fn set<T: Any + Send + Sync>(&mut self, value: T) {
+        self.0 = Some(Arc::new(value));
+    }
+
+    pub fn as_str(&self) -> Option<&str> {
+        self.0.as_ref()?.downcast_ref::<String>().map(|s| s.as_str())
+    }
+
+    pub fn reflect(&self) -> Option<&ReflectedValue> {
+        self.get::<ReflectedValue>()
     }
 }
 
@@ -1710,7 +1740,8 @@ impl Default for SwitchButton {
 pub struct ToggleButton {
     pub entry: usize,
     pub label: String,
-    pub value: String,
+    #[reflect(ignore)]
+    pub value: WidgetValue,
     pub icon_place: IconPlace,
     pub icon_path: Option<String>,
     pub selected: bool,
@@ -1724,7 +1755,7 @@ impl Default for ToggleButton {
         Self {
             entry,
             label: String::from("label"),
-            value: String::from(""),
+            value: WidgetValue::new(String::from("")),
             icon_path: None,
             icon_place: IconPlace::default(),
             selected: false,

@@ -196,8 +196,8 @@ fn internal_node_creation_system(
 
                         for option in choice_box.options.iter() {
                             let is_selected = if !selected_assigned {
-                                if choice_box.value.value_as_str().map_or(false, |s| !s.is_empty()) {
-                                    choice_box.value.value_as_str() == option.value_as_str()
+                                if choice_box.value.value.as_str().map_or(false, |s| !s.is_empty()) {
+                                    choice_box.value.value.as_str() == option.value.as_str()
                                 } else if !choice_box.value.text.is_empty() {
                                     choice_box.value.text == option.text
                                 } else {

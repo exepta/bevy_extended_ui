@@ -1,6 +1,4 @@
 use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
-
 use bevy::asset::AssetEvent;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
@@ -1089,11 +1087,11 @@ fn parse_html_node(
                             Some(icon)
                         };
 
-                        let internal_value = parse_option_internal_value(&value, &value_type, type_registry);
+                        let value = parse_option_internal_value(&value, &value_type, type_registry);
 
                         let option = ChoiceOption {
                             text: text.clone(),
-                            internal_value,
+                            value,
                             icon_path,
                         };
 
@@ -1227,7 +1225,7 @@ fn parse_html_node(
                 ToggleButton {
                     label: text.clone(),
                     icon_path,
-                    value,
+                    value: WidgetValue::new(value),
                     icon_place,
                     selected: selected_attr,
                     ..default()
@@ -1264,12 +1262,11 @@ fn parse_html_node(
                             Some(icon)
                         };
 
-                        let internal_value =
-                            parse_option_internal_value(&value, &value_type, type_registry);
+                        let value = parse_option_internal_value(&value, &value_type, type_registry);
 
                         let option = ChoiceOption {
                             text: text.clone(),
-                            internal_value,
+                            value,
                             icon_path,
                         };
 
@@ -1958,7 +1955,7 @@ mod tests {
     }
 }
 
-/// Converts an HTML option's `value` string into an `Arc<dyn Any + Send + Sync>` using the
+/// Converts an HTML option's `value` string into a [`WidgetValue`] using the
 /// `internal-value-type` attribute hint.
 ///
 /// # Primitive types (parsed directly from the string)
@@ -1976,29 +1973,29 @@ fn parse_option_internal_value(
     value: &str,
     type_hint: &str,
     type_registry: &TypeRegistry,
-) -> Option<Arc<dyn std::any::Any + Send + Sync>> {
+) -> WidgetValue {
     use crate::widgets::ReflectedValue;
 
     if value.is_empty() {
-        return None;
+        return WidgetValue::default();
     }
 
-    let arc: Arc<dyn std::any::Any + Send + Sync> = match type_hint {
+    match type_hint {
         "bool" => match value.trim() {
-            "true" | "1" | "yes" => Arc::new(true),
-            _ => Arc::new(false),
+            "true" | "1" | "yes" => WidgetValue::new(true),
+            _ => WidgetValue::new(false),
         },
-        "i8"  => Arc::new(value.trim().parse::<i8>().unwrap_or(0)),
-        "i16" => Arc::new(value.trim().parse::<i16>().unwrap_or(0)),
-        "i32" => Arc::new(value.trim().parse::<i32>().unwrap_or(0)),
-        "i64" => Arc::new(value.trim().parse::<i64>().unwrap_or(0)),
-        "u8"  => Arc::new(value.trim().parse::<u8>().unwrap_or(0)),
-        "u16" => Arc::new(value.trim().parse::<u16>().unwrap_or(0)),
-        "u32" => Arc::new(value.trim().parse::<u32>().unwrap_or(0)),
-        "u64" => Arc::new(value.trim().parse::<u64>().unwrap_or(0)),
-        "f32" => Arc::new(value.trim().parse::<f32>().unwrap_or(0.0)),
-        "f64" => Arc::new(value.trim().parse::<f64>().unwrap_or(0.0)),
-        "" | "string" | "str" => Arc::new(value.to_string()),
+        "i8" => WidgetValue::new(value.trim().parse::<i8>().unwrap_or(0)),
+        "i16" => WidgetValue::new(value.trim().parse::<i16>().unwrap_or(0)),
+        "i32" => WidgetValue::new(value.trim().parse::<i32>().unwrap_or(0)),
+        "i64" => WidgetValue::new(value.trim().parse::<i64>().unwrap_or(0)),
+        "u8" => WidgetValue::new(value.trim().parse::<u8>().unwrap_or(0)),
+        "u16" => WidgetValue::new(value.trim().parse::<u16>().unwrap_or(0)),
+        "u32" => WidgetValue::new(value.trim().parse::<u32>().unwrap_or(0)),
+        "u64" => WidgetValue::new(value.trim().parse::<u64>().unwrap_or(0)),
+        "f32" => WidgetValue::new(value.trim().parse::<f32>().unwrap_or(0.0)),
+        "f64" => WidgetValue::new(value.trim().parse::<f64>().unwrap_or(0.0)),
+        "" | "string" | "str" => WidgetValue::new(value.to_string()),
         type_name => {
             // Try Bevy reflection first (short path, then full path).
             let registration = type_registry
@@ -2009,18 +2006,16 @@ fn parse_option_internal_value(
                 let deserializer = TypedReflectDeserializer::new(registration, type_registry);
                 let mut json_de = serde_json::Deserializer::from_str(value);
                 match deserializer.deserialize(&mut json_de) {
-                    Ok(reflected) => Arc::new(ReflectedValue(reflected)),
-                    Err(_) => Arc::new(value.to_string()),
+                    Ok(reflected) => WidgetValue::new(ReflectedValue(reflected)),
+                    Err(_) => WidgetValue::new(value.to_string()),
                 }
             } else {
                 // Type not registered — fall back to serde_json::Value, then String.
                 match serde_json::from_str::<JsonValue>(value) {
-                    Ok(json) => Arc::new(json),
-                    Err(_) => Arc::new(value.to_string()),
+                    Ok(json) => WidgetValue::new(json),
+                    Err(_) => WidgetValue::new(value.to_string()),
                 }
             }
         }
-    };
-
-    Some(arc)
+    }
 }
