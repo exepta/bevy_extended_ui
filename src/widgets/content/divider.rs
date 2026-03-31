@@ -28,18 +28,25 @@ impl Plugin for DividerWidget {
 /// Spawns the divider UI node with initial alignment classes.
 fn internal_node_creation_system(
     mut commands: Commands,
-    query: Query<(Entity, &Divider, Option<&CssSource>), (With<Divider>, Without<DividerBase>)>,
+    query: Query<
+        (Entity, &Divider, Option<&CssSource>, Option<&CssClass>),
+        (With<Divider>, Without<DividerBase>),
+    >,
     config: Res<ExtendedUiConfiguration>,
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
 
-    for (entity, divider, source_opt) in query.iter() {
+    for (entity, divider, source_opt, class_opt) in query.iter() {
         let mut css_source = CssSource::default();
         if let Some(source) = source_opt {
             css_source = source.clone();
         }
 
         let align_class = alignment_class(&divider.alignment);
+        let mut classes = class_opt.map(|c| c.0.clone()).unwrap_or_default();
+        if !classes.iter().any(|c| c == align_class) {
+            classes.push(align_class.to_string());
+        }
 
         commands.entity(entity).insert((
             Name::new(format!("Divider-{}", divider.entry)),
@@ -54,7 +61,7 @@ fn internal_node_creation_system(
             BorderColor::default(),
             css_source,
             TagName("divider".to_string()),
-            CssClass(vec![align_class.to_string()]),
+            CssClass(classes),
             RenderLayers::layer(*layer),
             DividerBase,
             PrevDividerAlignment(divider.alignment.clone()),
