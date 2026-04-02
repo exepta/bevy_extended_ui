@@ -8,8 +8,16 @@ Includes examples:
 - `theming_provider_example`
 - `widget_overview_example`
 
-Run:
+Run the default demo (`widget-overview`):
 
 ```bash
 cargo run --manifest-path crates/local-examples/Cargo.toml
+```
+
+Run a specific example:
+
+```bash
+cargo run --manifest-path crates/local-examples/Cargo.toml -- theming-provider
+cargo run --manifest-path crates/local-examples/Cargo.toml -- typed-values
+cargo run --manifest-path crates/local-examples/Cargo.toml -- widget-overview
 ```
