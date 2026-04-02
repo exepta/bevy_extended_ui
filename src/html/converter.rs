@@ -272,10 +272,11 @@ fn update_html_ui(
         if let Some(body_widget) =
             parse_html_node(&body_node, &css_handles, &label_map, &ui_key, html, &type_registry)
         {
-            structure_map.html_map.insert(ui_key, vec![body_widget]);
+            structure_map.html_map.insert(ui_key.clone(), vec![body_widget]);
 
-            // IMPORTANT: Explicitly mark UI as dirty so the builder rebuilds.
+            // IMPORTANT: Explicitly mark the affected UI key as dirty so the builder rebuilds.
             html_dirty.0 = true;
+            html_dirty.1.insert(ui_key);
         } else {
             error!("Failed to parse <body> node.");
         }
@@ -1532,6 +1533,10 @@ pub fn resolve_relative_asset_path(html_path: &str, href: &str) -> String {
 
     if let Some(rest) = href.strip_prefix('/') {
         return rest.to_string();
+    }
+
+    if href.starts_with("./") || href.starts_with("../") {
+        return href;
     }
 
     let base = std::path::Path::new(html_path)

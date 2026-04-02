@@ -1,6 +1,13 @@
 use crate::CurrentWidgetState;
 use crate::widgets::{BindToID, IgnoreParentState, UIGenID, UIWidgetState};
 use bevy::prelude::*;
+use std::collections::HashMap;
+
+#[derive(Resource, Default)]
+pub(crate) struct BoundStateIndex {
+    by_widget: HashMap<usize, Vec<Entity>>,
+    by_entity: HashMap<Entity, usize>,
+}
 
 /// Plugin that manages widget focus and state propagation.
 pub struct StateService;
@@ -8,8 +15,9 @@ pub struct StateService;
 impl Plugin for StateService {
     /// Registers widget state systems.
     fn build(&self, app: &mut App) {
+        app.init_resource::<BoundStateIndex>();
         app.register_type::<Pickable>();
-        app.add_systems(PostUpdate, update_widget_states);
+        app.add_systems(PostUpdate, (refresh_bound_state_index, update_widget_states).chain());
         app.add_systems(
             Update,
             (
@@ -18,6 +26,46 @@ impl Plugin for StateService {
                 unfocus_disabled,
             ),
         );
+    }
+}
+
+fn remove_from_bound_state_index(index: &mut BoundStateIndex, entity: Entity, widget_id: usize) {
+    let should_remove = if let Some(entries) = index.by_widget.get_mut(&widget_id) {
+        entries.retain(|current| *current != entity);
+        entries.is_empty()
+    } else {
+        false
+    };
+
+    if should_remove {
+        index.by_widget.remove(&widget_id);
+    }
+}
+
+fn refresh_bound_state_index(
+    mut index: ResMut<BoundStateIndex>,
+    query: Query<(Entity, &BindToID), Or<(Added<BindToID>, Changed<BindToID>)>>,
+    mut removed: RemovedComponents<BindToID>,
+) {
+    for entity in removed.read() {
+        if let Some(previous_id) = index.by_entity.remove(&entity) {
+            remove_from_bound_state_index(&mut index, entity, previous_id);
+        }
+    }
+
+    for (entity, bind_to) in query.iter() {
+        let widget_id = bind_to.0;
+
+        if let Some(previous_id) = index.by_entity.insert(entity, widget_id) {
+            if previous_id != widget_id {
+                remove_from_bound_state_index(&mut index, entity, previous_id);
+            }
+        }
+
+        let entries = index.by_widget.entry(widget_id).or_default();
+        if !entries.contains(&entity) {
+            entries.push(entity);
+        }
     }
 }
 
@@ -39,13 +87,31 @@ impl Plugin for StateService {
 /// will also be marked as focused.
 pub fn update_widget_states(
     main_query: Query<(&UIGenID, &UIWidgetState), (Changed<UIWidgetState>, With<UIGenID>)>,
+    index: Option<Res<BoundStateIndex>>,
     mut inner_query: Query<
-        (&BindToID, &mut UIWidgetState),
+        (Entity, &BindToID, &mut UIWidgetState),
         (Without<UIGenID>, Without<IgnoreParentState>),
     >,
 ) {
     for (id, state) in main_query.iter() {
-        for (bind_to, mut inner_state) in inner_query.iter_mut() {
+        if let Some(index) = index.as_ref() {
+            if let Some(targets) = index.by_widget.get(&id.get()) {
+                for entity in targets {
+                    let Ok((_, _, mut inner_state)) = inner_query.get_mut(*entity) else {
+                        continue;
+                    };
+
+                    inner_state.hovered = state.hovered;
+                    inner_state.focused = state.focused;
+                    inner_state.readonly = state.readonly;
+                    inner_state.disabled = state.disabled;
+                    inner_state.checked = state.checked;
+                }
+                continue;
+            }
+        }
+
+        for (_, bind_to, mut inner_state) in inner_query.iter_mut() {
             if bind_to.0 != id.get() {
                 continue;
             }

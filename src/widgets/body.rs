@@ -78,6 +78,7 @@ impl Plugin for BodyWidget {
     /// Registers systems for body widget setup.
     fn build(&self, app: &mut App) {
         app.init_resource::<HoveredBodyTracker>();
+        app.init_resource::<ActiveScrollTarget>();
         app.add_systems(
             Update,
             (
@@ -650,7 +651,7 @@ fn route_hover_from_pointer_messages(
 /// Wheel scroll uses the "last hovered body" and scrolls its BodyScrollContent (Y only).
 fn handle_body_scroll_wheel(
     mut wheel_events: MessageReader<MouseWheel>,
-    active_scroll_target: Res<ActiveScrollTarget>,
+    active_scroll_target: Option<Res<ActiveScrollTarget>>,
     hovered: Res<HoveredBodyTracker>,
     body_q: Query<(Entity, &BodyContentRoot), With<Body>>,
     mut content_q: Query<(&Node, &ComputedNode, &mut ScrollPosition), With<BodyScrollContent>>,
@@ -665,7 +666,10 @@ fn handle_body_scroll_wheel(
     >,
     dialog_overlay_q: Query<(Option<&TagName>, Option<&CssClass>, &Visibility)>,
 ) {
-    if active_scroll_target.entity.is_some() {
+    if active_scroll_target
+        .as_ref()
+        .is_some_and(|target| target.entity.is_some())
+    {
         wheel_events.clear();
         return;
     }

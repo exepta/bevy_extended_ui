@@ -13,7 +13,7 @@ use crate::html::reload::HtmlReloadPlugin;
 use crate::lang::{UILang, UiLangState, UiLangVariables};
 use bevy::ecs::system::SystemId;
 use bevy::prelude::*;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[cfg(feature = "extended-dialog")]
@@ -100,11 +100,12 @@ pub struct ShowWidgetsTimer {
 #[derive(Event, Message)]
 pub struct HtmlChangeEvent;
 
-/// A simple explicit "UI needs rebuild" flag.
-/// We use this because mutating the internal HashMap of HtmlStructureMap
+/// Tracks whether the HTML UI needs rebuilding and, when possible, which UI keys changed.
+///
+/// We use this because mutating the internal HashMap of `HtmlStructureMap`
 /// does NOT reliably trigger `resource_changed::<HtmlStructureMap>()`.
 #[derive(Resource, Default)]
-pub struct HtmlDirty(pub bool);
+pub struct HtmlDirty(pub bool, pub HashSet<String>);
 
 /// Component storing parsed inline CSS (`style="..."`) as your custom Style struct.
 /// Component storing parsed inline CSS (`style="..."`) as a `Style`.
