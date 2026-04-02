@@ -2,7 +2,7 @@
 mod tests {
     use super::super::controls::{ButtonImage, place_icon_if};
     use super::super::validation::update_validation_states;
-    use super::super::widget_util::wheel_delta_y;
+    use super::super::widget_util::{wheel_delta_x, wheel_delta_y};
     use super::super::*;
     use crate::styles::{CssClass, CssSource, IconPlace};
     use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
@@ -283,6 +283,33 @@ mod tests {
             window: Entity::PLACEHOLDER,
         };
         assert_eq!(wheel_delta_y(&pixel, 0.5), 15.0);
+    }
+
+    #[test]
+    fn wheel_delta_x_converts_line_and_pixel_units() {
+        let line_small = MouseWheel {
+            unit: MouseScrollUnit::Line,
+            x: 2.0,
+            y: 0.0,
+            window: Entity::PLACEHOLDER,
+        };
+        assert_eq!(wheel_delta_x(&line_small, 0.5), 50.0);
+
+        let line_big = MouseWheel {
+            unit: MouseScrollUnit::Line,
+            x: 12.0,
+            y: 0.0,
+            window: Entity::PLACEHOLDER,
+        };
+        assert_eq!(wheel_delta_x(&line_big, 0.5), 6.0);
+
+        let pixel = MouseWheel {
+            unit: MouseScrollUnit::Pixel,
+            x: 30.0,
+            y: 0.0,
+            window: Entity::PLACEHOLDER,
+        };
+        assert_eq!(wheel_delta_x(&pixel, 0.5), 15.0);
     }
 
     #[test]

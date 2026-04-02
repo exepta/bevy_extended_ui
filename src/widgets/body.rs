@@ -5,7 +5,7 @@ use crate::registry::UiRegistry;
 use crate::styles::{CssClass, CssSource, Style, TagName};
 use crate::widgets::controls::choice_box::ChoiceLayoutBoxBase;
 use crate::widgets::div::DivContentRoot;
-use crate::widgets::widget_util::wheel_delta_y;
+use crate::widgets::widget_util::{wheel_delta_x, wheel_delta_y};
 use crate::widgets::{
     ActiveScrollTarget, BindToID, Body, Div, Scrollbar, UIGenID, UIWidgetState, WidgetId,
     WidgetKind,
@@ -648,9 +648,10 @@ fn route_hover_from_pointer_messages(
     }
 }
 
-/// Wheel scroll uses the "last hovered body" and scrolls its BodyScrollContent (Y only).
+/// Wheel scroll uses the "last hovered body" and scrolls its BodyScrollContent on both axes.
 fn handle_body_scroll_wheel(
     mut wheel_events: MessageReader<MouseWheel>,
+    keyboard: Option<Res<ButtonInput<KeyCode>>>,
     active_scroll_target: Option<Res<ActiveScrollTarget>>,
     hovered: Res<HoveredBodyTracker>,
     body_q: Query<(Entity, &BodyContentRoot), With<Body>>,
@@ -684,16 +685,25 @@ fn handle_body_scroll_wheel(
             return false;
         };
 
-        if node.overflow.y != OverflowAxis::Scroll {
-            return false;
-        }
-
         let inv_sf = computed.inverse_scale_factor.max(f32::EPSILON);
-        let viewport_h = (computed.size().y * inv_sf).max(1.0);
-        let content_h = (computed.content_size.y * inv_sf).max(viewport_h);
-        let max_scroll = (content_h - viewport_h).max(0.0);
 
-        max_scroll > 0.5
+        let can_scroll_y = if node.overflow.y == OverflowAxis::Scroll {
+            let viewport_h = (computed.size().y * inv_sf).max(1.0);
+            let content_h = (computed.content_size.y * inv_sf).max(viewport_h);
+            (content_h - viewport_h).max(0.0) > 0.5
+        } else {
+            false
+        };
+
+        let can_scroll_x = if node.overflow.x == OverflowAxis::Scroll {
+            let viewport_w = (computed.size().x * inv_sf).max(1.0);
+            let content_w = (computed.content_size.x * inv_sf).max(viewport_w);
+            (content_w - viewport_w).max(0.0) > 0.5
+        } else {
+            false
+        };
+
+        can_scroll_x || can_scroll_y
     });
     if has_hovered_scrollable_div {
         return;
@@ -710,16 +720,25 @@ fn handle_body_scroll_wheel(
                 if !matches!(*visibility, Visibility::Visible | Visibility::Inherited) {
                     return false;
                 }
-                if node.overflow.y != OverflowAxis::Scroll {
-                    return false;
-                }
-
                 let inv_sf = computed.inverse_scale_factor.max(f32::EPSILON);
-                let viewport_h = (computed.size().y * inv_sf).max(1.0);
-                let content_h = (computed.content_size.y * inv_sf).max(viewport_h);
-                let max_scroll = (content_h - viewport_h).max(0.0);
 
-                max_scroll > 0.5
+                let can_scroll_y = if node.overflow.y == OverflowAxis::Scroll {
+                    let viewport_h = (computed.size().y * inv_sf).max(1.0);
+                    let content_h = (computed.content_size.y * inv_sf).max(viewport_h);
+                    (content_h - viewport_h).max(0.0) > 0.5
+                } else {
+                    false
+                };
+
+                let can_scroll_x = if node.overflow.x == OverflowAxis::Scroll {
+                    let viewport_w = (computed.size().x * inv_sf).max(1.0);
+                    let content_w = (computed.content_size.x * inv_sf).max(viewport_w);
+                    (content_w - viewport_w).max(0.0) > 0.5
+                } else {
+                    false
+                };
+
+                can_scroll_x || can_scroll_y
             });
     if has_hovered_scrollable_choice_overlay {
         return;
@@ -754,18 +773,38 @@ fn handle_body_scroll_wheel(
             continue;
         };
 
-        if node.overflow.y != OverflowAxis::Scroll {
+        let can_scroll_y = node.overflow.y == OverflowAxis::Scroll;
+        let can_scroll_x = node.overflow.x == OverflowAxis::Scroll;
+        if !can_scroll_x && !can_scroll_y {
             continue;
         }
 
         let inv_sf = computed.inverse_scale_factor.max(f32::EPSILON);
-        let delta = -wheel_delta_y(event, inv_sf);
+        let shift = keyboard.as_ref().is_some_and(|keys| {
+            keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight)
+        });
 
-        let viewport_h = (computed.size().y * inv_sf).max(1.0);
-        let content_h = (computed.content_size.y * inv_sf).max(viewport_h);
-        let max_scroll = (content_h - viewport_h).max(0.0);
+        let mut delta_x = -wheel_delta_x(event, inv_sf);
+        let mut delta_y = -wheel_delta_y(event, inv_sf);
 
-        scroll.y = (scroll.y + delta).clamp(0.0, max_scroll);
+        if shift && delta_x.abs() <= f32::EPSILON && can_scroll_x {
+            delta_x = delta_y;
+            delta_y = 0.0;
+        }
+
+        if can_scroll_y && delta_y.abs() > f32::EPSILON {
+            let viewport_h = (computed.size().y * inv_sf).max(1.0);
+            let content_h = (computed.content_size.y * inv_sf).max(viewport_h);
+            let max_scroll_y = (content_h - viewport_h).max(0.0);
+            scroll.y = (scroll.y + delta_y).clamp(0.0, max_scroll_y);
+        }
+
+        if can_scroll_x && delta_x.abs() > f32::EPSILON {
+            let viewport_w = (computed.size().x * inv_sf).max(1.0);
+            let content_w = (computed.content_size.x * inv_sf).max(viewport_w);
+            let max_scroll_x = (content_w - viewport_w).max(0.0);
+            scroll.x = (scroll.x + delta_x).clamp(0.0, max_scroll_x);
+        }
     }
 }
 
@@ -977,6 +1016,15 @@ mod tests {
         }
     }
 
+    fn line_wheel_xy(x: f32, y: f32) -> MouseWheel {
+        MouseWheel {
+            unit: MouseScrollUnit::Line,
+            x,
+            y,
+            window: Entity::PLACEHOLDER,
+        }
+    }
+
     fn spawn_body_scroll_content(world: &mut World, viewport_h: f32, content_h: f32) -> Entity {
         let mut node = Node::default();
         node.overflow = Overflow {
@@ -989,6 +1037,23 @@ mod tests {
                 BodyScrollContent,
                 node,
                 computed_node(Vec2::new(200.0, viewport_h), Vec2::new(200.0, content_h)),
+                ScrollPosition::default(),
+            ))
+            .id()
+    }
+
+    fn spawn_body_scroll_content_xy(world: &mut World, viewport: Vec2, content: Vec2) -> Entity {
+        let mut node = Node::default();
+        node.overflow = Overflow {
+            x: OverflowAxis::Scroll,
+            y: OverflowAxis::Hidden,
+        };
+
+        world
+            .spawn((
+                BodyScrollContent,
+                node,
+                computed_node(viewport, content),
                 ScrollPosition::default(),
             ))
             .id()
@@ -1078,6 +1143,72 @@ mod tests {
             .get::<ScrollPosition>(content_entity)
             .expect("body scroll content is missing ScrollPosition");
         assert_eq!(pos.y, 25.0);
+    }
+
+    #[test]
+    fn body_wheel_scroll_moves_body_content_horizontally_when_x_wheel_is_used() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
+        app.init_resource::<Messages<MouseWheel>>();
+        app.insert_resource(HoveredBodyTracker::default());
+        app.add_systems(Update, handle_body_scroll_wheel);
+
+        let content_entity =
+            spawn_body_scroll_content_xy(app.world_mut(), Vec2::new(100.0, 80.0), Vec2::new(260.0, 80.0));
+        let body_entity = app
+            .world_mut()
+            .spawn((Body::default(), BodyContentRoot(content_entity)))
+            .id();
+        app.world_mut()
+            .resource_mut::<HoveredBodyTracker>()
+            .last_body = Some(body_entity);
+
+        app.world_mut()
+            .resource_mut::<Messages<MouseWheel>>()
+            .write(line_wheel_xy(-1.0, 0.0));
+        app.update();
+
+        let pos = app
+            .world()
+            .get::<ScrollPosition>(content_entity)
+            .expect("body scroll content is missing ScrollPosition");
+        assert_eq!(pos.x, 25.0);
+        assert_eq!(pos.y, 0.0);
+    }
+
+    #[test]
+    fn body_wheel_scroll_uses_shift_vertical_wheel_for_horizontal_scroll() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
+        app.init_resource::<Messages<MouseWheel>>();
+        app.insert_resource(ButtonInput::<KeyCode>::default());
+        app.insert_resource(HoveredBodyTracker::default());
+        app.add_systems(Update, handle_body_scroll_wheel);
+
+        let content_entity =
+            spawn_body_scroll_content_xy(app.world_mut(), Vec2::new(100.0, 80.0), Vec2::new(260.0, 80.0));
+        let body_entity = app
+            .world_mut()
+            .spawn((Body::default(), BodyContentRoot(content_entity)))
+            .id();
+        app.world_mut()
+            .resource_mut::<HoveredBodyTracker>()
+            .last_body = Some(body_entity);
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(KeyCode::ShiftLeft);
+
+        app.world_mut()
+            .resource_mut::<Messages<MouseWheel>>()
+            .write(line_wheel(-1.0));
+        app.update();
+
+        let pos = app
+            .world()
+            .get::<ScrollPosition>(content_entity)
+            .expect("body scroll content is missing ScrollPosition");
+        assert_eq!(pos.x, 25.0);
+        assert_eq!(pos.y, 0.0);
     }
 
     #[test]

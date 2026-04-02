@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::styles::paint::Colored;
 use crate::styles::{CssClass, CssSource, TagName};
-use crate::widgets::widget_util::wheel_delta_y;
+use crate::widgets::widget_util::{wheel_delta_x, wheel_delta_y};
 use crate::widgets::{
     ActiveScrollTarget, BindToID, Div, Scrollbar, UIGenID, UIWidgetState, WidgetId, WidgetKind,
 };
@@ -566,10 +566,11 @@ fn route_hover_from_pointer_messages(
     }
 }
 
-/// Wheel scroll uses the "last hovered div" and scrolls its DivScrollContent (Y only).
+/// Wheel scroll uses the "last hovered div" and scrolls its DivScrollContent on both axes.
 /// Handles mouse wheel scrolling for div content.
 fn handle_div_scroll_wheel(
     mut wheel_events: MessageReader<MouseWheel>,
+    keyboard: Option<Res<ButtonInput<KeyCode>>>,
     active_scroll_target: Res<ActiveScrollTarget>,
     hovered: Res<HoveredDivTracker>,
     div_q: Query<(&DivContentRoot, &Visibility), With<Div>>,
@@ -598,18 +599,38 @@ fn handle_div_scroll_wheel(
             continue;
         };
 
-        if node.overflow.y != OverflowAxis::Scroll {
+        let can_scroll_y = node.overflow.y == OverflowAxis::Scroll;
+        let can_scroll_x = node.overflow.x == OverflowAxis::Scroll;
+        if !can_scroll_x && !can_scroll_y {
             continue;
         }
 
         let inv_sf = computed.inverse_scale_factor.max(f32::EPSILON);
-        let delta = -wheel_delta_y(event, inv_sf);
+        let shift = keyboard.as_ref().is_some_and(|keys| {
+            keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight)
+        });
 
-        let viewport_h = (computed.size().y * inv_sf).max(1.0);
-        let content_h = (computed.content_size.y * inv_sf).max(viewport_h);
-        let max_scroll = (content_h - viewport_h).max(0.0);
+        let mut delta_x = -wheel_delta_x(event, inv_sf);
+        let mut delta_y = -wheel_delta_y(event, inv_sf);
 
-        scroll.y = (scroll.y + delta).clamp(0.0, max_scroll);
+        if shift && delta_x.abs() <= f32::EPSILON && can_scroll_x {
+            delta_x = delta_y;
+            delta_y = 0.0;
+        }
+
+        if can_scroll_y && delta_y.abs() > f32::EPSILON {
+            let viewport_h = (computed.size().y * inv_sf).max(1.0);
+            let content_h = (computed.content_size.y * inv_sf).max(viewport_h);
+            let max_scroll_y = (content_h - viewport_h).max(0.0);
+            scroll.y = (scroll.y + delta_y).clamp(0.0, max_scroll_y);
+        }
+
+        if can_scroll_x && delta_x.abs() > f32::EPSILON {
+            let viewport_w = (computed.size().x * inv_sf).max(1.0);
+            let content_w = (computed.content_size.x * inv_sf).max(viewport_w);
+            let max_scroll_x = (content_w - viewport_w).max(0.0);
+            scroll.x = (scroll.x + delta_x).clamp(0.0, max_scroll_x);
+        }
     }
 }
 
