@@ -86,7 +86,7 @@ version = "0.8.1"
 version = "1.0.0-alpha.71"
 
 [dependencies.once_cell]
-version = "1.21.3"
+version = "1.21.4"
 
 [dependencies.regex]
 version = "1.12.3"
