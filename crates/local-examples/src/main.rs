@@ -1,9 +1,45 @@
 mod theming_provider_example;
+mod typed_values_example;
 mod widget_overview_example;
 
 fn main() {
     configure_linux_window_backend();
-    widget_overview_example::run();
+
+    let mut args = std::env::args();
+    let program = args.next().unwrap_or_else(|| "local-examples".to_string());
+
+    match args.next().as_deref() {
+        None => widget_overview_example::run(),
+        Some("--help" | "-h" | "help") => print_usage(&program),
+        Some(selection) if run_example(selection) => {}
+        Some(selection) => {
+            eprintln!("Unknown example: {selection}\n");
+            print_usage(&program);
+            std::process::exit(2);
+        }
+    }
+}
+
+fn run_example(selection: &str) -> bool {
+    match selection {
+        "widget_overview_example" | "widget-overview" | "widget" => {
+            widget_overview_example::run();
+            true
+        }
+        "theming_provider_example" | "theming-provider" | "theme" => {
+            theming_provider_example::run();
+            true
+        }
+        "typed_values_example" | "typed-values" | "typed" => {
+            typed_values_example::run();
+            true
+        }
+        _ => false,
+    }
+}
+
+fn print_usage(program: &str) {
+    eprintln!("Usage: {program} [widget-overview|theming-provider|typed-values]");
 }
 
 #[cfg(target_os = "linux")]

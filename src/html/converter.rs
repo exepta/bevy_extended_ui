@@ -1,10 +1,14 @@
 use std::collections::{HashMap, HashSet};
-
 use bevy::asset::AssetEvent;
+use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
+use bevy::reflect::TypeRegistry;
+use bevy::reflect::serde::TypedReflectDeserializer;
 use kuchiki::{Attributes, NodeRef, traits::TendrilSink};
 use once_cell::sync::Lazy;
 use regex::Regex;
+use serde::de::DeserializeSeed;
+use serde_json::Value as JsonValue;
 
 use crate::ExtendedUiConfiguration;
 #[cfg(feature = "extended-dialog")]
@@ -50,6 +54,14 @@ impl Plugin for HtmlConverterSystem {
 /// Marker component for HtmlSource entities that need a retry parse.
 struct PendingHtmlParse;
 
+/// Bundled query params for `update_html_ui`, keeping total system-param count ≤ 16.
+#[derive(SystemParam)]
+struct HtmlSourceQueries<'w, 's> {
+    added: Query<'w, 's, (Entity, &'static HtmlSource), Added<HtmlSource>>,
+    pending: Query<'w, 's, Entity, With<PendingHtmlParse>>,
+    all: Query<'w, 's, (Entity, &'static HtmlSource)>,
+}
+
 /// Converts HtmlAsset content into HtmlStructureMap entries.
 /// Also resolves <link rel="stylesheet" href="..."> into Handle<CssAsset>.
 /// Updates parsed HTML structures from assets and language state.
@@ -69,10 +81,11 @@ fn update_html_ui(
     #[cfg(feature = "providers")] provider_registry: Option<Res<UiProviderRegistry>>,
     #[cfg(feature = "providers")] mut theme_provider_state: Option<ResMut<ThemeProviderState>>,
 
-    query_added: Query<(Entity, &HtmlSource), Added<HtmlSource>>,
-    query_pending: Query<Entity, With<PendingHtmlParse>>,
-    query_all: Query<(Entity, &HtmlSource)>,
+    type_registry: Res<AppTypeRegistry>,
+
+    queries: HtmlSourceQueries,
 ) {
+    let type_registry = type_registry.read();
     let resolved = ui_lang.resolved().map(|lang| lang.to_string());
     let mut lang_dirty = false;
     let vars_hash = vars_fingerprint(&lang_vars);
@@ -95,8 +108,8 @@ fn update_html_ui(
     }
 
     // Entities that need reparse (new HtmlSource, pending retry, or changed HtmlAsset).
-    let mut dirty_entities: Vec<Entity> = query_added.iter().map(|(e, _)| e).collect();
-    dirty_entities.extend(query_pending.iter());
+    let mut dirty_entities: Vec<Entity> = queries.added.iter().map(|(e, _)| e).collect();
+    dirty_entities.extend(queries.pending.iter());
 
     // If an HtmlAsset changed OR was added later (async), find all entities referencing it.
     for ev in html_asset_events.read() {
@@ -107,7 +120,7 @@ fn update_html_ui(
             _ => continue,
         };
 
-        for (entity, src) in query_all.iter() {
+        for (entity, src) in queries.all.iter() {
             if src.handle.id() == id {
                 dirty_entities.push(entity);
             }
@@ -118,7 +131,7 @@ fn update_html_ui(
     dirty_entities.dedup();
 
     if lang_dirty {
-        dirty_entities.extend(query_all.iter().map(|(e, _)| e));
+        dirty_entities.extend(queries.all.iter().map(|(e, _)| e));
         dirty_entities.sort();
         dirty_entities.dedup();
     }
@@ -128,7 +141,7 @@ fn update_html_ui(
     }
 
     for entity in dirty_entities {
-        let Ok((_entity, html)) = query_all.get(entity) else {
+        let Ok((_entity, html)) = queries.all.get(entity) else {
             continue;
         };
 
@@ -257,12 +270,13 @@ fn update_html_ui(
         let label_map = collect_labels_by_for(&body_node);
 
         if let Some(body_widget) =
-            parse_html_node(&body_node, &css_handles, &label_map, &ui_key, html)
+            parse_html_node(&body_node, &css_handles, &label_map, &ui_key, html, &type_registry)
         {
-            structure_map.html_map.insert(ui_key, vec![body_widget]);
+            structure_map.html_map.insert(ui_key.clone(), vec![body_widget]);
 
-            // IMPORTANT: Explicitly mark UI as dirty so the builder rebuilds.
+            // IMPORTANT: Explicitly mark the affected UI key as dirty so the builder rebuilds.
             html_dirty.0 = true;
+            html_dirty.1.insert(ui_key);
         } else {
             error!("Failed to parse <body> node.");
         }
@@ -276,6 +290,7 @@ fn parse_html_node(
     label_map: &HashMap<String, String>,
     key: &String,
     html: &HtmlSource,
+    type_registry: &TypeRegistry,
 ) -> Option<HtmlWidgetNode> {
     let element = node.as_element()?;
     let tag = element.name.local.to_string();
@@ -306,7 +321,7 @@ fn parse_html_node(
         "body" => {
             let children = node
                 .children()
-                .filter_map(|child| parse_html_node(&child, css_sources, label_map, key, html))
+                .filter_map(|child| parse_html_node(&child, css_sources, label_map, key, html, type_registry))
                 .collect();
 
             Some(HtmlWidgetNode::Body(
@@ -404,7 +419,7 @@ fn parse_html_node(
         "div" => {
             let mut children = Vec::new();
             for child in node.children() {
-                if let Some(parsed) = parse_html_node(&child, css_sources, label_map, key, html) {
+                if let Some(parsed) = parse_html_node(&child, css_sources, label_map, key, html, type_registry) {
                     children.push(parsed);
                 }
             }
@@ -423,7 +438,7 @@ fn parse_html_node(
         "form" => {
             let mut children = Vec::new();
             for child in node.children() {
-                if let Some(parsed) = parse_html_node(&child, css_sources, label_map, key, html) {
+                if let Some(parsed) = parse_html_node(&child, css_sources, label_map, key, html, type_registry) {
                     children.push(parsed);
                 }
             }
@@ -458,7 +473,7 @@ fn parse_html_node(
         "dialog" => {
             let mut children = Vec::new();
             for child in node.children() {
-                if let Some(parsed) = parse_html_node(&child, css_sources, label_map, key, html) {
+                if let Some(parsed) = parse_html_node(&child, css_sources, label_map, key, html, type_registry) {
                     children.push(parsed);
                 }
             }
@@ -503,7 +518,7 @@ fn parse_html_node(
         "dialog-header" => {
             let mut children = Vec::new();
             for child in node.children() {
-                if let Some(parsed) = parse_html_node(&child, css_sources, label_map, key, html) {
+                if let Some(parsed) = parse_html_node(&child, css_sources, label_map, key, html, type_registry) {
                     children.push(parsed);
                 }
             }
@@ -526,7 +541,7 @@ fn parse_html_node(
         "dialog-body" => {
             let mut children = Vec::new();
             for child in node.children() {
-                if let Some(parsed) = parse_html_node(&child, css_sources, label_map, key, html) {
+                if let Some(parsed) = parse_html_node(&child, css_sources, label_map, key, html, type_registry) {
                     children.push(parsed);
                 }
             }
@@ -549,7 +564,7 @@ fn parse_html_node(
         "dialog-footer" => {
             let mut children = Vec::new();
             for child in node.children() {
-                if let Some(parsed) = parse_html_node(&child, css_sources, label_map, key, html) {
+                if let Some(parsed) = parse_html_node(&child, css_sources, label_map, key, html, type_registry) {
                     children.push(parsed);
                 }
             }
@@ -598,7 +613,7 @@ fn parse_html_node(
                         continue;
                     }
                 }
-                if let Some(parsed) = parse_html_node(&child, css_sources, label_map, key, html) {
+                if let Some(parsed) = parse_html_node(&child, css_sources, label_map, key, html, type_registry) {
                     children.push(parsed);
                 }
             }
@@ -611,7 +626,9 @@ fn parse_html_node(
                 let element = radio_node.as_element().unwrap();
                 let attrs = element.attributes.borrow();
 
-                let value = attrs.get("value").unwrap_or("").to_string();
+                let value_str = attrs.get("value").unwrap_or("").to_string();
+                let value_type = attrs.get("internal-value-type").unwrap_or("").trim().to_ascii_lowercase();
+                let value = parse_option_internal_value(&value_str, &value_type, type_registry);
                 let label = radio_node.text_contents().trim().to_string();
 
                 let selected = if any_selected_attr {
@@ -656,6 +673,7 @@ fn parse_html_node(
                         selected,
                         ..default()
                     },
+
                     child_meta,
                     child_states,
                     child_functions,
@@ -1011,7 +1029,9 @@ fn parse_html_node(
         }
 
         "radio" => {
-            let value = attributes.get("value").unwrap_or("").to_string();
+            let value_str = attributes.get("value").unwrap_or("").to_string();
+            let value_type = attributes.get("internal-value-type").unwrap_or("").trim().to_ascii_lowercase();
+            let value = parse_option_internal_value(&value_str, &value_type, type_registry);
             let label = node.text_contents().trim().to_string();
             let selected_attr = attributes.contains("selected");
 
@@ -1058,6 +1078,7 @@ fn parse_html_node(
                     if option_el.name.local.eq("option") {
                         let attrs = option_el.attributes.borrow();
                         let value = attrs.get("value").unwrap_or("").to_string();
+                        let value_type = attrs.get("internal-value-type").unwrap_or("").trim().to_ascii_lowercase();
                         let icon = attrs.get("icon").unwrap_or("").to_string();
                         let text = child.text_contents().trim().to_string();
 
@@ -1067,9 +1088,11 @@ fn parse_html_node(
                             Some(icon)
                         };
 
+                        let value = parse_option_internal_value(&value, &value_type, type_registry);
+
                         let option = ChoiceOption {
                             text: text.clone(),
-                            internal_value: value.clone(),
+                            value,
                             icon_path,
                         };
 
@@ -1203,9 +1226,65 @@ fn parse_html_node(
                 ToggleButton {
                     label: text.clone(),
                     icon_path,
-                    value,
+                    value: WidgetValue::new(value),
                     icon_place,
                     selected: selected_attr,
+                    ..default()
+                },
+                meta,
+                states,
+                functions,
+                widget.clone(),
+                HtmlID::default(),
+            ))
+        }
+
+        "listbox" => {
+            let mut options = Vec::new();
+            let mut selected_values = Vec::new();
+            let multiselect = attributes.contains("multiselect");
+
+            for child in node.children() {
+                if let Some(option_el) = child.as_element() {
+                    if option_el.name.local.eq("option") {
+                        let attrs = option_el.attributes.borrow();
+                        let value = attrs.get("value").unwrap_or("").to_string();
+                        let value_type = attrs
+                            .get("internal-value-type")
+                            .unwrap_or("")
+                            .trim()
+                            .to_ascii_lowercase();
+                        let icon = attrs.get("icon").unwrap_or("").to_string();
+                        let text = child.text_contents().trim().to_string();
+
+                        let icon_path = if icon.trim().is_empty() {
+                            None
+                        } else {
+                            Some(icon)
+                        };
+
+                        let value = parse_option_internal_value(&value, &value_type, type_registry);
+
+                        let option = ChoiceOption {
+                            text: text.clone(),
+                            value,
+                            icon_path,
+                        };
+
+                        if attrs.contains("selected") {
+                            selected_values.push(option.clone());
+                        }
+
+                        options.push(option);
+                    }
+                }
+            }
+
+            Some(HtmlWidgetNode::ListBox(
+                ListBox {
+                    options,
+                    values: selected_values,
+                    multiselect,
                     ..default()
                 },
                 meta,
@@ -1454,6 +1533,10 @@ pub fn resolve_relative_asset_path(html_path: &str, href: &str) -> String {
 
     if let Some(rest) = href.strip_prefix('/') {
         return rest.to_string();
+    }
+
+    if href.starts_with("./") || href.starts_with("../") {
+        return href;
     }
 
     let base = std::path::Path::new(html_path)
@@ -1874,5 +1957,70 @@ mod tests {
         assert!(content.inner_text().contains("Hello"));
         assert!(content.inner_html().contains("<b>{{ user.name }}</b>"));
         assert_eq!(content.inner_bindings(), &["{{ user.name }}".to_string()]);
+    }
+}
+
+/// Converts an HTML option's `value` string into a [`WidgetValue`] using the
+/// `internal-value-type` attribute hint.
+///
+/// # Primitive types (parsed directly from the string)
+/// `bool`, `i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64`, `f32`, `f64`, `string` / `str`
+///
+/// # Structured types (deserialized via Bevy reflection)
+/// Any other type name — looked up in the Bevy `TypeRegistry` by short path (e.g. `"MyStruct"`)
+/// then deserialized from the JSON value string using `TypedReflectDeserializer` and wrapped in
+/// a [`ReflectedValue`]. Falls back to `serde_json::Value` if the type is not registered, and
+/// to a plain `String` if that also fails.
+///
+/// # Fallback
+/// An empty or unrecognised `type_hint` stores the value as a plain `String`.
+fn parse_option_internal_value(
+    value: &str,
+    type_hint: &str,
+    type_registry: &TypeRegistry,
+) -> WidgetValue {
+    use crate::widgets::ReflectedValue;
+
+    if value.is_empty() {
+        return WidgetValue::default();
+    }
+
+    match type_hint {
+        "bool" => match value.trim() {
+            "true" | "1" | "yes" => WidgetValue::new(true),
+            _ => WidgetValue::new(false),
+        },
+        "i8" => WidgetValue::new(value.trim().parse::<i8>().unwrap_or(0)),
+        "i16" => WidgetValue::new(value.trim().parse::<i16>().unwrap_or(0)),
+        "i32" => WidgetValue::new(value.trim().parse::<i32>().unwrap_or(0)),
+        "i64" => WidgetValue::new(value.trim().parse::<i64>().unwrap_or(0)),
+        "u8" => WidgetValue::new(value.trim().parse::<u8>().unwrap_or(0)),
+        "u16" => WidgetValue::new(value.trim().parse::<u16>().unwrap_or(0)),
+        "u32" => WidgetValue::new(value.trim().parse::<u32>().unwrap_or(0)),
+        "u64" => WidgetValue::new(value.trim().parse::<u64>().unwrap_or(0)),
+        "f32" => WidgetValue::new(value.trim().parse::<f32>().unwrap_or(0.0)),
+        "f64" => WidgetValue::new(value.trim().parse::<f64>().unwrap_or(0.0)),
+        "" | "string" | "str" => WidgetValue::new(value.to_string()),
+        type_name => {
+            // Try Bevy reflection first (short path, then full path).
+            let registration = type_registry
+                .get_with_short_type_path(type_name)
+                .or_else(|| type_registry.get_with_type_path(type_name));
+
+            if let Some(registration) = registration {
+                let deserializer = TypedReflectDeserializer::new(registration, type_registry);
+                let mut json_de = serde_json::Deserializer::from_str(value);
+                match deserializer.deserialize(&mut json_de) {
+                    Ok(reflected) => WidgetValue::new(ReflectedValue(reflected)),
+                    Err(_) => WidgetValue::new(value.to_string()),
+                }
+            } else {
+                // Type not registered — fall back to serde_json::Value, then String.
+                match serde_json::from_str::<JsonValue>(value) {
+                    Ok(json) => WidgetValue::new(json),
+                    Err(_) => WidgetValue::new(value.to_string()),
+                }
+            }
+        }
     }
 }

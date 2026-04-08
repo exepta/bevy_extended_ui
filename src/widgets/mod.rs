@@ -16,7 +16,9 @@ use crate::widgets::controls::ExtendedControlWidgets;
 use crate::widgets::div::DivWidget;
 use crate::widgets::form::FormWidget;
 use bevy::prelude::*;
+use std::any::Any;
 use std::fmt;
+use std::sync::Arc;
 
 pub(crate) use validation::evaluate_validation_state;
 
@@ -25,6 +27,12 @@ pub(crate) use validation::evaluate_validation_state;
 /// Used to mark UI nodes that do not inherit state like `focused` or `hovered`.
 #[derive(Component)]
 pub struct IgnoreParentState;
+
+/// Tracks the currently hovered scrollable widget so wheel input is routed once.
+#[derive(Resource, Default)]
+pub(crate) struct ActiveScrollTarget {
+    pub entity: Option<Entity>,
+}
 
 /// Unique identifier for UI elements.
 ///
@@ -211,6 +219,7 @@ pub enum WidgetKind {
     Slider,
     SwitchButton,
     ToggleButton,
+    ListBox,
 }
 
 /// Plugin that registers all built-in widget types.
@@ -219,6 +228,7 @@ pub struct ExtendedWidgetPlugin;
 impl Plugin for ExtendedWidgetPlugin {
     /// Registers widget components and systems.
     fn build(&self, app: &mut App) {
+        app.init_resource::<ActiveScrollTarget>();
         app.register_type::<UIGenID>();
         app.register_type::<BindToID>();
         app.register_type::<UIWidgetState>();
@@ -447,31 +457,137 @@ impl Default for ChoiceBox {
 }
 
 /// Single option entry used by choice boxes.
-#[derive(Component, Reflect, Debug, Clone, PartialEq, Eq)]
+#[derive(Component, Reflect, Debug, Clone)]
 pub struct ChoiceOption {
     pub text: String,
-    pub internal_value: String,
+    /// The option's value. Defaults to a `String` but can hold any `Send + Sync` type.
+    /// Use [`ChoiceOption::with_value`] to attach a typed value and
+    /// [`ChoiceOption::get_value`] to recover it. Use [`ChoiceOption::value_as_str`]
+    /// for the common `String` case.
+    #[reflect(ignore)]
+    pub value: WidgetValue,
     pub icon_path: Option<String>,
 }
+
+impl PartialEq for ChoiceOption {
+    fn eq(&self, other: &Self) -> bool {
+        if self.text != other.text || self.icon_path != other.icon_path {
+            return false;
+        }
+        match (&self.value.0, &other.value.0) {
+            (None, None) => true,
+            (Some(a), Some(b)) => match (a.downcast_ref::<String>(), b.downcast_ref::<String>()) {
+                (Some(sa), Some(sb)) => sa == sb,
+                _ => Arc::ptr_eq(a, b),
+            },
+            _ => false,
+        }
+    }
+}
+
+impl Eq for ChoiceOption {}
 
 impl Default for ChoiceOption {
     /// Creates a default option labeled "Please Select".
     fn default() -> Self {
         Self {
             text: String::from("Please Select"),
-            internal_value: String::from("default"),
+            value: WidgetValue::new(String::from("default")),
             icon_path: None,
         }
     }
 }
 
 impl ChoiceOption {
-    /// Creates an option using the provided text.
+    /// Creates an option using the provided text as the internal string value.
     pub fn new(text: &str) -> Self {
         Self {
             text: text.to_string(),
-            internal_value: text.trim().to_string(),
+            value: WidgetValue::new(text.trim().to_string()),
             icon_path: None,
+        }
+    }
+
+    /// Sets a typed value for this option.
+    pub fn with_value<T: Any + Send + Sync>(mut self, value: T) -> Self {
+        self.value.set(value);
+        self
+    }
+
+    /// Returns the typed value if it can be downcast to `T`.
+    pub fn get_value<T: Any>(&self) -> Option<&T> {
+        self.value.get::<T>()
+    }
+
+    /// Returns the internal value as `&str` when it holds a `String`.
+    pub fn value_as_str(&self) -> Option<&str> {
+        self.value.as_str()
+    }
+
+    /// Returns a reflected value when the option was created from reflection.
+    pub fn get_reflected(&self) -> Option<&ReflectedValue> {
+        self.value.reflect()
+    }
+}
+
+/// Wraps a `Box<dyn PartialReflect>` so it can be stored as `Arc<dyn Any + Send + Sync>` and
+/// retrieved via [`ChoiceOption::get_reflected`].
+///
+/// Use [`ReflectedValue::downcast_ref`] to obtain the concrete type.
+///
+/// # Example
+/// ```ignore
+/// if let Some(rv) = option.get_reflected() {
+///     if let Some(my_val) = rv.downcast_ref::<MyStruct>() { ... }
+/// }
+/// ```
+pub struct ReflectedValue(pub Box<dyn PartialReflect>);
+
+impl ReflectedValue {
+    /// Downcasts the inner reflected value to `T`.
+    ///
+    /// Returns `None` if the concrete type doesn't implement the full [`Reflect`] trait or
+    /// if the type doesn't match.
+    pub fn downcast_ref<T: 'static>(&self) -> Option<&T> {
+        self.0.try_as_reflect()?.as_any().downcast_ref::<T>()
+    }
+}
+
+// ===============================================
+//                    ListBox
+// ===============================================
+
+/// List box widget displaying all options in a scrollable list.
+///
+/// Unlike [`ChoiceBox`], all options are always visible (no dropdown).
+/// Supports both single-select and multiselect modes via [`ListBox::multiselect`].
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+#[require(UIGenID, UIWidgetState, Widget)]
+pub struct ListBox {
+    pub entry: usize,
+    pub options: Vec<ChoiceOption>,
+    /// Currently selected options. In single-select mode this holds at most one entry.
+    pub values: Vec<ChoiceOption>,
+    /// When `true`, clicking options toggles their selection independently.
+    /// When `false`, only one option can be selected at a time.
+    pub multiselect: bool,
+}
+
+impl Default for ListBox {
+    /// Creates a default list box widget with no pre-selected options.
+    fn default() -> Self {
+        let entry = LIST_BOX_ID_POOL.lock().unwrap().acquire();
+
+        Self {
+            entry,
+            options: vec![
+                ChoiceOption::new("Option A"),
+                ChoiceOption::new("Option B"),
+                ChoiceOption::new("Option C"),
+            ],
+            values: Vec::new(),
+            multiselect: false,
         }
     }
 }
@@ -1245,7 +1361,12 @@ impl Default for ProgressBar {
 pub struct RadioButton {
     pub entry: usize,
     pub label: String,
-    pub value: String,
+    /// The button's value. Defaults to an empty `String` but can hold any `Send + Sync` type.
+    /// Use [`RadioButton::with_value`] to attach a typed value and
+    /// [`RadioButton::get_value`] to recover it. Use [`RadioButton::value_as_str`]
+    /// for the common `String` case.
+    #[reflect(ignore)]
+    pub value: WidgetValue,
     pub selected: bool,
 }
 
@@ -1257,9 +1378,63 @@ impl Default for RadioButton {
         Self {
             entry,
             label: String::from("label"),
-            value: String::from(""),
+            value: WidgetValue::new(String::new()),
             selected: false,
         }
+    }
+}
+
+impl RadioButton {
+    /// Sets a typed value for this radio button.
+    pub fn with_value<T: Any + Send + Sync>(mut self, value: T) -> Self {
+        self.value.set(value);
+        self
+    }
+
+    /// Returns the typed value if it can be downcast to `T`.
+    pub fn get_value<T: Any>(&self) -> Option<&T> {
+        self.value.get::<T>()
+    }
+
+    /// Returns the internal value as `&str` when it holds a `String`.
+    pub fn value_as_str(&self) -> Option<&str> {
+        self.value.as_str()
+    }
+
+    /// Returns a reflected value when the radio value was created from reflection.
+    pub fn get_reflected(&self) -> Option<&ReflectedValue> {
+        self.value.reflect()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct WidgetValue(Option<Arc<dyn Any + Send + Sync>>);
+
+impl Default for WidgetValue {
+    fn default() -> Self {
+        Self(None)
+    }
+}
+
+impl WidgetValue {
+    pub fn new<T: Any + Send + Sync>(value: T) -> Self {
+        Self(Some(Arc::new(value)))
+    }
+
+    pub fn get<T: Any>(&self) -> Option<&T> {
+        self.0.as_ref()?.downcast_ref::<T>()
+    }
+
+    pub fn set<T: Any + Send + Sync>(&mut self, value: T) {
+        self.0 = Some(Arc::new(value));
+    }
+
+    pub fn as_str(&self) -> Option<&str> {
+        self.0.as_ref()?.downcast_ref::<String>().map(|s| s.as_str())
+    }
+
+    pub fn reflect(&self) -> Option<&ReflectedValue> {
+        self.get::<ReflectedValue>()
     }
 }
 
@@ -1565,7 +1740,8 @@ impl Default for SwitchButton {
 pub struct ToggleButton {
     pub entry: usize,
     pub label: String,
-    pub value: String,
+    #[reflect(ignore)]
+    pub value: WidgetValue,
     pub icon_place: IconPlace,
     pub icon_path: Option<String>,
     pub selected: bool,
@@ -1579,7 +1755,7 @@ impl Default for ToggleButton {
         Self {
             entry,
             label: String::from("label"),
-            value: String::from(""),
+            value: WidgetValue::new(String::from("")),
             icon_path: None,
             icon_place: IconPlace::default(),
             selected: false,

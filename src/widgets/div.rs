@@ -2,8 +2,10 @@ use std::collections::HashMap;
 
 use crate::styles::paint::Colored;
 use crate::styles::{CssClass, CssSource, TagName};
-use crate::widgets::widget_util::wheel_delta_y;
-use crate::widgets::{BindToID, Div, Scrollbar, UIGenID, UIWidgetState, WidgetId, WidgetKind};
+use crate::widgets::widget_util::{wheel_delta_x, wheel_delta_y};
+use crate::widgets::{
+    ActiveScrollTarget, BindToID, Div, Scrollbar, UIGenID, UIWidgetState, WidgetId, WidgetKind,
+};
 use crate::{CurrentWidgetState, ExtendedUiConfiguration};
 use bevy::camera::visibility::RenderLayers;
 use bevy::input::mouse::MouseWheel;
@@ -420,6 +422,7 @@ fn route_hover_from_pointer_messages(
     sb_owner_q: Query<&DivScrollbarOwner>,
     is_scroll_content_q: Query<(), With<DivScrollContent>>,
     mut div_state_q: Query<&mut UIWidgetState, With<Div>>,
+    div_with_scroll_q: Query<&DivContentRoot, With<Div>>,
     mut hovered: ResMut<HoveredDivTracker>,
 ) {
     /// Walks up the hierarchy to find the owning div entity.
@@ -454,6 +457,22 @@ fn route_hover_from_pointer_messages(
         }
     }
 
+    /// Finds all ancestor Div entities up the parent chain.
+    fn find_all_ancestor_divs(
+        mut e: Entity,
+        parents: &Query<&ChildOf>,
+        is_div_q: &Query<(), With<Div>>,
+    ) -> Vec<Entity> {
+        let mut ancestors = Vec::new();
+        while let Ok(p) = parents.get(e) {
+            e = p.parent();
+            if is_div_q.get(e).is_ok() {
+                ancestors.push(e);
+            }
+        }
+        ancestors
+    }
+
     for msg in over.read() {
         let Some(div) = find_owner_div(
             msg.entity,
@@ -468,11 +487,35 @@ fn route_hover_from_pointer_messages(
 
         let d = hovered.div_ref.entry(div).or_insert(0);
         *d = d.saturating_add(1);
-        hovered.last_div = Some(div);
 
         if let Ok(mut state) = div_state_q.get_mut(div) {
             state.hovered = true;
         }
+
+        // Also mark all ancestor divs as hovered for nested div support
+        let ancestors = find_all_ancestor_divs(div, &parents, &is_div_q);
+
+        // Find the closest (deepest/most recent) scrollable div in the hierarchy for last_div.
+        // Prefer scrollable ancestors over non-scrollable children for wheel event handling.
+        let mut scrollable_div = None;
+        if div_with_scroll_q.get(div).is_ok() {
+            scrollable_div = Some(div);
+        }
+        for ancestor_div in &ancestors {
+            let d = hovered.div_ref.entry(*ancestor_div).or_insert(0);
+            *d = d.saturating_add(1);
+
+            if let Ok(mut state) = div_state_q.get_mut(*ancestor_div) {
+                state.hovered = true;
+            }
+
+            // Use the first scrollable ancestor found (closest parent)
+            if scrollable_div.is_none() && div_with_scroll_q.get(*ancestor_div).is_ok() {
+                scrollable_div = Some(*ancestor_div);
+            }
+        }
+
+        hovered.last_div = scrollable_div.or(Some(div));
     }
 
     for msg in out.read() {
@@ -501,17 +544,43 @@ fn route_hover_from_pointer_messages(
                 }
             }
         }
+
+        // Also unmark ancestor divs
+        let ancestors = find_all_ancestor_divs(div, &parents, &is_div_q);
+        for ancestor_div in ancestors {
+            if let Some(d) = hovered.div_ref.get_mut(&ancestor_div) {
+                *d = d.saturating_sub(1);
+                if *d == 0 {
+                    hovered.div_ref.remove(&ancestor_div);
+
+                    if let Ok(mut state) = div_state_q.get_mut(ancestor_div) {
+                        state.hovered = false;
+                    }
+
+                    if hovered.last_div == Some(ancestor_div) {
+                        hovered.last_div = hovered.div_ref.keys().next().copied();
+                    }
+                }
+            }
+        }
     }
 }
 
-/// Wheel scroll uses the "last hovered div" and scrolls its DivScrollContent (Y only).
+/// Wheel scroll uses the "last hovered div" and scrolls its DivScrollContent on both axes.
 /// Handles mouse wheel scrolling for div content.
 fn handle_div_scroll_wheel(
     mut wheel_events: MessageReader<MouseWheel>,
+    keyboard: Option<Res<ButtonInput<KeyCode>>>,
+    active_scroll_target: Res<ActiveScrollTarget>,
     hovered: Res<HoveredDivTracker>,
     div_q: Query<(&DivContentRoot, &Visibility), With<Div>>,
     mut content_q: Query<(&Node, &ComputedNode, &mut ScrollPosition), With<DivScrollContent>>,
 ) {
+    if active_scroll_target.entity.is_some() {
+        wheel_events.clear();
+        return;
+    }
+
     let Some(active_div) = hovered.last_div else {
         wheel_events.clear();
         return;
@@ -530,18 +599,38 @@ fn handle_div_scroll_wheel(
             continue;
         };
 
-        if node.overflow.y != OverflowAxis::Scroll {
+        let can_scroll_y = node.overflow.y == OverflowAxis::Scroll;
+        let can_scroll_x = node.overflow.x == OverflowAxis::Scroll;
+        if !can_scroll_x && !can_scroll_y {
             continue;
         }
 
         let inv_sf = computed.inverse_scale_factor.max(f32::EPSILON);
-        let delta = -wheel_delta_y(event, inv_sf);
+        let shift = keyboard.as_ref().is_some_and(|keys| {
+            keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight)
+        });
 
-        let viewport_h = (computed.size().y * inv_sf).max(1.0);
-        let content_h = (computed.content_size.y * inv_sf).max(viewport_h);
-        let max_scroll = (content_h - viewport_h).max(0.0);
+        let mut delta_x = -wheel_delta_x(event, inv_sf);
+        let mut delta_y = -wheel_delta_y(event, inv_sf);
 
-        scroll.y = (scroll.y + delta).clamp(0.0, max_scroll);
+        if shift && delta_x.abs() <= f32::EPSILON && can_scroll_x {
+            delta_x = delta_y;
+            delta_y = 0.0;
+        }
+
+        if can_scroll_y && delta_y.abs() > f32::EPSILON {
+            let viewport_h = (computed.size().y * inv_sf).max(1.0);
+            let content_h = (computed.content_size.y * inv_sf).max(viewport_h);
+            let max_scroll_y = (content_h - viewport_h).max(0.0);
+            scroll.y = (scroll.y + delta_y).clamp(0.0, max_scroll_y);
+        }
+
+        if can_scroll_x && delta_x.abs() > f32::EPSILON {
+            let viewport_w = (computed.size().x * inv_sf).max(1.0);
+            let content_w = (computed.content_size.x * inv_sf).max(viewport_w);
+            let max_scroll_x = (content_w - viewport_w).max(0.0);
+            scroll.x = (scroll.x + delta_x).clamp(0.0, max_scroll_x);
+        }
     }
 }
 

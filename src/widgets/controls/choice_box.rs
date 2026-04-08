@@ -4,14 +4,15 @@ use crate::styles::paint::Colored;
 use crate::styles::{CssClass, CssSource, FontVal, TagName};
 use crate::widgets::widget_util::wheel_delta_y;
 use crate::widgets::{
-    BindToID, ChoiceBox, ChoiceOption, IgnoreParentState, UIGenID, UIWidgetState, WidgetId,
-    WidgetKind,
+    ActiveScrollTarget, BindToID, ChoiceBox, ChoiceOption, IgnoreParentState, UIGenID,
+    UIWidgetState, WidgetId, WidgetKind,
 };
 use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
 use bevy::camera::visibility::RenderLayers;
 use bevy::ecs::relationship::RelatedSpawnerCommands;
 use bevy::input::mouse::MouseWheel;
 use bevy::prelude::*;
+use bevy::ui::RelativeCursorPosition;
 
 const CHOICE_BOX_OVERLAY_ROOT_Z: i32 = 40_000;
 const CHOICE_BOX_OVERLAY_CONTENT_Z: i32 = 40_001;
@@ -182,6 +183,7 @@ fn internal_node_creation_system(
                         CssClass(vec![String::from("choice-content-box")]),
                         RenderLayers::layer(*layer),
                         Visibility::Hidden,
+                        RelativeCursorPosition::default(),
                         ChoiceLayoutBoxBase,
                         BindToID(id.0),
                     ))
@@ -194,8 +196,8 @@ fn internal_node_creation_system(
 
                         for option in choice_box.options.iter() {
                             let is_selected = if !selected_assigned {
-                                if !choice_box.value.internal_value.is_empty() {
-                                    choice_box.value.internal_value == option.internal_value
+                                if choice_box.value.value.as_str().map_or(false, |s| !s.is_empty()) {
+                                    choice_box.value.value.as_str() == option.value.as_str()
                                 } else if !choice_box.value.text.is_empty() {
                                     choice_box.value.text == option.text
                                 } else {
@@ -436,6 +438,7 @@ fn update_content_box_visibility(
 /// Handles mouse wheel scrolling within the dropdown content.
 fn handle_scroll_events(
     mut scroll_events: MessageReader<MouseWheel>,
+    active_scroll_target: Res<ActiveScrollTarget>,
     mut layout_query: Query<
         (
             Entity,
@@ -443,6 +446,7 @@ fn handle_scroll_events(
             &Children,
             &mut ScrollPosition,
             &ComputedNode,
+            &RelativeCursorPosition,
         ),
         With<ChoiceLayoutBoxBase>,
     >,
@@ -452,11 +456,15 @@ fn handle_scroll_events(
     let smooth_factor = 30.0;
 
     for event in scroll_events.read() {
-        for (layout_entity, visibility, children, mut scroll, layout_computed) in
+        for (layout_entity, visibility, children, mut scroll, layout_computed, cursor_pos) in
             layout_query.iter_mut()
         {
             let is_visible = matches!(*visibility, Visibility::Visible | Visibility::Inherited);
-            if !is_visible {
+            if !is_visible || cursor_pos.normalized.is_none() {
+                continue;
+            }
+
+            if active_scroll_target.entity != Some(layout_entity) {
                 continue;
             }
 
@@ -579,9 +587,11 @@ fn on_internal_cursor_leave(
 fn on_layout_cursor_entered(
     trigger: On<Pointer<Over>>,
     mut query: Query<&mut UIWidgetState, With<ChoiceLayoutBoxBase>>,
+    mut active_scroll_target: ResMut<ActiveScrollTarget>,
 ) {
     if let Ok(mut state) = query.get_mut(trigger.entity) {
         state.hovered = true;
+        active_scroll_target.entity = Some(trigger.entity);
     }
 }
 
@@ -589,9 +599,13 @@ fn on_layout_cursor_entered(
 fn on_layout_cursor_leave(
     trigger: On<Pointer<Out>>,
     mut query: Query<&mut UIWidgetState, With<ChoiceLayoutBoxBase>>,
+    mut active_scroll_target: ResMut<ActiveScrollTarget>,
 ) {
     if let Ok(mut state) = query.get_mut(trigger.entity) {
         state.hovered = false;
+        if active_scroll_target.entity == Some(trigger.entity) {
+            active_scroll_target.entity = None;
+        }
     }
 }
 
@@ -601,7 +615,7 @@ fn on_layout_cursor_leave(
 ///
 /// This system:
 /// - Updates the selected state across all sibling options (only one is `checked = true`).
-/// - Updates the parent [`ChoiceBox`] value with the clicked option's text/icon.
+/// - Updates the parent [`ChoiceBox`] value with the full clicked option, including typed value.
 /// - Closes the dropdown (`open = false`).
 /// - Updates any [`SelectedOptionBase`] display widgets with the new value.
 /// - Optionally removes focus from the clicked option if no value was selected.
@@ -617,7 +631,7 @@ fn on_layout_cursor_leave(
 /// - Optional: `UIWidgetState::focused`
 /// Handles clicks on choice box options to update selection.
 fn on_internal_option_click(
-    trigger: On<Pointer<Click>>,
+    mut trigger: On<Pointer<Click>>,
     mut option_query: Query<
         (
             Entity,
@@ -635,19 +649,19 @@ fn on_internal_option_click(
     mut selected_query: Query<(&BindToID, &Children), With<SelectedOptionBase>>,
     mut text_query: Query<&mut Text>,
     mut inner_query: Query<&mut UIWidgetState, (Without<ChoiceOptionBase>, Without<ChoiceBox>)>,
+    mut active_scroll_target: ResMut<ActiveScrollTarget>,
 ) {
     let clicked_entity = trigger.entity;
 
-    let (clicked_parent_id, clicked_option_text, clicked_option_icon) =
+    let (clicked_parent_id, clicked_option) =
         if let Ok((_, _, option, bind_id, _)) = option_query.get(clicked_entity) {
-            (
-                bind_id.0.clone(),
-                option.text.clone(),
-                option.icon_path.clone(),
-            )
+            (bind_id.0, option.clone())
         } else {
             return;
         };
+
+    let clicked_option_text = clicked_option.text.clone();
+    let clicked_option_icon = clicked_option.icon_path.clone();
 
     for (entity, mut state, _, bind_id, children) in option_query.iter_mut() {
         if bind_id.0 == clicked_parent_id {
@@ -663,9 +677,9 @@ fn on_internal_option_click(
 
     for (_, mut parent_state, id, mut choice_box) in parent_query.iter_mut() {
         if id.0 == clicked_parent_id {
-            choice_box.value.text = clicked_option_text.clone();
-            choice_box.value.icon_path = clicked_option_icon.clone();
+            choice_box.value = clicked_option.clone();
             parent_state.open = false;
+            active_scroll_target.entity = None;
 
             if clicked_option_text.is_empty() && clicked_option_icon.is_none() {
                 if let Ok((_, mut state, _, _, _)) = option_query.get_mut(clicked_entity) {
@@ -684,6 +698,8 @@ fn on_internal_option_click(
             }
         }
     }
+
+    trigger.propagate(false);
 }
 
 /// Sets `hovered = true` on a [`ChoiceOptionBase`] and its visual children when hovered.

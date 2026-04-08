@@ -52,22 +52,42 @@ pub fn build_html_source(
     if !html_dirty.0 {
         return;
     }
-    html_dirty.0 = false;
 
     let Some(active_list) = structure_map.active.as_ref() else {
+        html_dirty.0 = false;
+        html_dirty.1.clear();
         return;
     };
 
-    // Despawn the old active UI (recursive).
+    let rebuild_keys: Vec<String> = if html_dirty.1.is_empty() {
+        active_list.clone()
+    } else {
+        active_list
+            .iter()
+            .filter(|active| html_dirty.1.contains(*active))
+            .cloned()
+            .collect()
+    };
+
+    html_dirty.0 = false;
+    for key in &rebuild_keys {
+        html_dirty.1.remove(key);
+    }
+
+    if rebuild_keys.is_empty() {
+        return;
+    }
+
+    // Despawn only the active UI roots that actually changed.
     for (entity, body) in body_query.iter() {
         if let Some(key) = body.html_key.as_deref() {
-            if active_list.iter().any(|active| active == key) {
+            if rebuild_keys.iter().any(|dirty_key| dirty_key == key) {
                 commands.entity(entity).despawn();
             }
         }
     }
 
-    for active in active_list {
+    for active in &rebuild_keys {
         spawn_structure_for_active(
             &mut commands,
             active,
@@ -181,7 +201,8 @@ fn collect_html_ids(nodes: &Vec<HtmlWidgetNode>, ids: &mut Vec<HtmlID>) {
             | HtmlWidgetNode::Scrollbar(_, _, _, _, _, id)
             | HtmlWidgetNode::Slider(_, _, _, _, _, id)
             | HtmlWidgetNode::SwitchButton(_, _, _, _, _, id)
-            | HtmlWidgetNode::ToggleButton(_, _, _, _, _, id) => {
+            | HtmlWidgetNode::ToggleButton(_, _, _, _, _, id)
+            | HtmlWidgetNode::ListBox(_, _, _, _, _, id) => {
                 ids.push(id.clone());
             }
             HtmlWidgetNode::Div(_, _, _, children, _, _, id) => {
@@ -439,6 +460,17 @@ fn spawn_widget_node(
             spawn_with_meta(
                 commands,
                 toggle_button.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+            )
+        }
+        HtmlWidgetNode::ListBox(list_box, meta, states, functions, widget, id) => {
+            spawn_with_meta(
+                commands,
+                list_box.clone(),
                 meta,
                 states,
                 functions,

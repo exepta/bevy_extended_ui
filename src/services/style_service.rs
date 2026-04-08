@@ -11,7 +11,7 @@ use crate::styles::{
     Style, TextTransform, TransformStyle, TransitionProperty, TransitionSpec,
 };
 use crate::widgets::UIWidgetState;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use bevy::asset::RenderAssetUsages;
 use bevy::asset::{load_internal_asset, uuid_handle};
@@ -47,10 +47,30 @@ use bevy::ui_render::{DrawUiMaterial, TransparentUi, UiCameraView};
 use bevy::window::{
     CursorIcon, CustomCursor, CustomCursorImage, PrimaryWindow, SystemCursorIcon, WindowResized,
 };
+use once_cell::sync::Lazy;
+use std::sync::RwLock;
 
 const BACKDROP_BLUR_SHADER_HANDLE: Handle<Shader> =
     uuid_handle!("9d04a8bb-b6cf-4758-bca8-30706480973f");
 const MAX_BACKDROP_BLUR_PX: f32 = 80.0;
+
+const SELECTOR_READ_ONLY: u8 = 1 << 0;
+const SELECTOR_DISABLED: u8 = 1 << 1;
+const SELECTOR_CHECKED: u8 = 1 << 2;
+const SELECTOR_FOCUS: u8 = 1 << 3;
+const SELECTOR_HOVER: u8 = 1 << 4;
+const SELECTOR_INVALID: u8 = 1 << 5;
+
+static SELECTOR_METADATA_CACHE: Lazy<RwLock<HashMap<String, SelectorMetadata>>> =
+    Lazy::new(|| RwLock::new(HashMap::new()));
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct SelectorMetadata {
+    specificity: u32,
+    pseudo_flags: u8,
+    has_pseudo: bool,
+    skip: bool,
+}
 
 /// Plugin that applies CSS styles, transitions, and animations to UI nodes.
 pub struct StyleService;
@@ -379,15 +399,15 @@ pub fn update_widget_styles_system(
                 style_pair.selector.as_str()
             };
 
-            if selector.contains("::") {
+            let metadata = selector_metadata(selector);
+            if metadata.skip {
                 continue;
             }
-            if selector_matches_state(selector, &state) {
-                let specificity = selector_specificity(selector);
-                if selector.contains(':') {
-                    pseudo_styles.push((key, specificity, style_pair.origin));
+            if selector_matches_state(metadata, &state) {
+                if metadata.has_pseudo {
+                    pseudo_styles.push((key, metadata.specificity, style_pair.origin));
                 } else {
-                    base_styles.push((key, specificity, style_pair.origin));
+                    base_styles.push((key, metadata.specificity, style_pair.origin));
                 }
             }
         }
@@ -2581,51 +2601,99 @@ fn lerp(from: f32, to: f32, t: f32) -> f32 {
     from + (to - from) * t
 }
 
-/// Returns true if the selector's pseudo state matches the widget state.
-fn selector_matches_state(selector: &str, state: &UIWidgetState) -> bool {
-    for part in selector.replace('>', " > ").split_whitespace() {
-        if part == ">" {
-            continue;
-        }
-        let segments: Vec<&str> = part.split(':').collect();
-        for pseudo in &segments[1..] {
-            match *pseudo {
-                "read-only" if !state.readonly => return false,
-                "disabled" if !state.disabled => return false,
-                "checked" if state.disabled || !state.checked => return false,
-                "focus" if state.disabled || !state.focused => return false,
-                "hover" if state.disabled || !state.hovered => return false,
-                "invalid" if !state.invalid => return false,
-                _ => {}
-            }
-        }
+fn selector_metadata(selector: &str) -> SelectorMetadata {
+    if let Some(cached) = SELECTOR_METADATA_CACHE
+        .read()
+        .ok()
+        .and_then(|cache| cache.get(selector).copied())
+    {
+        return cached;
     }
-    true
+
+    let metadata = compute_selector_metadata(selector);
+    if let Ok(mut cache) = SELECTOR_METADATA_CACHE.write() {
+        cache.insert(selector.to_string(), metadata);
+    }
+    metadata
 }
 
-/// Computes a simple specificity score for a selector.
-fn selector_specificity(selector: &str) -> u32 {
-    let mut spec = 0;
+fn compute_selector_metadata(selector: &str) -> SelectorMetadata {
+    if selector.contains("::") {
+        return SelectorMetadata {
+            skip: true,
+            ..Default::default()
+        };
+    }
+
+    let mut specificity = 0;
+    let mut pseudo_flags = 0;
+    let mut has_pseudo = false;
+
     for part in selector.replace('>', " > ").split_whitespace() {
         if part == ">" {
             continue;
         }
+
         let segments: Vec<&str> = part.split(':').collect();
         let base = segments[0];
 
-        spec += if base.starts_with('#') {
+        specificity += if base.starts_with('#') {
             100
         } else if base.starts_with('.') {
             10
-        } else if base == "*" {
+        } else if base == "*" || base.is_empty() {
             0
         } else {
             1
         };
 
-        spec += segments.len().saturating_sub(1) as u32;
+        if segments.len() > 1 {
+            has_pseudo = true;
+            specificity += segments.len().saturating_sub(1) as u32;
+        }
+
+        for pseudo in &segments[1..] {
+            match *pseudo {
+                "read-only" => pseudo_flags |= SELECTOR_READ_ONLY,
+                "disabled" => pseudo_flags |= SELECTOR_DISABLED,
+                "checked" => pseudo_flags |= SELECTOR_CHECKED,
+                "focus" => pseudo_flags |= SELECTOR_FOCUS,
+                "hover" => pseudo_flags |= SELECTOR_HOVER,
+                "invalid" => pseudo_flags |= SELECTOR_INVALID,
+                _ => {}
+            }
+        }
     }
-    spec
+
+    SelectorMetadata {
+        specificity,
+        pseudo_flags,
+        has_pseudo,
+        skip: false,
+    }
+}
+
+/// Returns true if the selector's cached pseudo state matches the widget state.
+fn selector_matches_state(metadata: SelectorMetadata, state: &UIWidgetState) -> bool {
+    if metadata.pseudo_flags & SELECTOR_READ_ONLY != 0 && !state.readonly {
+        return false;
+    }
+    if metadata.pseudo_flags & SELECTOR_DISABLED != 0 && !state.disabled {
+        return false;
+    }
+    if metadata.pseudo_flags & SELECTOR_CHECKED != 0 && (state.disabled || !state.checked) {
+        return false;
+    }
+    if metadata.pseudo_flags & SELECTOR_FOCUS != 0 && (state.disabled || !state.focused) {
+        return false;
+    }
+    if metadata.pseudo_flags & SELECTOR_HOVER != 0 && (state.disabled || !state.hovered) {
+        return false;
+    }
+    if metadata.pseudo_flags & SELECTOR_INVALID != 0 && !state.invalid {
+        return false;
+    }
+    true
 }
 
 /// Applies layout-related style fields to a Bevy `Node`.
@@ -2736,28 +2804,81 @@ fn folder_basename(folder: &str) -> &str {
         .unwrap_or(folder)
 }
 
-/// Propagates inheritable style fields down the widget tree.
+/// Propagates inheritable style fields only through subtrees that actually changed.
 pub fn propagate_style_inheritance(
     mut commands: Commands,
-    root_query: Query<Entity, (With<UiStyle>, Without<ChildOf>)>,
+    mut qs: ParamSet<(
+        Query<
+            Entity,
+            Or<(
+                Added<UiStyle>,
+                Changed<UiStyle>,
+                Added<StyleTransition>,
+                Changed<StyleTransition>,
+                Added<StyleAnimation>,
+                Changed<StyleAnimation>,
+                Added<ChildOf>,
+                Changed<ChildOf>,
+                Added<Text>,
+                Changed<Text>,
+                Added<TextColor>,
+                Added<TextFont>,
+                Added<LineHeight>,
+                Added<ImageNode>,
+                Added<TextShadow>,
+            )>,
+        >,
+        Query<(
+            Option<&mut TextColor>,
+            Option<&mut TextFont>,
+            Option<&mut LineHeight>,
+            Option<&mut ImageNode>,
+            Option<&mut TextShadow>,
+            Option<&mut Text>,
+            Option<&mut TextTransformState>,
+        )>,
+    )>,
+    parent_query: Query<&ChildOf>,
     children_query: Query<&Children>,
     style_query: Query<&UiStyle>,
     style_state_query: Query<(Option<&StyleTransition>, Option<&StyleAnimation>)>,
-    mut target_query: Query<(
-        Option<&mut TextColor>,
-        Option<&mut TextFont>,
-        Option<&mut LineHeight>,
-        Option<&mut ImageNode>,
-        Option<&mut TextShadow>,
-        Option<&mut Text>,
-        Option<&mut TextTransformState>,
-    )>,
     asset_server: Res<AssetServer>,
 ) {
-    for root_entity in root_query.iter() {
+    let dirty_entities: Vec<Entity> = qs.p0().iter().collect();
+    if dirty_entities.is_empty() {
+        return;
+    }
+
+    let dirty_set: HashSet<Entity> = dirty_entities.iter().copied().collect();
+    let mut target_query = qs.p1();
+
+    for entity in dirty_entities {
+        let mut current = entity;
+        let mut has_dirty_ancestor = false;
+
+        while let Ok(parent) = parent_query.get(current) {
+            let parent_entity = parent.parent();
+            if dirty_set.contains(&parent_entity) {
+                has_dirty_ancestor = true;
+                break;
+            }
+            current = parent_entity;
+        }
+
+        if has_dirty_ancestor {
+            continue;
+        }
+
+        let inherited_style = resolve_inherited_style_for_entity(
+            entity,
+            &parent_query,
+            &style_query,
+            &style_state_query,
+        );
+
         propagate_recursive(
-            root_entity,
-            None,
+            entity,
+            inherited_style.as_ref(),
             &mut commands,
             &children_query,
             &style_query,
@@ -2765,6 +2886,68 @@ pub fn propagate_style_inheritance(
             &mut target_query,
             &asset_server,
         );
+    }
+}
+
+fn resolve_inherited_style_for_entity(
+    entity: Entity,
+    parent_query: &Query<&ChildOf>,
+    style_query: &Query<&UiStyle>,
+    style_state_query: &Query<(Option<&StyleTransition>, Option<&StyleAnimation>)>,
+) -> Option<Style> {
+    let mut lineage = Vec::new();
+    let mut current = entity;
+
+    while let Ok(parent) = parent_query.get(current) {
+        let parent_entity = parent.parent();
+        lineage.push(parent_entity);
+        current = parent_entity;
+    }
+
+    if lineage.is_empty() {
+        return None;
+    }
+
+    let mut inherited_style = Style::default();
+    let mut has_inherited = false;
+
+    for ancestor in lineage.into_iter().rev() {
+        merge_entity_style_for_propagation(
+            ancestor,
+            &mut inherited_style,
+            style_query,
+            style_state_query,
+        );
+        has_inherited = true;
+    }
+
+    has_inherited.then_some(inherited_style)
+}
+
+fn merge_entity_style_for_propagation(
+    entity: Entity,
+    style_to_propagate: &mut Style,
+    style_query: &Query<&UiStyle>,
+    style_state_query: &Query<(Option<&StyleTransition>, Option<&StyleAnimation>)>,
+) {
+    if let Ok(ui_style) = style_query.get(entity) {
+        if let Some(active_style) = ui_style.active_style.as_ref() {
+            style_to_propagate.merge(active_style);
+        }
+    }
+
+    if let Ok((transition_opt, animation_opt)) = style_state_query.get(entity) {
+        if let Some(transition) = transition_opt {
+            if let Some(current) = &transition.current_style {
+                style_to_propagate.merge(current);
+            }
+        }
+
+        if let Some(animation) = animation_opt {
+            if let Some(current) = &animation.current_style {
+                style_to_propagate.merge(current);
+            }
+        }
     }
 }
 
@@ -2790,28 +2973,13 @@ fn propagate_recursive(
     let my_style_comp = style_query.get(entity).ok();
     let my_active_style = my_style_comp.and_then(|s| s.active_style.as_ref());
 
-    let mut style_to_propagate = if let Some(inherited) = inherited_style {
-        inherited.clone()
-    } else {
-        Style::default()
-    };
-
-    if let Some(mine) = my_active_style {
-        style_to_propagate.merge(mine);
-    }
-
-    if let Ok((transition_opt, animation_opt)) = style_state_query.get(entity) {
-        if let Some(transition) = transition_opt {
-            if let Some(current) = &transition.current_style {
-                style_to_propagate.merge(current);
-            }
-        }
-        if let Some(animation) = animation_opt {
-            if let Some(current) = &animation.current_style {
-                style_to_propagate.merge(current);
-            }
-        }
-    }
+    let mut style_to_propagate = inherited_style.cloned().unwrap_or_default();
+    merge_entity_style_for_propagation(
+        entity,
+        &mut style_to_propagate,
+        style_query,
+        style_state_query,
+    );
 
     if let Ok((
         mut text_color_opt,

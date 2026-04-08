@@ -13,7 +13,7 @@ use crate::html::reload::HtmlReloadPlugin;
 use crate::lang::{UILang, UiLangState, UiLangVariables};
 use bevy::ecs::system::SystemId;
 use bevy::prelude::*;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[cfg(feature = "extended-dialog")]
@@ -23,8 +23,8 @@ use crate::styles::Style;
 use crate::styles::parser::apply_property_to_style;
 use crate::widgets::{
     Badge, Body, Button, CheckBox, ChoiceBox, ColorPicker, DatePicker, Div, Divider, FieldSet,
-    Form, Headline, HyperLink, Img, InputField, Paragraph, ProgressBar, RadioButton, Scrollbar,
-    Slider, SwitchButton, ToggleButton, ToolTip, ValidationRules, Widget,
+    Form, Headline, HyperLink, Img, InputField, ListBox, Paragraph, ProgressBar, RadioButton,
+    Scrollbar, Slider, SwitchButton, ToggleButton, ToolTip, ValidationRules, Widget,
 };
 
 pub static HTML_ID_COUNTER: AtomicUsize = AtomicUsize::new(1);
@@ -100,11 +100,12 @@ pub struct ShowWidgetsTimer {
 #[derive(Event, Message)]
 pub struct HtmlChangeEvent;
 
-/// A simple explicit "UI needs rebuild" flag.
-/// We use this because mutating the internal HashMap of HtmlStructureMap
+/// Tracks whether the HTML UI needs rebuilding and, when possible, which UI keys changed.
+///
+/// We use this because mutating the internal HashMap of `HtmlStructureMap`
 /// does NOT reliably trigger `resource_changed::<HtmlStructureMap>()`.
 #[derive(Resource, Default)]
-pub struct HtmlDirty(pub bool);
+pub struct HtmlDirty(pub bool, pub HashSet<String>);
 
 /// Component storing parsed inline CSS (`style="..."`) as your custom Style struct.
 /// Component storing parsed inline CSS (`style="..."`) as a `Style`.
@@ -429,6 +430,15 @@ pub enum HtmlWidgetNode {
     /// A toggle-button `<toggle>`.
     ToggleButton(
         ToggleButton,
+        HtmlMeta,
+        HtmlStates,
+        HtmlEventBindings,
+        Widget,
+        HtmlID,
+    ),
+    /// A list box `<listbox>`.
+    ListBox(
+        ListBox,
         HtmlMeta,
         HtmlStates,
         HtmlEventBindings,

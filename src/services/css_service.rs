@@ -33,6 +33,7 @@ struct ParsedCssWithVarsKey {
 #[derive(Resource, Default)]
 pub struct CssUsers {
     pub users: HashMap<AssetId<CssAsset>, HashSet<Entity>>,
+    entity_assets: HashMap<Entity, Vec<AssetId<CssAsset>>>,
 }
 
 /// Stores the last known primary-window size to detect breakpoint changes.
@@ -105,9 +106,10 @@ fn invalidate_css_cache_on_asset_change(mut ev: MessageReader<AssetEvent<CssAsse
     }
 }
 
-fn get_or_parse_css(handle: &Handle<CssAsset>, css_assets: &Assets<CssAsset>) -> Option<ParsedCss> {
-    let asset_id = handle.id();
-
+fn get_or_parse_css_by_id(
+    asset_id: AssetId<CssAsset>,
+    css_assets: &Assets<CssAsset>,
+) -> Option<ParsedCss> {
     if let Some(cached) = PARSED_CSS_CACHE
         .read()
         .ok()
@@ -116,12 +118,16 @@ fn get_or_parse_css(handle: &Handle<CssAsset>, css_assets: &Assets<CssAsset>) ->
         return Some(cached);
     }
 
-    let css_asset = css_assets.get(handle)?;
+    let css_asset = css_assets.get(asset_id)?;
     let parsed = load_css(&css_asset.text);
     if let Ok(mut cache) = PARSED_CSS_CACHE.write() {
         cache.insert(asset_id, parsed.clone());
     }
     Some(parsed)
+}
+
+fn get_or_parse_css(handle: &Handle<CssAsset>, css_assets: &Assets<CssAsset>) -> Option<ParsedCss> {
+    get_or_parse_css_by_id(handle.id(), css_assets)
 }
 
 fn hash_root_vars(root_vars: &HashMap<String, String>) -> u64 {
@@ -211,31 +217,61 @@ fn collect_global_root_vars_for_sources(
     vars
 }
 
-/// Updates the reverse index of entities using each CSS asset.
-fn update_css_users_index(
-    mut css_users: ResMut<CssUsers>,
-    query_changed: Query<(Entity, &CssSource), Or<(Added<CssSource>, Changed<CssSource>)>>,
-) {
-    for (entity, css_source) in query_changed.iter() {
-        // Remove entity from all previous sets
-        for set in css_users.users.values_mut() {
-            set.remove(&entity);
-        }
+fn remove_entity_from_css_users(css_users: &mut CssUsers, entity: Entity) {
+    let Some(previous_assets) = css_users.entity_assets.remove(&entity) else {
+        return;
+    };
 
-        // Add entity to new CSS handles
-        for h in &css_source.0 {
-            css_users.users.entry(h.id()).or_default().insert(entity);
+    for asset_id in previous_assets {
+        let should_remove = if let Some(set) = css_users.users.get_mut(&asset_id) {
+            set.remove(&entity);
+            set.is_empty()
+        } else {
+            false
+        };
+
+        if should_remove {
+            css_users.users.remove(&asset_id);
         }
     }
 }
 
-/// Marks all CSS users dirty when the active breakpoint viewport changes.
+/// Updates the reverse index of entities using each CSS asset.
+fn update_css_users_index(
+    mut css_users: ResMut<CssUsers>,
+    query_changed: Query<(Entity, &CssSource), Or<(Added<CssSource>, Changed<CssSource>)>>,
+    mut removed_sources: RemovedComponents<CssSource>,
+) {
+    for entity in removed_sources.read() {
+        remove_entity_from_css_users(&mut css_users, entity);
+    }
+
+    for (entity, css_source) in query_changed.iter() {
+        remove_entity_from_css_users(&mut css_users, entity);
+
+        let mut current_assets = Vec::with_capacity(css_source.0.len());
+
+        for handle in &css_source.0 {
+            let asset_id = handle.id();
+            css_users.users.entry(asset_id).or_default().insert(entity);
+            if !current_assets.contains(&asset_id) {
+                current_assets.push(asset_id);
+            }
+        }
+
+        if !current_assets.is_empty() {
+            css_users.entity_assets.insert(entity, current_assets);
+        }
+    }
+}
+
+/// Marks only affected CSS users dirty when breakpoint/media-query matches change.
 fn mark_css_users_dirty_on_viewport_change(
     mut commands: Commands,
     mut viewport_tracker: ResMut<CssViewportTracker>,
     window_query: Query<&Window, With<PrimaryWindow>>,
     css_assets: Res<Assets<CssAsset>>,
-    css_query: Query<(Entity, &CssSource)>,
+    css_users: Res<CssUsers>,
 ) {
     let Some(next_viewport) = resolve_breakpoint_viewport(&window_query) else {
         return;
@@ -250,21 +286,33 @@ fn mark_css_users_dirty_on_viewport_change(
 
     let prev_viewport = Vec2::new(viewport_tracker.width, viewport_tracker.height);
 
-    let breakpoint_changed = if prev_viewport.x < 0.0 || prev_viewport.y < 0.0 {
+    let affected_assets = if prev_viewport.x < 0.0 || prev_viewport.y < 0.0 {
         // Initial resize tracking warm-up: startup CssSource insertion already triggers CSS apply.
-        false
+        HashSet::new()
     } else {
-        media_match_changed_between_viewports(&css_query, &css_assets, prev_viewport, next_viewport)
+        collect_assets_with_changed_media_matches(
+            &css_users,
+            &css_assets,
+            prev_viewport,
+            next_viewport,
+        )
     };
 
     viewport_tracker.width = next_viewport.x;
     viewport_tracker.height = next_viewport.y;
 
-    if !breakpoint_changed {
+    if affected_assets.is_empty() {
         return;
     }
 
-    for (entity, _) in css_query.iter() {
+    let mut affected_entities = HashSet::new();
+    for asset_id in affected_assets {
+        if let Some(users) = css_users.users.get(&asset_id) {
+            affected_entities.extend(users.iter().copied());
+        }
+    }
+
+    for entity in affected_entities {
         if let Ok(mut entity_commands) = commands.get_entity(entity) {
             entity_commands.insert(CssDirty);
         }
@@ -312,41 +360,34 @@ fn resolve_breakpoint_viewport(
     None
 }
 
-/// Returns true when at least one media rule changes the match state between two viewports.
-fn media_match_changed_between_viewports(
-    css_query: &Query<(Entity, &CssSource)>,
+/// Returns the CSS asset ids whose media rules change match state between two viewports.
+pub(crate) fn collect_assets_with_changed_media_matches(
+    css_users: &CssUsers,
     css_assets: &Assets<CssAsset>,
     prev_viewport: Vec2,
     next_viewport: Vec2,
-) -> bool {
-    let mut seen_assets = HashSet::new();
+) -> HashSet<AssetId<CssAsset>> {
+    let mut affected_assets = HashSet::new();
 
-    for (_, css_source) in css_query.iter() {
-        for handle in &css_source.0 {
-            let asset_id = handle.id();
-            if !seen_assets.insert(asset_id) {
-                continue;
-            }
+    for asset_id in css_users.users.keys().copied() {
+        let Some(parsed) = get_or_parse_css_by_id(asset_id, css_assets) else {
+            continue;
+        };
 
-            let Some(parsed) = get_or_parse_css(handle, css_assets) else {
-                continue;
+        let media_changed = parsed.styles.values().any(|style| {
+            let Some(media) = style.media.as_ref() else {
+                return false;
             };
 
-            for style in parsed.styles.values() {
-                let Some(media) = style.media.as_ref() else {
-                    continue;
-                };
+            media.matches_viewport(prev_viewport) != media.matches_viewport(next_viewport)
+        });
 
-                let old_match = media.matches_viewport(prev_viewport);
-                let new_match = media.matches_viewport(next_viewport);
-                if old_match != new_match {
-                    return true;
-                }
-            }
+        if media_changed {
+            affected_assets.insert(asset_id);
         }
     }
 
-    false
+    affected_assets
 }
 
 /// Applies merged CSS styles to entities that are dirty or affected by changes.

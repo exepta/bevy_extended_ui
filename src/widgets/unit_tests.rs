@@ -2,7 +2,7 @@
 mod tests {
     use super::super::controls::{ButtonImage, place_icon_if};
     use super::super::validation::update_validation_states;
-    use super::super::widget_util::wheel_delta_y;
+    use super::super::widget_util::{wheel_delta_x, wheel_delta_y};
     use super::super::*;
     use crate::styles::{CssClass, CssSource, IconPlace};
     use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
@@ -137,7 +137,7 @@ mod tests {
     fn choice_option_new_trims_internal_value() {
         let option = ChoiceOption::new("  Hello World  ");
         assert_eq!(option.text, "  Hello World  ");
-        assert_eq!(option.internal_value, "Hello World");
+        assert_eq!(option.value_as_str(), Some("Hello World"));
         assert_eq!(option.icon_path, None);
     }
 
@@ -283,6 +283,33 @@ mod tests {
             window: Entity::PLACEHOLDER,
         };
         assert_eq!(wheel_delta_y(&pixel, 0.5), 15.0);
+    }
+
+    #[test]
+    fn wheel_delta_x_converts_line_and_pixel_units() {
+        let line_small = MouseWheel {
+            unit: MouseScrollUnit::Line,
+            x: 2.0,
+            y: 0.0,
+            window: Entity::PLACEHOLDER,
+        };
+        assert_eq!(wheel_delta_x(&line_small, 0.5), 50.0);
+
+        let line_big = MouseWheel {
+            unit: MouseScrollUnit::Line,
+            x: 12.0,
+            y: 0.0,
+            window: Entity::PLACEHOLDER,
+        };
+        assert_eq!(wheel_delta_x(&line_big, 0.5), 6.0);
+
+        let pixel = MouseWheel {
+            unit: MouseScrollUnit::Pixel,
+            x: 30.0,
+            y: 0.0,
+            window: Entity::PLACEHOLDER,
+        };
+        assert_eq!(wheel_delta_x(&pixel, 0.5), 15.0);
     }
 
     #[test]
@@ -536,5 +563,166 @@ mod tests {
         app.insert_resource(ImageCache::default());
         app.init_asset::<Image>();
         app.add_plugins(ExtendedWidgetPlugin);
+    }
+
+    // ---------------------------------------------------------------
+    // Typed-value helpers shared by ChoiceOption and RadioButton
+    // ---------------------------------------------------------------
+
+    /// Enum used only inside these tests — no Reflect needed since we test
+    /// the plain `Arc<dyn Any>` path, not the Bevy-reflection path.
+    #[derive(Debug, PartialEq)]
+    enum Priority {
+        Low,
+        Medium,
+        High,
+    }
+
+    /// Arbitrary struct to cover the "object value" case.
+    #[derive(Debug, PartialEq)]
+    struct Point {
+        x: i32,
+        y: i32,
+    }
+
+    // --- ChoiceOption ---
+
+    #[test]
+    fn choice_option_with_integer_value() {
+        let opt = ChoiceOption::new("42").with_value(42_i32);
+
+        assert_eq!(opt.get_value::<i32>(), Some(&42_i32));
+        assert_eq!(opt.get_value::<u32>(), None); // wrong type
+        // value_as_str returns None because the Arc holds an i32, not a String
+        assert_eq!(opt.value_as_str(), None);
+    }
+
+    #[test]
+    fn choice_option_with_boolean_value() {
+        let opt_true = ChoiceOption::new("yes").with_value(true);
+        let opt_false = ChoiceOption::new("no").with_value(false);
+
+        assert_eq!(opt_true.get_value::<bool>(), Some(&true));
+        assert_eq!(opt_false.get_value::<bool>(), Some(&false));
+    }
+
+    #[test]
+    fn choice_option_with_enum_value() {
+        let opt = ChoiceOption::new("High").with_value(Priority::High);
+
+        assert_eq!(opt.get_value::<Priority>(), Some(&Priority::High));
+        assert_eq!(opt.get_value::<i32>(), None);
+    }
+
+    #[test]
+    fn choice_option_with_object_value() {
+        let opt = ChoiceOption::new("origin").with_value(Point { x: 0, y: 0 });
+
+        let p = opt.get_value::<Point>().expect("should downcast to Point");
+        assert_eq!(p.x, 0);
+        assert_eq!(p.y, 0);
+    }
+
+    #[test]
+    fn choice_option_value_as_str_only_for_string_values() {
+        let string_opt = ChoiceOption::new("hello");
+        assert_eq!(string_opt.value_as_str(), Some("hello"));
+
+        let int_opt = ChoiceOption::new("1").with_value(1_u32);
+        assert_eq!(int_opt.value_as_str(), None);
+    }
+
+    #[test]
+    fn choice_option_no_value_returns_none() {
+        let opt = ChoiceOption {
+            text: "empty".to_string(),
+            value: WidgetValue::default(),
+            icon_path: None,
+        };
+
+        assert_eq!(opt.get_value::<i32>(), None);
+        assert_eq!(opt.value_as_str(), None);
+        assert!(opt.get_reflected().is_none());
+    }
+
+    #[test]
+    fn choice_option_partial_eq_compares_string_values() {
+        let a = ChoiceOption::new("foo");
+        let b = ChoiceOption::new("foo");
+        let c = ChoiceOption::new("bar");
+
+        assert_eq!(a, b);
+        assert_ne!(a, c);
+    }
+
+    #[test]
+    fn choice_option_partial_eq_non_string_uses_ptr_identity() {
+        let opt_a = ChoiceOption::new("x").with_value(Priority::Low);
+        let opt_b = ChoiceOption::new("x").with_value(Priority::Low);
+        // Two independent Arcs holding equal values but different allocations.
+        assert_ne!(opt_a, opt_b);
+
+        // Cloning shares the Arc, so ptr_eq holds.
+        let opt_c = opt_a.clone();
+        assert_eq!(opt_a, opt_c);
+    }
+
+    // --- RadioButton ---
+
+    #[test]
+    fn radio_button_with_integer_value() {
+        let rb = RadioButton::default().with_value(7_i32);
+
+        assert_eq!(rb.get_value::<i32>(), Some(&7_i32));
+        assert_eq!(rb.get_value::<u8>(), None);
+        assert_eq!(rb.value_as_str(), None);
+    }
+
+    #[test]
+    fn radio_button_with_boolean_value() {
+        let rb = RadioButton::default().with_value(true);
+
+        assert_eq!(rb.get_value::<bool>(), Some(&true));
+    }
+
+    #[test]
+    fn radio_button_with_enum_value() {
+        let rb = RadioButton::default().with_value(Priority::Medium);
+
+        assert_eq!(rb.get_value::<Priority>(), Some(&Priority::Medium));
+        assert_eq!(rb.get_value::<bool>(), None);
+    }
+
+    #[test]
+    fn radio_button_with_object_value() {
+        let rb = RadioButton::default().with_value(Point { x: 3, y: -1 });
+
+        let p = rb.get_value::<Point>().expect("should downcast to Point");
+        assert_eq!(p.x, 3);
+        assert_eq!(p.y, -1);
+    }
+
+    #[test]
+    fn radio_button_value_as_str_only_for_string_values() {
+        let string_rb = RadioButton {
+            value: WidgetValue::new("option_a".to_string()),
+            ..RadioButton::default()
+        };
+        assert_eq!(string_rb.value_as_str(), Some("option_a"));
+
+        let int_rb = RadioButton::default().with_value(99_i32);
+        assert_eq!(int_rb.value_as_str(), None);
+    }
+
+    #[test]
+    fn radio_button_no_value_returns_none() {
+        let rb = RadioButton {
+            value: WidgetValue::default(),
+            ..RadioButton::default()
+        };
+
+        assert_eq!(rb.get_value::<i32>(), None);
+        assert_eq!(rb.value_as_str(), None);
+        assert!(rb.get_reflected().is_none());
     }
 }

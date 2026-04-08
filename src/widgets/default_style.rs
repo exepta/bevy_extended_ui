@@ -1086,6 +1086,78 @@ select {
     }
 }
 
+/* ListBox */
+
+listbox {
+    width: 200px;
+    height: 150px;
+    border-radius: 5px 0;
+    border: 2px;
+    border-color: var(--text-color);
+    color: var(--text-color);
+    font-size: 14px;
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+    flex-direction: column;
+    overflow-x: hidden;
+    overflow-y: scroll;
+    transition: all 0.3s;
+
+    &:disabled {
+        border-color: var(--disabled-text);
+        color: var(--disabled-text);
+    }
+
+    &:hover {
+        border-color: var(--primary-hover);
+    }
+
+    &:focus {
+        border-color: var(--primary);
+    }
+
+    > .listbox-option {
+        width: 100%;
+        height: 40px;
+        min-height: 40px;
+        max-height: 40px;
+        padding-left: 10px;
+        display: flex;
+        justify-content: flex-start;
+        align-items: center;
+        flex-direction: row;
+        gap: 10px;
+        background: var(--gray-background);
+        transition: all 0.3s;
+
+        > .option-text {
+            transition: all 0.3s;
+
+            &:hover {
+                color: var(--text-color);
+            }
+
+            &:checked {
+                color: var(--text-color);
+            }
+        }
+
+        &:hover {
+            background: var(--primary-hover);
+        }
+
+        &:checked {
+            background: var(--primary);
+        }
+
+        &:disabled {
+            color: var(--disabled-text);
+            background: var(--gray-background);
+        }
+    }
+}
+
 /* Slider */
 
 slider {

@@ -3,7 +3,7 @@ use crate::html::*;
 use crate::widgets::{
     BindToID, Button, ButtonType, CheckBox, ChoiceBox, ColorPicker, DatePicker,
     FieldSelectionMulti, FieldSelectionSingle, Form, FormValidationMode, InputField, InputValue,
-    RadioButton, Scrollbar, Slider, SwitchButton, ToggleButton, UIGenID, UIWidgetState,
+    ListBox, RadioButton, Scrollbar, Slider, SwitchButton, ToggleButton, UIGenID, UIWidgetState,
     ValidationRules, evaluate_validation_state,
 };
 use bevy::log::warn;
@@ -67,6 +67,10 @@ impl Plugin for HtmlEventBindingsPlugin {
         app.add_systems(
             Update,
             emit_choice_box_change.in_set(HtmlSystemSet::Bindings),
+        );
+        app.add_systems(
+            Update,
+            emit_list_box_change.in_set(HtmlSystemSet::Bindings),
         );
         app.add_systems(
             Update,
@@ -725,6 +729,17 @@ pub(crate) fn emit_checkbox_change(
 pub(crate) fn emit_choice_box_change(
     mut commands: Commands,
     query: Query<(Entity, &HtmlEventBindings), Changed<ChoiceBox>>,
+) {
+    for (entity, binding) in &query {
+        emit_change_if_bound(&mut commands, binding, entity, HtmlChangeAction::State);
+    }
+}
+
+/// ListBox
+/// Emits change events for list box widgets.
+pub(crate) fn emit_list_box_change(
+    mut commands: Commands,
+    query: Query<(Entity, &HtmlEventBindings), Changed<ListBox>>,
 ) {
     for (entity, binding) in &query {
         emit_change_if_bound(&mut commands, binding, entity, HtmlChangeAction::State);

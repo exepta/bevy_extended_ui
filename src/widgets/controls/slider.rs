@@ -362,6 +362,7 @@ fn spawn_thumb(
             ),
         ))
         .observe(on_thumb_drag)
+        .observe(on_thumb_click)
         .observe(on_thumb_over)
         .observe(on_thumb_out)
         .with_children(|builder| {
@@ -609,7 +610,7 @@ fn apply_from_track_pointer(
 
 /// Handles dragging the slider thumb to update value.
 fn on_thumb_drag(
-    event: On<Pointer<Drag>>,
+    mut event: On<Pointer<Drag>>,
     parent_q: Query<&ChildOf>,
     track_q: Query<(&ComputedNode, &BindToID), With<SliderTrackContainer>>,
     thumb_node_q: Query<&ComputedNode, With<SliderThumb>>,
@@ -673,6 +674,14 @@ fn on_thumb_drag(
         &mut fill_q,
         &mut thumb_q,
     );
+
+    // Prevent thumb drags from bubbling to the track drag observer.
+    event.propagate(false);
+}
+
+/// Stops thumb click events from reaching the track.
+fn on_thumb_click(mut event: On<Pointer<Click>>) {
+    event.propagate(false);
 }
 
 /// Tracks thumb hover state.
@@ -721,29 +730,55 @@ fn apply_from_track_left_x(
 
         sanitize_slider(&mut slider);
 
-        let role = resolve_target_role(
-            &slider,
-            preferred_role,
-            desired_left_x,
-            track_width,
-            thumb_width,
-            ui_id.0,
-            thumb_q,
-        );
-
         let next_value = value_from_left(desired_left_x, track_width, thumb_width, &slider);
         match slider.slider_type {
             SliderType::Default => {
                 slider.value = next_value;
             }
-            SliderType::Range => match role {
-                SliderThumbRole::Start => {
-                    slider.range_start = next_value.min(slider.range_end);
+            SliderType::Range => {
+                if preferred_role.is_none() {
+                    // Track interactions move the full selected span.
+                    let current_center = (slider.range_start + slider.range_end) * 0.5;
+                    let delta = next_value - current_center;
+                    let span = slider.range_end - slider.range_start;
+                    let max_start = (slider.max - span).max(slider.min);
+
+                    let mut next_start = slider.range_start + delta;
+                    let mut next_end = slider.range_end + delta;
+
+                    if next_start < slider.min {
+                        let shift = slider.min - next_start;
+                        next_start += shift;
+                        next_end += shift;
+                    }
+                    if next_end > slider.max {
+                        let shift = next_end - slider.max;
+                        next_start -= shift;
+                    }
+
+                    slider.range_start = next_start.clamp(slider.min, max_start);
+                    slider.range_end = slider.range_start + span;
+                } else {
+                    let role = resolve_target_role(
+                        &slider,
+                        preferred_role,
+                        desired_left_x,
+                        track_width,
+                        thumb_width,
+                        ui_id.0,
+                        thumb_q,
+                    );
+
+                    match role {
+                        SliderThumbRole::Start => {
+                            slider.range_start = next_value.min(slider.range_end - slider.step);
+                        }
+                        SliderThumbRole::End => {
+                            slider.range_end = next_value.max(slider.range_start + slider.step);
+                        }
+                    }
                 }
-                SliderThumbRole::End => {
-                    slider.range_end = next_value.max(slider.range_start);
-                }
-            },
+            }
         }
 
         apply_slider_visual_state(

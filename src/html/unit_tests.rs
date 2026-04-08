@@ -766,12 +766,12 @@ mod tests {
         assert!(all.iter().any(|node| matches!(
             node,
             HtmlWidgetNode::ToggleButton(ToggleButton { value, icon_place: IconPlace::Right, selected: true, .. }, _, _, _, _, _)
-                if value == "t1"
+                if value.as_str() == Some("t1")
         )));
         assert!(all.iter().any(|node| matches!(
             node,
             HtmlWidgetNode::ToggleButton(ToggleButton { value, icon_place: IconPlace::Left, selected: false, .. }, _, _, _, _, _)
-                if value == "t2"
+                if value.as_str() == Some("t2")
         )));
 
         assert!(all.iter().any(|node| matches!(
@@ -991,6 +991,93 @@ mod tests {
         assert!(entity_ref.contains::<UIWidgetState>());
 
         assert!(!app.world().entities().contains(old_body));
+    }
+
+    #[test]
+    fn builder_rebuilds_only_dirty_active_keys() {
+        let mut app = setup_converter_app();
+        app.add_message::<HtmlAllWidgetsSpawned>();
+        app.add_systems(Update, builder::build_html_source);
+
+        add_html_source(
+            &mut app,
+            "examples/build_fixture_a.html",
+            html_fixture(),
+            "build-key-a",
+            Some("builder::controller"),
+        );
+        add_html_source(
+            &mut app,
+            "examples/build_fixture_b.html",
+            html_fixture(),
+            "build-key-b",
+            Some("builder::controller"),
+        );
+
+        app.update();
+
+        {
+            let mut dirty = app.world_mut().resource_mut::<HtmlDirty>();
+            dirty.0 = false;
+            dirty.1.clear();
+        }
+
+        let old_body_a = app
+            .world_mut()
+            .spawn(Body {
+                entry: 111_111,
+                html_key: Some("build-key-a".to_string()),
+            })
+            .id();
+        let old_body_b = app
+            .world_mut()
+            .spawn(Body {
+                entry: 222_222,
+                html_key: Some("build-key-b".to_string()),
+            })
+            .id();
+
+        {
+            let mut map = app.world_mut().resource_mut::<HtmlStructureMap>();
+            map.active = Some(vec!["build-key-a".to_string(), "build-key-b".to_string()]);
+        }
+        {
+            let mut dirty = app.world_mut().resource_mut::<HtmlDirty>();
+            dirty.0 = true;
+            dirty.1.insert("build-key-a".to_string());
+        }
+
+        app.update();
+
+        let mut body_query = app.world_mut().query::<(Entity, &Body)>();
+        let all_bodies: Vec<(Entity, String)> = body_query
+            .iter(app.world())
+            .map(|(entity, body)| (entity, body.html_key.clone().unwrap_or_default()))
+            .collect();
+
+        assert_eq!(
+            all_bodies
+                .iter()
+                .filter(|(_, key)| key == "build-key-a")
+                .count(),
+            1
+        );
+        assert_eq!(
+            all_bodies
+                .iter()
+                .filter(|(_, key)| key == "build-key-b")
+                .count(),
+            1
+        );
+
+        assert!(
+            !app.world().entities().contains(old_body_a),
+            "dirty active body should be replaced"
+        );
+        assert!(
+            app.world().entities().contains(old_body_b),
+            "clean active body should be left untouched"
+        );
     }
 
     #[test]
