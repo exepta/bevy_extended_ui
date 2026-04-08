@@ -137,7 +137,7 @@ rfd = { version = "0.15.4", optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen = { version = "0.2.92", optional = true }
-wasm-bindgen-futures = { version = "0.4.64", optional = true }
+wasm-bindgen-futures = { version = "0.4.67", optional = true }
 web-sys = { version = "0.3.69", features = ["Navigator", "Clipboard", "Window", "Document", "Element", "HtmlElement", "HtmlInputElement", "Event", "File", "FileList", "FileReader", "Blob", "Url"], optional = true }
 js-sys = "0.3.69"
 # `lightningcss -> ahash` pulls `getrandom` on wasm; opt into JS backend for wasm32-unknown-unknown.
