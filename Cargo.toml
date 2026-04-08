@@ -133,7 +133,7 @@ optional = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 arboard = "3.5.0"
-rfd = { version = "0.15.4", optional = true }
+rfd = { version = "0.17.2", optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen = { version = "0.2.92", optional = true }
