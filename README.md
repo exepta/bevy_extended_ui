@@ -1,3 +1,7 @@
+<div style="text-align: center;">
+<img src="./doc/bevy_extended_ui.svg" alt="Logo" width="128" height="128">
+</div>
+
 # bevy_extended_ui
 
 ---
@@ -58,18 +62,18 @@ bevy_extended_ui_macros = "1.5.0"
 ```
 
 #### Features
-| Feature            | Description                                                                                          |
-|--------------------|------------------------------------------------------------------------------------------------------|
-| `default`          | Enables `css-breakpoints`, `fluent`, `providers`, `svg`, and `extended-dialog`.                     |
-| `wasm-default`     | Web preset: `wasm-breakpoints` + `clipboard-wasm` with legacy WASM CSS/style pipeline compatibility. |
-| `css-breakpoints`  | Desktop breakpoints via primary window.                                                              |
-| `wasm-breakpoints` | WASM breakpoints via browser viewport.                                                               |
-| `fluent`           | Enables Fluent Language support.                                                                     |
-| `properties-lang`  | Enables Java Properties Language support.                                                            |
-| `clipboard-wasm`   | Enables WASM clipboard support web.                                                                  |
-| `svg`              | Optional SVG image support for UI images/icons (rasterized to Bevy `Image`); not enabled by default. |
-| `providers`        | Enables custom HTML providers (e.g. theme-provider).                                                 |
-| `extended-dialog`  | Enables the dialog system with `BevyApp` and desktop `System` providers.                            |
+| Feature            | Description                                                                                           |
+|--------------------|-------------------------------------------------------------------------------------------------------|
+| `default`          | Enables `css-breakpoints`, `fluent`, `providers`, `svg`, and `extended-dialog`.                       |
+| `wasm-default`     | Web preset: `wasm-breakpoints` + `clipboard-wasm` with legacy WASM CSS/style pipeline compatibility.  |
+| `css-breakpoints`  | Desktop breakpoints via primary window.                                                               |
+| `wasm-breakpoints` | WASM breakpoints via browser viewport.                                                                |
+| `fluent`           | Enables Fluent Language support.                                                                      |
+| `properties-lang`  | Enables Java Properties Language support.                                                             |
+| `clipboard-wasm`   | Enables WASM clipboard support web.                                                                   |
+| `svg`              | Optional SVG image support for UI images/icons (rasterized to Bevy `Image`); not enabled by default.  |
+| `providers`        | Enables custom HTML providers (e.g. theme-provider).                                                  |
+| `extended-dialog`  | Enables the dialog system with `BevyApp` and desktop `System` providers.                              |
 
 Then, you add the plugin to your `main.rs` or on any point at a build function:
 

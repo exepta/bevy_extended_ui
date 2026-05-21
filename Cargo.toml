@@ -33,6 +33,7 @@ clipboard-wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:web-sys"]
 providers = []
 svg = ["dep:resvg"]
 extended-dialog = ["dep:rfd"]
+extended-framework = []
 
 ############################################
 #                  Crates                  #

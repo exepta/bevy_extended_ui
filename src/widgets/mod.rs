@@ -162,7 +162,7 @@ fn apply_length_rules(args: &str, rules: &mut ValidationRules) {
                 rules.max_length = Some(value);
             }
         }
-        &[] => todo!(),
+        &[] => {}
     }
 }
 
@@ -1430,7 +1430,10 @@ impl WidgetValue {
     }
 
     pub fn as_str(&self) -> Option<&str> {
-        self.0.as_ref()?.downcast_ref::<String>().map(|s| s.as_str())
+        self.0
+            .as_ref()?
+            .downcast_ref::<String>()
+            .map(|s| s.as_str())
     }
 
     pub fn reflect(&self) -> Option<&ReflectedValue> {

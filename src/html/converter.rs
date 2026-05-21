@@ -1,4 +1,3 @@
-use std::collections::{HashMap, HashSet};
 use bevy::asset::AssetEvent;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
@@ -9,6 +8,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::de::DeserializeSeed;
 use serde_json::Value as JsonValue;
+use std::collections::{HashMap, HashSet};
 
 use crate::ExtendedUiConfiguration;
 #[cfg(feature = "extended-dialog")]
@@ -269,10 +269,17 @@ fn update_html_ui(
 
         let label_map = collect_labels_by_for(&body_node);
 
-        if let Some(body_widget) =
-            parse_html_node(&body_node, &css_handles, &label_map, &ui_key, html, &type_registry)
-        {
-            structure_map.html_map.insert(ui_key.clone(), vec![body_widget]);
+        if let Some(body_widget) = parse_html_node(
+            &body_node,
+            &css_handles,
+            &label_map,
+            &ui_key,
+            html,
+            &type_registry,
+        ) {
+            structure_map
+                .html_map
+                .insert(ui_key.clone(), vec![body_widget]);
 
             // IMPORTANT: Explicitly mark the affected UI key as dirty so the builder rebuilds.
             html_dirty.0 = true;
@@ -321,7 +328,9 @@ fn parse_html_node(
         "body" => {
             let children = node
                 .children()
-                .filter_map(|child| parse_html_node(&child, css_sources, label_map, key, html, type_registry))
+                .filter_map(|child| {
+                    parse_html_node(&child, css_sources, label_map, key, html, type_registry)
+                })
                 .collect();
 
             Some(HtmlWidgetNode::Body(
@@ -419,7 +428,9 @@ fn parse_html_node(
         "div" => {
             let mut children = Vec::new();
             for child in node.children() {
-                if let Some(parsed) = parse_html_node(&child, css_sources, label_map, key, html, type_registry) {
+                if let Some(parsed) =
+                    parse_html_node(&child, css_sources, label_map, key, html, type_registry)
+                {
                     children.push(parsed);
                 }
             }
@@ -438,7 +449,9 @@ fn parse_html_node(
         "form" => {
             let mut children = Vec::new();
             for child in node.children() {
-                if let Some(parsed) = parse_html_node(&child, css_sources, label_map, key, html, type_registry) {
+                if let Some(parsed) =
+                    parse_html_node(&child, css_sources, label_map, key, html, type_registry)
+                {
                     children.push(parsed);
                 }
             }
@@ -473,7 +486,9 @@ fn parse_html_node(
         "dialog" => {
             let mut children = Vec::new();
             for child in node.children() {
-                if let Some(parsed) = parse_html_node(&child, css_sources, label_map, key, html, type_registry) {
+                if let Some(parsed) =
+                    parse_html_node(&child, css_sources, label_map, key, html, type_registry)
+                {
                     children.push(parsed);
                 }
             }
@@ -518,7 +533,9 @@ fn parse_html_node(
         "dialog-header" => {
             let mut children = Vec::new();
             for child in node.children() {
-                if let Some(parsed) = parse_html_node(&child, css_sources, label_map, key, html, type_registry) {
+                if let Some(parsed) =
+                    parse_html_node(&child, css_sources, label_map, key, html, type_registry)
+                {
                     children.push(parsed);
                 }
             }
@@ -541,7 +558,9 @@ fn parse_html_node(
         "dialog-body" => {
             let mut children = Vec::new();
             for child in node.children() {
-                if let Some(parsed) = parse_html_node(&child, css_sources, label_map, key, html, type_registry) {
+                if let Some(parsed) =
+                    parse_html_node(&child, css_sources, label_map, key, html, type_registry)
+                {
                     children.push(parsed);
                 }
             }
@@ -564,7 +583,9 @@ fn parse_html_node(
         "dialog-footer" => {
             let mut children = Vec::new();
             for child in node.children() {
-                if let Some(parsed) = parse_html_node(&child, css_sources, label_map, key, html, type_registry) {
+                if let Some(parsed) =
+                    parse_html_node(&child, css_sources, label_map, key, html, type_registry)
+                {
                     children.push(parsed);
                 }
             }
@@ -613,7 +634,9 @@ fn parse_html_node(
                         continue;
                     }
                 }
-                if let Some(parsed) = parse_html_node(&child, css_sources, label_map, key, html, type_registry) {
+                if let Some(parsed) =
+                    parse_html_node(&child, css_sources, label_map, key, html, type_registry)
+                {
                     children.push(parsed);
                 }
             }
@@ -627,7 +650,11 @@ fn parse_html_node(
                 let attrs = element.attributes.borrow();
 
                 let value_str = attrs.get("value").unwrap_or("").to_string();
-                let value_type = attrs.get("internal-value-type").unwrap_or("").trim().to_ascii_lowercase();
+                let value_type = attrs
+                    .get("internal-value-type")
+                    .unwrap_or("")
+                    .trim()
+                    .to_ascii_lowercase();
                 let value = parse_option_internal_value(&value_str, &value_type, type_registry);
                 let label = radio_node.text_contents().trim().to_string();
 
@@ -673,7 +700,6 @@ fn parse_html_node(
                         selected,
                         ..default()
                     },
-
                     child_meta,
                     child_states,
                     child_functions,
@@ -1030,7 +1056,11 @@ fn parse_html_node(
 
         "radio" => {
             let value_str = attributes.get("value").unwrap_or("").to_string();
-            let value_type = attributes.get("internal-value-type").unwrap_or("").trim().to_ascii_lowercase();
+            let value_type = attributes
+                .get("internal-value-type")
+                .unwrap_or("")
+                .trim()
+                .to_ascii_lowercase();
             let value = parse_option_internal_value(&value_str, &value_type, type_registry);
             let label = node.text_contents().trim().to_string();
             let selected_attr = attributes.contains("selected");
@@ -1078,7 +1108,11 @@ fn parse_html_node(
                     if option_el.name.local.eq("option") {
                         let attrs = option_el.attributes.borrow();
                         let value = attrs.get("value").unwrap_or("").to_string();
-                        let value_type = attrs.get("internal-value-type").unwrap_or("").trim().to_ascii_lowercase();
+                        let value_type = attrs
+                            .get("internal-value-type")
+                            .unwrap_or("")
+                            .trim()
+                            .to_ascii_lowercase();
                         let icon = attrs.get("icon").unwrap_or("").to_string();
                         let text = child.text_contents().trim().to_string();
 
