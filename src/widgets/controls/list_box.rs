@@ -3,8 +3,8 @@ use crate::styles::paint::Colored;
 use crate::styles::{CssClass, CssSource, TagName};
 use crate::widgets::widget_util::wheel_delta_y;
 use crate::widgets::{
-    ActiveScrollTarget, BindToID, ChoiceOption, IgnoreParentState, ListBox, UIGenID,
-    UIWidgetState, WidgetId, WidgetKind,
+    ActiveScrollTarget, BindToID, ChoiceOption, IgnoreParentState, ListBox, UIGenID, UIWidgetState,
+    WidgetId, WidgetKind,
 };
 use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
 use bevy::camera::visibility::RenderLayers;
@@ -129,10 +129,7 @@ fn internal_node_creation_system(
                                 );
 
                                 builder.spawn((
-                                    Name::new(format!(
-                                        "ListBox-Option-Icon-{}",
-                                        list_box.entry
-                                    )),
+                                    Name::new(format!("ListBox-Option-Icon-{}", list_box.entry)),
                                     ImageNode {
                                         image: handle,
                                         ..default()
@@ -158,10 +155,7 @@ fn internal_node_creation_system(
                             };
 
                             builder.spawn((
-                                Name::new(format!(
-                                    "ListBox-Option-Text-{}",
-                                    list_box.entry
-                                )),
+                                Name::new(format!("ListBox-Option-Text-{}", list_box.entry)),
                                 text,
                                 TextColor::default(),
                                 TextFont::default(),
@@ -298,7 +292,13 @@ fn on_internal_cursor_leave(
 fn on_option_click(
     mut trigger: On<Pointer<Click>>,
     mut option_query: Query<
-        (Entity, &mut UIWidgetState, &ChoiceOption, &BindToID, &Children),
+        (
+            Entity,
+            &mut UIWidgetState,
+            &ChoiceOption,
+            &BindToID,
+            &Children,
+        ),
         With<ListBoxOptionBase>,
     >,
     mut parent_query: Query<(&UIGenID, &mut ListBox), Without<ListBoxOptionBase>>,

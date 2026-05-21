@@ -1153,8 +1153,11 @@ mod tests {
         app.insert_resource(HoveredBodyTracker::default());
         app.add_systems(Update, handle_body_scroll_wheel);
 
-        let content_entity =
-            spawn_body_scroll_content_xy(app.world_mut(), Vec2::new(100.0, 80.0), Vec2::new(260.0, 80.0));
+        let content_entity = spawn_body_scroll_content_xy(
+            app.world_mut(),
+            Vec2::new(100.0, 80.0),
+            Vec2::new(260.0, 80.0),
+        );
         let body_entity = app
             .world_mut()
             .spawn((Body::default(), BodyContentRoot(content_entity)))
@@ -1185,8 +1188,11 @@ mod tests {
         app.insert_resource(HoveredBodyTracker::default());
         app.add_systems(Update, handle_body_scroll_wheel);
 
-        let content_entity =
-            spawn_body_scroll_content_xy(app.world_mut(), Vec2::new(100.0, 80.0), Vec2::new(260.0, 80.0));
+        let content_entity = spawn_body_scroll_content_xy(
+            app.world_mut(),
+            Vec2::new(100.0, 80.0),
+            Vec2::new(260.0, 80.0),
+        );
         let body_entity = app
             .world_mut()
             .spawn((Body::default(), BodyContentRoot(content_entity)))

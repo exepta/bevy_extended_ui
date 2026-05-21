@@ -68,10 +68,7 @@ impl Plugin for HtmlEventBindingsPlugin {
             Update,
             emit_choice_box_change.in_set(HtmlSystemSet::Bindings),
         );
-        app.add_systems(
-            Update,
-            emit_list_box_change.in_set(HtmlSystemSet::Bindings),
-        );
+        app.add_systems(Update, emit_list_box_change.in_set(HtmlSystemSet::Bindings));
         app.add_systems(
             Update,
             emit_field_set_change.in_set(HtmlSystemSet::Bindings),

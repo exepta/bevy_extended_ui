@@ -4,6 +4,7 @@ mod tests {
     use crate::io::CssAsset;
     use crate::styles::components::UiStyle;
     use crate::styles::paint::Colored;
+    use crate::styles::parser::convert_to_color;
     use bevy::asset::AssetPlugin;
     use bevy::prelude::AppTypeRegistry;
     use bevy::prelude::*;
@@ -378,6 +379,9 @@ mod tests {
 
         assert_eq!(Colored::named("darkgrey"), Some(Colored::DARK_GRAY));
         assert_eq!(Colored::named("missing-color"), None);
+        assert_eq!(Colored::try_hex_to_color("#gggggg"), None);
+        assert_eq!(convert_to_color("#gggggg".to_string()), None);
+        assert_eq!(convert_to_color("#12".to_string()), None);
     }
 
     #[test]

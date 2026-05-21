@@ -1967,7 +1967,7 @@ pub fn convert_to_color(value: String) -> Option<Color> {
         if trimmed.eq("#00000000") {
             color = Some(Color::NONE);
         } else {
-            color = Some(Colored::hex_to_color(trimmed));
+            color = Colored::try_hex_to_color(trimmed);
         }
     } else if let Some(parts) = parse_color_components(trimmed, "rgb", 3) {
         color = Some(Color::srgb_u8(parts[0], parts[1], parts[2]));

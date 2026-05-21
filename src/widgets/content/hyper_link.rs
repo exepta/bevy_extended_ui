@@ -9,7 +9,11 @@ use bevy::prelude::*;
 use std::collections::HashMap;
 #[cfg(not(target_arch = "wasm32"))]
 use std::env;
-#[cfg(all(target_os = "linux", not(target_arch = "wasm32")))]
+#[cfg(all(
+    target_os = "linux",
+    not(target_arch = "wasm32"),
+    feature = "extended-dialog"
+))]
 use std::fs;
 #[cfg(target_os = "windows")]
 use std::path::PathBuf;
@@ -45,7 +49,11 @@ enum HyperLinkOpenOutcome {
     Failed,
 }
 
-#[cfg(all(target_os = "linux", not(target_arch = "wasm32")))]
+#[cfg(all(
+    target_os = "linux",
+    not(target_arch = "wasm32"),
+    feature = "extended-dialog"
+))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 enum LinuxFamily {
     Arch,
@@ -592,7 +600,7 @@ fn handle_install_dialog_closed(
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(all(not(target_arch = "wasm32"), feature = "extended-dialog"))]
 fn build_install_command_for_browser(browser: &str) -> Option<String> {
     #[cfg(target_os = "linux")]
     {
@@ -625,7 +633,7 @@ fn build_install_command_for_browser(browser: &str) -> Option<String> {
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(all(not(target_arch = "wasm32"), feature = "extended-dialog"))]
 fn open_install_command_in_terminal(command: &str) -> bool {
     #[cfg(target_os = "windows")]
     {
@@ -663,7 +671,11 @@ fn escape_applescript_text(input: &str) -> String {
     input.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
-#[cfg(all(target_os = "linux", not(target_arch = "wasm32")))]
+#[cfg(all(
+    target_os = "linux",
+    not(target_arch = "wasm32"),
+    feature = "extended-dialog"
+))]
 fn open_linux_terminal_with_command(command: &str) -> bool {
     let interactive_command = format!(r#"{command}; echo; read -r -p "Press Enter to close..." _"#);
 
@@ -724,7 +736,11 @@ fn open_linux_terminal_with_command(command: &str) -> bool {
     false
 }
 
-#[cfg(all(target_os = "linux", not(target_arch = "wasm32")))]
+#[cfg(all(
+    target_os = "linux",
+    not(target_arch = "wasm32"),
+    feature = "extended-dialog"
+))]
 fn detect_linux_family() -> Option<LinuxFamily> {
     let raw = fs::read_to_string("/etc/os-release").ok()?;
     let id = parse_os_release_value(&raw, "ID").unwrap_or_default();
@@ -752,7 +768,11 @@ fn detect_linux_family() -> Option<LinuxFamily> {
     None
 }
 
-#[cfg(all(target_os = "linux", not(target_arch = "wasm32")))]
+#[cfg(all(
+    target_os = "linux",
+    not(target_arch = "wasm32"),
+    feature = "extended-dialog"
+))]
 fn parse_os_release_value(raw: &str, key: &str) -> Option<String> {
     for line in raw.lines() {
         let trimmed = line.trim();
@@ -779,7 +799,11 @@ fn parse_os_release_value(raw: &str, key: &str) -> Option<String> {
     None
 }
 
-#[cfg(all(target_os = "linux", not(target_arch = "wasm32")))]
+#[cfg(all(
+    target_os = "linux",
+    not(target_arch = "wasm32"),
+    feature = "extended-dialog"
+))]
 fn linux_package_for_browser(browser: &str, family: LinuxFamily) -> String {
     let normalized = canonical_browser_name(browser);
     match (normalized.as_str(), family) {

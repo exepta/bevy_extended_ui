@@ -62,10 +62,8 @@ impl HtmlSource {
     pub fn get_source_path(&self) -> String {
         self.handle
             .path()
-            .expect("Failed to get source path!")
-            .path()
-            .to_string_lossy()
-            .replace('\\', "/")
+            .map(|asset_path| asset_path.path().to_string_lossy().replace('\\', "/"))
+            .unwrap_or_default()
     }
 }
 

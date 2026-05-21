@@ -9,7 +9,7 @@ use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use resvg::{tiny_skia::Pixmap, usvg::Options};
 use std::borrow::Cow;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 pub const DEFAULT_CHECK_MARK_KEY: &str = "extended_ui/icons/check-mark.png";
 pub const DEFAULT_CHOICE_BOX_KEY: &str = "extended_ui/icons/drop-arrow.png";
 pub const DEFAULT_COLOR_KEY: &str = "extended_ui/icons/color.png";
@@ -305,6 +305,27 @@ fn normalize_asset_path(path: &str) -> Cow<'_, str> {
     Cow::Borrowed(trimmed)
 }
 
+fn to_assets_relative_path(path: &Path) -> Option<String> {
+    let mut found_assets = false;
+    let mut relative = PathBuf::new();
+
+    for component in path.components() {
+        match component {
+            Component::Normal(part) if found_assets => relative.push(part),
+            Component::Normal(part) if part == std::ffi::OsStr::new("assets") => {
+                found_assets = true
+            }
+            _ => {}
+        }
+    }
+
+    if !found_assets || relative.as_os_str().is_empty() {
+        return None;
+    }
+
+    Some(relative.to_string_lossy().replace('\\', "/"))
+}
+
 /// Preloads images from the configured assets folder into the cache.
 pub fn pre_load_assets(
     extended_ui_configuration: Res<ExtendedUiConfiguration>,
@@ -324,7 +345,19 @@ pub fn pre_load_assets(
 
     let supported_extensions = supported_image_extensions();
 
-    for entry in fs::read_dir(folder).expect("Failed to read asset folder") {
+    let read_dir = match fs::read_dir(folder) {
+        Ok(read_dir) => read_dir,
+        Err(error) => {
+            warn!(
+                "pre_load_assets: Failed to read asset folder '{}': {}",
+                folder.display(),
+                error
+            );
+            return;
+        }
+    };
+
+    for entry in read_dir {
         if let Ok(entry) = entry {
             let path = entry.path();
 
@@ -332,32 +365,33 @@ pub fn pre_load_assets(
                 if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
                     let ext_lower = ext.to_lowercase();
                     if supported_extensions.contains(&ext_lower.as_str()) {
-                        if let Some(asset_path) = path.strip_prefix("assets").ok() {
-                            if let Some(asset_str) = asset_path.to_str() {
-                                let owned_path = normalize_asset_path(asset_str).into_owned();
+                        if let Some(asset_str) = to_assets_relative_path(&path) {
+                            let owned_path = normalize_asset_path(asset_str.as_str()).into_owned();
 
-                                #[cfg(all(feature = "svg", not(target_arch = "wasm32")))]
-                                if ext_lower == "svg" {
-                                    if let Some(handle) = load_svg_image_from_project(
-                                        owned_path.as_str(),
-                                        &mut images,
-                                    ) {
-                                        image_cache.map.insert(owned_path.clone(), handle);
-                                        debug!("Preloaded svg image: {}", owned_path);
-                                    } else {
-                                        warn!(
-                                            "Failed to preload SVG image '{}': rasterization failed",
-                                            owned_path
-                                        );
-                                    }
-                                    continue;
+                            #[cfg(all(feature = "svg", not(target_arch = "wasm32")))]
+                            if ext_lower == "svg" {
+                                if let Some(handle) =
+                                    load_svg_image_from_project(owned_path.as_str(), &mut images)
+                                {
+                                    image_cache.map.insert(owned_path.clone(), handle);
+                                    debug!("Preloaded svg image: {}", owned_path);
+                                } else {
+                                    warn!(
+                                        "Failed to preload SVG image '{}': rasterization failed",
+                                        owned_path
+                                    );
                                 }
-
-                                let handle: Handle<Image> = asset_server.load(owned_path.clone());
-                                image_cache.map.insert(owned_path.clone(), handle.clone());
-
-                                debug!("Preloaded image: {}", owned_path);
+                                continue;
                             }
+
+                            let handle: Handle<Image> = asset_server.load(owned_path.clone());
+                            image_cache.map.insert(owned_path.clone(), handle.clone());
+                            debug!("Preloaded image: {}", owned_path);
+                        } else {
+                            warn!(
+                                "pre_load_assets: Skipping '{}' because no 'assets/' relative path could be derived.",
+                                path.display()
+                            );
                         }
                     }
                 }

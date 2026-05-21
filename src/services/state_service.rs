@@ -17,7 +17,10 @@ impl Plugin for StateService {
     fn build(&self, app: &mut App) {
         app.init_resource::<BoundStateIndex>();
         app.register_type::<Pickable>();
-        app.add_systems(PostUpdate, (refresh_bound_state_index, update_widget_states).chain());
+        app.add_systems(
+            PostUpdate,
+            (refresh_bound_state_index, update_widget_states).chain(),
+        );
         app.add_systems(
             Update,
             (

@@ -1629,6 +1629,10 @@ fn calculate_text_width(text: &str, style: &TextFont) -> f32 {
     text.len() as f32 * style.font_size * 0.6
 }
 
+#[cfg(any(
+    all(not(target_arch = "wasm32"), feature = "extended-dialog"),
+    all(target_arch = "wasm32", feature = "clipboard-wasm")
+))]
 fn normalized_extensions(values: &[String]) -> Vec<String> {
     values
         .iter()
@@ -1653,6 +1657,10 @@ fn format_file_size(bytes: u64) -> String {
     format!("{:.0} {}", value.round(), UNITS[unit_idx])
 }
 
+#[cfg(any(
+    all(not(target_arch = "wasm32"), feature = "extended-dialog"),
+    all(target_arch = "wasm32", feature = "clipboard-wasm")
+))]
 fn push_pending_file_selection(
     bridge: &InputFileDialogBridge,
     target: usize,
@@ -1672,6 +1680,10 @@ fn push_pending_file_selection(
     });
 }
 
+#[cfg(any(
+    all(not(target_arch = "wasm32"), feature = "extended-dialog"),
+    all(target_arch = "wasm32", feature = "clipboard-wasm")
+))]
 fn push_pending_file_selection_error(
     bridge: &InputFileDialogBridge,
     target: usize,
@@ -1769,24 +1781,24 @@ fn run_native_file_picker(
     }
 }
 
-fn open_file_picker(target: usize, field: &InputField, bridge: &InputFileDialogBridge) {
+fn open_file_picker(_target: usize, _field: &InputField, _bridge: &InputFileDialogBridge) {
     #[cfg(all(not(target_arch = "wasm32"), feature = "extended-dialog"))]
     {
-        let folder_mode = field.folder;
-        let extensions = normalized_extensions(&field.extensions);
-        let include_size = field.show_size && !folder_mode;
+        let folder_mode = _field.folder;
+        let extensions = normalized_extensions(&_field.extensions);
+        let include_size = _field.show_size && !folder_mode;
         let max_size_bytes = if folder_mode {
             None
         } else {
-            field.max_size_bytes
+            _field.max_size_bytes
         };
 
         #[cfg(target_os = "linux")]
         {
-            let bridge = bridge.clone();
+            let bridge = _bridge.clone();
             let _ = spawn_linux_file_dialog_task(move || {
                 run_native_file_picker(
-                    target,
+                    _target,
                     folder_mode,
                     extensions,
                     include_size,
@@ -1800,12 +1812,12 @@ fn open_file_picker(target: usize, field: &InputField, bridge: &InputFileDialogB
         #[cfg(not(target_os = "linux"))]
         {
             run_native_file_picker(
-                target,
+                _target,
                 folder_mode,
                 extensions,
                 include_size,
                 max_size_bytes,
-                bridge.clone(),
+                _bridge.clone(),
             );
             return;
         }
@@ -1829,12 +1841,12 @@ fn open_file_picker(target: usize, field: &InputField, bridge: &InputFileDialogB
         input.set_type("file");
         let _ = input.set_attribute("style", "display: none;");
 
-        let folder_mode = field.folder;
+        let folder_mode = _field.folder;
         if folder_mode {
             let _ = input.set_attribute("webkitdirectory", "");
             let _ = input.set_attribute("directory", "");
         } else {
-            let extensions = normalized_extensions(&field.extensions);
+            let extensions = normalized_extensions(&_field.extensions);
             if !extensions.is_empty() {
                 let accept = extensions
                     .iter()
@@ -1845,13 +1857,13 @@ fn open_file_picker(target: usize, field: &InputField, bridge: &InputFileDialogB
             }
         }
 
-        let bridge = bridge.clone();
+        let bridge = _bridge.clone();
         let input_clone = input.clone();
-        let include_size = field.show_size && !folder_mode;
+        let include_size = _field.show_size && !folder_mode;
         let max_size_bytes = if folder_mode {
             None
         } else {
-            field.max_size_bytes
+            _field.max_size_bytes
         };
 
         let onchange = Closure::wrap(Box::new(move |_event: web_sys::Event| {
@@ -1887,7 +1899,7 @@ fn open_file_picker(target: usize, field: &InputField, bridge: &InputFileDialogB
                 {
                     push_pending_file_selection_error(
                         &bridge,
-                        target,
+                        _target,
                         format!("File is too large (max: {})", format_file_size(limit)),
                     );
                     warn!(
@@ -1911,7 +1923,7 @@ fn open_file_picker(target: usize, field: &InputField, bridge: &InputFileDialogB
                 let Ok(reader) = web_sys::FileReader::new() else {
                     push_pending_file_selection(
                         &bridge,
-                        target,
+                        _target,
                         display_name.clone(),
                         display_name,
                         size,
@@ -1928,7 +1940,7 @@ fn open_file_picker(target: usize, field: &InputField, bridge: &InputFileDialogB
 
                     push_pending_file_selection(
                         &bridge_load,
-                        target,
+                        _target,
                         display_name_load.clone(),
                         value,
                         size,
@@ -1942,7 +1954,7 @@ fn open_file_picker(target: usize, field: &InputField, bridge: &InputFileDialogB
 
             push_pending_file_selection(
                 &bridge,
-                target,
+                _target,
                 display_name.clone(),
                 display_name,
                 size_bytes,
