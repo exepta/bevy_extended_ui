@@ -1,5 +1,7 @@
 #[cfg(feature = "extended-dialog")]
 use crate::dialog::ExtendedDialogPlugin;
+#[cfg(feature = "extended-framework")]
+use crate::framework::ExtendedFrameworkPlugin;
 use crate::html::ExtendedUiHtmlPlugin;
 use crate::io::ExtendedIoPlugin;
 #[cfg(feature = "providers")]
@@ -16,6 +18,8 @@ use std::collections::HashMap;
 #[cfg(feature = "extended-dialog")]
 pub mod dialog;
 pub mod example_utils;
+#[cfg(feature = "extended-framework")]
+pub mod framework;
 pub mod html;
 pub mod io;
 pub mod lang;
@@ -136,6 +140,8 @@ impl Plugin for ExtendedUiPlugin {
         ));
         #[cfg(feature = "extended-dialog")]
         app.add_plugins(ExtendedDialogPlugin);
+        #[cfg(feature = "extended-framework")]
+        app.add_plugins(ExtendedFrameworkPlugin);
         #[cfg(feature = "providers")]
         app.add_plugins(ExtendedUiProviderPlugin);
         app.add_systems(

@@ -13,6 +13,8 @@ use std::collections::{HashMap, HashSet};
 use crate::ExtendedUiConfiguration;
 #[cfg(feature = "extended-dialog")]
 use crate::dialog::{DialogProvider, DialogWidget, DialogWidgetType};
+#[cfg(feature = "extended-framework")]
+use crate::framework::{ExtendedFrameworkConfiguration, compile_framework_template};
 use crate::html::{
     HtmlDirty, HtmlEventBindings, HtmlID, HtmlInnerContent, HtmlMeta, HtmlSource, HtmlStates,
     HtmlStructureMap, HtmlStyle, HtmlSystemSet, HtmlWidgetNode,
@@ -78,6 +80,9 @@ fn update_html_ui(
     html_assets: Res<Assets<HtmlAsset>>,
     mut html_asset_events: MessageReader<AssetEvent<HtmlAsset>>,
     default_css: Res<DefaultCssHandle>,
+    #[cfg(feature = "extended-framework")] framework_config: Option<
+        Res<ExtendedFrameworkConfiguration>,
+    >,
     #[cfg(feature = "providers")] provider_registry: Option<Res<UiProviderRegistry>>,
     #[cfg(feature = "providers")] mut theme_provider_state: Option<ResMut<ThemeProviderState>>,
 
@@ -86,6 +91,8 @@ fn update_html_ui(
     queries: HtmlSourceQueries,
 ) {
     let type_registry = type_registry.read();
+    #[cfg(feature = "extended-framework")]
+    let framework_config = framework_config.as_deref().cloned().unwrap_or_default();
     let resolved = ui_lang.resolved().map(|lang| lang.to_string());
     let mut lang_dirty = false;
     let vars_hash = vars_fingerprint(&lang_vars);
@@ -154,7 +161,16 @@ fn update_html_ui(
         // Asset is ready -> ensure we don't keep a retry flag.
         commands.entity(entity).remove::<PendingHtmlParse>();
 
-        let content = html_asset.html.clone();
+        let source_path = html.get_source_path();
+        let raw_content = html_asset.html.clone();
+        #[cfg(feature = "extended-framework")]
+        let framework_compiled =
+            compile_framework_template(&raw_content, &source_path, &framework_config);
+        #[cfg(feature = "extended-framework")]
+        let content = framework_compiled.html.clone();
+        #[cfg(not(feature = "extended-framework"))]
+        let content = raw_content;
+
         let raw_document = kuchiki::parse_html().one(content.clone());
         let html_lang = raw_document
             .select_first("html")
@@ -234,7 +250,7 @@ fn update_html_ui(
                 drop(attrs);
 
                 // Resolve href relative to the HTML file location inside assets/
-                let resolved = resolve_relative_asset_path(&html.get_source_path(), &raw_href);
+                let resolved = resolve_relative_asset_path(&source_path, &raw_href);
 
                 Some(asset_server.load::<CssAsset>(resolved))
             })
@@ -262,9 +278,23 @@ fn update_html_ui(
             continue;
         };
 
+        let mut effective_controller = html.controller.clone();
+        if effective_controller.is_none() && !meta_controller.is_empty() {
+            effective_controller = Some(meta_controller.clone());
+        }
+        #[cfg(feature = "extended-framework")]
+        if effective_controller.is_none() {
+            effective_controller = framework_compiled.inferred_controller.clone();
+        }
+
+        let parse_source = HtmlSource {
+            controller: effective_controller,
+            ..html.clone()
+        };
+
         debug!("Create UI for HTML with key [{:?}]", ui_key);
-        if !meta_controller.is_empty() {
-            debug!("UI controller [{:?}]", meta_controller);
+        if let Some(controller) = parse_source.controller.as_ref() {
+            debug!("UI controller [{:?}]", controller);
         }
 
         let label_map = collect_labels_by_for(&body_node);
@@ -274,7 +304,7 @@ fn update_html_ui(
             &css_handles,
             &label_map,
             &ui_key,
-            html,
+            &parse_source,
             &type_registry,
         ) {
             structure_map

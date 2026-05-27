@@ -29,7 +29,7 @@ Available features:
 
 - [x] Full HTML support.
 - [x] CSS support but not all CSS properties.
-- [x] Hot reload support.
+- [x] Hot reload support. (`bevy:file_watcher` feature needed)
 - [x] HTML Bind support for interacting with the code.
 - [x] Font support for family and weight.
 - [x] Animation support (`@keyframes`).
@@ -50,6 +50,18 @@ This project supports both stable and nightly Rust.
 - Default: `stable` via `rust-toolchain.toml`
 - Nightly: `cargo +nightly-2025-08-07 ...` or `rustup override set nightly-2025-08-07`
 - Optional: use `rust-toolchain-nightly.toml` as a drop-in replacement if you want nightly by default
+
+#### Windows build prerequisites
+
+You can build on Windows with either MSVC or GNU:
+
+- **MSVC path**: use `x86_64-pc-windows-msvc` and install **Visual Studio 2017+** (or **Build Tools for Visual Studio**)
+  with **Desktop development with C++** so `link.exe` is available.
+- **GNU path (no Visual Studio)**: use `x86_64-pc-windows-gnu` and install MinGW tools (for example via **MSYS2** with
+  the `mingw-w64-ucrt-x86_64-toolchain` package), then ensure `C:\msys64\ucrt64\bin` is on `PATH`.
+
+If Cargo fails with `error: linker 'link.exe' not found`, you are building with MSVC but the Visual C++ tools are not
+available on `PATH`.
 
 ### How to use?
 
@@ -74,6 +86,7 @@ bevy_extended_ui_macros = "1.5.0"
 | `svg`              | Optional SVG image support for UI images/icons (rasterized to Bevy `Image`); not enabled by default.  |
 | `providers`        | Enables custom HTML providers (e.g. theme-provider).                                                  |
 | `extended-dialog`  | Enables the dialog system with `BevyApp` and desktop `System` providers.                              |
+| `extended-framework` | Enables the experimental Angular-like component base (`*.component.html` + `*.component.rs`).       |
 
 Then, you add the plugin to your `main.rs` or on any point at a build function:
 
@@ -133,6 +146,39 @@ Note that currently you can use this binding:
 - `ondragstart`
 - `ondrag`
 - `ondragstop`
+
+### Extended framework (experimental)
+
+To enable the Angular-like base, turn on the Cargo feature:
+
+```toml
+[dependencies]
+bevy_extended_ui = { version = "1.5.0", features = ["extended-framework"] }
+```
+
+Alias also available: `extended_framework`.
+
+Base folder layout:
+
+```text
+assets/
+  ui/
+    bevy_ang/
+      hud/
+        hud.component.html
+        hud.component.css
+
+src/
+  packages/
+    hud.component.rs
+```
+
+Behavior in `extended-framework` mode:
+
+- HTML and CSS are loaded via Bevy `AssetServer` (`assets/` only).
+- For `assets/ui/bevy_ang/**/*.component.html`, the framework infers a default Rust controller path.
+- Example: `assets/ui/bevy_ang/hud/hud.component.html` -> `src/packages/hud.component.rs`.
+- `<meta controller="...">` still has priority over inferred controller paths.
 
 ### Dialog system
 
