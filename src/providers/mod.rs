@@ -29,6 +29,7 @@ pub struct ProviderRules {
 }
 
 impl Default for ProviderRules {
+    /// Handles `default` in the extended UI workflow.
     fn default() -> Self {
         Self {
             requires_body_child: false,
@@ -156,6 +157,7 @@ pub trait UiProviderAppExt {
 }
 
 impl UiProviderAppExt for App {
+    /// Handles `register_ui_provider` in the extended UI workflow.
     fn register_ui_provider<P: UiProvider>(&mut self, provider: P) -> &mut Self {
         self.init_resource::<UiProviderRegistry>();
         self.world_mut()
@@ -169,6 +171,7 @@ impl UiProviderAppExt for App {
 pub struct ExtendedUiProviderPlugin;
 
 impl Plugin for ExtendedUiProviderPlugin {
+    /// Handles `build` in the extended UI workflow.
     fn build(&self, app: &mut App) {
         app.init_resource::<UiProviderRegistry>();
         app.init_resource::<ThemeProviderState>();

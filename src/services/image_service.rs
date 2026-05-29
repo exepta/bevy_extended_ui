@@ -137,6 +137,7 @@ pub fn get_or_load_image(
     handle
 }
 
+/// Handles `load_image_from_filesystem` in the extended UI workflow.
 fn load_image_from_filesystem(path: &str, images: &mut Assets<Image>) -> Option<Handle<Image>> {
     let fs_path = Path::new(path);
     if !fs_path.is_file() {
@@ -169,6 +170,7 @@ fn load_image_from_filesystem(path: &str, images: &mut Assets<Image>) -> Option<
     Some(images.add(image))
 }
 
+/// Handles `load_image_from_data_url` in the extended UI workflow.
 fn load_image_from_data_url(path: &str, images: &mut Assets<Image>) -> Option<Handle<Image>> {
     let raw = path.trim();
     if !raw.starts_with("data:") {
@@ -215,6 +217,7 @@ fn load_image_from_data_url(path: &str, images: &mut Assets<Image>) -> Option<Ha
     Some(images.add(image))
 }
 
+/// Handles `embedded_icon_bytes` in the extended UI workflow.
 fn embedded_icon_bytes(path: &str) -> Option<&'static [u8]> {
     match path {
         DEFAULT_CHECK_MARK_KEY => Some(EMBEDDED_CHECK_MARK),
@@ -224,10 +227,12 @@ fn embedded_icon_bytes(path: &str) -> Option<&'static [u8]> {
     }
 }
 
+/// Handles `asset_exists_in_project` in the extended UI workflow.
 fn asset_exists_in_project(path: &str) -> bool {
     resolve_asset_fs_path(path).exists()
 }
 
+/// Handles `resolve_asset_fs_path` in the extended UI workflow.
 fn resolve_asset_fs_path(path: &str) -> PathBuf {
     let raw = Path::new(path);
     if raw.is_absolute() || raw.starts_with("assets") {
@@ -237,6 +242,7 @@ fn resolve_asset_fs_path(path: &str) -> PathBuf {
     Path::new("assets").join(raw)
 }
 
+/// Handles `path_is_svg` in the extended UI workflow.
 #[cfg(all(feature = "svg", not(target_arch = "wasm32")))]
 fn path_is_svg(path: &str) -> bool {
     Path::new(path)
@@ -245,6 +251,7 @@ fn path_is_svg(path: &str) -> bool {
         .is_some_and(|ext| ext.eq_ignore_ascii_case("svg"))
 }
 
+/// Handles `load_svg_image_from_project` in the extended UI workflow.
 #[cfg(all(feature = "svg", not(target_arch = "wasm32")))]
 fn load_svg_image_from_project(path: &str, images: &mut Assets<Image>) -> Option<Handle<Image>> {
     let fs_path = resolve_asset_fs_path(path);
@@ -275,6 +282,7 @@ fn load_svg_image_from_project(path: &str, images: &mut Assets<Image>) -> Option
     Some(images.add(image))
 }
 
+/// Handles `supported_image_extensions` in the extended UI workflow.
 fn supported_image_extensions() -> Vec<&'static str> {
     #[cfg(feature = "svg")]
     {
@@ -287,6 +295,7 @@ fn supported_image_extensions() -> Vec<&'static str> {
     }
 }
 
+/// Handles `normalize_asset_path` in the extended UI workflow.
 fn normalize_asset_path(path: &str) -> Cow<'_, str> {
     let trimmed = path.trim();
     if trimmed.is_empty() {
@@ -305,6 +314,7 @@ fn normalize_asset_path(path: &str) -> Cow<'_, str> {
     Cow::Borrowed(trimmed)
 }
 
+/// Handles `to_assets_relative_path` in the extended UI workflow.
 fn to_assets_relative_path(path: &Path) -> Option<String> {
     let mut found_assets = false;
     let mut relative = PathBuf::new();

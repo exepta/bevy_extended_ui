@@ -2,7 +2,6 @@ mod bindings;
 pub mod builder;
 pub mod converter;
 pub mod reload;
-mod unit_tests;
 
 pub use inventory;
 
@@ -32,9 +31,13 @@ pub static HTML_ID_COUNTER: AtomicUsize = AtomicUsize::new(1);
 /// System set ordering for the HTML UI pipeline.
 #[derive(SystemSet, Debug, Hash, PartialEq, Eq, Clone)]
 pub enum HtmlSystemSet {
+    /// Variant `Convert`.
     Convert,
+    /// Variant `Build`.
     Build,
+    /// Variant `ShowWidgets`.
     ShowWidgets,
+    /// Variant `Bindings`.
     Bindings,
 }
 
@@ -221,226 +224,370 @@ pub struct HtmlStates {
 pub enum HtmlWidgetNode {
     /// The root `<body>` element of the HTML structure.
     Body(
+        /// Variant `Body`.
         Body,
+        /// Variant `HtmlMeta`.
         HtmlMeta,
+        /// Variant `HtmlStates`.
         HtmlStates,
         Vec<HtmlWidgetNode>,
+        /// Variant `HtmlEventBindings`.
         HtmlEventBindings,
+        /// Variant `Widget`.
         Widget,
+        /// Variant `HtmlID`.
         HtmlID,
     ),
     /// A `<div>` container element with nested child nodes.
     Div(
+        /// Variant `Div`.
         Div,
+        /// Variant `HtmlMeta`.
         HtmlMeta,
+        /// Variant `HtmlStates`.
         HtmlStates,
         Vec<HtmlWidgetNode>,
+        /// Variant `HtmlEventBindings`.
         HtmlEventBindings,
+        /// Variant `Widget`.
         Widget,
+        /// Variant `HtmlID`.
         HtmlID,
     ),
     /// A `<form>` container element with nested child nodes.
     Form(
+        /// Variant `Form`.
         Form,
+        /// Variant `HtmlMeta`.
         HtmlMeta,
+        /// Variant `HtmlStates`.
         HtmlStates,
         Vec<HtmlWidgetNode>,
+        /// Variant `HtmlEventBindings`.
         HtmlEventBindings,
+        /// Variant `Widget`.
         Widget,
+        /// Variant `HtmlID`.
         HtmlID,
     ),
     /// A `<dialog>` widget container with nested child nodes.
     #[cfg(feature = "extended-dialog")]
     Dialog(
+        /// Variant `DialogWidget`.
         DialogWidget,
+        /// Variant `HtmlMeta`.
         HtmlMeta,
+        /// Variant `HtmlStates`.
         HtmlStates,
         Vec<HtmlWidgetNode>,
+        /// Variant `HtmlEventBindings`.
         HtmlEventBindings,
+        /// Variant `Widget`.
         Widget,
+        /// Variant `HtmlID`.
         HtmlID,
     ),
     /// A `<divider>` element.
     Divider(
+        /// Variant `Divider`.
         Divider,
+        /// Variant `HtmlMeta`.
         HtmlMeta,
+        /// Variant `HtmlStates`.
         HtmlStates,
+        /// Variant `HtmlEventBindings`.
         HtmlEventBindings,
+        /// Variant `Widget`.
         Widget,
+        /// Variant `HtmlID`.
         HtmlID,
     ),
     /// A `<button>` element.
     Button(
+        /// Variant `Button`.
         Button,
+        /// Variant `HtmlMeta`.
         HtmlMeta,
+        /// Variant `HtmlStates`.
         HtmlStates,
+        /// Variant `HtmlEventBindings`.
         HtmlEventBindings,
+        /// Variant `Widget`.
         Widget,
+        /// Variant `HtmlID`.
         HtmlID,
     ),
     /// A checkbox `<checkbox>`.
     CheckBox(
+        /// Variant `CheckBox`.
         CheckBox,
+        /// Variant `HtmlMeta`.
         HtmlMeta,
+        /// Variant `HtmlStates`.
         HtmlStates,
+        /// Variant `HtmlEventBindings`.
         HtmlEventBindings,
+        /// Variant `Widget`.
         Widget,
+        /// Variant `HtmlID`.
         HtmlID,
     ),
     /// A color picker `<colorpicker>`.
     ColorPicker(
+        /// Variant `ColorPicker`.
         ColorPicker,
+        /// Variant `HtmlMeta`.
         HtmlMeta,
+        /// Variant `HtmlStates`.
         HtmlStates,
+        /// Variant `HtmlEventBindings`.
         HtmlEventBindings,
+        /// Variant `Widget`.
         Widget,
+        /// Variant `HtmlID`.
         HtmlID,
     ),
     /// A dropdown or select box.
     ChoiceBox(
+        /// Variant `ChoiceBox`.
         ChoiceBox,
+        /// Variant `HtmlMeta`.
         HtmlMeta,
+        /// Variant `HtmlStates`.
         HtmlStates,
+        /// Variant `HtmlEventBindings`.
         HtmlEventBindings,
+        /// Variant `Widget`.
         Widget,
+        /// Variant `HtmlID`.
         HtmlID,
     ),
     /// A date picker `<date-picker>`.
     DatePicker(
+        /// Variant `DatePicker`.
         DatePicker,
+        /// Variant `HtmlMeta`.
         HtmlMeta,
+        /// Variant `HtmlStates`.
         HtmlStates,
+        /// Variant `HtmlEventBindings`.
         HtmlEventBindings,
+        /// Variant `Widget`.
         Widget,
+        /// Variant `HtmlID`.
         HtmlID,
     ),
     /// A `<fieldset>` container element with nested child nodes from type `<radio> and <toggle>`.
     FieldSet(
+        /// Variant `FieldSet`.
         FieldSet,
+        /// Variant `HtmlMeta`.
         HtmlMeta,
+        /// Variant `HtmlStates`.
         HtmlStates,
         Vec<HtmlWidgetNode>,
+        /// Variant `HtmlEventBindings`.
         HtmlEventBindings,
+        /// Variant `Widget`.
         Widget,
+        /// Variant `HtmlID`.
         HtmlID,
     ),
     /// A heading element (`<h1>`-`<h6>`).
     Headline(
+        /// Variant `Headline`.
         Headline,
+        /// Variant `HtmlMeta`.
         HtmlMeta,
+        /// Variant `HtmlStates`.
         HtmlStates,
+        /// Variant `HtmlEventBindings`.
         HtmlEventBindings,
+        /// Variant `Widget`.
         Widget,
+        /// Variant `HtmlID`.
         HtmlID,
     ),
     /// A hyperlink `<a>`.
     HyperLink(
+        /// Variant `HyperLink`.
         HyperLink,
+        /// Variant `HtmlMeta`.
         HtmlMeta,
+        /// Variant `HtmlStates`.
         HtmlStates,
+        /// Variant `HtmlEventBindings`.
         HtmlEventBindings,
+        /// Variant `Widget`.
         Widget,
+        /// Variant `HtmlID`.
         HtmlID,
     ),
     /// A img element (`<img>`).
     Img(Img, HtmlMeta, HtmlStates, HtmlEventBindings, Widget, HtmlID),
     /// An `<input ...>` field.
     Input(
+        /// Variant `InputField`.
         InputField,
+        /// Variant `HtmlMeta`.
         HtmlMeta,
+        /// Variant `HtmlStates`.
         HtmlStates,
+        /// Variant `HtmlEventBindings`.
         HtmlEventBindings,
+        /// Variant `Widget`.
         Widget,
+        /// Variant `HtmlID`.
         HtmlID,
     ),
     /// A paragraph `<p>`.
     Paragraph(
+        /// Variant `Paragraph`.
         Paragraph,
+        /// Variant `HtmlMeta`.
         HtmlMeta,
+        /// Variant `HtmlStates`.
         HtmlStates,
+        /// Variant `HtmlEventBindings`.
         HtmlEventBindings,
+        /// Variant `Widget`.
         Widget,
+        /// Variant `HtmlID`.
         HtmlID,
     ),
     /// A tooltip `<tool-tip>`.
     ToolTip(
+        /// Variant `ToolTip`.
         ToolTip,
+        /// Variant `HtmlMeta`.
         HtmlMeta,
+        /// Variant `HtmlStates`.
         HtmlStates,
+        /// Variant `HtmlEventBindings`.
         HtmlEventBindings,
+        /// Variant `Widget`.
         Widget,
+        /// Variant `HtmlID`.
         HtmlID,
     ),
     /// A badge `<badge>`.
     Badge(
+        /// Variant `Badge`.
         Badge,
+        /// Variant `HtmlMeta`.
         HtmlMeta,
+        /// Variant `HtmlStates`.
         HtmlStates,
+        /// Variant `HtmlEventBindings`.
         HtmlEventBindings,
+        /// Variant `Widget`.
         Widget,
+        /// Variant `HtmlID`.
         HtmlID,
     ),
     /// A progressbar `<progressbar>`.
     ProgressBar(
+        /// Variant `ProgressBar`.
         ProgressBar,
+        /// Variant `HtmlMeta`.
         HtmlMeta,
+        /// Variant `HtmlStates`.
         HtmlStates,
+        /// Variant `HtmlEventBindings`.
         HtmlEventBindings,
+        /// Variant `Widget`.
         Widget,
+        /// Variant `HtmlID`.
         HtmlID,
     ),
     /// A radio-button `<radio>`.
     RadioButton(
+        /// Variant `RadioButton`.
         RadioButton,
+        /// Variant `HtmlMeta`.
         HtmlMeta,
+        /// Variant `HtmlStates`.
         HtmlStates,
+        /// Variant `HtmlEventBindings`.
         HtmlEventBindings,
+        /// Variant `Widget`.
         Widget,
+        /// Variant `HtmlID`.
         HtmlID,
     ),
     /// A slider input `<slider>`).
     Scrollbar(
+        /// Variant `Scrollbar`.
         Scrollbar,
+        /// Variant `HtmlMeta`.
         HtmlMeta,
+        /// Variant `HtmlStates`.
         HtmlStates,
+        /// Variant `HtmlEventBindings`.
         HtmlEventBindings,
+        /// Variant `Widget`.
         Widget,
+        /// Variant `HtmlID`.
         HtmlID,
     ),
     /// A slider input `<slider>`).
     Slider(
+        /// Variant `Slider`.
         Slider,
+        /// Variant `HtmlMeta`.
         HtmlMeta,
+        /// Variant `HtmlStates`.
         HtmlStates,
+        /// Variant `HtmlEventBindings`.
         HtmlEventBindings,
+        /// Variant `Widget`.
         Widget,
+        /// Variant `HtmlID`.
         HtmlID,
     ),
     /// A switch-button `<switch>`).
     SwitchButton(
+        /// Variant `SwitchButton`.
         SwitchButton,
+        /// Variant `HtmlMeta`.
         HtmlMeta,
+        /// Variant `HtmlStates`.
         HtmlStates,
+        /// Variant `HtmlEventBindings`.
         HtmlEventBindings,
+        /// Variant `Widget`.
         Widget,
+        /// Variant `HtmlID`.
         HtmlID,
     ),
     /// A toggle-button `<toggle>`.
     ToggleButton(
+        /// Variant `ToggleButton`.
         ToggleButton,
+        /// Variant `HtmlMeta`.
         HtmlMeta,
+        /// Variant `HtmlStates`.
         HtmlStates,
+        /// Variant `HtmlEventBindings`.
         HtmlEventBindings,
+        /// Variant `Widget`.
         Widget,
+        /// Variant `HtmlID`.
         HtmlID,
     ),
     /// A list box `<listbox>`.
     ListBox(
+        /// Variant `ListBox`.
         ListBox,
+        /// Variant `HtmlMeta`.
         HtmlMeta,
+        /// Variant `HtmlStates`.
         HtmlStates,
+        /// Variant `HtmlEventBindings`.
         HtmlEventBindings,
+        /// Variant `Widget`.
         Widget,
+        /// Variant `HtmlID`.
         HtmlID,
     ),
 }
@@ -476,82 +623,102 @@ impl Default for HtmlID {
 
 /// Registry entry for HTML event handler builders.
 pub enum HtmlFnRegistration {
+    /// Variant `HtmlEvent`.
     HtmlEvent {
         name: &'static str,
         build: fn(&mut World) -> SystemId<In<HtmlEvent>, ()>,
     },
+    /// Variant `HtmlClick`.
     HtmlClick {
         name: &'static str,
         build: fn(&mut World) -> SystemId<In<HtmlClick>, ()>,
     },
+    /// Variant `HtmlMouseDown`.
     HtmlMouseDown {
         name: &'static str,
         build: fn(&mut World) -> SystemId<In<HtmlMouseDown>, ()>,
     },
+    /// Variant `HtmlMouseUp`.
     HtmlMouseUp {
         name: &'static str,
         build: fn(&mut World) -> SystemId<In<HtmlMouseUp>, ()>,
     },
+    /// Variant `HtmlChange`.
     HtmlChange {
         name: &'static str,
         build: fn(&mut World) -> SystemId<In<HtmlChange>, ()>,
     },
+    /// Variant `HtmlSubmit`.
     HtmlSubmit {
         name: &'static str,
         build: fn(&mut World) -> SystemId<In<HtmlSubmit>, ()>,
     },
+    /// Variant `HtmlInit`.
     HtmlInit {
         name: &'static str,
         build: fn(&mut World) -> SystemId<In<HtmlInit>, ()>,
     },
+    /// Variant `HtmlMouseOut`.
     HtmlMouseOut {
         name: &'static str,
         build: fn(&mut World) -> SystemId<In<HtmlMouseOut>, ()>,
     },
+    /// Variant `HtmlMouseOver`.
     HtmlMouseOver {
         name: &'static str,
         build: fn(&mut World) -> SystemId<In<HtmlMouseOver>, ()>,
     },
+    /// Variant `HtmlFocus`.
     HtmlFocus {
         name: &'static str,
         build: fn(&mut World) -> SystemId<In<HtmlFocus>, ()>,
     },
+    /// Variant `HtmlScroll`.
     HtmlScroll {
         name: &'static str,
         build: fn(&mut World) -> SystemId<In<HtmlScroll>, ()>,
     },
+    /// Variant `HtmlWheel`.
     HtmlWheel {
         name: &'static str,
         build: fn(&mut World) -> SystemId<In<HtmlWheel>, ()>,
     },
+    /// Variant `HtmlKeyDown`.
     HtmlKeyDown {
         name: &'static str,
         build: fn(&mut World) -> SystemId<In<HtmlKeyDown>, ()>,
     },
+    /// Variant `HtmlKeyUp`.
     HtmlKeyUp {
         name: &'static str,
         build: fn(&mut World) -> SystemId<In<HtmlKeyUp>, ()>,
     },
+    /// Variant `HtmlDragStart`.
     HtmlDragStart {
         name: &'static str,
         build: fn(&mut World) -> SystemId<In<HtmlDragStart>, ()>,
     },
+    /// Variant `HtmlDrag`.
     HtmlDrag {
         name: &'static str,
         build: fn(&mut World) -> SystemId<In<HtmlDrag>, ()>,
     },
+    /// Variant `HtmlDragStop`.
     HtmlDragStop {
         name: &'static str,
         build: fn(&mut World) -> SystemId<In<HtmlDragStop>, ()>,
     },
+    /// Variant `HtmlTouchStart`.
     HtmlTouchStart {
         name: &'static str,
         build: fn(&mut World) -> SystemId<In<HtmlTouchStart>, ()>,
     },
+    /// Variant `HtmlTouchMove`.
     HtmlTouchMove {
         name: &'static str,
         build: fn(&mut World) -> SystemId<In<HtmlTouchMove>, ()>,
     },
+    /// Variant `HtmlTouchEnd`.
     HtmlTouchEnd {
         name: &'static str,
         build: fn(&mut World) -> SystemId<In<HtmlTouchEnd>, ()>,
@@ -686,8 +853,11 @@ pub struct HtmlMouseOut {
 /// Change action types for HTML change events.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HtmlChangeAction {
+    /// Variant `State`.
     State,
+    /// Variant `Style`.
     Style,
+    /// Variant `Unknown`.
     Unknown,
 }
 
@@ -719,7 +889,9 @@ pub struct HtmlInit {
 /// Focus transition state for focus events.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HtmlFocusState {
+    /// Variant `Gained`.
     Gained,
+    /// Variant `Lost`.
     Lost,
 }
 

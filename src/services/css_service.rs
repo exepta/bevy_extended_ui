@@ -23,6 +23,7 @@ static ROOT_CSS_VARS_CACHE: Lazy<RwLock<HashMap<AssetId<CssAsset>, HashMap<Strin
 static PARSED_CSS_WITH_VARS_CACHE: Lazy<RwLock<HashMap<ParsedCssWithVarsKey, ParsedCss>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
 
+/// Represents the `ParsedCssWithVarsKey` data structure used by the extended UI system.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 struct ParsedCssWithVarsKey {
     asset_id: AssetId<CssAsset>,
@@ -44,6 +45,7 @@ struct CssViewportTracker {
 }
 
 impl Default for CssViewportTracker {
+    /// Handles `default` in the extended UI workflow.
     fn default() -> Self {
         Self {
             width: -1.0,
@@ -106,6 +108,7 @@ fn invalidate_css_cache_on_asset_change(mut ev: MessageReader<AssetEvent<CssAsse
     }
 }
 
+/// Handles `get_or_parse_css_by_id` in the extended UI workflow.
 fn get_or_parse_css_by_id(
     asset_id: AssetId<CssAsset>,
     css_assets: &Assets<CssAsset>,
@@ -126,10 +129,12 @@ fn get_or_parse_css_by_id(
     Some(parsed)
 }
 
+/// Handles `get_or_parse_css` in the extended UI workflow.
 fn get_or_parse_css(handle: &Handle<CssAsset>, css_assets: &Assets<CssAsset>) -> Option<ParsedCss> {
     get_or_parse_css_by_id(handle.id(), css_assets)
 }
 
+/// Handles `hash_root_vars` in the extended UI workflow.
 fn hash_root_vars(root_vars: &HashMap<String, String>) -> u64 {
     let mut entries: Vec<(&String, &String)> = root_vars.iter().collect();
     entries.sort_unstable_by(|(left_key, _), (right_key, _)| left_key.cmp(right_key));
@@ -142,6 +147,7 @@ fn hash_root_vars(root_vars: &HashMap<String, String>) -> u64 {
     hasher.finish()
 }
 
+/// Handles `get_or_collect_root_vars` in the extended UI workflow.
 fn get_or_collect_root_vars(
     handle: &Handle<CssAsset>,
     css_assets: &Assets<CssAsset>,
@@ -166,6 +172,7 @@ fn get_or_collect_root_vars(
     Some(vars)
 }
 
+/// Handles `get_or_parse_css_with_root_vars` in the extended UI workflow.
 fn get_or_parse_css_with_root_vars(
     handle: &Handle<CssAsset>,
     css_assets: &Assets<CssAsset>,
@@ -199,6 +206,7 @@ fn get_or_parse_css_with_root_vars(
     Some(parsed)
 }
 
+/// Handles `collect_global_root_vars_for_sources` in the extended UI workflow.
 fn collect_global_root_vars_for_sources(
     sources: &[Handle<CssAsset>],
     css_assets: &Assets<CssAsset>,
@@ -217,6 +225,7 @@ fn collect_global_root_vars_for_sources(
     vars
 }
 
+/// Handles `remove_entity_from_css_users` in the extended UI workflow.
 fn remove_entity_from_css_users(css_users: &mut CssUsers, entity: Entity) {
     let Some(previous_assets) = css_users.entity_assets.remove(&entity) else {
         return;
@@ -335,6 +344,7 @@ fn resolve_breakpoint_viewport(
     Some(Vec2::new(width, height))
 }
 
+/// Handles `resolve_breakpoint_viewport` in the extended UI workflow.
 #[cfg(all(feature = "wasm-breakpoints", not(target_arch = "wasm32")))]
 fn resolve_breakpoint_viewport(window_query: &Query<&Window, With<PrimaryWindow>>) -> Option<Vec2> {
     let window = window_query.single().ok()?;
@@ -344,6 +354,7 @@ fn resolve_breakpoint_viewport(window_query: &Query<&Window, With<PrimaryWindow>
     ))
 }
 
+/// Handles `resolve_breakpoint_viewport` in the extended UI workflow.
 #[cfg(all(not(feature = "wasm-breakpoints"), feature = "css-breakpoints"))]
 fn resolve_breakpoint_viewport(window_query: &Query<&Window, With<PrimaryWindow>>) -> Option<Vec2> {
     let window = window_query.single().ok()?;
@@ -353,6 +364,7 @@ fn resolve_breakpoint_viewport(window_query: &Query<&Window, With<PrimaryWindow>
     ))
 }
 
+/// Handles `resolve_breakpoint_viewport` in the extended UI workflow.
 #[cfg(all(not(feature = "wasm-breakpoints"), not(feature = "css-breakpoints")))]
 fn resolve_breakpoint_viewport(
     _window_query: &Query<&Window, With<PrimaryWindow>>,
@@ -361,7 +373,7 @@ fn resolve_breakpoint_viewport(
 }
 
 /// Returns the CSS asset ids whose media rules change match state between two viewports.
-pub(crate) fn collect_assets_with_changed_media_matches(
+pub fn collect_assets_with_changed_media_matches(
     css_users: &CssUsers,
     css_assets: &Assets<CssAsset>,
     prev_viewport: Vec2,
@@ -713,6 +725,7 @@ fn load_and_merge_styles_from_assets(
     }
 }
 
+/// Handles `load_and_merge_styles_from_assets_legacy` in the extended UI workflow.
 #[cfg(all(feature = "wasm-default", target_arch = "wasm32"))]
 fn load_and_merge_styles_from_assets_legacy(
     sources: &[Handle<CssAsset>],
@@ -890,19 +903,25 @@ fn matches_selector(
     false
 }
 
+/// Defines the available `SelectorCombinator` variants for this part of the UI runtime.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum SelectorCombinator {
+    /// Variant `Root`.
     Root,
+    /// Variant `Descendant`.
     Descendant,
+    /// Variant `Child`.
     Child,
 }
 
+/// Represents the `SelectorStep` data structure used by the extended UI system.
 #[derive(Clone, Debug)]
 struct SelectorStep {
     selector: String,
     combinator: SelectorCombinator,
 }
 
+/// Handles `parse_selector_steps` in the extended UI workflow.
 fn parse_selector_steps(selector: &str) -> Vec<SelectorStep> {
     let mut steps = Vec::new();
     let mut next_relation = SelectorCombinator::Descendant;

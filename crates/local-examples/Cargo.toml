@@ -6,6 +6,10 @@ publish = false
 
 [workspace]
 
+[features]
+default = []
+extended-framework = ["bevy_extended_ui/extended-framework"]
+
 [dependencies]
 bevy = "0.18.1"
 bevy_extended_ui = { path = "../..", features = ["svg"] }

@@ -46,11 +46,16 @@ struct ToolTipTriggerState {
     dragging: HashSet<Entity>,
 }
 
+/// Defines the available `ToolTipSide` variants for this part of the UI runtime.
 #[derive(Clone, Copy, Eq, PartialEq)]
 enum ToolTipSide {
+    /// Variant `Top`.
     Top,
+    /// Variant `Bottom`.
     Bottom,
+    /// Variant `Left`.
     Left,
+    /// Variant `Right`.
     Right,
 }
 
@@ -462,6 +467,7 @@ fn place_nose(node: &mut Node, side: ToolTipSide, tip_w: f32, tip_h: f32) {
     }
 }
 
+/// Handles `side_to_tooltip_class` in the extended UI workflow.
 fn side_to_tooltip_class(side: ToolTipSide) -> &'static str {
     match side {
         ToolTipSide::Top => "tooltip-side-top",
@@ -471,6 +477,7 @@ fn side_to_tooltip_class(side: ToolTipSide) -> &'static str {
     }
 }
 
+/// Handles `side_to_nose_class` in the extended UI workflow.
 fn side_to_nose_class(side: ToolTipSide) -> &'static str {
     match side {
         ToolTipSide::Top => "tooltip-nose-side-top",
@@ -480,6 +487,7 @@ fn side_to_nose_class(side: ToolTipSide) -> &'static str {
     }
 }
 
+/// Handles `set_css_classes` in the extended UI workflow.
 fn set_css_classes(classes: &mut CssClass, base: &[String], dynamic: &[&str]) {
     let mut next = base.to_vec();
     for class in dynamic {

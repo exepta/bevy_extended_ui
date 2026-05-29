@@ -7,6 +7,7 @@ Includes examples:
 - `typed_values_example` — ChoiceBox/RadioButton typed values (i32, bool, enum, object)
 - `theming_provider_example`
 - `widget_overview_example`
+- `framework_example` (requires `--features extended-framework`)
 
 Run the default demo (`widget-overview`):
 
@@ -20,4 +21,10 @@ Run a specific example:
 cargo run --manifest-path crates/local-examples/Cargo.toml -- theming-provider
 cargo run --manifest-path crates/local-examples/Cargo.toml -- typed-values
 cargo run --manifest-path crates/local-examples/Cargo.toml -- widget-overview
+```
+
+Run framework mode:
+
+```bash
+cargo run --manifest-path crates/local-examples/Cargo.toml --features extended-framework -- framework
 ```

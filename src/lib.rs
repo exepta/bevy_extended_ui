@@ -1,10 +1,15 @@
+#[cfg(feature = "extended-framework")]
+use crate::component::ExtendedComponentPlugin;
 #[cfg(feature = "extended-dialog")]
 use crate::dialog::ExtendedDialogPlugin;
+#[cfg(feature = "extended-framework")]
+use crate::framework::ExtendedFrameworkPlugin;
 use crate::html::ExtendedUiHtmlPlugin;
 use crate::io::ExtendedIoPlugin;
+#[cfg(not(feature = "extended-framework"))]
+use crate::old::registry::ExtendedRegistryPlugin;
 #[cfg(feature = "providers")]
 use crate::providers::ExtendedUiProviderPlugin;
-use crate::registry::ExtendedRegistryPlugin;
 use crate::services::ExtendedServicePlugin;
 use crate::styles::ExtendedStylingPlugin;
 use crate::widgets::ExtendedWidgetPlugin;
@@ -13,18 +18,23 @@ use bevy::prelude::*;
 use bevy::render::view::Hdr;
 use std::collections::HashMap;
 
+#[cfg(feature = "extended-framework")]
+pub mod component;
 #[cfg(feature = "extended-dialog")]
 pub mod dialog;
 pub mod example_utils;
+#[cfg(feature = "extended-framework")]
+pub mod framework;
 pub mod html;
 pub mod io;
 pub mod lang;
+pub mod old;
 #[cfg(feature = "providers")]
 pub mod providers;
+#[deprecated(note = "Legacy module moved to `old::registry`. Use the new component framework.")]
 pub mod registry;
 pub mod services;
 pub mod styles;
-mod unit_tests;
 pub mod utils;
 pub mod widgets;
 
@@ -47,6 +57,11 @@ pub struct ExtendedUiConfiguration {
     pub hdr_support: bool,
     pub camera: ExtendedCam,
     pub render_layers: Vec<usize>,
+    /// Extended-framework component root relative to the asset root.
+    ///
+    /// Example: `components` resolves to `assets/components` (or to
+    /// `<asset_root_fs_path>/components` when overridden in framework config).
+    pub framework_components_path: String,
     pub assets_path: String,
     pub language_path: String,
     pub themes_path: String,
@@ -69,6 +84,7 @@ impl Default for ExtendedUiConfiguration {
             hdr_support: false,
             camera: ExtendedCam::default(),
             render_layers: vec![1, 2],
+            framework_components_path: String::from("components"),
             assets_path: String::from("assets/extended_ui/"),
             language_path: String::from("assets/lang"),
             themes_path: String::from("assets/themes"),
@@ -112,7 +128,7 @@ impl Default for CurrentWidgetState {
 
 /// Marker component for the UI camera entity.
 #[derive(Component)]
-struct UiCamera;
+pub struct UiCamera;
 
 /// Bevy plugin that wires up all extended UI subsystems.
 pub struct ExtendedUiPlugin;
@@ -126,8 +142,11 @@ impl Plugin for ExtendedUiPlugin {
         app.init_resource::<UILang>();
         app.init_resource::<UiLangVariables>();
         app.register_type::<Camera>();
+        #[cfg(not(feature = "extended-framework"))]
+        app.add_plugins(ExtendedRegistryPlugin);
+        #[cfg(feature = "extended-framework")]
+        app.add_plugins(ExtendedComponentPlugin);
         app.add_plugins((
-            ExtendedRegistryPlugin,
             ExtendedWidgetPlugin,
             ExtendedServicePlugin,
             ExtendedStylingPlugin,
@@ -136,6 +155,8 @@ impl Plugin for ExtendedUiPlugin {
         ));
         #[cfg(feature = "extended-dialog")]
         app.add_plugins(ExtendedDialogPlugin);
+        #[cfg(feature = "extended-framework")]
+        app.add_plugins(ExtendedFrameworkPlugin);
         #[cfg(feature = "providers")]
         app.add_plugins(ExtendedUiProviderPlugin);
         app.add_systems(
@@ -148,7 +169,7 @@ impl Plugin for ExtendedUiPlugin {
 /// Manages the lifecycle and configuration of the UI camera.
 ///
 /// Uses `ExtendedUiConfiguration.camera` to decide which camera setup is active.
-fn load_ui_camera_system(
+pub fn load_ui_camera_system(
     mut commands: Commands,
     configuration: Res<ExtendedUiConfiguration>,
     mut query: Query<(Entity, &mut Camera, &mut RenderLayers), With<UiCamera>>,

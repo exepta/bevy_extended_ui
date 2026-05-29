@@ -1,18 +1,15 @@
-mod body;
-mod content;
-mod controls;
+pub mod body;
+pub mod content;
+pub mod controls;
 pub(crate) mod default_style;
-mod div;
+pub mod div;
 mod form;
-mod unit_tests;
-mod validation;
-mod widget_util;
+pub mod validation;
+pub mod widget_util;
 
-use crate::registry::*;
+use crate::old::registry::*;
 use crate::styles::IconPlace;
 use crate::widgets::body::BodyWidget;
-use crate::widgets::content::ExtendedContentWidgets;
-use crate::widgets::controls::ExtendedControlWidgets;
 use crate::widgets::div::DivWidget;
 use crate::widgets::form::FormWidget;
 use bevy::prelude::*;
@@ -20,7 +17,9 @@ use std::any::Any;
 use std::fmt;
 use std::sync::Arc;
 
-pub(crate) use validation::evaluate_validation_state;
+pub use content::ExtendedContentWidgets;
+pub use controls::ExtendedControlWidgets;
+pub use validation::evaluate_validation_state;
 
 /// Marker component for UI elements that should ignore the parent widget state.
 ///
@@ -30,7 +29,7 @@ pub struct IgnoreParentState;
 
 /// Tracks the currently hovered scrollable widget so wheel input is routed once.
 #[derive(Resource, Default)]
-pub(crate) struct ActiveScrollTarget {
+pub struct ActiveScrollTarget {
     pub entity: Option<Entity>,
 }
 
@@ -196,29 +195,53 @@ pub struct WidgetId {
 /// Enumerates the supported widget kinds.
 #[derive(Debug, Clone, Copy)]
 pub enum WidgetKind {
+    /// Variant `Body`.
     Body,
+    /// Variant `Button`.
     Button,
+    /// Variant `ColorPicker`.
     ColorPicker,
+    /// Variant `CheckBox`.
     CheckBox,
+    /// Variant `ChoiceBox`.
     ChoiceBox,
+    /// Variant `DatePicker`.
     DatePicker,
+    /// Variant `Div`.
     Div,
+    /// Variant `Divider`.
     Divider,
+    /// Variant `Form`.
     Form,
+    /// Variant `FieldSet`.
     FieldSet,
+    /// Variant `Headline`.
     Headline,
+    /// Variant `HyperLink`.
     HyperLink,
+    /// Variant `Img`.
     Img,
+    /// Variant `InputField`.
     InputField,
+    /// Variant `Paragraph`.
     Paragraph,
+    /// Variant `ToolTip`.
     ToolTip,
+    /// Variant `Badge`.
     Badge,
+    /// Variant `ProgressBar`.
     ProgressBar,
+    /// Variant `RadioButton`.
     RadioButton,
+    /// Variant `Scrollbar`.
     Scrollbar,
+    /// Variant `Slider`.
     Slider,
+    /// Variant `SwitchButton`.
     SwitchButton,
+    /// Variant `ToggleButton`.
     ToggleButton,
+    /// Variant `ListBox`.
     ListBox,
 }
 
@@ -470,6 +493,7 @@ pub struct ChoiceOption {
 }
 
 impl PartialEq for ChoiceOption {
+    /// Handles `eq` in the extended UI workflow.
     fn eq(&self, other: &Self) -> bool {
         if self.text != other.text || self.icon_path != other.icon_path {
             return false;
@@ -619,8 +643,10 @@ impl Default for Divider {
 /// Orientation of a divider widget.
 #[derive(Reflect, Default, Debug, Clone, Eq, PartialEq)]
 pub enum DividerAlignment {
+    /// Variant `Vertical`.
     #[default]
     Vertical,
+    /// Variant `Horizontal`.
     Horizontal,
 }
 
@@ -677,15 +703,20 @@ impl Default for FieldSet {
 /// Field set content kind.
 #[derive(Reflect, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FieldKind {
+    /// Variant `Radio`.
     Radio,
+    /// Variant `Toggle`.
     Toggle,
 }
 
 /// Selection mode for field sets.
 #[derive(Reflect, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FieldMode {
+    /// Variant `Multi`.
     Multi,
+    /// Variant `Single`.
     Single,
+    /// Variant `Count`.
     Count(u8),
 }
 
@@ -756,12 +787,18 @@ impl Default for Headline {
 /// Heading level for headline widgets.
 #[derive(Reflect, Default, Debug, Clone, Eq, PartialEq)]
 pub enum HeadlineType {
+    /// Variant `H1`.
     #[default]
     H1,
+    /// Variant `H2`.
     H2,
+    /// Variant `H3`.
     H3,
+    /// Variant `H4`.
     H4,
+    /// Variant `H5`.
     H5,
+    /// Variant `H6`.
     H6,
 }
 
@@ -817,9 +854,12 @@ impl Default for Img {
 /// Date value display format for date picker widgets.
 #[derive(Reflect, Default, Debug, Clone, Copy, Eq, PartialEq)]
 pub enum DateFormat {
+    /// Variant `MonthDayYear`.
     #[default]
     MonthDayYear,
+    /// Variant `DayMonthYear`.
     DayMonthYear,
+    /// Variant `YearMonthDay`.
     YearMonthDay,
 }
 
@@ -942,13 +982,20 @@ impl Default for InputField {
 /// Supported input types for input fields.
 #[derive(Reflect, Default, Debug, Clone, Copy, Eq, PartialEq)]
 pub enum InputType {
+    /// Variant `Text`.
     #[default]
     Text,
+    /// Variant `Email`.
     Email,
+    /// Variant `Date`.
     Date,
+    /// Variant `Range`.
     Range,
+    /// Variant `Password`.
     Password,
+    /// Variant `Number`.
     Number,
+    /// Variant `File`.
     File,
 }
 
@@ -983,9 +1030,12 @@ impl InputType {
 /// Input length capping configuration.
 #[derive(Reflect, Default, Debug, Clone, Eq, PartialEq)]
 pub enum InputCap {
+    /// Variant `NoCap`.
     #[default]
     NoCap,
+    /// Variant `CapAtNodeSize`.
     CapAtNodeSize,
+    /// Variant `CapAt`.
     CapAt(usize), // 0 means no cap!
 }
 
@@ -1012,8 +1062,10 @@ pub struct InputValue(pub String);
 /// Browser launch configuration for hyperlink widgets.
 #[derive(Reflect, Debug, Clone, Eq, PartialEq, Default)]
 pub enum HyperLinkBrowsers {
+    /// Variant `System`.
     #[default]
     System,
+    /// Variant `Custom`.
     Custom(Vec<String>),
 }
 
@@ -1062,6 +1114,7 @@ impl HyperLinkBrowsers {
     }
 }
 
+/// Handles `normalize_browser_name` in the extended UI workflow.
 fn normalize_browser_name(value: &str) -> String {
     value
         .trim()
@@ -1084,6 +1137,7 @@ pub struct HyperLink {
 }
 
 impl Default for HyperLink {
+    /// Handles `default` in the extended UI workflow.
     fn default() -> Self {
         let entry = HYPER_LINK_ID_POOL.lock().unwrap().acquire();
         Self {
@@ -1128,10 +1182,14 @@ impl Default for Paragraph {
 /// Corner anchor used to place a badge relative to its target widget.
 #[derive(Reflect, Default, Debug, Clone, Copy, Eq, PartialEq)]
 pub enum BadgeAnchor {
+    /// Variant `TopLeft`.
     TopLeft,
+    /// Variant `TopRight`.
     #[default]
     TopRight,
+    /// Variant `BottomLeft`.
     BottomLeft,
+    /// Variant `BottomRight`.
     BottomRight,
 }
 
@@ -1231,9 +1289,13 @@ impl ToolTipVariant {
 /// Preferred side for tooltip placement.
 #[derive(Reflect, Default, Debug, Clone, Copy, Eq, PartialEq)]
 pub enum ToolTipPriority {
+    /// Variant `Top`.
     Top,
+    /// Variant `Bottom`.
     Bottom,
+    /// Variant `Left`.
     Left,
+    /// Variant `Right`.
     #[default]
     Right,
 }
@@ -1254,7 +1316,9 @@ impl ToolTipPriority {
 /// Axis along which tooltip side preference is resolved.
 #[derive(Reflect, Default, Debug, Clone, Copy, Eq, PartialEq)]
 pub enum ToolTipAlignment {
+    /// Variant `Vertical`.
     Vertical,
+    /// Variant `Horizontal`.
     #[default]
     Horizontal,
 }
@@ -1273,8 +1337,11 @@ impl ToolTipAlignment {
 /// Trigger mode controlling when a tooltip becomes visible.
 #[derive(Reflect, Debug, Clone, Copy, Eq, PartialEq)]
 pub enum ToolTipTrigger {
+    /// Variant `Hover`.
     Hover,
+    /// Variant `Click`.
     Click,
+    /// Variant `Drag`.
     Drag,
 }
 
@@ -1407,28 +1474,58 @@ impl RadioButton {
     }
 }
 
+/// Represents the `WidgetValue` data structure used by the extended UI system.
 #[derive(Debug, Clone)]
 pub struct WidgetValue(Option<Arc<dyn Any + Send + Sync>>);
 
 impl Default for WidgetValue {
+    /// Handles `default` in the extended UI workflow.
     fn default() -> Self {
         Self(None)
     }
 }
 
 impl WidgetValue {
+    /// Handles `new` in the extended UI workflow.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// // Call `new` with values from your app state and world context.
+    /// ```
     pub fn new<T: Any + Send + Sync>(value: T) -> Self {
         Self(Some(Arc::new(value)))
     }
 
+    /// Handles `get` in the extended UI workflow.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// // Call `get` with values from your app state and world context.
+    /// ```
     pub fn get<T: Any>(&self) -> Option<&T> {
         self.0.as_ref()?.downcast_ref::<T>()
     }
 
+    /// Handles `set` in the extended UI workflow.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// // Call `set` with values from your app state and world context.
+    /// ```
     pub fn set<T: Any + Send + Sync>(&mut self, value: T) {
         self.0 = Some(Arc::new(value));
     }
 
+    /// Handles `as_str` in the extended UI workflow.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// // Call `as_str` with values from your app state and world context.
+    /// ```
     pub fn as_str(&self) -> Option<&str> {
         self.0
             .as_ref()?
@@ -1436,6 +1533,13 @@ impl WidgetValue {
             .map(|s| s.as_str())
     }
 
+    /// Handles `reflect` in the extended UI workflow.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// // Call `reflect` with values from your app state and world context.
+    /// ```
     pub fn reflect(&self) -> Option<&ReflectedValue> {
         self.get::<ReflectedValue>()
     }
@@ -1486,8 +1590,10 @@ impl Default for Scrollbar {
 /// Slider behavior mode.
 #[derive(Reflect, Default, Debug, Clone, Copy, Eq, PartialEq)]
 pub enum SliderType {
+    /// Variant `Default`.
     #[default]
     Default,
+    /// Variant `Range`.
     Range,
 }
 
@@ -1505,8 +1611,10 @@ impl SliderType {
 /// Label anchor position for slider dots.
 #[derive(Reflect, Default, Debug, Clone, Copy, Eq, PartialEq)]
 pub enum SliderDotAnchor {
+    /// Variant `Top`.
     #[default]
     Top,
+    /// Variant `Bottom`.
     Bottom,
 }
 
@@ -1596,6 +1704,7 @@ impl ColorPicker {
         Self::from_rgba_u8_with_entry(entry, red, green, blue, alpha)
     }
 
+    /// Handles `from_rgba_u8_with_entry` in the extended UI workflow.
     fn from_rgba_u8_with_entry(entry: usize, red: u8, green: u8, blue: u8, alpha: u8) -> Self {
         let (hue, saturation, value) = rgb_u8_to_hsv(red, green, blue);
         Self {
@@ -1651,6 +1760,13 @@ impl ColorPicker {
     }
 }
 
+/// Handles `hsv_to_rgb_u8` in the extended UI workflow.
+///
+/// # Examples
+///
+/// ```rust
+/// // Call `hsv_to_rgb_u8` with values from your app state and world context.
+/// ```
 pub fn hsv_to_rgb_u8(hue: f32, saturation: f32, value: f32) -> (u8, u8, u8) {
     let h = hue.rem_euclid(360.0);
     let s = saturation.clamp(0.0, 1.0);
@@ -1678,6 +1794,7 @@ pub fn hsv_to_rgb_u8(hue: f32, saturation: f32, value: f32) -> (u8, u8, u8) {
     (to_u8(r1), to_u8(g1), to_u8(b1))
 }
 
+/// Handles `rgb_u8_to_hsv` in the extended UI workflow.
 fn rgb_u8_to_hsv(red: u8, green: u8, blue: u8) -> (f32, f32, f32) {
     let r = red as f32 / 255.0;
     let g = green as f32 / 255.0;

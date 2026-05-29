@@ -137,3 +137,12 @@ fn extract_event_type(input_fn: &ItemFn) -> Result<Option<(syn::Ident, Type)>> {
 
     Ok(Some((variant, inner_type.clone())))
 }
+
+/// Marks a `*.component.rs` definition for the extended framework.
+///
+/// This attribute is intentionally a passthrough. Validation happens in
+/// `bevy_extended_ui` by scanning component definition files.
+#[proc_macro_attribute]
+pub fn ui_component(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}

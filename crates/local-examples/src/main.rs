@@ -1,3 +1,6 @@
+#[cfg(feature = "extended-framework")]
+mod assets_components;
+mod framework_example;
 mod theming_provider_example;
 mod typed_values_example;
 mod widget_overview_example;
@@ -34,12 +37,18 @@ fn run_example(selection: &str) -> bool {
             typed_values_example::run();
             true
         }
+        "framework_example" | "framework" | "app-framework" => {
+            framework_example::run();
+            true
+        }
         _ => false,
     }
 }
 
 fn print_usage(program: &str) {
-    eprintln!("Usage: {program} [widget-overview|theming-provider|typed-values]");
+    eprintln!(
+        "Usage: {program} [widget-overview|theming-provider|typed-values|framework]"
+    );
 }
 
 #[cfg(target_os = "linux")]

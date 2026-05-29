@@ -39,7 +39,7 @@ struct OverlayLabel;
 
 /// Marker component for the dropdown content layout box.
 #[derive(Component)]
-pub(crate) struct ChoiceLayoutBoxBase;
+pub struct ChoiceLayoutBoxBase;
 
 /// Plugin that registers choice box widget behavior.
 pub struct ChoiceBoxWidget;
