@@ -82,3 +82,5 @@ bevy_extended_ui_macros = "x.y.z"
 - Sichtbarkeit der UI und Event-Reaktionen überprüfen
 
 Für den fachlichen Einstieg siehe [Überblick](01_Überblick.md).
+
+Weiter mit konkreten Event- und Datenbeispielen: [Beispiele](03_Beispiele.md).

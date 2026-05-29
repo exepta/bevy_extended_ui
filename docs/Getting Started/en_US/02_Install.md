@@ -84,3 +84,5 @@ bevy_extended_ui_macros = "x.y.z"
 - Confirm that the UI is visible and event handlers are called
 
 For concept and architecture context, see [Overview](01_Overview.md).
+
+Continue with concrete event and data examples: [Examples](03_Examples.md).

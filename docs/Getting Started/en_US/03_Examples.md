@@ -1,27 +1,27 @@
 ---
-title: Beispiele
+title: Examples
 ---
 
-# Praxisbeispiele
+# Practical Examples
 
-Diese Seite zeigt einen vollständigen Ablauf für:
+This page shows an end-to-end flow for:
 
-- Werte aus Widgets auslesen (`InputField`, `DatePicker`, `CheckBox`, `ChoiceBox`, `Slider`, `ColorPicker`)
-- Selektionen aus `FieldSet` lesen (`Radio` und `Toggle`)
-- Form-Submit-Daten lesen (`HtmlSubmit`)
-- Event-Handler mit `#[html_fn]` korrekt binden
+- Reading values from widgets (`InputField`, `DatePicker`, `CheckBox`, `ChoiceBox`, `Slider`, `ColorPicker`)
+- Reading `FieldSet` selections (`Radio` and `Toggle`)
+- Reading form submit payloads (`HtmlSubmit`)
+- Correct usage of `#[html_fn]`
 
-## 1. HTML mit Event-Bindings
+## 1. HTML with event bindings
 
 ```html
 <body>
   <input id="email-input" name="email" type="email" onchange="on_any_change" />
   <date-picker id="birthday-input" name="birthday" onchange="on_any_change"></date-picker>
-  <checkbox id="tos-checkbox" onchange="on_any_change">AGB akzeptieren</checkbox>
+  <checkbox id="tos-checkbox" onchange="on_any_change">Accept terms</checkbox>
 
   <select id="country-select" onchange="on_any_change">
-    <option value="de">Deutschland</option>
-    <option value="us">USA</option>
+    <option value="de">Germany</option>
+    <option value="us">United States</option>
   </select>
 
   <slider id="volume-slider" min="0" max="100" step="1" onchange="on_any_change"></slider>
@@ -41,12 +41,12 @@ Diese Seite zeigt einen vollständigen Ablauf für:
   <form id="profile-form" action="on_profile_submit" validate="Send">
     <input name="username" type="text" required />
     <input name="age" type="number" />
-    <button type="submit">Speichern</button>
+    <button type="submit">Save</button>
   </form>
 </body>
 ```
 
-## 2. Rust-Handler: Werte aus Widgets lesen
+## 2. Rust handlers: read values from widgets
 
 ```rust
 use bevy::prelude::*;
@@ -146,10 +146,10 @@ fn on_any_change(
 }
 ```
 
-## 3. FieldSet auslesen (Single/Radio)
+## 3. Read `FieldSet` (single/radio)
 
-Wichtig: Bei `onchange` von `fieldset` ist `event.entity` das `FieldSet`-Entity.  
-Die eigentliche Auswahl liest du über `FieldSelectionSingle`.
+Important: for `fieldset onchange`, `event.entity` is the `FieldSet` entity.  
+Read the selected child via `FieldSelectionSingle`.
 
 ```rust
 #[html_fn("on_fieldset_change")]
@@ -163,7 +163,7 @@ fn on_fieldset_change(
     };
 
     let Some(selected_radio_entity) = selection.0 else {
-        info!("FieldSet: keine Auswahl");
+        info!("FieldSet: no selection");
         return;
     };
 
@@ -179,9 +179,9 @@ fn on_fieldset_change(
 }
 ```
 
-## 4. FieldSet auslesen (Multi/Toggle)
+## 4. Read `FieldSet` (multi/toggle)
 
-Bei Multi-Mode enthält `FieldSelectionMulti` alle aktuell selektierten Toggle-Entities.
+In multi mode, `FieldSelectionMulti` contains all selected toggle entities.
 
 ```rust
 #[html_fn("on_fieldset_multi_change")]
@@ -211,9 +211,9 @@ fn on_fieldset_multi_change(
 }
 ```
 
-## 5. Form-Submit-Daten lesen
+## 5. Read form submit data
 
-`HtmlSubmit` liefert alle Form-Felder als `HashMap<String, String>` in `event.data`.
+`HtmlSubmit` includes all form fields in `event.data` as `HashMap<String, String>`.
 
 ```rust
 #[html_fn("on_profile_submit")]
@@ -232,21 +232,21 @@ fn on_profile_submit(In(event): In<HtmlSubmit>) {
 }
 ```
 
-## 6. `#[html_fn]` richtig verwenden
+## 6. How to use `#[html_fn]` correctly
 
-`#[html_fn("name")]` registriert eine Rust-Funktion unter genau diesem Namen im HTML-Event-System.
+`#[html_fn("name")]` registers a Rust function under exactly that HTML handler name.
 
-Regeln und Praxis:
+Rules and practical notes:
 
-1. Der String in `#[html_fn("...")]` muss exakt zum HTML-Attribut passen (z. B. `onclick="save_user"`).
-2. Nutze typisierte Events, wenn du Event-Daten brauchst:
+1. The string in `#[html_fn("...")]` must exactly match the HTML attribute value (for example `onclick="save_user"`).
+2. Use typed events when you need event payload:
    - `HtmlClick`, `HtmlChange`, `HtmlSubmit`, `HtmlKeyDown`, ...
-3. Nutze `HtmlEvent` nur, wenn dir das Ziel-Entity reicht.
-4. Handler sollten robust sein:
-   - `Query::get(event.entity)` mit `if let Ok(...)` / `let Ok(...) = ... else { return; }`
-5. Bei `FieldSet` immer über `FieldSelectionSingle` oder `FieldSelectionMulti` lesen, nicht direkt nur über das Child-Widget.
+3. Use `HtmlEvent` only when target entity is enough.
+4. Handlers should be resilient:
+   - `Query::get(event.entity)` with `if let Ok(...)` / `let Ok(...) = ... else { return; }`
+5. For `FieldSet`, always read selection via `FieldSelectionSingle` or `FieldSelectionMulti`.
 
-Kleines Minimalbeispiel:
+Minimal example:
 
 ```rust
 use bevy::prelude::*;
@@ -255,6 +255,6 @@ use bevy_extended_ui_macros::html_fn;
 
 #[html_fn("save_user")]
 fn save_user(In(event): In<HtmlClick>) {
-    info!("Klick auf Entity {:?}", event.entity);
+    info!("Click on entity {:?}", event.entity);
 }
 ```
