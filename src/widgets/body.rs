@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::html::HtmlStyle;
-use crate::registry::UiRegistry;
+use crate::old::registry::UiRegistry;
 use crate::styles::{CssClass, CssSource, Style, TagName};
 use crate::widgets::controls::choice_box::ChoiceLayoutBoxBase;
 use crate::widgets::div::DivContentRoot;
@@ -103,11 +103,11 @@ fn internal_node_creation_system(
     >,
     existing_bodies: Query<&ZIndex, With<BodyBase>>,
     config: Res<ExtendedUiConfiguration>,
-    ui_registry: Res<UiRegistry>,
+    ui_registry: Option<Res<UiRegistry>>,
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
 
-    let ui_order = ui_registry.current.as_ref();
+    let ui_order = ui_registry.as_ref().and_then(|reg| reg.current.as_ref());
     let max_z_index = existing_bodies
         .iter()
         .map(|z_index| z_index.0)

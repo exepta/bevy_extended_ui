@@ -1,4 +1,10 @@
 use bevy::prelude::*;
+use regex::Regex;
+use std::collections::BTreeSet;
+
+use crate::component::{
+    load_component_definitions, load_component_template_html, validate_component_assets,
+};
 
 /// Configuration for the experimental extended framework mode.
 ///
@@ -8,6 +14,8 @@ use bevy::prelude::*;
 pub struct ExtendedFrameworkConfiguration {
     pub assets_component_root: String,
     pub rust_component_root: String,
+    pub asset_root_fs_path: String,
+    pub index_html_file: String,
 }
 
 impl Default for ExtendedFrameworkConfiguration {
@@ -15,6 +23,8 @@ impl Default for ExtendedFrameworkConfiguration {
         Self {
             assets_component_root: "ui/bevy_ang".to_string(),
             rust_component_root: "src/packages".to_string(),
+            asset_root_fs_path: "assets".to_string(),
+            index_html_file: "index.html".to_string(),
         }
     }
 }
@@ -49,8 +59,16 @@ pub fn compile_framework_template(
     source_path: &str,
     config: &ExtendedFrameworkConfiguration,
 ) -> FrameworkCompileResult {
+    let source = normalize_source_path(source_path);
+    let mut html = template_html.to_string();
+    if source == normalize_source_path(&config.index_html_file) {
+        if let Err(err) = compile_index_template(&mut html, config) {
+            panic!("extended-framework compile failed for index.html: {err}");
+        }
+    }
+
     FrameworkCompileResult {
-        html: template_html.to_string(),
+        html,
         inferred_controller: infer_component_controller_path(source_path, config),
     }
 }
@@ -114,6 +132,106 @@ fn normalize_root(path: &str) -> String {
     normalized.trim_matches('/').to_string()
 }
 
+fn compile_index_template(
+    index_html: &mut String,
+    config: &ExtendedFrameworkConfiguration,
+) -> Result<(), String> {
+    let defs = load_component_definitions(config)?;
+    validate_component_assets(&defs, config)?;
+
+    let mut used_style_hrefs: BTreeSet<String> = BTreeSet::new();
+
+    for _ in 0..16 {
+        let mut replaced = false;
+
+        for def in &defs {
+            let component_html = load_component_template_html(def, config)?;
+            let tag_name = regex::escape(&def.template_name);
+
+            let full_tag_re = Regex::new(&format!(
+                r"(?is)<\s*{tag}\b[^>]*>.*?</\s*{tag}\s*>",
+                tag = tag_name
+            ))
+            .map_err(|err| format!("invalid regex for tag `{}`: {err}", def.template_name))?;
+            let self_closing_re =
+                Regex::new(&format!(r"(?is)<\s*{tag}\b[^>]*/\s*>", tag = tag_name)).map_err(
+                    |err| format!("invalid regex for tag `{}`: {err}", def.template_name),
+                )?;
+
+            if full_tag_re.is_match(index_html) || self_closing_re.is_match(index_html) {
+                *index_html = full_tag_re
+                    .replace_all(index_html, component_html.as_str())
+                    .to_string();
+                *index_html = self_closing_re
+                    .replace_all(index_html, component_html.as_str())
+                    .to_string();
+                for style in &def.styles {
+                    used_style_hrefs.insert(build_component_style_href(
+                        &config.assets_component_root,
+                        &def.source_dir_rel,
+                        style,
+                    ));
+                }
+                replaced = true;
+            }
+        }
+
+        if !replaced {
+            break;
+        }
+    }
+
+    inject_component_styles(index_html, used_style_hrefs);
+    Ok(())
+}
+
+fn inject_component_styles(html: &mut String, style_hrefs: BTreeSet<String>) {
+    if style_hrefs.is_empty() {
+        return;
+    }
+
+    let mut links = String::new();
+
+    for href in style_hrefs {
+        let marker = format!("href=\"{href}\"");
+        if html.contains(&marker) {
+            continue;
+        }
+        links.push_str(&format!("<link rel=\"stylesheet\" href=\"{href}\">\n"));
+    }
+
+    if links.is_empty() {
+        return;
+    }
+
+    let lower = html.to_ascii_lowercase();
+    if let Some(pos) = lower.find("</head>") {
+        html.insert_str(pos, &links);
+    } else {
+        html.insert_str(0, &links);
+    }
+}
+
+fn build_component_style_href(component_root: &str, source_dir_rel: &str, style: &str) -> String {
+    let root = normalize_root(component_root);
+    let style = normalize_root(style);
+    let source_dir_rel = normalize_root(source_dir_rel);
+
+    let relative = if style.contains('/') {
+        style
+    } else if source_dir_rel.is_empty() {
+        style
+    } else {
+        format!("{source_dir_rel}/{style}")
+    };
+
+    if root.is_empty() {
+        relative
+    } else {
+        format!("{root}/{relative}")
+    }
+}
+
 #[cfg(test)]
 mod unit_tests {
     use super::*;
@@ -137,7 +255,8 @@ mod unit_tests {
 
     #[test]
     fn compile_framework_template_keeps_html_and_infers_controller() {
-        let cfg = ExtendedFrameworkConfiguration::default();
+        let mut cfg = ExtendedFrameworkConfiguration::default();
+        cfg.index_html_file = "root.html".to_string();
         let result = compile_framework_template(
             "<html><body><p>Hello</p></body></html>",
             "ui/bevy_ang/menu/menu.component.html",
@@ -149,5 +268,11 @@ mod unit_tests {
             result.inferred_controller.as_deref(),
             Some("src/packages/menu.component.rs")
         );
+    }
+
+    #[test]
+    fn build_component_style_href_keeps_nested_component_dirs() {
+        let href = build_component_style_href("components", "test", "test.component.css");
+        assert_eq!(href, "components/test/test.component.css");
     }
 }

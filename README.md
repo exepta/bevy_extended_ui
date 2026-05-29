@@ -118,6 +118,8 @@ Then you create an HTML file:
 And finally,
 
 ```rust
+use bevy_extended_ui::old::registry::UiRegistry;
+
 fn build(&mut app: App) {
     app.add_systems(Startup, |mut reg: ResMut<UiRegistry>, asset_server: Res<AssetServer>| {
         let handle: Handle<HtmlAsset> = asset_server.load("YOUR_ASSETS_LOCATION/test.html");
@@ -162,23 +164,25 @@ Base folder layout:
 
 ```text
 assets/
+  index.html
   ui/
     bevy_ang/
-      hud/
-        hud.component.html
-        hud.component.css
+      main.component.html
+      main.component.css
 
 src/
   packages/
-    hud.component.rs
+    main.component.rs
 ```
 
 Behavior in `extended-framework` mode:
 
-- HTML and CSS are loaded via Bevy `AssetServer` (`assets/` only).
-- For `assets/ui/bevy_ang/**/*.component.html`, the framework infers a default Rust controller path.
-- Example: `assets/ui/bevy_ang/hud/hud.component.html` -> `src/packages/hud.component.rs`.
-- `<meta controller="...">` still has priority over inferred controller paths.
+- Startup requires `assets/index.html` exactly as entrypoint.
+- `UiRegistry`/`ExtendedRegistryPlugin` are disabled in this mode (legacy path).
+- Components are resolved by tag name from `*.component.rs` definitions:
+  `template_name`, `template_file`, `styles`.
+- `template_file` must match the component rust filename (`main.component.rs` -> `main.component.html`).
+- Component styles are injected into the compiled index template automatically.
 
 ### Dialog system
 
@@ -240,6 +244,8 @@ fn main() {
         .add_systems(Startup, load_ui)
         .run();
 }
+
+use bevy_extended_ui::old::registry::UiRegistry;
 
 fn load_ui(mut reg: ResMut<UiRegistry>, asset_server: Res<AssetServer>) {
     let handle: Handle<HtmlAsset> = asset_server.load("test.html");

@@ -9,6 +9,8 @@ use regex::Regex;
 use serde::de::DeserializeSeed;
 use serde_json::Value as JsonValue;
 use std::collections::{HashMap, HashSet};
+#[cfg(feature = "extended-framework")]
+use std::path::PathBuf;
 
 use crate::ExtendedUiConfiguration;
 #[cfg(feature = "extended-dialog")]
@@ -92,7 +94,21 @@ fn update_html_ui(
 ) {
     let type_registry = type_registry.read();
     #[cfg(feature = "extended-framework")]
-    let framework_config = framework_config.as_deref().cloned().unwrap_or_default();
+    let mut framework_config = framework_config.as_deref().cloned().unwrap_or_default();
+    #[cfg(feature = "extended-framework")]
+    {
+        framework_config.assets_component_root = config.framework_components_path.clone();
+
+        // Keep explicit custom roots untouched. If still on the legacy default,
+        // derive the rust component root from the configured assets component path.
+        if framework_config.rust_component_root == "src/packages" {
+            framework_config.rust_component_root =
+                PathBuf::from(&framework_config.asset_root_fs_path)
+                    .join(trim_path_separators(&config.framework_components_path))
+                    .to_string_lossy()
+                    .to_string();
+        }
+    }
     let resolved = ui_lang.resolved().map(|lang| lang.to_string());
     let mut lang_dirty = false;
     let vars_hash = vars_fingerprint(&lang_vars);
@@ -310,6 +326,13 @@ fn update_html_ui(
             structure_map
                 .html_map
                 .insert(ui_key.clone(), vec![body_widget]);
+            #[cfg(feature = "extended-framework")]
+            {
+                let active = structure_map.active.get_or_insert_with(Vec::new);
+                if !active.iter().any(|existing| existing == &ui_key) {
+                    active.push(ui_key.clone());
+                }
+            }
 
             // IMPORTANT: Explicitly mark the affected UI key as dirty so the builder rebuilds.
             html_dirty.0 = true;
@@ -318,6 +341,11 @@ fn update_html_ui(
             error!("Failed to parse <body> node.");
         }
     }
+}
+
+#[cfg(feature = "extended-framework")]
+fn trim_path_separators(path: &str) -> String {
+    path.trim_matches('/').trim_matches('\\').to_string()
 }
 
 /// Parses a DOM node into HtmlWidgetNode.

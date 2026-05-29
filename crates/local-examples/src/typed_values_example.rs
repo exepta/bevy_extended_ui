@@ -6,7 +6,7 @@
 use bevy::prelude::*;
 use bevy_extended_ui::html::{HtmlChange, HtmlSource};
 use bevy_extended_ui::io::HtmlAsset;
-use bevy_extended_ui::registry::UiRegistry;
+use bevy_extended_ui::old::registry::UiRegistry;
 use bevy_extended_ui::styles::CssID;
 use bevy_extended_ui::widgets::{ChoiceBox, FieldSelectionSingle, Paragraph, RadioButton};
 use bevy_extended_ui::{ExtendedCam, ExtendedUiConfiguration, ExtendedUiPlugin};

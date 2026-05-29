@@ -1,13 +1,17 @@
 #[cfg(test)]
 mod tests {
     use super::super::*;
+    #[cfg(not(feature = "extended-framework"))]
     use crate::html::HtmlSource;
     use crate::lang::vars_fingerprint;
-    use crate::registry::{ExtendedRegistryPlugin, IdPool, UiInitResource, UiRegistry};
+    use crate::old::registry::IdPool;
+    #[cfg(not(feature = "extended-framework"))]
+    use crate::old::registry::{ExtendedRegistryPlugin, UiInitResource, UiRegistry};
     use crate::utils::keycode_to_char;
     use bevy::camera::visibility::RenderLayers;
     use bevy::render::view::Hdr;
 
+    #[cfg(not(feature = "extended-framework"))]
     fn source(controller: Option<&str>) -> HtmlSource {
         HtmlSource {
             handle: Handle::default(),
@@ -23,6 +27,7 @@ mod tests {
         assert!(!cfg.hdr_support);
         assert!(matches!(cfg.camera, ExtendedCam::Default));
         assert_eq!(cfg.render_layers, vec![1, 2]);
+        assert_eq!(cfg.framework_components_path, "components");
         assert_eq!(cfg.assets_path, "assets/extended_ui/");
         assert_eq!(cfg.language_path, "assets/lang");
     }
@@ -110,6 +115,7 @@ mod tests {
         assert_eq!(pool.acquire(), 2);
     }
 
+    #[cfg(not(feature = "extended-framework"))]
     #[test]
     fn ui_registry_add_get_get_mut_and_remove_work() {
         let mut registry = UiRegistry::new();
@@ -136,6 +142,7 @@ mod tests {
         assert_eq!(registry.current, None);
     }
 
+    #[cfg(not(feature = "extended-framework"))]
     #[test]
     fn ui_registry_add_and_use_multiple_and_switching_work() {
         let mut registry = UiRegistry::new();
@@ -158,6 +165,7 @@ mod tests {
         );
     }
 
+    #[cfg(not(feature = "extended-framework"))]
     #[test]
     fn ui_registry_use_uis_filters_unknown_entries_and_can_clear_current() {
         let mut registry = UiRegistry::new();
@@ -177,6 +185,7 @@ mod tests {
         assert_eq!(registry.current, None);
     }
 
+    #[cfg(not(feature = "extended-framework"))]
     #[test]
     fn extended_registry_plugin_initializes_registry_resources() {
         let mut app = App::new();
@@ -218,6 +227,7 @@ mod tests {
             hdr_support: false,
             camera: ExtendedCam::Default,
             render_layers: vec![1, 3],
+            framework_components_path: "components".to_string(),
             assets_path: "assets/extended_ui/".to_string(),
             language_path: "assets/lang".to_string(),
             themes_path: "assets/themes".to_string(),

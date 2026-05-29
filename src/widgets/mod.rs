@@ -8,7 +8,7 @@ mod unit_tests;
 mod validation;
 mod widget_util;
 
-use crate::registry::*;
+use crate::old::registry::*;
 use crate::styles::IconPlace;
 use crate::widgets::body::BodyWidget;
 use crate::widgets::content::ExtendedContentWidgets;
