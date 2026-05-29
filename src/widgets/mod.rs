@@ -1834,6 +1834,7 @@ pub struct SwitchButton {
     pub entry: usize,
     pub label: String,
     pub icon: Option<String>,
+    pub selected: bool,
 }
 
 impl Default for SwitchButton {
@@ -1845,6 +1846,7 @@ impl Default for SwitchButton {
             entry,
             label: String::from(""),
             icon: None,
+            selected: false,
         }
     }
 }

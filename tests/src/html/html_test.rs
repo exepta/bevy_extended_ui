@@ -899,6 +899,66 @@ mod tests {
     }
 
     #[test]
+    fn converter_expands_if_and_for_directives_before_widget_parsing() {
+        let mut app = setup_converter_app();
+        app.world_mut().resource_mut::<UiLangVariables>().set(
+            "data",
+            r#"{"username":"NetUser","users":[{"name":"Ada"},{"name":"Bob"}]}"#,
+        );
+        app.world_mut()
+            .resource_mut::<UiLangVariables>()
+            .set("enabled", "true");
+
+        let html = r#"
+        <html>
+          <head>
+            <meta name="directive-key" />
+          </head>
+          <body>
+            @if(data.username.startsWidth("Net") && enabled) {
+              <p>Visible</p>
+            }
+            @for(user, idx in data.users) {
+              <p>{{ idx }}-{{ user.name }}</p>
+            }
+          </body>
+        </html>
+        "#;
+
+        add_html_source(
+            &mut app,
+            "examples/directive_test.html",
+            html,
+            "directive-key",
+            None,
+        );
+        app.update();
+
+        let structure_map = app.world().resource::<HtmlStructureMap>();
+        let nodes = structure_map
+            .html_map
+            .get("directive-key")
+            .expect("expected parsed html structure for directive test");
+
+        let mut all = Vec::new();
+        collect_nodes(nodes, &mut all);
+
+        let paragraphs: Vec<String> = all
+            .iter()
+            .filter_map(|node| match node {
+                HtmlWidgetNode::Paragraph(Paragraph { text, .. }, _, _, _, _, _) => {
+                    Some(text.clone())
+                }
+                _ => None,
+            })
+            .collect();
+
+        assert!(paragraphs.iter().any(|text| text == "Visible"));
+        assert!(paragraphs.iter().any(|text| text == "0-Ada"));
+        assert!(paragraphs.iter().any(|text| text == "1-Bob"));
+    }
+
+    #[test]
     fn converter_retries_when_html_asset_becomes_available_later() {
         let mut app = setup_converter_app();
 

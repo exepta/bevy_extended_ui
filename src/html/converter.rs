@@ -37,6 +37,10 @@ pub const DEFAULT_UI_CSS: &str = "embedded/default_style";
 
 static INNER_BINDING_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?s)\{\{\s*([^{}]+?)\s*\}\}").unwrap());
+static FOR_HEADER_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^\s*([A-Za-z_][A-Za-z0-9_]*)(?:\s*,\s*([A-Za-z_][A-Za-z0-9_]*))?\s+in\s+(.+?)\s*$")
+        .unwrap()
+});
 static SLIDER_RANGE_VALUE_RE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^\s*([+-]?(?:\d+(?:\.\d+)?|\.\d+))\s*-\s*([+-]?(?:\d+(?:\.\d+)?|\.\d+))\s*$")
         .unwrap()
@@ -202,10 +206,11 @@ fn update_html_ui(
             &config.language_path,
             &lang_vars,
         );
-        let document = if localized == content {
+        let template_resolved = preprocess_template_directives(&localized, &lang_vars);
+        let document = if template_resolved == content {
             raw_document
         } else {
-            kuchiki::parse_html().one(localized.clone())
+            kuchiki::parse_html().one(template_resolved.clone())
         };
 
         #[cfg(feature = "providers")]
@@ -276,7 +281,7 @@ fn update_html_ui(
         #[cfg(feature = "providers")]
         if let Some(provider_registry) = provider_registry.as_ref() {
             let mut provider_css = resolve_provider_css_handles(
-                &localized,
+                &template_resolved,
                 provider_registry,
                 html,
                 &asset_server,
@@ -322,6 +327,7 @@ fn update_html_ui(
             &ui_key,
             &parse_source,
             &type_registry,
+            "0",
         ) {
             structure_map
                 .html_map
@@ -349,6 +355,25 @@ fn trim_path_separators(path: &str) -> String {
     path.trim_matches('/').trim_matches('\\').to_string()
 }
 
+/// Builds a deterministic HtmlID from logical position in the parsed HTML tree.
+fn stable_html_id(key: &str, path: &str, tag: &str) -> HtmlID {
+    const FNV_OFFSET_BASIS: u64 = 0xcbf29ce484222325;
+    const FNV_PRIME: u64 = 0x100000001b3;
+
+    let mut hash = FNV_OFFSET_BASIS;
+    for byte in key
+        .as_bytes()
+        .iter()
+        .chain(path.as_bytes().iter())
+        .chain(tag.as_bytes().iter())
+    {
+        hash ^= *byte as u64;
+        hash = hash.wrapping_mul(FNV_PRIME);
+    }
+
+    HtmlID(hash as usize)
+}
+
 /// Parses a DOM node into HtmlWidgetNode.
 fn parse_html_node(
     node: &NodeRef,
@@ -357,6 +382,7 @@ fn parse_html_node(
     key: &String,
     html: &HtmlSource,
     type_registry: &TypeRegistry,
+    path: &str,
 ) -> Option<HtmlWidgetNode> {
     let element = node.as_element()?;
     let tag = element.name.local.to_string();
@@ -382,13 +408,24 @@ fn parse_html_node(
     let functions = bind_html_func(&attributes);
 
     let widget = Widget(html.controller.clone());
+    let node_id = stable_html_id(key, path, &tag);
 
     match tag.as_str() {
         "body" => {
             let children = node
                 .children()
-                .filter_map(|child| {
-                    parse_html_node(&child, css_sources, label_map, key, html, type_registry)
+                .enumerate()
+                .filter_map(|(index, child)| {
+                    let child_path = format!("{path}.{index}");
+                    parse_html_node(
+                        &child,
+                        css_sources,
+                        label_map,
+                        key,
+                        html,
+                        type_registry,
+                        child_path.as_str(),
+                    )
                 })
                 .collect();
 
@@ -402,7 +439,7 @@ fn parse_html_node(
                 children,
                 functions,
                 widget.clone(),
-                HtmlID::default(),
+                node_id.clone(),
             ))
         }
 
@@ -425,7 +462,7 @@ fn parse_html_node(
                 states,
                 functions,
                 widget.clone(),
-                HtmlID::default(),
+                node_id.clone(),
             ))
         }
 
@@ -443,7 +480,7 @@ fn parse_html_node(
                 states,
                 functions,
                 widget.clone(),
-                HtmlID::default(),
+                node_id.clone(),
             ))
         }
 
@@ -480,15 +517,24 @@ fn parse_html_node(
                 states,
                 functions,
                 widget.clone(),
-                HtmlID::default(),
+                node_id.clone(),
             ))
         }
 
         "div" => {
             let mut children = Vec::new();
-            for child in node.children() {
+            for (index, child) in node.children().enumerate() {
+                let child_path = format!("{path}.{index}");
                 if let Some(parsed) =
-                    parse_html_node(&child, css_sources, label_map, key, html, type_registry)
+                    parse_html_node(
+                        &child,
+                        css_sources,
+                        label_map,
+                        key,
+                        html,
+                        type_registry,
+                        child_path.as_str(),
+                    )
                 {
                     children.push(parsed);
                 }
@@ -501,15 +547,24 @@ fn parse_html_node(
                 children,
                 functions,
                 widget.clone(),
-                HtmlID::default(),
+                node_id.clone(),
             ))
         }
 
         "form" => {
             let mut children = Vec::new();
-            for child in node.children() {
+            for (index, child) in node.children().enumerate() {
+                let child_path = format!("{path}.{index}");
                 if let Some(parsed) =
-                    parse_html_node(&child, css_sources, label_map, key, html, type_registry)
+                    parse_html_node(
+                        &child,
+                        css_sources,
+                        label_map,
+                        key,
+                        html,
+                        type_registry,
+                        child_path.as_str(),
+                    )
                 {
                     children.push(parsed);
                 }
@@ -537,16 +592,25 @@ fn parse_html_node(
                 children,
                 functions,
                 widget.clone(),
-                HtmlID::default(),
+                node_id.clone(),
             ))
         }
 
         #[cfg(feature = "extended-dialog")]
         "dialog" => {
             let mut children = Vec::new();
-            for child in node.children() {
+            for (index, child) in node.children().enumerate() {
+                let child_path = format!("{path}.{index}");
                 if let Some(parsed) =
-                    parse_html_node(&child, css_sources, label_map, key, html, type_registry)
+                    parse_html_node(
+                        &child,
+                        css_sources,
+                        label_map,
+                        key,
+                        html,
+                        type_registry,
+                        child_path.as_str(),
+                    )
                 {
                     children.push(parsed);
                 }
@@ -584,16 +648,25 @@ fn parse_html_node(
                 children,
                 functions,
                 widget.clone(),
-                HtmlID::default(),
+                node_id.clone(),
             ))
         }
 
         #[cfg(feature = "extended-dialog")]
         "dialog-header" => {
             let mut children = Vec::new();
-            for child in node.children() {
+            for (index, child) in node.children().enumerate() {
+                let child_path = format!("{path}.{index}");
                 if let Some(parsed) =
-                    parse_html_node(&child, css_sources, label_map, key, html, type_registry)
+                    parse_html_node(
+                        &child,
+                        css_sources,
+                        label_map,
+                        key,
+                        html,
+                        type_registry,
+                        child_path.as_str(),
+                    )
                 {
                     children.push(parsed);
                 }
@@ -609,16 +682,25 @@ fn parse_html_node(
                 children,
                 functions,
                 widget.clone(),
-                HtmlID::default(),
+                node_id.clone(),
             ))
         }
 
         #[cfg(feature = "extended-dialog")]
         "dialog-body" => {
             let mut children = Vec::new();
-            for child in node.children() {
+            for (index, child) in node.children().enumerate() {
+                let child_path = format!("{path}.{index}");
                 if let Some(parsed) =
-                    parse_html_node(&child, css_sources, label_map, key, html, type_registry)
+                    parse_html_node(
+                        &child,
+                        css_sources,
+                        label_map,
+                        key,
+                        html,
+                        type_registry,
+                        child_path.as_str(),
+                    )
                 {
                     children.push(parsed);
                 }
@@ -634,16 +716,25 @@ fn parse_html_node(
                 children,
                 functions,
                 widget.clone(),
-                HtmlID::default(),
+                node_id.clone(),
             ))
         }
 
         #[cfg(feature = "extended-dialog")]
         "dialog-footer" => {
             let mut children = Vec::new();
-            for child in node.children() {
+            for (index, child) in node.children().enumerate() {
+                let child_path = format!("{path}.{index}");
                 if let Some(parsed) =
-                    parse_html_node(&child, css_sources, label_map, key, html, type_registry)
+                    parse_html_node(
+                        &child,
+                        css_sources,
+                        label_map,
+                        key,
+                        html,
+                        type_registry,
+                        child_path.as_str(),
+                    )
                 {
                     children.push(parsed);
                 }
@@ -659,7 +750,7 @@ fn parse_html_node(
                 children,
                 functions,
                 widget.clone(),
-                HtmlID::default(),
+                node_id.clone(),
             ))
         }
 
@@ -674,7 +765,7 @@ fn parse_html_node(
                 states,
                 functions,
                 widget.clone(),
-                HtmlID::default(),
+                node_id.clone(),
             ))
         }
 
@@ -684,27 +775,36 @@ fn parse_html_node(
             let mode = attributes.get("mode").unwrap_or("single").to_string();
             let mut children = Vec::new();
 
-            let mut radio_nodes: Vec<(NodeRef, bool)> = Vec::new();
-            for child in node.children() {
+            let mut radio_nodes: Vec<(usize, NodeRef, bool)> = Vec::new();
+            for (index, child) in node.children().enumerate() {
                 if let Some(el) = child.as_element() {
                     if el.name.local.eq("radio") {
                         let selected_attr = el.attributes.borrow().contains("selected");
-                        radio_nodes.push((child.clone(), selected_attr));
+                        radio_nodes.push((index, child.clone(), selected_attr));
                         continue;
                     }
                 }
+                let child_path = format!("{path}.{index}");
                 if let Some(parsed) =
-                    parse_html_node(&child, css_sources, label_map, key, html, type_registry)
+                    parse_html_node(
+                        &child,
+                        css_sources,
+                        label_map,
+                        key,
+                        html,
+                        type_registry,
+                        child_path.as_str(),
+                    )
                 {
                     children.push(parsed);
                 }
             }
 
-            let any_selected_attr = radio_nodes.iter().any(|(_, sel)| *sel);
+            let any_selected_attr = radio_nodes.iter().any(|(_, _, sel)| *sel);
             let mut selected_used = false;
             let mut first_radio_seen = false;
 
-            for (radio_node, had_selected_attr) in radio_nodes {
+            for (radio_index, radio_node, had_selected_attr) in radio_nodes {
                 let element = radio_node.as_element().unwrap();
                 let attrs = element.attributes.borrow();
 
@@ -763,7 +863,7 @@ fn parse_html_node(
                     child_states,
                     child_functions,
                     widget.clone(),
-                    HtmlID::default(),
+                    stable_html_id(key, &format!("{path}.{radio_index}"), "radio"),
                 ));
             }
 
@@ -778,7 +878,7 @@ fn parse_html_node(
                 children,
                 functions,
                 widget.clone(),
-                HtmlID::default(),
+                node_id.clone(),
             ))
         }
 
@@ -805,7 +905,7 @@ fn parse_html_node(
                 states,
                 functions,
                 widget.clone(),
-                HtmlID::default(),
+                node_id.clone(),
             ))
         }
 
@@ -837,7 +937,7 @@ fn parse_html_node(
                 states,
                 functions,
                 widget.clone(),
-                HtmlID::default(),
+                node_id.clone(),
             ))
         }
 
@@ -870,7 +970,7 @@ fn parse_html_node(
                 states,
                 functions,
                 widget.clone(),
-                HtmlID::default(),
+                node_id.clone(),
             ))
         }
 
@@ -936,7 +1036,7 @@ fn parse_html_node(
                 states,
                 functions,
                 widget.clone(),
-                HtmlID::default(),
+                node_id.clone(),
             ))
         }
 
@@ -991,7 +1091,7 @@ fn parse_html_node(
                 states,
                 functions,
                 widget.clone(),
-                HtmlID::default(),
+                node_id.clone(),
             ))
         }
 
@@ -1003,7 +1103,7 @@ fn parse_html_node(
                 states,
                 functions,
                 widget.clone(),
-                HtmlID::default(),
+                node_id.clone(),
             ))
         }
 
@@ -1045,7 +1145,7 @@ fn parse_html_node(
                 states,
                 functions,
                 widget.clone(),
-                HtmlID::default(),
+                node_id.clone(),
             ))
         }
 
@@ -1078,7 +1178,7 @@ fn parse_html_node(
                 states,
                 functions,
                 widget.clone(),
-                HtmlID::default(),
+                node_id.clone(),
             ))
         }
 
@@ -1109,7 +1209,7 @@ fn parse_html_node(
                 states,
                 functions,
                 widget.clone(),
-                HtmlID::default(),
+                node_id.clone(),
             ))
         }
 
@@ -1135,7 +1235,7 @@ fn parse_html_node(
                 states,
                 functions,
                 widget.clone(),
-                HtmlID::default(),
+                node_id.clone(),
             ))
         }
 
@@ -1154,7 +1254,7 @@ fn parse_html_node(
                 states,
                 functions,
                 widget.clone(),
-                HtmlID::default(),
+                node_id.clone(),
             ))
         }
 
@@ -1211,7 +1311,7 @@ fn parse_html_node(
                 states,
                 functions,
                 widget.clone(),
-                HtmlID::default(),
+                node_id.clone(),
             ))
         }
 
@@ -1283,7 +1383,7 @@ fn parse_html_node(
                 states,
                 functions,
                 widget.clone(),
-                HtmlID::default(),
+                node_id.clone(),
             ))
         }
 
@@ -1295,18 +1395,20 @@ fn parse_html_node(
             } else {
                 Some(icon_attr.to_string())
             };
+            let selected = parse_bool_attribute(&attributes, "checked");
 
             Some(HtmlWidgetNode::SwitchButton(
                 SwitchButton {
                     label: text,
                     icon,
+                    selected,
                     ..default()
                 },
                 meta,
                 states,
                 functions,
                 widget.clone(),
-                HtmlID::default(),
+                node_id.clone(),
             ))
         }
 
@@ -1328,7 +1430,7 @@ fn parse_html_node(
                 states,
                 functions,
                 widget.clone(),
-                HtmlID::default(),
+                node_id.clone(),
             ))
         }
 
@@ -1384,7 +1486,7 @@ fn parse_html_node(
                 states,
                 functions,
                 widget.clone(),
-                HtmlID::default(),
+                node_id.clone(),
             ))
         }
 
@@ -1926,6 +2028,915 @@ fn extract_direct_child_tags(inner_html: &str) -> Vec<String> {
     }
 
     direct_children
+}
+
+const TEMPLATE_MAX_RECURSION: usize = 64;
+
+#[derive(Debug, Clone)]
+struct TemplateValueContext {
+    values: HashMap<String, JsonValue>,
+}
+
+impl TemplateValueContext {
+    fn from_lang_vars(vars: &UiLangVariables) -> Self {
+        let mut values = HashMap::new();
+        for (key, value) in &vars.vars {
+            values.insert(key.clone(), parse_template_context_value(value));
+        }
+        Self { values }
+    }
+
+    fn with_iteration(
+        &self,
+        item_name: &str,
+        item_value: JsonValue,
+        index_name: Option<&str>,
+        index: usize,
+    ) -> Self {
+        let mut values = self.values.clone();
+        values.insert(item_name.to_string(), item_value);
+        if let Some(index_name) = index_name {
+            values.insert(
+                index_name.to_string(),
+                JsonValue::Number(serde_json::Number::from(index as u64)),
+            );
+        }
+        Self { values }
+    }
+}
+
+fn parse_template_context_value(raw: &str) -> JsonValue {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return JsonValue::String(String::new());
+    }
+
+    serde_json::from_str(trimmed).unwrap_or_else(|_| JsonValue::String(raw.to_string()))
+}
+
+#[derive(Debug, Clone)]
+struct TemplateCursor<'a> {
+    src: &'a str,
+    idx: usize,
+}
+
+impl<'a> TemplateCursor<'a> {
+    fn new(src: &'a str) -> Self {
+        Self { src, idx: 0 }
+    }
+
+    fn is_eof(&self) -> bool {
+        self.idx >= self.src.len()
+    }
+
+    fn starts_with(&self, value: &str) -> bool {
+        self.src[self.idx..].starts_with(value)
+    }
+
+    fn remaining(&self) -> &'a str {
+        &self.src[self.idx..]
+    }
+
+    fn peek_char(&self) -> Option<char> {
+        self.remaining().chars().next()
+    }
+
+    fn next_char(&mut self) -> Option<char> {
+        let ch = self.peek_char()?;
+        self.idx += ch.len_utf8();
+        Some(ch)
+    }
+
+    fn consume_str(&mut self, value: &str) -> bool {
+        if self.starts_with(value) {
+            self.idx += value.len();
+            true
+        } else {
+            false
+        }
+    }
+
+    fn skip_whitespace(&mut self) {
+        while let Some(ch) = self.peek_char() {
+            if !ch.is_whitespace() {
+                break;
+            }
+            self.next_char();
+        }
+    }
+}
+
+/// Expands control-flow template directives inside HTML source before DOM parsing.
+///
+/// Supported directives:
+/// - `@if(<expr>) { ... }`
+/// - `@if(<expr>) { ... } @else { ... }`
+/// - `@for(item in list) { ... }`
+/// - `@for(item, index in list) { ... }`
+///
+/// Expressions support:
+/// - object paths (`data.user.name`)
+/// - unary negation (`!state`)
+/// - equality (`==`)
+/// - logical `&&` / `||`
+/// - method calls on values: `startsWidth`, `endsWidth`, `contains`
+///   (`startsWith` / `endsWith` aliases are accepted too)
+pub fn preprocess_template_directives(template: &str, vars: &UiLangVariables) -> String {
+    let context = TemplateValueContext::from_lang_vars(vars);
+    render_template_with_context(template, &context, 0)
+}
+
+fn render_template_with_context(
+    template: &str,
+    context: &TemplateValueContext,
+    depth: usize,
+) -> String {
+    if depth > TEMPLATE_MAX_RECURSION {
+        return template.to_string();
+    }
+
+    let mut cursor = TemplateCursor::new(template);
+    render_template_segment(&mut cursor, context, depth, false)
+}
+
+fn render_template_segment(
+    cursor: &mut TemplateCursor,
+    context: &TemplateValueContext,
+    depth: usize,
+    stop_on_block_end: bool,
+) -> String {
+    let mut output = String::new();
+
+    while !cursor.is_eof() {
+        if stop_on_block_end && cursor.starts_with("}") {
+            cursor.next_char();
+            break;
+        }
+
+        if cursor.starts_with("{{") {
+            output.push_str(&consume_moustache(cursor));
+            continue;
+        }
+
+        if is_template_directive(cursor, "@if") {
+            if let Some(rendered) = parse_if_directive(cursor, context, depth + 1) {
+                output.push_str(&rendered);
+                continue;
+            }
+        }
+
+        if is_template_directive(cursor, "@for") {
+            if let Some(rendered) = parse_for_directive(cursor, context, depth + 1) {
+                output.push_str(&rendered);
+                continue;
+            }
+        }
+
+        if let Some(ch) = cursor.next_char() {
+            output.push(ch);
+        } else {
+            break;
+        }
+    }
+
+    output
+}
+
+fn is_template_directive(cursor: &TemplateCursor, keyword: &str) -> bool {
+    if !cursor.starts_with(keyword) {
+        return false;
+    }
+
+    let next = cursor.remaining()[keyword.len()..].chars().next();
+    !matches!(next, Some(ch) if ch.is_alphanumeric() || ch == '_')
+}
+
+fn parse_if_directive(
+    cursor: &mut TemplateCursor,
+    context: &TemplateValueContext,
+    depth: usize,
+) -> Option<String> {
+    let checkpoint = cursor.idx;
+    if !cursor.consume_str("@if") {
+        return None;
+    }
+    cursor.skip_whitespace();
+    let condition_raw = match extract_group_content(cursor, '(', ')') {
+        Some(value) => value,
+        None => {
+            cursor.idx = checkpoint;
+            return None;
+        }
+    };
+    cursor.skip_whitespace();
+    let then_source = match extract_block_content(cursor) {
+        Some(value) => value,
+        None => {
+            cursor.idx = checkpoint;
+            return None;
+        }
+    };
+
+    let mut else_source = None;
+    cursor.skip_whitespace();
+    if is_template_directive(cursor, "@else") {
+        cursor.consume_str("@else");
+        cursor.skip_whitespace();
+        else_source = match extract_block_content(cursor) {
+            Some(value) => Some(value),
+            None => {
+                cursor.idx = checkpoint;
+                return None;
+            }
+        };
+    }
+
+    let condition = evaluate_condition_expression(condition_raw.as_str(), context);
+    let selected = if condition {
+        then_source
+    } else {
+        else_source.unwrap_or_default()
+    };
+
+    Some(render_template_with_context(&selected, context, depth))
+}
+
+fn parse_for_directive(
+    cursor: &mut TemplateCursor,
+    context: &TemplateValueContext,
+    depth: usize,
+) -> Option<String> {
+    let checkpoint = cursor.idx;
+    if !cursor.consume_str("@for") {
+        return None;
+    }
+    cursor.skip_whitespace();
+    let header = match extract_group_content(cursor, '(', ')') {
+        Some(value) => value,
+        None => {
+            cursor.idx = checkpoint;
+            return None;
+        }
+    };
+    cursor.skip_whitespace();
+    let block_source = match extract_block_content(cursor) {
+        Some(value) => value,
+        None => {
+            cursor.idx = checkpoint;
+            return None;
+        }
+    };
+
+    let (item_name, index_name, iterable_expression) = match parse_for_header(&header) {
+        Some(value) => value,
+        None => {
+            cursor.idx = checkpoint;
+            return None;
+        }
+    };
+    let Some(iterable_value) = evaluate_expression(&iterable_expression, context) else {
+        warn!("Failed to evaluate @for expression: {iterable_expression}");
+        return Some(String::new());
+    };
+
+    let mut rendered = String::new();
+    for (index, item) in iterable_items(iterable_value).into_iter().enumerate() {
+        let iteration_context =
+            context.with_iteration(&item_name, item, index_name.as_deref(), index);
+        let nested = render_template_with_context(&block_source, &iteration_context, depth);
+        rendered.push_str(&interpolate_inline_placeholders(
+            &nested,
+            &iteration_context,
+        ));
+    }
+
+    Some(rendered)
+}
+
+fn parse_for_header(header: &str) -> Option<(String, Option<String>, String)> {
+    let captures = FOR_HEADER_RE.captures(header.trim())?;
+    let item_name = captures.get(1)?.as_str().to_string();
+    let index_name = captures.get(2).map(|value| value.as_str().to_string());
+    let iterable_expression = captures.get(3)?.as_str().trim().to_string();
+
+    Some((item_name, index_name, iterable_expression))
+}
+
+fn iterable_items(value: JsonValue) -> Vec<JsonValue> {
+    match value {
+        JsonValue::Array(items) => items,
+        JsonValue::Object(map) => map.into_values().collect(),
+        _ => Vec::new(),
+    }
+}
+
+fn consume_moustache(cursor: &mut TemplateCursor) -> String {
+    let mut out = String::new();
+
+    if !cursor.consume_str("{{") {
+        return out;
+    }
+
+    out.push_str("{{");
+    while !cursor.is_eof() {
+        if cursor.starts_with("}}") {
+            cursor.consume_str("}}");
+            out.push_str("}}");
+            break;
+        }
+        if let Some(ch) = cursor.next_char() {
+            out.push(ch);
+        }
+    }
+
+    out
+}
+
+fn extract_group_content(cursor: &mut TemplateCursor, open: char, close: char) -> Option<String> {
+    if cursor.peek_char()? != open {
+        return None;
+    }
+
+    cursor.next_char();
+    let mut content = String::new();
+    let mut depth = 1usize;
+    let mut quote: Option<char> = None;
+    let mut escaped = false;
+
+    while let Some(ch) = cursor.next_char() {
+        if let Some(active_quote) = quote {
+            if escaped {
+                escaped = false;
+            } else if ch == '\\' {
+                escaped = true;
+            } else if ch == active_quote {
+                quote = None;
+            }
+            content.push(ch);
+            continue;
+        }
+
+        if ch == '"' || ch == '\'' {
+            quote = Some(ch);
+            content.push(ch);
+            continue;
+        }
+
+        if ch == open {
+            depth += 1;
+            content.push(ch);
+            continue;
+        }
+
+        if ch == close {
+            depth = depth.saturating_sub(1);
+            if depth == 0 {
+                return Some(content);
+            }
+            content.push(ch);
+            continue;
+        }
+
+        content.push(ch);
+    }
+
+    None
+}
+
+fn extract_block_content(cursor: &mut TemplateCursor) -> Option<String> {
+    extract_group_content(cursor, '{', '}')
+}
+
+fn interpolate_inline_placeholders(value: &str, context: &TemplateValueContext) -> String {
+    INNER_BINDING_RE
+        .replace_all(value, |caps: &regex::Captures| {
+            let Some(expression) = caps.get(1).map(|m| m.as_str()) else {
+                return caps
+                    .get(0)
+                    .map(|m| m.as_str())
+                    .unwrap_or_default()
+                    .to_string();
+            };
+
+            let Some(evaluated) = evaluate_expression(expression, context) else {
+                return caps
+                    .get(0)
+                    .map(|m| m.as_str())
+                    .unwrap_or_default()
+                    .to_string();
+            };
+
+            value_to_inline_string(&evaluated).unwrap_or_else(|| {
+                caps.get(0)
+                    .map(|m| m.as_str())
+                    .unwrap_or_default()
+                    .to_string()
+            })
+        })
+        .into_owned()
+}
+
+fn evaluate_condition_expression(expression: &str, context: &TemplateValueContext) -> bool {
+    evaluate_expression(expression, context)
+        .map(|value| value_truthy(&value))
+        .unwrap_or(false)
+}
+
+fn value_truthy(value: &JsonValue) -> bool {
+    match value {
+        JsonValue::Bool(value) => *value,
+        JsonValue::Null => false,
+        JsonValue::Number(value) => value.as_f64().is_some_and(|number| number != 0.0),
+        JsonValue::String(value) => {
+            let normalized = value.trim().to_ascii_lowercase();
+            if normalized == "true" {
+                true
+            } else if normalized == "false" || normalized.is_empty() {
+                false
+            } else {
+                true
+            }
+        }
+        JsonValue::Array(items) => !items.is_empty(),
+        JsonValue::Object(map) => !map.is_empty(),
+    }
+}
+
+fn value_to_inline_string(value: &JsonValue) -> Option<String> {
+    match value {
+        JsonValue::Bool(value) => Some(value.to_string()),
+        JsonValue::Number(value) => Some(value.to_string()),
+        JsonValue::String(value) => Some(value.clone()),
+        _ => None,
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+enum ExprToken {
+    Identifier(String),
+    String(String),
+    Number(f64),
+    Bool(bool),
+    LParen,
+    RParen,
+    Dot,
+    Comma,
+    LBracket,
+    RBracket,
+    EqEq,
+    AndAnd,
+    OrOr,
+    Bang,
+}
+
+fn tokenize_expression(expression: &str) -> Option<Vec<ExprToken>> {
+    let mut tokens = Vec::new();
+    let mut chars = expression.chars().peekable();
+
+    while let Some(ch) = chars.peek().copied() {
+        if ch.is_whitespace() {
+            chars.next();
+            continue;
+        }
+
+        if ch == '&' {
+            chars.next();
+            if chars.next()? != '&' {
+                return None;
+            }
+            tokens.push(ExprToken::AndAnd);
+            continue;
+        }
+
+        if ch == '|' {
+            chars.next();
+            if chars.next()? != '|' {
+                return None;
+            }
+            tokens.push(ExprToken::OrOr);
+            continue;
+        }
+
+        if ch == '=' {
+            chars.next();
+            if chars.next()? != '=' {
+                return None;
+            }
+            tokens.push(ExprToken::EqEq);
+            continue;
+        }
+
+        if ch == '!' {
+            chars.next();
+            tokens.push(ExprToken::Bang);
+            continue;
+        }
+
+        if ch == '(' {
+            chars.next();
+            tokens.push(ExprToken::LParen);
+            continue;
+        }
+
+        if ch == ')' {
+            chars.next();
+            tokens.push(ExprToken::RParen);
+            continue;
+        }
+
+        if ch == '.' {
+            chars.next();
+            tokens.push(ExprToken::Dot);
+            continue;
+        }
+
+        if ch == ',' {
+            chars.next();
+            tokens.push(ExprToken::Comma);
+            continue;
+        }
+
+        if ch == '[' {
+            chars.next();
+            tokens.push(ExprToken::LBracket);
+            continue;
+        }
+
+        if ch == ']' {
+            chars.next();
+            tokens.push(ExprToken::RBracket);
+            continue;
+        }
+
+        if ch == '\'' || ch == '"' {
+            let quote = ch;
+            chars.next();
+
+            let mut value = String::new();
+            let mut escaped = false;
+
+            for current in chars.by_ref() {
+                if escaped {
+                    value.push(current);
+                    escaped = false;
+                    continue;
+                }
+
+                if current == '\\' {
+                    escaped = true;
+                    continue;
+                }
+
+                if current == quote {
+                    break;
+                }
+
+                value.push(current);
+            }
+
+            tokens.push(ExprToken::String(value));
+            continue;
+        }
+
+        if ch.is_ascii_digit()
+            || (ch == '-'
+                && chars
+                    .clone()
+                    .nth(1)
+                    .is_some_and(|next| next.is_ascii_digit()))
+        {
+            let mut raw = String::new();
+            raw.push(ch);
+            chars.next();
+
+            while let Some(next) = chars.peek().copied() {
+                if !(next.is_ascii_digit() || next == '.') {
+                    break;
+                }
+                raw.push(next);
+                chars.next();
+            }
+
+            let number = raw.parse::<f64>().ok()?;
+            tokens.push(ExprToken::Number(number));
+            continue;
+        }
+
+        if ch.is_ascii_alphabetic() || ch == '_' {
+            let mut ident = String::new();
+            ident.push(ch);
+            chars.next();
+
+            while let Some(next) = chars.peek().copied() {
+                if !(next.is_ascii_alphanumeric() || next == '_') {
+                    break;
+                }
+                ident.push(next);
+                chars.next();
+            }
+
+            let lower = ident.to_ascii_lowercase();
+            if lower == "true" {
+                tokens.push(ExprToken::Bool(true));
+            } else if lower == "false" {
+                tokens.push(ExprToken::Bool(false));
+            } else {
+                tokens.push(ExprToken::Identifier(ident));
+            }
+            continue;
+        }
+
+        return None;
+    }
+
+    Some(tokens)
+}
+
+fn evaluate_expression(expression: &str, context: &TemplateValueContext) -> Option<JsonValue> {
+    let tokens = tokenize_expression(expression)?;
+    let mut parser = ExpressionParser {
+        tokens: &tokens,
+        index: 0,
+        context,
+    };
+
+    let value = parser.parse_or()?;
+    if parser.index != parser.tokens.len() {
+        return None;
+    }
+
+    Some(value)
+}
+
+struct ExpressionParser<'a> {
+    tokens: &'a [ExprToken],
+    index: usize,
+    context: &'a TemplateValueContext,
+}
+
+impl<'a> ExpressionParser<'a> {
+    fn peek(&self) -> Option<&ExprToken> {
+        self.tokens.get(self.index)
+    }
+
+    fn next(&mut self) -> Option<&ExprToken> {
+        let token = self.tokens.get(self.index)?;
+        self.index += 1;
+        Some(token)
+    }
+
+    fn consume(&mut self, expected: ExprToken) -> bool {
+        if self.peek() == Some(&expected) {
+            self.index += 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    fn parse_or(&mut self) -> Option<JsonValue> {
+        let mut left = self.parse_and()?;
+        while self.consume(ExprToken::OrOr) {
+            let right = self.parse_and()?;
+            left = JsonValue::Bool(value_truthy(&left) || value_truthy(&right));
+        }
+        Some(left)
+    }
+
+    fn parse_and(&mut self) -> Option<JsonValue> {
+        let mut left = self.parse_equality()?;
+        while self.consume(ExprToken::AndAnd) {
+            let right = self.parse_equality()?;
+            left = JsonValue::Bool(value_truthy(&left) && value_truthy(&right));
+        }
+        Some(left)
+    }
+
+    fn parse_equality(&mut self) -> Option<JsonValue> {
+        let mut left = self.parse_unary()?;
+        while self.consume(ExprToken::EqEq) {
+            let right = self.parse_unary()?;
+            left = JsonValue::Bool(json_values_equal(&left, &right));
+        }
+        Some(left)
+    }
+
+    fn parse_unary(&mut self) -> Option<JsonValue> {
+        if self.consume(ExprToken::Bang) {
+            let value = self.parse_unary()?;
+            return Some(JsonValue::Bool(!value_truthy(&value)));
+        }
+        self.parse_primary()
+    }
+
+    fn parse_primary(&mut self) -> Option<JsonValue> {
+        match self.peek()? {
+            ExprToken::LParen => {
+                self.next();
+                let inner = self.parse_or()?;
+                if !self.consume(ExprToken::RParen) {
+                    return None;
+                }
+                Some(inner)
+            }
+            ExprToken::Bool(value) => {
+                let value = *value;
+                self.next();
+                Some(JsonValue::Bool(value))
+            }
+            ExprToken::Number(value) => {
+                let value = *value;
+                self.next();
+                Some(
+                    serde_json::Number::from_f64(value)
+                        .map(JsonValue::Number)
+                        .unwrap_or(JsonValue::Null),
+                )
+            }
+            ExprToken::String(value) => {
+                let value = value.clone();
+                self.next();
+                Some(JsonValue::String(value))
+            }
+            ExprToken::Identifier(_) => self.parse_identifier_chain(),
+            _ => None,
+        }
+    }
+
+    fn parse_identifier_chain(&mut self) -> Option<JsonValue> {
+        let base_name = match self.next()? {
+            ExprToken::Identifier(name) => name.clone(),
+            _ => return None,
+        };
+
+        let mut current = self
+            .context
+            .values
+            .get(&base_name)
+            .cloned()
+            .unwrap_or(JsonValue::Null);
+
+        loop {
+            if self.consume(ExprToken::Dot) {
+                let name = match self.next()? {
+                    ExprToken::Identifier(name) => name.clone(),
+                    _ => return None,
+                };
+
+                if self.consume(ExprToken::LParen) {
+                    let args = self.parse_call_arguments()?;
+                    current = evaluate_value_method(&current, &name, &args);
+                    continue;
+                }
+
+                current = resolve_json_property(&current, &name);
+                continue;
+            }
+
+            if self.consume(ExprToken::LBracket) {
+                let token = self.next()?.clone();
+                let index_value = match token {
+                    ExprToken::Number(number) => {
+                        serde_json::Number::from_f64(number).map(JsonValue::Number)?
+                    }
+                    ExprToken::String(value) => JsonValue::String(value),
+                    ExprToken::Identifier(value) => self
+                        .context
+                        .values
+                        .get(&value)
+                        .cloned()
+                        .unwrap_or(JsonValue::Null),
+                    _ => return None,
+                };
+
+                if !self.consume(ExprToken::RBracket) {
+                    return None;
+                }
+
+                current = resolve_json_index(&current, &index_value);
+                continue;
+            }
+
+            break;
+        }
+
+        Some(current)
+    }
+
+    fn parse_call_arguments(&mut self) -> Option<Vec<JsonValue>> {
+        let mut args = Vec::new();
+        if self.consume(ExprToken::RParen) {
+            return Some(args);
+        }
+
+        loop {
+            args.push(self.parse_or()?);
+
+            if self.consume(ExprToken::Comma) {
+                continue;
+            }
+
+            if self.consume(ExprToken::RParen) {
+                break;
+            }
+
+            return None;
+        }
+
+        Some(args)
+    }
+}
+
+fn resolve_json_property(source: &JsonValue, key: &str) -> JsonValue {
+    match source {
+        JsonValue::Object(map) => map.get(key).cloned().unwrap_or(JsonValue::Null),
+        _ => JsonValue::Null,
+    }
+}
+
+fn resolve_json_index(source: &JsonValue, index: &JsonValue) -> JsonValue {
+    match (source, index) {
+        (JsonValue::Array(list), JsonValue::Number(number)) => {
+            let Some(index) = number.as_u64() else {
+                return JsonValue::Null;
+            };
+            list.get(index as usize).cloned().unwrap_or(JsonValue::Null)
+        }
+        (JsonValue::Object(map), JsonValue::String(key)) => {
+            map.get(key).cloned().unwrap_or(JsonValue::Null)
+        }
+        _ => JsonValue::Null,
+    }
+}
+
+fn evaluate_value_method(target: &JsonValue, method: &str, args: &[JsonValue]) -> JsonValue {
+    let method = method.to_ascii_lowercase();
+    match method.as_str() {
+        "startswidth" | "startswith" => {
+            let Some(prefix) = args.first().and_then(json_as_string) else {
+                return JsonValue::Bool(false);
+            };
+            let Some(value) = json_as_string(target) else {
+                return JsonValue::Bool(false);
+            };
+            JsonValue::Bool(value.starts_with(prefix.as_str()))
+        }
+        "endswidth" | "endswith" => {
+            let Some(suffix) = args.first().and_then(json_as_string) else {
+                return JsonValue::Bool(false);
+            };
+            let Some(value) = json_as_string(target) else {
+                return JsonValue::Bool(false);
+            };
+            JsonValue::Bool(value.ends_with(suffix.as_str()))
+        }
+        "contains" => {
+            let Some(value) = args.first() else {
+                return JsonValue::Bool(false);
+            };
+
+            match target {
+                JsonValue::String(text) => {
+                    let Some(needle) = json_as_string(value) else {
+                        return JsonValue::Bool(false);
+                    };
+                    JsonValue::Bool(text.contains(needle.as_str()))
+                }
+                JsonValue::Array(items) => {
+                    JsonValue::Bool(items.iter().any(|item| json_values_equal(item, value)))
+                }
+                JsonValue::Object(map) => {
+                    let Some(key) = json_as_string(value) else {
+                        return JsonValue::Bool(false);
+                    };
+                    JsonValue::Bool(map.contains_key(key.as_str()))
+                }
+                _ => JsonValue::Bool(false),
+            }
+        }
+        _ => JsonValue::Null,
+    }
+}
+
+fn json_as_string(value: &JsonValue) -> Option<String> {
+    match value {
+        JsonValue::String(value) => Some(value.clone()),
+        JsonValue::Number(value) => Some(value.to_string()),
+        JsonValue::Bool(value) => Some(value.to_string()),
+        _ => None,
+    }
+}
+
+fn json_values_equal(left: &JsonValue, right: &JsonValue) -> bool {
+    match (left, right) {
+        (JsonValue::Number(left), JsonValue::Number(right)) => {
+            let (Some(left), Some(right)) = (left.as_f64(), right.as_f64()) else {
+                return false;
+            };
+            (left - right).abs() <= f64::EPSILON
+        }
+        _ => left == right,
+    }
 }
 
 /// Handles `is_void_html_tag` in the extended UI workflow.

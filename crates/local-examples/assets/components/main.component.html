@@ -2,5 +2,11 @@
   <h3>Extended Framework Active</h3>
   <p>This UI was booted from index.html and app-main component.</p>
   <button>Component Button</button>
+
+  @if(state) {
+  <switch checked onclick="check_state">On / Off</switch>
   <app-test />
+  } @else {
+  <switch onclick="check_state">On / Off</switch>
+  }
 </div>
