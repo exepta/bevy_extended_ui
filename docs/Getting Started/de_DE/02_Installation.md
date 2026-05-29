@@ -41,7 +41,7 @@ fn main() {
 use bevy::prelude::*;
 use bevy_extended_ui::html::HtmlSource;
 use bevy_extended_ui::io::HtmlAsset;
-use bevy_extended_ui::registry::UiRegistry;
+use bevy_extended_ui::old::registry::UiRegistry;
 
 fn lade_ui(mut reg: ResMut<UiRegistry>, asset_server: Res<AssetServer>) {
     let handle: Handle<HtmlAsset> = asset_server.load("ui/main.html");
@@ -82,3 +82,5 @@ bevy_extended_ui_macros = "x.y.z"
 - Sichtbarkeit der UI und Event-Reaktionen überprüfen
 
 Für den fachlichen Einstieg siehe [Überblick](01_Überblick.md).
+
+Weiter mit konkreten Event- und Datenbeispielen: [Beispiele](03_Beispiele.md).

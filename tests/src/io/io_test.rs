@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod tests {
     use super::super::*;
+    use bevy::asset::AssetLoader;
     use bevy::asset::AssetPlugin;
     use bevy::prelude::*;
     use std::path::PathBuf;

@@ -147,13 +147,22 @@ impl Colored {
     pub const YELLOW_GREEN: Color = Color::Srgba(Srgba::new(0.604, 0.804, 0.196, 1.0));
 
     /// Converts a hex color string into a `Color`.
+    ///
+    /// Invalid input returns `Color::NONE`.
     pub fn hex_to_color(hex: &str) -> Color {
+        Self::try_hex_to_color(hex).unwrap_or(Color::NONE)
+    }
+
+    /// Attempts to convert a hex color string into a `Color`.
+    ///
+    /// Returns `None` for malformed length or non-hex digits.
+    pub fn try_hex_to_color(hex: &str) -> Option<Color> {
         // Remove the "#" prefix if it exists
         let hex = hex.trim_start_matches('#');
 
         // Ensure the hex string is either 3, 6, or 8 characters long
         if hex.len() != 3 && hex.len() != 4 && hex.len() != 6 && hex.len() != 8 {
-            panic!("Invalid hex string length: {}", hex);
+            return None;
         }
 
         // If the length is 3, expand it to 6 (e.g. "fff" -> "ffffff")
@@ -179,28 +188,28 @@ impl Colored {
                 &hex[3..4]
             ),
             6 | 8 => hex.to_string(),
-            _ => unreachable!(),
+            _ => return None,
         };
 
         // Parse the hex string into the RGBA components (values between 0 and 255)
-        let r = u8::from_str_radix(&hex[0..2], 16).unwrap_or(0);
-        let g = u8::from_str_radix(&hex[2..4], 16).unwrap_or(0);
-        let b = u8::from_str_radix(&hex[4..6], 16).unwrap_or(0);
+        let r = u8::from_str_radix(&hex[0..2], 16).ok()?;
+        let g = u8::from_str_radix(&hex[2..4], 16).ok()?;
+        let b = u8::from_str_radix(&hex[4..6], 16).ok()?;
 
         // If there's an alpha component (e.g., #ff5733ff)
         let a = if hex.len() == 8 {
-            u8::from_str_radix(&hex[6..8], 16).unwrap_or(255)
+            u8::from_str_radix(&hex[6..8], 16).ok()?
         } else {
             255 // Default to fully opaque if no alpha is provided
         };
 
         // Convert the RGBA components to the [0.0, 1.0] range and return a Color
-        Color::Srgba(Srgba {
+        Some(Color::Srgba(Srgba {
             red: r as f32 / 255.0,
             green: g as f32 / 255.0,
             blue: b as f32 / 255.0,
             alpha: a as f32 / 255.0,
-        })
+        }))
     }
 
     /// Looks up a named CSS color and returns its `Color`.

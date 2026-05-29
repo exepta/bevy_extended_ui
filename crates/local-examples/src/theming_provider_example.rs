@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use bevy_extended_ui::html::{HtmlClick, HtmlSource};
 use bevy_extended_ui::io::HtmlAsset;
 use bevy_extended_ui::providers::ThemeProvider;
-use bevy_extended_ui::registry::UiRegistry;
+use bevy_extended_ui::old::registry::UiRegistry;
 use bevy_extended_ui::{ExtendedCam, ExtendedUiConfiguration, ExtendedUiPlugin};
 use bevy_extended_ui_macros::html_fn;
 

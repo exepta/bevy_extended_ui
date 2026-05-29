@@ -1,3 +1,7 @@
+<div style="text-align: center;">
+<img src="./doc/bevy_extended_ui.svg" alt="Logo" width="128" height="128">
+</div>
+
 # bevy_extended_ui
 
 ---
@@ -25,7 +29,7 @@ Available features:
 
 - [x] Full HTML support.
 - [x] CSS support but not all CSS properties.
-- [x] Hot reload support.
+- [x] Hot reload support. (`bevy:file_watcher` feature needed)
 - [x] HTML Bind support for interacting with the code.
 - [x] Font support for family and weight.
 - [x] Animation support (`@keyframes`).
@@ -47,6 +51,18 @@ This project supports both stable and nightly Rust.
 - Nightly: `cargo +nightly-2025-08-07 ...` or `rustup override set nightly-2025-08-07`
 - Optional: use `rust-toolchain-nightly.toml` as a drop-in replacement if you want nightly by default
 
+#### Windows build prerequisites
+
+You can build on Windows with either MSVC or GNU:
+
+- **MSVC path**: use `x86_64-pc-windows-msvc` and install **Visual Studio 2017+** (or **Build Tools for Visual Studio**)
+  with **Desktop development with C++** so `link.exe` is available.
+- **GNU path (no Visual Studio)**: use `x86_64-pc-windows-gnu` and install MinGW tools (for example via **MSYS2** with
+  the `mingw-w64-ucrt-x86_64-toolchain` package), then ensure `C:\msys64\ucrt64\bin` is on `PATH`.
+
+If Cargo fails with `error: linker 'link.exe' not found`, you are building with MSVC but the Visual C++ tools are not
+available on `PATH`.
+
 ### How to use?
 
 Add this to your `Cargo.toml`:
@@ -58,18 +74,19 @@ bevy_extended_ui_macros = "1.5.0"
 ```
 
 #### Features
-| Feature            | Description                                                                                          |
-|--------------------|------------------------------------------------------------------------------------------------------|
-| `default`          | Enables `css-breakpoints`, `fluent`, `providers`, `svg`, and `extended-dialog`.                     |
-| `wasm-default`     | Web preset: `wasm-breakpoints` + `clipboard-wasm` with legacy WASM CSS/style pipeline compatibility. |
-| `css-breakpoints`  | Desktop breakpoints via primary window.                                                              |
-| `wasm-breakpoints` | WASM breakpoints via browser viewport.                                                               |
-| `fluent`           | Enables Fluent Language support.                                                                     |
-| `properties-lang`  | Enables Java Properties Language support.                                                            |
-| `clipboard-wasm`   | Enables WASM clipboard support web.                                                                  |
-| `svg`              | Optional SVG image support for UI images/icons (rasterized to Bevy `Image`); not enabled by default. |
-| `providers`        | Enables custom HTML providers (e.g. theme-provider).                                                 |
-| `extended-dialog`  | Enables the dialog system with `BevyApp` and desktop `System` providers.                            |
+| Feature            | Description                                                                                           |
+|--------------------|-------------------------------------------------------------------------------------------------------|
+| `default`          | Enables `css-breakpoints`, `fluent`, `providers`, `svg`, and `extended-dialog`.                       |
+| `wasm-default`     | Web preset: `wasm-breakpoints` + `clipboard-wasm` with legacy WASM CSS/style pipeline compatibility.  |
+| `css-breakpoints`  | Desktop breakpoints via primary window.                                                               |
+| `wasm-breakpoints` | WASM breakpoints via browser viewport.                                                                |
+| `fluent`           | Enables Fluent Language support.                                                                      |
+| `properties-lang`  | Enables Java Properties Language support.                                                             |
+| `clipboard-wasm`   | Enables WASM clipboard support web.                                                                   |
+| `svg`              | Optional SVG image support for UI images/icons (rasterized to Bevy `Image`); not enabled by default.  |
+| `providers`        | Enables custom HTML providers (e.g. theme-provider).                                                  |
+| `extended-dialog`  | Enables the dialog system with `BevyApp` and desktop `System` providers.                              |
+| `extended-framework` | Enables the experimental Angular-like component base (`*.component.html` + `*.component.rs`).       |
 
 Then, you add the plugin to your `main.rs` or on any point at a build function:
 
@@ -101,6 +118,8 @@ Then you create an HTML file:
 And finally,
 
 ```rust
+use bevy_extended_ui::old::registry::UiRegistry;
+
 fn build(&mut app: App) {
     app.add_systems(Startup, |mut reg: ResMut<UiRegistry>, asset_server: Res<AssetServer>| {
         let handle: Handle<HtmlAsset> = asset_server.load("YOUR_ASSETS_LOCATION/test.html");
@@ -129,6 +148,41 @@ Note that currently you can use this binding:
 - `ondragstart`
 - `ondrag`
 - `ondragstop`
+
+### Extended framework (experimental)
+
+To enable the Angular-like base, turn on the Cargo feature:
+
+```toml
+[dependencies]
+bevy_extended_ui = { version = "1.5.0", features = ["extended-framework"] }
+```
+
+Alias also available: `extended_framework`.
+
+Base folder layout:
+
+```text
+assets/
+  index.html
+  ui/
+    bevy_ang/
+      main.component.html
+      main.component.css
+
+src/
+  packages/
+    main.component.rs
+```
+
+Behavior in `extended-framework` mode:
+
+- Startup requires `assets/index.html` exactly as entrypoint.
+- `UiRegistry`/`ExtendedRegistryPlugin` are disabled in this mode (legacy path).
+- Components are resolved by tag name from `*.component.rs` definitions:
+  `template_name`, `template_file`, `styles`.
+- `template_file` must match the component rust filename (`main.component.rs` -> `main.component.html`).
+- Component styles are injected into the compiled index template automatically.
 
 ### Dialog system
 
@@ -190,6 +244,8 @@ fn main() {
         .add_systems(Startup, load_ui)
         .run();
 }
+
+use bevy_extended_ui::old::registry::UiRegistry;
 
 fn load_ui(mut reg: ResMut<UiRegistry>, asset_server: Res<AssetServer>) {
     let handle: Handle<HtmlAsset> = asset_server.load("test.html");

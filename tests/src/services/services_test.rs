@@ -1,6 +1,8 @@
 #[cfg(test)]
 mod tests {
-    use super::super::css_service::{CssService, CssUsers};
+    use super::super::css_service::{
+        CssService, CssUsers, collect_assets_with_changed_media_matches,
+    };
     use super::super::image_service::{get_or_load_image, pre_load_assets};
     use super::super::state_service::{StateService, update_widget_states};
     use super::super::style_service::{
@@ -16,7 +18,7 @@ mod tests {
     use bevy::input::ButtonInput;
     use bevy::prelude::*;
     use bevy::text::LineHeight;
-    use std::collections::HashMap;
+    use std::collections::{HashMap, HashSet};
     use std::fs;
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -383,6 +385,44 @@ mod tests {
     }
 
     #[test]
+    fn css_service_collects_only_assets_with_changed_media_matches() {
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, AssetPlugin::default()));
+        app.init_asset::<CssAsset>();
+
+        let responsive_entity = app.world_mut().spawn_empty().id();
+        let static_entity = app.world_mut().spawn_empty().id();
+
+        let (responsive_css, static_css) = {
+            let mut assets = app.world_mut().resource_mut::<Assets<CssAsset>>();
+            (
+                assets.add(CssAsset {
+                    text: "@media (max-width: 500px) { .card { color: red; } }".to_string(),
+                }),
+                assets.add(CssAsset {
+                    text: ".card { color: blue; }".to_string(),
+                }),
+            )
+        };
+
+        let mut css_users = CssUsers::default();
+        css_users.users = HashMap::from([
+            (responsive_css.id(), HashSet::from([responsive_entity])),
+            (static_css.id(), HashSet::from([static_entity])),
+        ]);
+
+        let affected = collect_assets_with_changed_media_matches(
+            &css_users,
+            app.world().resource::<Assets<CssAsset>>(),
+            Vec2::new(800.0, 600.0),
+            Vec2::new(400.0, 600.0),
+        );
+
+        assert!(affected.contains(&responsive_css.id()));
+        assert!(!affected.contains(&static_css.id()));
+    }
+
+    #[test]
     fn css_service_updates_css_users_index_for_added_and_changed_sources() {
         let mut app = App::new();
         app.add_plugins((MinimalPlugins, AssetPlugin::default(), CssService));
@@ -665,6 +705,65 @@ mod tests {
 
         assert_eq!(text_color.0, Color::srgb(1.0, 0.0, 0.0));
         assert_eq!(image_node.color, Color::srgb(0.2, 0.3, 0.4));
+    }
+
+    #[test]
+    fn update_widget_styles_system_prefers_hover_pseudo_styles_when_state_matches() {
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, AssetPlugin::default()));
+        app.init_asset::<Image>();
+        app.insert_resource(ImageCache::default());
+        app.add_systems(Update, update_widget_styles_system);
+
+        let mut base_style = Style::default();
+        base_style.color = Some(Color::srgb(0.2, 0.2, 1.0));
+
+        let mut hover_style = Style::default();
+        hover_style.color = Some(Color::srgb(1.0, 0.5, 0.0));
+
+        let mut styles = HashMap::new();
+        styles.insert(
+            "button".to_string(),
+            StylePair {
+                normal: base_style,
+                selector: "button".to_string(),
+                ..default()
+            },
+        );
+        styles.insert(
+            "button:hover".to_string(),
+            StylePair {
+                normal: hover_style,
+                selector: "button:hover".to_string(),
+                ..default()
+            },
+        );
+
+        let entity = app
+            .world_mut()
+            .spawn((
+                UiStyle {
+                    css: Handle::default(),
+                    styles,
+                    keyframes: HashMap::new(),
+                    active_style: None,
+                },
+                UIWidgetState {
+                    hovered: true,
+                    ..default()
+                },
+                Node::default(),
+                TextColor(Color::NONE),
+            ))
+            .id();
+
+        app.update();
+
+        let text_color = app
+            .world()
+            .get::<TextColor>(entity)
+            .expect("missing TextColor");
+        assert_eq!(text_color.0, Color::srgb(1.0, 0.5, 0.0));
     }
 
     #[test]

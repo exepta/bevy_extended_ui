@@ -3,7 +3,7 @@ use crate::html::*;
 use crate::widgets::{
     BindToID, Button, ButtonType, CheckBox, ChoiceBox, ColorPicker, DatePicker,
     FieldSelectionMulti, FieldSelectionSingle, Form, FormValidationMode, InputField, InputValue,
-    RadioButton, Scrollbar, Slider, SwitchButton, ToggleButton, UIGenID, UIWidgetState,
+    ListBox, RadioButton, Scrollbar, Slider, SwitchButton, ToggleButton, UIGenID, UIWidgetState,
     ValidationRules, evaluate_validation_state,
 };
 use bevy::log::warn;
@@ -68,6 +68,7 @@ impl Plugin for HtmlEventBindingsPlugin {
             Update,
             emit_choice_box_change.in_set(HtmlSystemSet::Bindings),
         );
+        app.add_systems(Update, emit_list_box_change.in_set(HtmlSystemSet::Bindings));
         app.add_systems(
             Update,
             emit_field_set_change.in_set(HtmlSystemSet::Bindings),
@@ -130,6 +131,7 @@ impl Plugin for HtmlEventBindingsPlugin {
     }
 }
 
+/// Handles `pointer_inner_position` in the extended UI workflow.
 fn pointer_inner_position(
     rel_pos: Option<&RelativeCursorPosition>,
     node: Option<&ComputedNode>,
@@ -731,6 +733,17 @@ pub(crate) fn emit_choice_box_change(
     }
 }
 
+/// ListBox
+/// Emits change events for list box widgets.
+pub(crate) fn emit_list_box_change(
+    mut commands: Commands,
+    query: Query<(Entity, &HtmlEventBindings), Changed<ListBox>>,
+) {
+    for (entity, binding) in &query {
+        emit_change_if_bound(&mut commands, binding, entity, HtmlChangeAction::State);
+    }
+}
+
 /// FieldSet
 /// Emits change events for field set widgets.
 pub(crate) fn emit_field_set_change(
@@ -1063,6 +1076,7 @@ pub(crate) fn on_html_wheel(
 //                       Keyboard
 // =================================================
 
+/// Handles `find_keyboard_target_entity` in the extended UI workflow.
 fn find_keyboard_target_entity(
     current_widget_state: &CurrentWidgetState,
     q_bindings: &Query<(Entity, &UIGenID, &HtmlEventBindings, &UIWidgetState)>,

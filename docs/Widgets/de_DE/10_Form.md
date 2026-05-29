@@ -45,7 +45,7 @@ Unterstützte globale HTML-Attribute:
 #### Html Example
 
 ```html
-<form action="log_form" validate="Send">
+<form action="log_form" validate="Send" class="con-column">
   <input name="email" type="email" required />
   <button type="submit">Send</button>
 </form>

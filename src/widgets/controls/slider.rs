@@ -31,7 +31,9 @@ struct SliderDotNode;
 /// Thumb role for single/range slider handling.
 #[derive(Component, Reflect, Debug, Clone, Copy, Eq, PartialEq)]
 enum SliderThumbRole {
+    /// Variant `Start`.
     Start,
+    /// Variant `End`.
     End,
 }
 
@@ -75,6 +77,7 @@ struct SliderLayoutCache {
 }
 
 impl PreviousSliderState {
+    /// Handles `from_slider` in the extended UI workflow.
     fn from_slider(slider: &Slider) -> Self {
         Self {
             slider_type: slider.slider_type,
@@ -319,6 +322,7 @@ fn internal_node_creation_system(
     }
 }
 
+/// Handles `spawn_thumb` in the extended UI workflow.
 fn spawn_thumb(
     builder: &mut ChildSpawnerCommands,
     slider: &Slider,
@@ -362,6 +366,7 @@ fn spawn_thumb(
             ),
         ))
         .observe(on_thumb_drag)
+        .observe(on_thumb_click)
         .observe(on_thumb_over)
         .observe(on_thumb_out)
         .with_children(|builder| {
@@ -546,6 +551,7 @@ fn on_track_drag(
     trigger.propagate(false);
 }
 
+/// Handles `apply_from_track_pointer` in the extended UI workflow.
 fn apply_from_track_pointer(
     track_entity: Entity,
     sf: f32,
@@ -609,7 +615,7 @@ fn apply_from_track_pointer(
 
 /// Handles dragging the slider thumb to update value.
 fn on_thumb_drag(
-    event: On<Pointer<Drag>>,
+    mut event: On<Pointer<Drag>>,
     parent_q: Query<&ChildOf>,
     track_q: Query<(&ComputedNode, &BindToID), With<SliderTrackContainer>>,
     thumb_node_q: Query<&ComputedNode, With<SliderThumb>>,
@@ -673,6 +679,14 @@ fn on_thumb_drag(
         &mut fill_q,
         &mut thumb_q,
     );
+
+    // Prevent thumb drags from bubbling to the track drag observer.
+    event.propagate(false);
+}
+
+/// Stops thumb click events from reaching the track.
+fn on_thumb_click(mut event: On<Pointer<Click>>) {
+    event.propagate(false);
 }
 
 /// Tracks thumb hover state.
@@ -721,29 +735,55 @@ fn apply_from_track_left_x(
 
         sanitize_slider(&mut slider);
 
-        let role = resolve_target_role(
-            &slider,
-            preferred_role,
-            desired_left_x,
-            track_width,
-            thumb_width,
-            ui_id.0,
-            thumb_q,
-        );
-
         let next_value = value_from_left(desired_left_x, track_width, thumb_width, &slider);
         match slider.slider_type {
             SliderType::Default => {
                 slider.value = next_value;
             }
-            SliderType::Range => match role {
-                SliderThumbRole::Start => {
-                    slider.range_start = next_value.min(slider.range_end);
+            SliderType::Range => {
+                if preferred_role.is_none() {
+                    // Track interactions move the full selected span.
+                    let current_center = (slider.range_start + slider.range_end) * 0.5;
+                    let delta = next_value - current_center;
+                    let span = slider.range_end - slider.range_start;
+                    let max_start = (slider.max - span).max(slider.min);
+
+                    let mut next_start = slider.range_start + delta;
+                    let mut next_end = slider.range_end + delta;
+
+                    if next_start < slider.min {
+                        let shift = slider.min - next_start;
+                        next_start += shift;
+                        next_end += shift;
+                    }
+                    if next_end > slider.max {
+                        let shift = next_end - slider.max;
+                        next_start -= shift;
+                    }
+
+                    slider.range_start = next_start.clamp(slider.min, max_start);
+                    slider.range_end = slider.range_start + span;
+                } else {
+                    let role = resolve_target_role(
+                        &slider,
+                        preferred_role,
+                        desired_left_x,
+                        track_width,
+                        thumb_width,
+                        ui_id.0,
+                        thumb_q,
+                    );
+
+                    match role {
+                        SliderThumbRole::Start => {
+                            slider.range_start = next_value.min(slider.range_end - slider.step);
+                        }
+                        SliderThumbRole::End => {
+                            slider.range_end = next_value.max(slider.range_start + slider.step);
+                        }
+                    }
                 }
-                SliderThumbRole::End => {
-                    slider.range_end = next_value.max(slider.range_start);
-                }
-            },
+            }
         }
 
         apply_slider_visual_state(
@@ -758,6 +798,7 @@ fn apply_from_track_left_x(
     }
 }
 
+/// Handles `resolve_target_role` in the extended UI workflow.
 fn resolve_target_role(
     slider: &Slider,
     preferred_role: Option<SliderThumbRole>,
@@ -1187,6 +1228,7 @@ fn update_thumb_tooltips(
     }
 }
 
+/// Handles `value_from_left` in the extended UI workflow.
 fn value_from_left(desired_left: f32, track_width: f32, thumb_width: f32, slider: &Slider) -> f32 {
     let track_width = track_width.max(1.0);
     let thumb_width = thumb_width.max(1.0).min(track_width);
@@ -1199,6 +1241,7 @@ fn value_from_left(desired_left: f32, track_width: f32, thumb_width: f32, slider
     snap_to_step(raw, slider)
 }
 
+/// Handles `normalize_value` in the extended UI workflow.
 fn normalize_value(value: f32, min: f32, max: f32) -> f32 {
     let span = (max - min).abs();
     if span <= f32::EPSILON {
@@ -1208,12 +1251,14 @@ fn normalize_value(value: f32, min: f32, max: f32) -> f32 {
     }
 }
 
+/// Handles `snap_to_step` in the extended UI workflow.
 fn snap_to_step(raw: f32, slider: &Slider) -> f32 {
     let step = slider.step.abs().max(f32::EPSILON);
     let snapped = slider.min + ((raw - slider.min) / step).round() * step;
     snapped.clamp(slider.min, slider.max)
 }
 
+/// Handles `sanitize_slider` in the extended UI workflow.
 fn sanitize_slider(slider: &mut Slider) {
     if slider.max < slider.min {
         std::mem::swap(&mut slider.min, &mut slider.max);
@@ -1229,6 +1274,7 @@ fn sanitize_slider(slider: &mut Slider) {
     }
 }
 
+/// Handles `format_slider_value` in the extended UI workflow.
 fn format_slider_value(value: f32) -> String {
     let rounded = (value * 100.0).round() / 100.0;
     if rounded.fract().abs() < 0.0001 {
@@ -1245,6 +1291,7 @@ fn format_slider_value(value: f32) -> String {
     txt
 }
 
+/// Handles `effective_dot_segments` in the extended UI workflow.
 fn effective_dot_segments(slider: &Slider, requested: u32) -> usize {
     let requested = requested.max(1) as usize;
     let span = (slider.max - slider.min).abs();

@@ -11,9 +11,12 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::sync::Mutex;
 
+/// Defines the available `ThemeSwitchRequest` variants for this part of the UI runtime.
 #[derive(Debug, Clone)]
 enum ThemeSwitchRequest {
+    /// Variant `ByName`.
     ByName(String),
+    /// Variant `Next`.
     Next,
 }
 
@@ -32,6 +35,7 @@ pub struct ThemeProviderState {
 }
 
 impl Default for ThemeProviderState {
+    /// Handles `default` in the extended UI workflow.
     fn default() -> Self {
         Self {
             themes_fs_path: "assets/themes".to_string(),
@@ -45,22 +49,57 @@ impl Default for ThemeProviderState {
 }
 
 impl ThemeProviderState {
+    /// Handles `themes_asset_dir` in the extended UI workflow.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// // Call `themes_asset_dir` with values from your app state and world context.
+    /// ```
     pub fn themes_asset_dir(&self) -> &str {
         self.themes_asset_dir.as_str()
     }
 
+    /// Handles `known_themes` in the extended UI workflow.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// // Call `known_themes` with values from your app state and world context.
+    /// ```
     pub fn known_themes(&self) -> HashSet<String> {
         self.themes.keys().cloned().collect()
     }
 
+    /// Handles `default_theme` in the extended UI workflow.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// // Call `default_theme` with values from your app state and world context.
+    /// ```
     pub fn default_theme(&self) -> Option<&str> {
         self.default_theme.as_deref()
     }
 
+    /// Handles `active_theme` in the extended UI workflow.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// // Call `active_theme` with values from your app state and world context.
+    /// ```
     pub fn active_theme(&self) -> Option<&str> {
         self.active_theme.as_deref()
     }
 
+    /// Handles `set_default_theme` in the extended UI workflow.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// // Call `set_default_theme` with values from your app state and world context.
+    /// ```
     pub fn set_default_theme(&mut self, requested: &str) {
         let requested = requested.trim();
         if requested.is_empty() {
@@ -78,6 +117,7 @@ impl ThemeProviderState {
         }
     }
 
+    /// Handles `ensure_default_theme` in the extended UI workflow.
     fn ensure_default_theme(&mut self) {
         if let Some(current) = self.default_theme.as_deref() {
             if self.themes.contains_key(current) {
@@ -88,6 +128,7 @@ impl ThemeProviderState {
         self.default_theme = self.themes.keys().min().cloned();
     }
 
+    /// Handles `resolve_theme_or_default` in the extended UI workflow.
     fn resolve_theme_or_default(&self, requested: &str) -> Option<String> {
         let requested = requested.trim();
         if self.themes.contains_key(requested) {
@@ -103,6 +144,7 @@ impl ThemeProviderState {
         self.themes.keys().min().cloned()
     }
 
+    /// Handles `next_theme_name` in the extended UI workflow.
     fn next_theme_name(&self) -> Option<String> {
         let mut names: Vec<&String> = self.themes.keys().collect();
         names.sort();
@@ -124,6 +166,7 @@ impl ThemeProviderState {
         names.first().cloned().map(|name| name.to_string())
     }
 
+    /// Handles `theme_handle` in the extended UI workflow.
     fn theme_handle(&self, name: &str) -> Option<Handle<CssAsset>> {
         self.themes.get(name).cloned()
     }
@@ -159,10 +202,12 @@ impl ThemeProvider {
 }
 
 impl UiProvider for ThemeProvider {
+    /// Handles `tag` in the extended UI workflow.
     fn tag(&self) -> &'static str {
         "theme-provider"
     }
 
+    /// Handles `rules` in the extended UI workflow.
     fn rules(&self) -> ProviderRules {
         ProviderRules {
             requires_body_child: true,
@@ -171,6 +216,7 @@ impl UiProvider for ThemeProvider {
         }
     }
 
+    /// Handles `resolve` in the extended UI workflow.
     fn resolve(&self, ctx: ProviderResolveContext<'_>) -> Result<ProviderEffect, String> {
         let requested = ctx
             .active_theme()
@@ -228,6 +274,13 @@ impl UiProvider for ThemeProvider {
     }
 }
 
+/// Handles `refresh_theme_provider_state` in the extended UI workflow.
+///
+/// # Examples
+///
+/// ```rust
+/// // Call `refresh_theme_provider_state` with values from your app state and world context.
+/// ```
 pub(crate) fn refresh_theme_provider_state(
     mut state: ResMut<ThemeProviderState>,
     config: Res<ExtendedUiConfiguration>,
@@ -276,6 +329,13 @@ pub(crate) fn refresh_theme_provider_state(
     }
 }
 
+/// Handles `apply_theme_switch_requests` in the extended UI workflow.
+///
+/// # Examples
+///
+/// ```rust
+/// // Call `apply_theme_switch_requests` with values from your app state and world context.
+/// ```
 pub(crate) fn apply_theme_switch_requests(
     mut state: ResMut<ThemeProviderState>,
     mut css_query: Query<&mut CssSource>,
@@ -332,6 +392,7 @@ pub(crate) fn apply_theme_switch_requests(
     }
 }
 
+/// Handles `normalize_theme_names` in the extended UI workflow.
 fn normalize_theme_names(names: &[String]) -> Vec<String> {
     let mut out = Vec::new();
     for name in names {
@@ -356,6 +417,7 @@ fn normalize_theme_names(names: &[String]) -> Vec<String> {
     out
 }
 
+/// Handles `discover_theme_names` in the extended UI workflow.
 fn discover_theme_names(folder: &str) -> Vec<String> {
     let Ok(entries) = fs::read_dir(folder) else {
         return Vec::new();
@@ -388,6 +450,7 @@ fn discover_theme_names(folder: &str) -> Vec<String> {
     themes
 }
 
+/// Handles `normalize_themes_asset_dir` in the extended UI workflow.
 fn normalize_themes_asset_dir(path: &str) -> String {
     let normalized = path.replace('\\', "/");
     let trimmed = normalized

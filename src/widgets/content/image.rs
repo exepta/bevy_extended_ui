@@ -24,7 +24,9 @@ struct AltTextChild(Entity);
 /// Tracks what we *last applied* so we don't spam updates/logs every frame.
 #[derive(Component, Copy, Clone, Debug, PartialEq, Eq)]
 enum ImgFallbackState {
+    /// Variant `None`.
     None,
+    /// Variant `AltShown`.
     AltShown,
 }
 
@@ -352,6 +354,7 @@ fn assign_image_from_src(
     }
 }
 
+/// Handles `input_allows_image_preview` in the extended UI workflow.
 fn input_allows_image_preview(input: &InputField) -> bool {
     input.extensions.iter().any(|ext| {
         let ext = ext.trim().trim_start_matches('.').to_ascii_lowercase();
@@ -359,6 +362,7 @@ fn input_allows_image_preview(input: &InputField) -> bool {
     })
 }
 
+/// Handles `path_is_supported_preview_image` in the extended UI workflow.
 fn path_is_supported_preview_image(path: &str) -> bool {
     std::path::Path::new(path)
         .extension()
@@ -367,6 +371,7 @@ fn path_is_supported_preview_image(path: &str) -> bool {
         .is_some_and(|ext| matches!(ext.as_str(), "jpg" | "jpeg" | "png"))
 }
 
+/// Handles `is_supported_preview_source` in the extended UI workflow.
 fn is_supported_preview_source(value: &str) -> bool {
     value.starts_with("data:") || path_is_supported_preview_image(value)
 }

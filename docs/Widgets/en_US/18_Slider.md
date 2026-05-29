@@ -45,7 +45,7 @@ Supported global HTML attributes:
 
 ### WASM Previews
 
-### Slider Example
+### Slider
 <iframe
   id="slider"
   title="Slider"
@@ -58,7 +58,8 @@ Supported global HTML attributes:
 #### Html Example
 
 ```html
-<slider min="0" max="100" value="25" step="1" onchange="log_slider"></slider>
+<slider min="0" max="100" value="25" step="1"></slider>
+<slider value="0" min="0" max="100" step="1" dots="4" show-labels="true" tip="false"></slider>
 ```
 
 #### Rust Example
@@ -71,6 +72,54 @@ fn spawn_slider_widget(mut commands: Commands) {
             max: 100.0,
             value: 25.0,
             step: 1.0,
+            ..default()
+        },
+        Node::default(),
+    ));
+    commands.spawn((
+        Slider {
+            min: 0.0,
+            max: 100.0,
+            value: 0.0,
+            step: 1.0,
+            dots: Some(4),
+            show_labels: true,
+            show_tip: false,
+            ..default()
+        },
+        Node::default(),
+    ));
+}
+```
+
+### Slider Range
+<iframe
+id="slider-range"
+title="Slider"
+src="{base.url}/examples/base"
+width="100%"
+height="420"
+loading="lazy">
+</iframe>
+
+#### Html Example
+
+```html
+<slider id="range-slider-demo" type="range" value="20 - 40" dots="4" show-labels="true" dot-anchor="bottom"></slider>
+```
+
+#### Rust Example
+
+```rust
+fn spawn_slider_widget(mut commands: Commands) {
+    commands.spawn((
+        Slider {
+            slider_type: SliderType::Range,
+            range_start: 20.0,
+            range_end: 40.0,
+            dots: Some(4),
+            show_labels: true,
+            dot_anchor: SliderDotAnchor::Bottom,
             ..default()
         },
         Node::default(),
