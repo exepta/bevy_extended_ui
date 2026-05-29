@@ -64,6 +64,7 @@ const SELECTOR_INVALID: u8 = 1 << 5;
 static SELECTOR_METADATA_CACHE: Lazy<RwLock<HashMap<String, SelectorMetadata>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
 
+/// Represents the `SelectorMetadata` data structure used by the extended UI system.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 struct SelectorMetadata {
     specificity: u32,
@@ -185,6 +186,7 @@ struct CssCursorState {
 #[derive(Component)]
 pub struct StyleRefreshOnNodeAdded;
 
+/// Represents the `TextTransformState` data structure used by the extended UI system.
 #[derive(Component, Debug, Clone, Default)]
 pub struct TextTransformState {
     source: String,
@@ -199,6 +201,7 @@ struct BackgroundGradientApplied;
 #[derive(Component)]
 struct BackgroundImageApplied;
 
+/// Represents the `BackdropBlurUniform` data structure used by the extended UI system.
 #[derive(ShaderType, Clone, Copy, Debug)]
 struct BackdropBlurUniform {
     blur_radius_px: f32,
@@ -208,6 +211,7 @@ struct BackdropBlurUniform {
     tint: Vec4,
 }
 
+/// Represents the `BackdropBlurMaterial` data structure used by the extended UI system.
 #[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
 struct BackdropBlurMaterial {
     #[uniform(0)]
@@ -221,11 +225,13 @@ struct BackdropBlurMaterial {
 }
 
 impl UiMaterial for BackdropBlurMaterial {
+    /// Handles `fragment_shader` in the extended UI workflow.
     fn fragment_shader() -> ShaderRef {
         BACKDROP_BLUR_SHADER_HANDLE.into()
     }
 }
 
+/// Represents the `BackdropCaptureState` data structure used by the extended UI system.
 #[derive(Resource, Default, Clone, ExtractResource)]
 struct BackdropCaptureState {
     screen_texture: Option<Handle<Image>>,
@@ -234,18 +240,23 @@ struct BackdropCaptureState {
     warmup_frames: u8,
 }
 
+/// Represents the `BackdropCaptureCopyPass` data structure used by the extended UI system.
 #[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
 struct BackdropCaptureCopyPass;
 
+/// Represents the `BackdropDeferredDrawPass` data structure used by the extended UI system.
 #[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
 struct BackdropDeferredDrawPass;
 
+/// Represents the `BackdropCaptureCopyNode` data structure used by the extended UI system.
 #[derive(Default)]
 struct BackdropCaptureCopyNode;
 
+/// Represents the `BackdropDeferredDrawNode` data structure used by the extended UI system.
 #[derive(Default)]
 struct BackdropDeferredDrawNode;
 
+/// Represents the `DeferredBackdropUiPhases` data structure used by the extended UI system.
 #[derive(Resource, Default)]
 struct DeferredBackdropUiPhases(HashMap<RetainedViewEntity, SortedRenderPhase<TransparentUi>>);
 
@@ -348,6 +359,7 @@ fn update_css_cursor_icons(
     }
 }
 
+/// Handles `mark_new_nodes_for_style_refresh` in the extended UI workflow.
 #[cfg(not(all(feature = "wasm-default", target_arch = "wasm32")))]
 fn mark_new_nodes_for_style_refresh(
     mut commands: Commands,
@@ -702,6 +714,7 @@ pub fn update_style_animations(
     }
 }
 
+/// Handles `apply_calc_styles_system` in the extended UI workflow.
 fn apply_calc_styles_system(
     mut query: Query<(
         Entity,
@@ -858,6 +871,7 @@ fn apply_calc_styles_system(
     }
 }
 
+/// Handles `resolve_layout_viewport` in the extended UI workflow.
 #[cfg(all(feature = "wasm-default", target_arch = "wasm32"))]
 fn resolve_layout_viewport(window_q: &Query<&Window, With<PrimaryWindow>>) -> Option<Vec2> {
     let window = window_q.single().ok()?;
@@ -869,6 +883,7 @@ fn resolve_layout_viewport(window_q: &Query<&Window, With<PrimaryWindow>>) -> Op
     not(feature = "wasm-default"),
     target_arch = "wasm32"
 ))]
+/// Handles `resolve_layout_viewport` in the extended UI workflow.
 fn resolve_layout_viewport(_window_q: &Query<&Window, With<PrimaryWindow>>) -> Option<Vec2> {
     let window = web_sys::window()?;
     let width = window.inner_width().ok()?.as_f64()? as f32;
@@ -876,23 +891,27 @@ fn resolve_layout_viewport(_window_q: &Query<&Window, With<PrimaryWindow>>) -> O
     Some(Vec2::new(width, height))
 }
 
+/// Handles `resolve_layout_viewport` in the extended UI workflow.
 #[cfg(all(feature = "wasm-breakpoints", not(target_arch = "wasm32")))]
 fn resolve_layout_viewport(window_q: &Query<&Window, With<PrimaryWindow>>) -> Option<Vec2> {
     let window = window_q.single().ok()?;
     Some(window.resolution.size())
 }
 
+/// Handles `resolve_layout_viewport` in the extended UI workflow.
 #[cfg(all(not(feature = "wasm-breakpoints"), feature = "css-breakpoints"))]
 fn resolve_layout_viewport(window_q: &Query<&Window, With<PrimaryWindow>>) -> Option<Vec2> {
     let window = window_q.single().ok()?;
     Some(window.resolution.size())
 }
 
+/// Handles `resolve_layout_viewport` in the extended UI workflow.
 #[cfg(all(not(feature = "wasm-breakpoints"), not(feature = "css-breakpoints")))]
 fn resolve_layout_viewport(_window_q: &Query<&Window, With<PrimaryWindow>>) -> Option<Vec2> {
     None
 }
 
+/// Handles `clear_image_node_texture` in the extended UI workflow.
 #[inline]
 fn clear_image_node_texture(img_node: &mut ImageNode) {
     if img_node.image.id() != TRANSPARENT_IMAGE_HANDLE.id() {
@@ -900,6 +919,7 @@ fn clear_image_node_texture(img_node: &mut ImageNode) {
     }
 }
 
+/// Handles `apply_background_gradients_system` in the extended UI workflow.
 fn apply_background_gradients_system(
     mut commands: Commands,
     mut query: Query<(
@@ -1020,6 +1040,7 @@ fn apply_background_gradients_system(
     }
 }
 
+/// Handles `apply_background_images_system` in the extended UI workflow.
 fn apply_background_images_system(
     mut commands: Commands,
     mut query: Query<(
@@ -1205,6 +1226,7 @@ fn apply_background_images_system(
     }
 }
 
+/// Handles `resolved_active_style` in the extended UI workflow.
 fn resolved_active_style<'a>(
     ui_style: &'a UiStyle,
     transition_opt: Option<&'a StyleTransition>,
@@ -1219,6 +1241,7 @@ fn resolved_active_style<'a>(
     ui_style.active_style.as_ref()
 }
 
+/// Handles `sync_backdrop_blur_materials_system` in the extended UI workflow.
 fn sync_backdrop_blur_materials_system(
     mut commands: Commands,
     window_q: Query<&Window, With<PrimaryWindow>>,
@@ -1339,6 +1362,7 @@ fn sync_backdrop_blur_materials_system(
     }
 }
 
+/// Handles `ensure_backdrop_capture_texture_system` in the extended UI workflow.
 fn ensure_backdrop_capture_texture_system(
     window_q: Query<&Window, With<PrimaryWindow>>,
     blur_query: Query<(&UiStyle, Option<&StyleTransition>, Option<&StyleAnimation>)>,
@@ -1419,6 +1443,7 @@ fn ensure_backdrop_capture_texture_system(
 }
 
 impl ViewNode for BackdropCaptureCopyNode {
+    /// Type alias used for `ViewQuery` values in the extended UI API.
     type ViewQuery = (
         Entity,
         &'static ExtractedCamera,
@@ -1426,6 +1451,7 @@ impl ViewNode for BackdropCaptureCopyNode {
         Option<&'static UiCameraView>,
     );
 
+    /// Handles `run` in the extended UI workflow.
     fn run(
         &self,
         _graph: &mut RenderGraphContext,
@@ -1497,6 +1523,7 @@ impl ViewNode for BackdropCaptureCopyNode {
     }
 }
 
+/// Handles `split_backdrop_ui_phase_items_system` in the extended UI workflow.
 fn split_backdrop_ui_phase_items_system(
     mut phases: ResMut<ViewSortedRenderPhases<TransparentUi>>,
     draw_functions: Res<DrawFunctions<TransparentUi>>,
@@ -1533,6 +1560,7 @@ fn split_backdrop_ui_phase_items_system(
 }
 
 impl ViewNode for BackdropDeferredDrawNode {
+    /// Type alias used for `ViewQuery` values in the extended UI API.
     type ViewQuery = (
         Entity,
         &'static ViewTarget,
@@ -1540,6 +1568,7 @@ impl ViewNode for BackdropDeferredDrawNode {
         Option<&'static UiCameraView>,
     );
 
+    /// Handles `run` in the extended UI workflow.
     fn run(
         &self,
         _graph: &mut RenderGraphContext,
@@ -1578,8 +1607,10 @@ impl ViewNode for BackdropDeferredDrawNode {
     }
 }
 
+/// Type alias used for `StyleCandidate` values in the extended UI API.
 type StyleCandidate<'a> = (&'a String, u32, usize);
 
+/// Handles `sort_style_candidates` in the extended UI workflow.
 fn sort_style_candidates(candidates: &mut [StyleCandidate<'_>]) {
     candidates.sort_by(|a, b| match a.2.cmp(&b.2) {
         std::cmp::Ordering::Equal => a.1.cmp(&b.1),
@@ -1587,6 +1618,7 @@ fn sort_style_candidates(candidates: &mut [StyleCandidate<'_>]) {
     });
 }
 
+/// Handles `merge_style_candidates` in the extended UI workflow.
 fn merge_style_candidates(
     final_style: &mut Style,
     ui_style: &UiStyle,
@@ -1604,6 +1636,7 @@ fn merge_style_candidates(
     }
 }
 
+/// Handles `apply_transform_style_if_blocked` in the extended UI workflow.
 fn apply_transform_style_if_blocked(
     qs: &mut ParamSet<(Query<UiStyleComponents>,)>,
     entity: Entity,
@@ -1621,10 +1654,12 @@ fn apply_transform_style_if_blocked(
     }
 }
 
+/// Handles `shrink_axis` in the extended UI workflow.
 fn shrink_axis(size: f32, min_inset: f32, max_inset: f32) -> f32 {
     (size - min_inset - max_inset).max(0.0)
 }
 
+/// Handles `gradient_cache_key` in the extended UI workflow.
 fn gradient_cache_key(gradient: &LinearGradient, size: UVec2) -> String {
     let mut key = format!("__linear-gradient__:{:.4}", gradient.angle);
     for stop in &gradient.stops {
@@ -1648,6 +1683,7 @@ fn gradient_cache_key(gradient: &LinearGradient, size: UVec2) -> String {
     key
 }
 
+/// Handles `background_image_cache_key` in the extended UI workflow.
 fn background_image_cache_key(
     source: &Handle<Image>,
     container_size: UVec2,
@@ -1664,6 +1700,7 @@ fn background_image_cache_key(
     )
 }
 
+/// Handles `resolve_background_draw_size` in the extended UI workflow.
 fn resolve_background_draw_size(
     size: &BackgroundSize,
     source: UVec2,
@@ -1708,6 +1745,7 @@ fn resolve_background_draw_size(
     )
 }
 
+/// Handles `resolve_background_size_value` in the extended UI workflow.
 fn resolve_background_size_value(
     value: &BackgroundSizeValue,
     area: f32,
@@ -1720,6 +1758,7 @@ fn resolve_background_size_value(
     }
 }
 
+/// Handles `resolve_background_position` in the extended UI workflow.
 fn resolve_background_position(
     position: &BackgroundPosition,
     area: UVec2,
@@ -1736,6 +1775,7 @@ fn resolve_background_position(
     Vec2::new(x, y)
 }
 
+/// Handles `resolve_background_position_axis` in the extended UI workflow.
 fn resolve_background_position_axis(
     value: &BackgroundPositionValue,
     area: f32,
@@ -1748,6 +1788,7 @@ fn resolve_background_position_axis(
     }
 }
 
+/// Handles `render_background_image` in the extended UI workflow.
 fn render_background_image(
     source: &Image,
     container_size: UVec2,
@@ -1853,6 +1894,7 @@ fn render_background_image(
     Some(image)
 }
 
+/// Handles `render_linear_gradient_image` in the extended UI workflow.
 fn render_linear_gradient_image(
     gradient: &LinearGradient,
     size: UVec2,
@@ -1901,12 +1943,14 @@ fn render_linear_gradient_image(
     image
 }
 
+/// Represents the `ResolvedGradientStop` data structure used by the extended UI system.
 #[derive(Clone, Copy)]
 struct ResolvedGradientStop {
     color: Srgba,
     position: f32,
 }
 
+/// Handles `resolve_gradient_stops` in the extended UI workflow.
 fn resolve_gradient_stops(
     gradient: &LinearGradient,
     line_length: f32,
@@ -2002,6 +2046,7 @@ fn resolve_gradient_stops(
     resolved
 }
 
+/// Handles `sample_gradient_color` in the extended UI workflow.
 fn sample_gradient_color(stops: &[ResolvedGradientStop], t: f32) -> Srgba {
     if stops.is_empty() {
         return Srgba::new(0.0, 0.0, 0.0, 0.0);
@@ -2023,6 +2068,7 @@ fn sample_gradient_color(stops: &[ResolvedGradientStop], t: f32) -> Srgba {
     stops.last().map(|stop| stop.color).unwrap_or_default()
 }
 
+/// Handles `lerp_srgba` in the extended UI workflow.
 fn lerp_srgba(a: Srgba, b: Srgba, t: f32) -> Srgba {
     Srgba {
         red: lerp(a.red, b.red, t),
@@ -2032,6 +2078,7 @@ fn lerp_srgba(a: Srgba, b: Srgba, t: f32) -> Srgba {
     }
 }
 
+/// Handles `apply_calc_length` in the extended UI workflow.
 fn apply_calc_length(expr: Option<&CalcExpr>, ctx: CalcContext, target: &mut Val) {
     if let Some(expr) = expr {
         if let Some(px) = expr.eval_length(ctx) {
@@ -2247,10 +2294,12 @@ fn blend_animation_style(from: &Style, to: &Style, t: f32) -> Style {
     blended
 }
 
+/// Handles `style_requests_outline` in the extended UI workflow.
 fn style_requests_outline(style: &Style) -> bool {
     style.outline_width.is_some() || style.outline_offset.is_some() || style.outline_color.is_some()
 }
 
+/// Handles `build_outline_from_style` in the extended UI workflow.
 fn build_outline_from_style(style: &Style) -> Outline {
     let default_outline = Outline::default();
 
@@ -2601,6 +2650,7 @@ fn lerp(from: f32, to: f32, t: f32) -> f32 {
     from + (to - from) * t
 }
 
+/// Handles `selector_metadata` in the extended UI workflow.
 fn selector_metadata(selector: &str) -> SelectorMetadata {
     if let Some(cached) = SELECTOR_METADATA_CACHE
         .read()
@@ -2617,6 +2667,7 @@ fn selector_metadata(selector: &str) -> SelectorMetadata {
     metadata
 }
 
+/// Handles `compute_selector_metadata` in the extended UI workflow.
 fn compute_selector_metadata(selector: &str) -> SelectorMetadata {
     if selector.contains("::") {
         return SelectorMetadata {
@@ -2889,6 +2940,7 @@ pub fn propagate_style_inheritance(
     }
 }
 
+/// Handles `resolve_inherited_style_for_entity` in the extended UI workflow.
 fn resolve_inherited_style_for_entity(
     entity: Entity,
     parent_query: &Query<&ChildOf>,
@@ -2924,6 +2976,7 @@ fn resolve_inherited_style_for_entity(
     has_inherited.then_some(inherited_style)
 }
 
+/// Handles `merge_entity_style_for_propagation` in the extended UI workflow.
 fn merge_entity_style_for_propagation(
     entity: Entity,
     style_to_propagate: &mut Style,
@@ -3097,6 +3150,7 @@ fn propagate_recursive(
     }
 }
 
+/// Handles `sync_text_transform_entity` in the extended UI workflow.
 fn sync_text_transform_entity(
     entity: Entity,
     transform: Option<TextTransform>,
@@ -3153,6 +3207,7 @@ fn sync_text_transform_entity(
     }
 }
 
+/// Handles `apply_text_transform` in the extended UI workflow.
 fn apply_text_transform(transform: TextTransform, input: &str) -> String {
     match transform {
         TextTransform::None => input.to_string(),
@@ -3162,6 +3217,7 @@ fn apply_text_transform(transform: TextTransform, input: &str) -> String {
     }
 }
 
+/// Handles `capitalize_words` in the extended UI workflow.
 fn capitalize_words(input: &str) -> String {
     let mut out = String::with_capacity(input.len());
     let mut start_word = true;

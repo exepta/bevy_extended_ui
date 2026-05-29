@@ -32,6 +32,7 @@ pub struct ComponentDefinition {
 pub struct ExtendedComponentPlugin;
 
 impl Plugin for ExtendedComponentPlugin {
+    /// Handles `build` in the extended UI workflow.
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, load_framework_index);
     }
@@ -91,6 +92,7 @@ pub fn load_component_definitions(
     Ok(defs)
 }
 
+/// Handles `collect_component_rs_files` in the extended UI workflow.
 fn collect_component_rs_files(root: &Path, out: &mut Vec<PathBuf>) -> std::io::Result<()> {
     for entry in fs::read_dir(root)? {
         let entry = entry?;
@@ -109,6 +111,7 @@ fn collect_component_rs_files(root: &Path, out: &mut Vec<PathBuf>) -> std::io::R
     Ok(())
 }
 
+/// Handles `parse_component_definition_file` in the extended UI workflow.
 fn parse_component_definition_file(
     path: &Path,
     root: &Path,
@@ -170,6 +173,7 @@ fn parse_component_definition_file(
     })
 }
 
+/// Handles `ensure_ui_component_macro_used` in the extended UI workflow.
 fn ensure_ui_component_macro_used(path: &Path, text: &str) -> Result<(), String> {
     if UI_COMPONENT_MARKER_RE.is_match(text) {
         return Ok(());
@@ -181,6 +185,7 @@ fn ensure_ui_component_macro_used(path: &Path, text: &str) -> Result<(), String>
     ))
 }
 
+/// Handles `validate_component_name_contract` in the extended UI workflow.
 fn validate_component_name_contract(path: &Path, template_file: &str) -> Result<(), String> {
     let file_name = path
         .file_name()
@@ -256,14 +261,17 @@ pub fn load_component_template_html(
         .map_err(|err| format!("Failed to read component html `{}`: {err}", path.display()))
 }
 
+/// Handles `trim_slashes` in the extended UI workflow.
 fn trim_slashes(path: &str) -> String {
     path.trim_matches('/').trim_matches('\\').to_string()
 }
 
+/// Handles `normalize_path_like` in the extended UI workflow.
 fn normalize_path_like(path: &str) -> String {
     path.replace('\\', "/").trim_matches('/').to_string()
 }
 
+/// Handles `resolve_component_asset_candidate` in the extended UI workflow.
 fn resolve_component_asset_candidate(
     root: &Path,
     def: &ComponentDefinition,

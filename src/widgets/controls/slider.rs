@@ -31,7 +31,9 @@ struct SliderDotNode;
 /// Thumb role for single/range slider handling.
 #[derive(Component, Reflect, Debug, Clone, Copy, Eq, PartialEq)]
 enum SliderThumbRole {
+    /// Variant `Start`.
     Start,
+    /// Variant `End`.
     End,
 }
 
@@ -75,6 +77,7 @@ struct SliderLayoutCache {
 }
 
 impl PreviousSliderState {
+    /// Handles `from_slider` in the extended UI workflow.
     fn from_slider(slider: &Slider) -> Self {
         Self {
             slider_type: slider.slider_type,
@@ -319,6 +322,7 @@ fn internal_node_creation_system(
     }
 }
 
+/// Handles `spawn_thumb` in the extended UI workflow.
 fn spawn_thumb(
     builder: &mut ChildSpawnerCommands,
     slider: &Slider,
@@ -547,6 +551,7 @@ fn on_track_drag(
     trigger.propagate(false);
 }
 
+/// Handles `apply_from_track_pointer` in the extended UI workflow.
 fn apply_from_track_pointer(
     track_entity: Entity,
     sf: f32,
@@ -793,6 +798,7 @@ fn apply_from_track_left_x(
     }
 }
 
+/// Handles `resolve_target_role` in the extended UI workflow.
 fn resolve_target_role(
     slider: &Slider,
     preferred_role: Option<SliderThumbRole>,
@@ -1222,6 +1228,7 @@ fn update_thumb_tooltips(
     }
 }
 
+/// Handles `value_from_left` in the extended UI workflow.
 fn value_from_left(desired_left: f32, track_width: f32, thumb_width: f32, slider: &Slider) -> f32 {
     let track_width = track_width.max(1.0);
     let thumb_width = thumb_width.max(1.0).min(track_width);
@@ -1234,6 +1241,7 @@ fn value_from_left(desired_left: f32, track_width: f32, thumb_width: f32, slider
     snap_to_step(raw, slider)
 }
 
+/// Handles `normalize_value` in the extended UI workflow.
 fn normalize_value(value: f32, min: f32, max: f32) -> f32 {
     let span = (max - min).abs();
     if span <= f32::EPSILON {
@@ -1243,12 +1251,14 @@ fn normalize_value(value: f32, min: f32, max: f32) -> f32 {
     }
 }
 
+/// Handles `snap_to_step` in the extended UI workflow.
 fn snap_to_step(raw: f32, slider: &Slider) -> f32 {
     let step = slider.step.abs().max(f32::EPSILON);
     let snapped = slider.min + ((raw - slider.min) / step).round() * step;
     snapped.clamp(slider.min, slider.max)
 }
 
+/// Handles `sanitize_slider` in the extended UI workflow.
 fn sanitize_slider(slider: &mut Slider) {
     if slider.max < slider.min {
         std::mem::swap(&mut slider.min, &mut slider.max);
@@ -1264,6 +1274,7 @@ fn sanitize_slider(slider: &mut Slider) {
     }
 }
 
+/// Handles `format_slider_value` in the extended UI workflow.
 fn format_slider_value(value: f32) -> String {
     let rounded = (value * 100.0).round() / 100.0;
     if rounded.fract().abs() < 0.0001 {
@@ -1280,6 +1291,7 @@ fn format_slider_value(value: f32) -> String {
     txt
 }
 
+/// Handles `effective_dot_segments` in the extended UI workflow.
 fn effective_dot_segments(slider: &Slider, requested: u32) -> usize {
     let requested = requested.max(1) as usize;
     let span = (slider.max - slider.min).abs();

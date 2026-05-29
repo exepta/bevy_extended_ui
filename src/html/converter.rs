@@ -343,6 +343,7 @@ fn update_html_ui(
     }
 }
 
+/// Handles `trim_path_separators` in the extended UI workflow.
 #[cfg(feature = "extended-framework")]
 fn trim_path_separators(path: &str) -> String {
     path.trim_matches('/').trim_matches('\\').to_string()
@@ -1556,6 +1557,7 @@ fn parse_max_size_attribute(raw: Option<&str>) -> Option<u64> {
     Some((amount * multiplier).round() as u64)
 }
 
+/// Handles `ensure_meta_class` in the extended UI workflow.
 #[cfg(feature = "extended-dialog")]
 fn ensure_meta_class(meta: &mut HtmlMeta, class_name: &str) {
     let classes = meta.class.get_or_insert_with(Vec::new);
@@ -1654,6 +1656,7 @@ fn with_default_css_first(
     css
 }
 
+/// Handles `dedup_css_handles` in the extended UI workflow.
 #[cfg(feature = "providers")]
 fn dedup_css_handles(css: Vec<Handle<CssAsset>>) -> Vec<Handle<CssAsset>> {
     let mut seen = HashSet::new();
@@ -1668,6 +1671,7 @@ fn dedup_css_handles(css: Vec<Handle<CssAsset>>) -> Vec<Handle<CssAsset>> {
     out
 }
 
+/// Handles `resolve_provider_css_handles` in the extended UI workflow.
 #[cfg(feature = "providers")]
 fn resolve_provider_css_handles(
     html_content: &str,
@@ -1744,6 +1748,7 @@ fn resolve_provider_css_handles(
     handles
 }
 
+/// Handles `validate_provider_rules` in the extended UI workflow.
 #[cfg(feature = "providers")]
 fn validate_provider_rules(
     provider: &dyn UiProvider,
@@ -1778,6 +1783,7 @@ fn validate_provider_rules(
     Ok(())
 }
 
+/// Represents the `ProviderMatch` data structure used by the extended UI system.
 #[cfg(feature = "providers")]
 #[derive(Debug)]
 struct ProviderMatch {
@@ -1786,6 +1792,7 @@ struct ProviderMatch {
     in_head: bool,
 }
 
+/// Handles `collect_provider_matches` in the extended UI workflow.
 #[cfg(feature = "providers")]
 fn collect_provider_matches(html_content: &str, tag: &str) -> Vec<ProviderMatch> {
     let head_ranges = collect_head_ranges(html_content);
@@ -1819,6 +1826,7 @@ fn collect_provider_matches(html_content: &str, tag: &str) -> Vec<ProviderMatch>
         .collect()
 }
 
+/// Handles `collect_head_ranges` in the extended UI workflow.
 #[cfg(feature = "providers")]
 fn collect_head_ranges(html_content: &str) -> Vec<(usize, usize)> {
     let Ok(head_regex) = Regex::new(r"(?is)<\s*head\b[^>]*>.*?</\s*head\s*>") else {
@@ -1831,6 +1839,7 @@ fn collect_head_ranges(html_content: &str) -> Vec<(usize, usize)> {
         .collect()
 }
 
+/// Handles `unwrap_provider_nodes` in the extended UI workflow.
 #[cfg(feature = "providers")]
 fn unwrap_provider_nodes(document: &NodeRef, provider_registry: &UiProviderRegistry) {
     for provider in provider_registry.iter() {
@@ -1857,6 +1866,7 @@ fn unwrap_provider_nodes(document: &NodeRef, provider_registry: &UiProviderRegis
     }
 }
 
+/// Handles `parse_provider_attributes` in the extended UI workflow.
 #[cfg(feature = "providers")]
 fn parse_provider_attributes(raw_attrs: &str) -> HashMap<String, String> {
     let Ok(regex) =
@@ -1881,6 +1891,7 @@ fn parse_provider_attributes(raw_attrs: &str) -> HashMap<String, String> {
     out
 }
 
+/// Handles `extract_direct_child_tags` in the extended UI workflow.
 #[cfg(feature = "providers")]
 fn extract_direct_child_tags(inner_html: &str) -> Vec<String> {
     let Ok(tag_regex) = Regex::new(r"(?is)<\s*(/)?\s*([A-Za-z][A-Za-z0-9:-]*)[^>]*?>") else {
@@ -1917,6 +1928,7 @@ fn extract_direct_child_tags(inner_html: &str) -> Vec<String> {
     direct_children
 }
 
+/// Handles `is_void_html_tag` in the extended UI workflow.
 #[cfg(feature = "providers")]
 fn is_void_html_tag(tag: &str) -> bool {
     matches!(

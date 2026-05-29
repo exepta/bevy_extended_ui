@@ -158,6 +158,7 @@ fn resolve_badge_targets(
     }
 }
 
+/// Handles `resolve_parent_widget_target` in the extended UI workflow.
 fn resolve_parent_widget_target(
     parent_opt: Option<&ChildOf>,
     parents_q: &Query<&ChildOf>,
@@ -204,6 +205,7 @@ fn update_badge_text(
     }
 }
 
+/// Handles `format_badge_label` in the extended UI workflow.
 fn format_badge_label(value: u32, max: u32) -> String {
     if value > max {
         format!("+{}", max)
@@ -212,6 +214,7 @@ fn format_badge_label(value: u32, max: u32) -> String {
     }
 }
 
+/// Handles `anchor_to_class` in the extended UI workflow.
 fn anchor_to_class(anchor: BadgeAnchor) -> &'static str {
     match anchor {
         BadgeAnchor::TopLeft => "badge-anchor-top-left",
@@ -221,6 +224,7 @@ fn anchor_to_class(anchor: BadgeAnchor) -> &'static str {
     }
 }
 
+/// Handles `set_css_classes` in the extended UI workflow.
 fn set_css_classes(classes: &mut CssClass, base: &[String], dynamic: &[&str]) {
     let mut next = base.to_vec();
     for class in dynamic {
@@ -234,6 +238,7 @@ fn set_css_classes(classes: &mut CssClass, base: &[String], dynamic: &[&str]) {
     }
 }
 
+/// Handles `snap_to_pixel` in the extended UI workflow.
 fn snap_to_pixel(value: f32, scale: f32) -> f32 {
     (value * scale).round() / scale
 }

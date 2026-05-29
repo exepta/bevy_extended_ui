@@ -3,6 +3,7 @@ use crate::widgets::{BindToID, IgnoreParentState, UIGenID, UIWidgetState};
 use bevy::prelude::*;
 use std::collections::HashMap;
 
+/// Represents the `BoundStateIndex` data structure used by the extended UI system.
 #[derive(Resource, Default)]
 pub struct BoundStateIndex {
     by_widget: HashMap<usize, Vec<Entity>>,
@@ -32,6 +33,7 @@ impl Plugin for StateService {
     }
 }
 
+/// Handles `remove_from_bound_state_index` in the extended UI workflow.
 fn remove_from_bound_state_index(index: &mut BoundStateIndex, entity: Entity, widget_id: usize) {
     let should_remove = if let Some(entries) = index.by_widget.get_mut(&widget_id) {
         entries.retain(|current| *current != entity);
@@ -45,6 +47,7 @@ fn remove_from_bound_state_index(index: &mut BoundStateIndex, entity: Entity, wi
     }
 }
 
+/// Handles `refresh_bound_state_index` in the extended UI workflow.
 fn refresh_bound_state_index(
     mut index: ResMut<BoundStateIndex>,
     query: Query<(Entity, &BindToID), Or<(Added<BindToID>, Changed<BindToID>)>>,

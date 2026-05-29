@@ -91,6 +91,7 @@ pub struct UiRegistry {
 
 #[allow(deprecated)]
 impl UiRegistry {
+    /// Handles `ensure_legacy_registry_available` in the extended UI workflow.
     #[inline]
     fn ensure_legacy_registry_available() {
         #[cfg(feature = "extended-framework")]
@@ -103,6 +104,13 @@ impl UiRegistry {
     #[deprecated(
         note = "Legacy UiRegistry method. Prefer the extended-framework component entry via index.html."
     )]
+    /// Handles `new` in the extended UI workflow.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// // Call `new` with values from your app state and world context.
+    /// ```
     pub fn new() -> Self {
         Self::ensure_legacy_registry_available();
         Self::default()
@@ -117,6 +125,13 @@ impl UiRegistry {
     #[deprecated(
         note = "Legacy UiRegistry method. Prefer the extended-framework component entry via index.html."
     )]
+    /// Handles `add` in the extended UI workflow.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// // Call `add` with values from your app state and world context.
+    /// ```
     pub fn add(&mut self, name: String, source: HtmlSource) {
         Self::ensure_legacy_registry_available();
         self.collection.insert(
@@ -137,6 +152,13 @@ impl UiRegistry {
     #[deprecated(
         note = "Legacy UiRegistry method. Prefer the extended-framework component entry via index.html."
     )]
+    /// Handles `add_and_use` in the extended UI workflow.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// // Call `add_and_use` with values from your app state and world context.
+    /// ```
     pub fn add_and_use(&mut self, name: String, source: HtmlSource) {
         Self::ensure_legacy_registry_available();
         self.add(
@@ -157,6 +179,13 @@ impl UiRegistry {
     #[deprecated(
         note = "Legacy UiRegistry method. Prefer the extended-framework component entry via index.html."
     )]
+    /// Handles `add_and_use_multiple` in the extended UI workflow.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// // Call `add_and_use_multiple` with values from your app state and world context.
+    /// ```
     pub fn add_and_use_multiple(&mut self, entries: Vec<(String, HtmlSource)>) {
         Self::ensure_legacy_registry_available();
         let mut names = Vec::with_capacity(entries.len());
@@ -184,6 +213,13 @@ impl UiRegistry {
     #[deprecated(
         note = "Legacy UiRegistry method. Prefer the extended-framework component entry via index.html."
     )]
+    /// Handles `remove` in the extended UI workflow.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// // Call `remove` with values from your app state and world context.
+    /// ```
     pub fn remove(&mut self, name: &str) {
         Self::ensure_legacy_registry_available();
         if let Some(current) = &mut self.current {
@@ -207,6 +243,13 @@ impl UiRegistry {
     #[deprecated(
         note = "Legacy UiRegistry method. Prefer the extended-framework component entry via index.html."
     )]
+    /// Handles `remove_and_use` in the extended UI workflow.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// // Call `remove_and_use` with values from your app state and world context.
+    /// ```
     pub fn remove_and_use(&mut self, name: &str, to_switch: &str) {
         Self::ensure_legacy_registry_available();
         self.remove(name);
@@ -219,6 +262,13 @@ impl UiRegistry {
     #[deprecated(
         note = "Legacy UiRegistry method. Prefer the extended-framework component entry via index.html."
     )]
+    /// Handles `remove_all` in the extended UI workflow.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// // Call `remove_all` with values from your app state and world context.
+    /// ```
     pub fn remove_all(&mut self) {
         Self::ensure_legacy_registry_available();
         self.collection.clear();
@@ -237,6 +287,13 @@ impl UiRegistry {
     #[deprecated(
         note = "Legacy UiRegistry method. Prefer the extended-framework component entry via index.html."
     )]
+    /// Handles `get` in the extended UI workflow.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// // Call `get` with values from your app state and world context.
+    /// ```
     pub fn get(&self, name: &str) -> Option<&HtmlSource> {
         Self::ensure_legacy_registry_available();
         self.collection.get(name)
@@ -246,6 +303,13 @@ impl UiRegistry {
     #[deprecated(
         note = "Legacy UiRegistry method. Prefer the extended-framework component entry via index.html."
     )]
+    /// Handles `get_mut` in the extended UI workflow.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// // Call `get_mut` with values from your app state and world context.
+    /// ```
     pub fn get_mut(&mut self, name: &str) -> Option<&mut HtmlSource> {
         Self::ensure_legacy_registry_available();
         self.collection.get_mut(name)
@@ -268,6 +332,13 @@ impl UiRegistry {
     #[deprecated(
         note = "Legacy UiRegistry method. Prefer the extended-framework component entry via index.html."
     )]
+    /// Handles `use_ui` in the extended UI workflow.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// // Call `use_ui` with values from your app state and world context.
+    /// ```
     pub fn use_ui(&mut self, name: &str) {
         Self::ensure_legacy_registry_available();
         if self.get(name).is_some() {
@@ -287,6 +358,13 @@ impl UiRegistry {
     #[deprecated(
         note = "Legacy UiRegistry method. Prefer the extended-framework component entry via index.html."
     )]
+    /// Handles `use_uis` in the extended UI workflow.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// // Call `use_uis` with values from your app state and world context.
+    /// ```
     pub fn use_uis(&mut self, names: Vec<String>) {
         Self::ensure_legacy_registry_available();
         let mut valid = Vec::new();

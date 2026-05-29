@@ -26,6 +26,7 @@ use web_sys::window;
 #[derive(Component)]
 struct HyperLinkBase;
 
+/// Represents the `HyperLinkInstallRequests` data structure used by the extended UI system.
 #[cfg(all(not(target_arch = "wasm32"), feature = "extended-dialog"))]
 #[derive(Resource, Default)]
 struct HyperLinkInstallRequests {
@@ -33,19 +34,27 @@ struct HyperLinkInstallRequests {
     pending_commands: HashMap<u64, String>,
 }
 
+/// Defines the available `BrowserAttempt` variants for this part of the UI runtime.
 #[cfg(not(target_arch = "wasm32"))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 enum BrowserAttempt {
+    /// Variant `Opened`.
     Opened,
+    /// Variant `NotInstalled`.
     NotInstalled,
+    /// Variant `LaunchFailed`.
     LaunchFailed,
 }
 
+/// Defines the available `HyperLinkOpenOutcome` variants for this part of the UI runtime.
 #[cfg(not(target_arch = "wasm32"))]
 #[derive(Debug, Clone, Eq, PartialEq)]
 enum HyperLinkOpenOutcome {
+    /// Variant `Opened`.
     Opened,
+    /// Variant `MissingBrowser`.
     MissingBrowser { requested: Vec<String> },
+    /// Variant `Failed`.
     Failed,
 }
 
@@ -54,10 +63,14 @@ enum HyperLinkOpenOutcome {
     not(target_arch = "wasm32"),
     feature = "extended-dialog"
 ))]
+/// Defines the available `LinuxFamily` variants for this part of the UI runtime.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 enum LinuxFamily {
+    /// Variant `Arch`.
     Arch,
+    /// Variant `Debian`.
     Debian,
+    /// Variant `Fedora`.
     Fedora,
 }
 
@@ -65,6 +78,7 @@ enum LinuxFamily {
 pub struct HyperLinkWidget;
 
 impl Plugin for HyperLinkWidget {
+    /// Handles `build` in the extended UI workflow.
     fn build(&self, app: &mut App) {
         app.add_systems(Update, (internal_node_creation_system, update_text));
 
@@ -235,6 +249,7 @@ fn on_internal_cursor_leave(
     trigger.propagate(false);
 }
 
+/// Handles `open_hyper_link_wasm` in the extended UI workflow.
 #[cfg(target_arch = "wasm32")]
 fn open_hyper_link_wasm(link: &HyperLink) {
     let href = link.href.trim();
@@ -264,6 +279,7 @@ fn open_hyper_link_wasm(link: &HyperLink) {
     }
 }
 
+/// Handles `open_hyper_link_native` in the extended UI workflow.
 #[cfg(not(target_arch = "wasm32"))]
 fn open_hyper_link_native(link: &HyperLink) -> HyperLinkOpenOutcome {
     let href = link.href.trim();
@@ -306,6 +322,7 @@ fn open_hyper_link_native(link: &HyperLink) -> HyperLinkOpenOutcome {
     }
 }
 
+/// Handles `open_with_system_browser` in the extended UI workflow.
 #[cfg(not(target_arch = "wasm32"))]
 fn open_with_system_browser(href: &str) -> bool {
     #[cfg(target_os = "windows")]
@@ -333,6 +350,7 @@ fn open_with_system_browser(href: &str) -> bool {
     false
 }
 
+/// Handles `try_open_specific_browser` in the extended UI workflow.
 #[cfg(not(target_arch = "wasm32"))]
 fn try_open_specific_browser(browser: &str, href: &str) -> BrowserAttempt {
     #[cfg(target_os = "windows")]
@@ -354,6 +372,7 @@ fn try_open_specific_browser(browser: &str, href: &str) -> BrowserAttempt {
     BrowserAttempt::NotInstalled
 }
 
+/// Handles `try_open_browser_linux` in the extended UI workflow.
 #[cfg(all(unix, not(target_os = "macos"), not(target_arch = "wasm32")))]
 fn try_open_browser_linux(browser: &str, href: &str) -> BrowserAttempt {
     let candidates = browser_binary_candidates(browser);
@@ -371,6 +390,7 @@ fn try_open_browser_linux(browser: &str, href: &str) -> BrowserAttempt {
     BrowserAttempt::NotInstalled
 }
 
+/// Handles `try_open_browser_macos` in the extended UI workflow.
 #[cfg(all(target_os = "macos", not(target_arch = "wasm32")))]
 fn try_open_browser_macos(browser: &str, href: &str) -> BrowserAttempt {
     let candidates = browser_app_candidates(browser);
@@ -395,6 +415,7 @@ fn try_open_browser_macos(browser: &str, href: &str) -> BrowserAttempt {
     BrowserAttempt::NotInstalled
 }
 
+/// Handles `try_open_browser_windows` in the extended UI workflow.
 #[cfg(all(target_os = "windows", not(target_arch = "wasm32")))]
 fn try_open_browser_windows(browser: &str, href: &str) -> BrowserAttempt {
     for candidate in browser_windows_candidates(browser) {
@@ -424,6 +445,7 @@ fn try_open_browser_windows(browser: &str, href: &str) -> BrowserAttempt {
     BrowserAttempt::NotInstalled
 }
 
+/// Handles `canonical_browser_name` in the extended UI workflow.
 #[cfg(not(target_arch = "wasm32"))]
 fn canonical_browser_name(raw: &str) -> String {
     let normalized = raw.trim().to_ascii_lowercase().replace(['_', ' '], "-");
@@ -437,6 +459,7 @@ fn canonical_browser_name(raw: &str) -> String {
     }
 }
 
+/// Handles `browser_binary_candidates` in the extended UI workflow.
 #[cfg(not(target_arch = "wasm32"))]
 fn browser_binary_candidates(raw_browser: &str) -> Vec<String> {
     let browser = canonical_browser_name(raw_browser);
@@ -460,6 +483,7 @@ fn browser_binary_candidates(raw_browser: &str) -> Vec<String> {
     }
 }
 
+/// Handles `browser_app_candidates` in the extended UI workflow.
 #[cfg(all(target_os = "macos", not(target_arch = "wasm32")))]
 fn browser_app_candidates(raw_browser: &str) -> Vec<String> {
     let browser = canonical_browser_name(raw_browser);
@@ -476,6 +500,7 @@ fn browser_app_candidates(raw_browser: &str) -> Vec<String> {
     }
 }
 
+/// Handles `browser_windows_candidates` in the extended UI workflow.
 #[cfg(all(target_os = "windows", not(target_arch = "wasm32")))]
 fn browser_windows_candidates(raw_browser: &str) -> Vec<PathBuf> {
     let browser = canonical_browser_name(raw_browser);
@@ -511,6 +536,7 @@ fn browser_windows_candidates(raw_browser: &str) -> Vec<PathBuf> {
     out
 }
 
+/// Handles `command_exists` in the extended UI workflow.
 #[cfg(not(target_arch = "wasm32"))]
 fn command_exists(command: &str) -> bool {
     let Some(path_var) = env::var_os("PATH") else {
@@ -564,6 +590,7 @@ fn command_exists(command: &str) -> bool {
     }
 }
 
+/// Handles `spawn_silent` in the extended UI workflow.
 #[cfg(not(target_arch = "wasm32"))]
 fn spawn_silent(command: &mut Command) -> bool {
     command
@@ -574,12 +601,14 @@ fn spawn_silent(command: &mut Command) -> bool {
         .is_ok()
 }
 
+/// Handles `next_install_request_id` in the extended UI workflow.
 #[cfg(all(not(target_arch = "wasm32"), feature = "extended-dialog"))]
 fn next_install_request_id(requests: &mut HyperLinkInstallRequests) -> u64 {
     requests.next_request_id = requests.next_request_id.saturating_add(1);
     requests.next_request_id
 }
 
+/// Handles `handle_install_dialog_closed` in the extended UI workflow.
 #[cfg(all(not(target_arch = "wasm32"), feature = "extended-dialog"))]
 fn handle_install_dialog_closed(
     mut dialogs_closed: MessageReader<DialogClosed>,
@@ -600,6 +629,7 @@ fn handle_install_dialog_closed(
     }
 }
 
+/// Handles `build_install_command_for_browser` in the extended UI workflow.
 #[cfg(all(not(target_arch = "wasm32"), feature = "extended-dialog"))]
 fn build_install_command_for_browser(browser: &str) -> Option<String> {
     #[cfg(target_os = "linux")]
@@ -633,6 +663,7 @@ fn build_install_command_for_browser(browser: &str) -> Option<String> {
     }
 }
 
+/// Handles `open_install_command_in_terminal` in the extended UI workflow.
 #[cfg(all(not(target_arch = "wasm32"), feature = "extended-dialog"))]
 fn open_install_command_in_terminal(command: &str) -> bool {
     #[cfg(target_os = "windows")]
@@ -666,6 +697,7 @@ fn open_install_command_in_terminal(command: &str) -> bool {
     false
 }
 
+/// Handles `escape_applescript_text` in the extended UI workflow.
 #[cfg(all(target_os = "macos", not(target_arch = "wasm32")))]
 fn escape_applescript_text(input: &str) -> String {
     input.replace('\\', "\\\\").replace('"', "\\\"")
@@ -676,6 +708,7 @@ fn escape_applescript_text(input: &str) -> String {
     not(target_arch = "wasm32"),
     feature = "extended-dialog"
 ))]
+/// Handles `open_linux_terminal_with_command` in the extended UI workflow.
 fn open_linux_terminal_with_command(command: &str) -> bool {
     let interactive_command = format!(r#"{command}; echo; read -r -p "Press Enter to close..." _"#);
 
@@ -741,6 +774,7 @@ fn open_linux_terminal_with_command(command: &str) -> bool {
     not(target_arch = "wasm32"),
     feature = "extended-dialog"
 ))]
+/// Handles `detect_linux_family` in the extended UI workflow.
 fn detect_linux_family() -> Option<LinuxFamily> {
     let raw = fs::read_to_string("/etc/os-release").ok()?;
     let id = parse_os_release_value(&raw, "ID").unwrap_or_default();
@@ -773,6 +807,7 @@ fn detect_linux_family() -> Option<LinuxFamily> {
     not(target_arch = "wasm32"),
     feature = "extended-dialog"
 ))]
+/// Handles `parse_os_release_value` in the extended UI workflow.
 fn parse_os_release_value(raw: &str, key: &str) -> Option<String> {
     for line in raw.lines() {
         let trimmed = line.trim();
@@ -804,6 +839,7 @@ fn parse_os_release_value(raw: &str, key: &str) -> Option<String> {
     not(target_arch = "wasm32"),
     feature = "extended-dialog"
 ))]
+/// Handles `linux_package_for_browser` in the extended UI workflow.
 fn linux_package_for_browser(browser: &str, family: LinuxFamily) -> String {
     let normalized = canonical_browser_name(browser);
     match (normalized.as_str(), family) {
@@ -820,6 +856,7 @@ fn linux_package_for_browser(browser: &str, family: LinuxFamily) -> String {
     }
 }
 
+/// Handles `brew_package_for_browser` in the extended UI workflow.
 #[cfg(all(target_os = "macos", not(target_arch = "wasm32")))]
 fn brew_package_for_browser(browser: &str) -> String {
     let normalized = canonical_browser_name(browser);
@@ -835,6 +872,7 @@ fn brew_package_for_browser(browser: &str) -> String {
     }
 }
 
+/// Handles `winget_package_for_browser` in the extended UI workflow.
 #[cfg(all(target_os = "windows", not(target_arch = "wasm32")))]
 fn winget_package_for_browser(browser: &str) -> String {
     let normalized = canonical_browser_name(browser);

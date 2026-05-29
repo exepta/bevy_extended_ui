@@ -131,6 +131,7 @@ impl Plugin for HtmlEventBindingsPlugin {
     }
 }
 
+/// Handles `pointer_inner_position` in the extended UI workflow.
 fn pointer_inner_position(
     rel_pos: Option<&RelativeCursorPosition>,
     node: Option<&ComputedNode>,
@@ -1075,6 +1076,7 @@ pub(crate) fn on_html_wheel(
 //                       Keyboard
 // =================================================
 
+/// Handles `find_keyboard_target_entity` in the extended UI workflow.
 fn find_keyboard_target_entity(
     current_widget_state: &CurrentWidgetState,
     q_bindings: &Query<(Entity, &UIGenID, &HtmlEventBindings, &UIWidgetState)>,

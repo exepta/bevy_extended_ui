@@ -19,6 +19,7 @@ pub struct ExtendedFrameworkConfiguration {
 }
 
 impl Default for ExtendedFrameworkConfiguration {
+    /// Handles `default` in the extended UI workflow.
     fn default() -> Self {
         Self {
             assets_component_root: "ui/bevy_ang".to_string(),
@@ -43,6 +44,7 @@ pub struct FrameworkCompileResult {
 pub struct ExtendedFrameworkPlugin;
 
 impl Plugin for ExtendedFrameworkPlugin {
+    /// Handles `build` in the extended UI workflow.
     fn build(&self, app: &mut App) {
         app.init_resource::<ExtendedFrameworkConfiguration>();
     }
@@ -110,6 +112,7 @@ pub fn infer_component_controller_path(
     Some(format!("{rust_root}/{rust_file}"))
 }
 
+/// Handles `normalize_source_path` in the extended UI workflow.
 fn normalize_source_path(path: &str) -> String {
     let mut normalized = path.replace('\\', "/");
     while let Some(rest) = normalized.strip_prefix("./") {
@@ -121,6 +124,7 @@ fn normalize_source_path(path: &str) -> String {
     normalized.trim_matches('/').to_string()
 }
 
+/// Handles `normalize_root` in the extended UI workflow.
 fn normalize_root(path: &str) -> String {
     let mut normalized = path.replace('\\', "/");
     while let Some(rest) = normalized.strip_prefix("./") {
@@ -132,6 +136,7 @@ fn normalize_root(path: &str) -> String {
     normalized.trim_matches('/').to_string()
 }
 
+/// Handles `compile_index_template` in the extended UI workflow.
 fn compile_index_template(
     index_html: &mut String,
     config: &ExtendedFrameworkConfiguration,
@@ -185,6 +190,7 @@ fn compile_index_template(
     Ok(())
 }
 
+/// Handles `inject_component_styles` in the extended UI workflow.
 fn inject_component_styles(html: &mut String, style_hrefs: BTreeSet<String>) {
     if style_hrefs.is_empty() {
         return;
@@ -212,6 +218,7 @@ fn inject_component_styles(html: &mut String, style_hrefs: BTreeSet<String>) {
     }
 }
 
+/// Handles `build_component_style_href` in the extended UI workflow.
 fn build_component_style_href(component_root: &str, source_dir_rel: &str, style: &str) -> String {
     let root = normalize_root(component_root);
     let style = normalize_root(style);
