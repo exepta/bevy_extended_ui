@@ -10,6 +10,7 @@ publish = false
 default = ["theme-provider"]
 theme-provider = []
 widget-overview = []
+typed-values = []
 
 [dependencies]
 bevy = "0.18.1"

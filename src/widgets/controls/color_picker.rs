@@ -78,6 +78,7 @@ struct RgbaText;
 pub struct ColorPickerWidget;
 
 impl Plugin for ColorPickerWidget {
+    /// Handles `build` in the extended UI workflow.
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
@@ -495,6 +496,7 @@ fn update_modal_position(
     }
 }
 
+/// Handles `logical_size` in the extended UI workflow.
 fn logical_size(node: &ComputedNode) -> Vec2 {
     let inv = node.inverse_scale_factor.max(f32::EPSILON);
     node.size() * inv
@@ -645,6 +647,7 @@ fn sync_color_picker_visual_state(
     }
 }
 
+/// Handles `perceived_luminance` in the extended UI workflow.
 fn perceived_luminance(red: u8, green: u8, blue: u8) -> f32 {
     let r = red as f32 / 255.0;
     let g = green as f32 / 255.0;
@@ -652,6 +655,7 @@ fn perceived_luminance(red: u8, green: u8, blue: u8) -> f32 {
     0.2126 * r + 0.7152 * g + 0.0722 * b
 }
 
+/// Handles `trigger_text_color` in the extended UI workflow.
 fn trigger_text_color(red: u8, green: u8, blue: u8, alpha: u8) -> Color {
     // If trigger background is translucent, force dark text for readability
     // against likely bright surfaces behind it.
@@ -751,6 +755,7 @@ fn on_canvas_drag(
     );
 }
 
+/// Handles `apply_canvas_pointer` in the extended UI workflow.
 fn apply_canvas_pointer(
     entity: Entity,
     canvas_q: &Query<(&BindToID, &RelativeCursorPosition), With<ColorCanvas>>,
@@ -813,6 +818,7 @@ fn on_hue_drag(
     );
 }
 
+/// Handles `apply_hue_pointer` in the extended UI workflow.
 fn apply_hue_pointer(
     entity: Entity,
     hue_q: &Query<(&BindToID, &RelativeCursorPosition), With<HueTrack>>,
@@ -875,6 +881,7 @@ fn on_alpha_drag(
     );
 }
 
+/// Handles `apply_alpha_pointer` in the extended UI workflow.
 fn apply_alpha_pointer(
     entity: Entity,
     alpha_q: &Query<(&BindToID, &RelativeCursorPosition), With<AlphaTrack>>,

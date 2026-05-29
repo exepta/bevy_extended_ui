@@ -1,15 +1,37 @@
 use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
 
-pub fn wheel_delta_y(event: &MouseWheel, inv_scale_factor: f32) -> f32 {
-    match event.unit {
+/// Handles `wheel_delta_axis` in the extended UI workflow.
+fn wheel_delta_axis(value: f32, unit: MouseScrollUnit, inv_scale_factor: f32) -> f32 {
+    match unit {
         MouseScrollUnit::Line => {
-            let line_delta = event.y;
-            if line_delta.abs() > 10.0 {
-                line_delta * inv_scale_factor
+            if value.abs() > 10.0 {
+                value * inv_scale_factor
             } else {
-                line_delta * 25.0
+                value * 25.0
             }
         }
-        MouseScrollUnit::Pixel => event.y * inv_scale_factor,
+        MouseScrollUnit::Pixel => value * inv_scale_factor,
     }
+}
+
+/// Handles `wheel_delta_x` in the extended UI workflow.
+///
+/// # Examples
+///
+/// ```rust
+/// // Call `wheel_delta_x` with values from your app state and world context.
+/// ```
+pub fn wheel_delta_x(event: &MouseWheel, inv_scale_factor: f32) -> f32 {
+    wheel_delta_axis(event.x, event.unit, inv_scale_factor)
+}
+
+/// Handles `wheel_delta_y` in the extended UI workflow.
+///
+/// # Examples
+///
+/// ```rust
+/// // Call `wheel_delta_y` with values from your app state and world context.
+/// ```
+pub fn wheel_delta_y(event: &MouseWheel, inv_scale_factor: f32) -> f32 {
+    wheel_delta_axis(event.y, event.unit, inv_scale_factor)
 }

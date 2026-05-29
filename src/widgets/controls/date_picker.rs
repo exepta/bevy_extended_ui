@@ -136,25 +136,34 @@ struct SimpleDate {
     day: u32,
 }
 
+/// Defines the available `PickerSelectionMode` variants for this part of the UI runtime.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum PickerSelectionMode {
+    /// Variant `Single`.
     Single,
+    /// Variant `Range`.
     Range,
 }
 
+/// Defines the available `DateFieldOrder` variants for this part of the UI runtime.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum DateFieldOrder {
+    /// Variant `MonthDayYear`.
     MonthDayYear,
+    /// Variant `DayMonthYear`.
     DayMonthYear,
+    /// Variant `YearMonthDay`.
     YearMonthDay,
 }
 
+/// Represents the `DatePattern` data structure used by the extended UI system.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct DatePattern {
     order: DateFieldOrder,
     separator: char,
 }
 
+/// Represents the `CalendarCell` data structure used by the extended UI system.
 #[derive(Clone, Copy)]
 struct CalendarCell {
     date: SimpleDate,
@@ -2860,6 +2869,7 @@ fn on_day_cursor_leave(
     trigger.propagate(false);
 }
 
+/// Handles `resolve_date_pattern` in the extended UI workflow.
 fn resolve_date_pattern(picker: &DatePicker, bound_input: Option<&InputField>) -> DatePattern {
     if let Some(spec) = picker
         .format_pattern
@@ -2890,10 +2900,12 @@ fn resolve_date_pattern(picker: &DatePicker, bound_input: Option<&InputField>) -
     pattern_from_date_format(picker.format)
 }
 
+/// Handles `input_supports_date_picker` in the extended UI workflow.
 fn input_supports_date_picker(input_type: InputType) -> bool {
     matches!(input_type, InputType::Date | InputType::Range)
 }
 
+/// Handles `resolve_selection_mode` in the extended UI workflow.
 fn resolve_selection_mode(bound_input: Option<&InputField>) -> PickerSelectionMode {
     if bound_input.is_some_and(|input| input.input_type == InputType::Range) {
         PickerSelectionMode::Range
@@ -2902,6 +2914,7 @@ fn resolve_selection_mode(bound_input: Option<&InputField>) -> PickerSelectionMo
     }
 }
 
+/// Handles `default_separator_for_order` in the extended UI workflow.
 fn default_separator_for_order(order: DateFieldOrder) -> char {
     match order {
         DateFieldOrder::MonthDayYear | DateFieldOrder::DayMonthYear => '/',
@@ -2909,6 +2922,7 @@ fn default_separator_for_order(order: DateFieldOrder) -> char {
     }
 }
 
+/// Handles `pattern_from_date_format` in the extended UI workflow.
 fn pattern_from_date_format(format: DateFormat) -> DatePattern {
     match format {
         DateFormat::MonthDayYear => DatePattern {
@@ -2926,6 +2940,7 @@ fn pattern_from_date_format(format: DateFormat) -> DatePattern {
     }
 }
 
+/// Handles `parse_date_pattern` in the extended UI workflow.
 fn parse_date_pattern(spec: &str) -> Option<DatePattern> {
     let trimmed = spec.trim();
     if trimmed.is_empty() {
@@ -3006,12 +3021,14 @@ fn parse_date_pattern(spec: &str) -> Option<DatePattern> {
     })
 }
 
+/// Handles `detect_separator` in the extended UI workflow.
 fn detect_separator(value: &str) -> Option<char> {
     value
         .chars()
         .find(|ch| *ch == '/' || *ch == '-' || *ch == '.')
 }
 
+/// Handles `default_placeholder_for_format` in the extended UI workflow.
 fn default_placeholder_for_format(pattern: DatePattern) -> String {
     let sep = pattern.separator;
     match pattern.order {
@@ -3021,6 +3038,7 @@ fn default_placeholder_for_format(pattern: DatePattern) -> String {
     }
 }
 
+/// Handles `format_for_display` in the extended UI workflow.
 fn format_for_display(date: SimpleDate, pattern: DatePattern) -> String {
     let sep = pattern.separator;
     match pattern.order {
@@ -3036,6 +3054,7 @@ fn format_for_display(date: SimpleDate, pattern: DatePattern) -> String {
     }
 }
 
+/// Handles `format_range_for_display` in the extended UI workflow.
 fn format_range_for_display(
     start: Option<SimpleDate>,
     end: Option<SimpleDate>,
@@ -3054,6 +3073,7 @@ fn format_range_for_display(
     }
 }
 
+/// Handles `parse_picker_range` in the extended UI workflow.
 fn parse_picker_range(
     value: &str,
     pattern: DatePattern,
@@ -3082,6 +3102,7 @@ fn parse_picker_range(
     parse_picker_date(trimmed, pattern).map(|single| (single, None))
 }
 
+/// Handles `split_range_parts` in the extended UI workflow.
 fn split_range_parts(value: &str) -> Option<(&str, &str)> {
     for delimiter in [" - ", " – ", " — "] {
         if let Some((left, right)) = value.split_once(delimiter) {
@@ -3091,6 +3112,7 @@ fn split_range_parts(value: &str) -> Option<(&str, &str)> {
     None
 }
 
+/// Handles `normalize_bound_value_for_mode` in the extended UI workflow.
 fn normalize_bound_value_for_mode(
     value: &str,
     pattern: DatePattern,
@@ -3106,6 +3128,7 @@ fn normalize_bound_value_for_mode(
     }
 }
 
+/// Handles `in_selected_range` in the extended UI workflow.
 fn in_selected_range(date: SimpleDate, start: Option<SimpleDate>, end: Option<SimpleDate>) -> bool {
     let Some(start) = start else {
         return false;
@@ -3120,6 +3143,7 @@ fn in_selected_range(date: SimpleDate, start: Option<SimpleDate>, end: Option<Si
     }
 }
 
+/// Handles `parse_picker_date` in the extended UI workflow.
 fn parse_picker_date(value: &str, pattern: DatePattern) -> Option<SimpleDate> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
@@ -3157,6 +3181,7 @@ fn parse_picker_date(value: &str, pattern: DatePattern) -> Option<SimpleDate> {
         })
 }
 
+/// Handles `resolve_year_option_from_entity` in the extended UI workflow.
 fn resolve_year_option_from_entity(
     start: Entity,
     year_query: &Query<(&BindToID, &DatePickerYearOption), With<DatePickerYearOption>>,
@@ -3172,6 +3197,7 @@ fn resolve_year_option_from_entity(
     None
 }
 
+/// Handles `resolve_month_option_from_entity` in the extended UI workflow.
 fn resolve_month_option_from_entity(
     start: Entity,
     month_query: &Query<(&BindToID, &DatePickerMonthOption), With<DatePickerMonthOption>>,
@@ -3187,6 +3213,7 @@ fn resolve_month_option_from_entity(
     None
 }
 
+/// Handles `parse_iso_date` in the extended UI workflow.
 fn parse_iso_date(value: &str) -> Option<SimpleDate> {
     let mut parts = value.trim().split('-');
     let year = parts.next()?.trim().parse::<i32>().ok()?;
@@ -3198,6 +3225,7 @@ fn parse_iso_date(value: &str) -> Option<SimpleDate> {
     make_date(year, month, day)
 }
 
+/// Handles `parse_date_with_pattern` in the extended UI workflow.
 fn parse_date_with_pattern(value: &str, pattern: DatePattern) -> Option<SimpleDate> {
     let tokens: Vec<&str> = value
         .trim()
@@ -3230,6 +3258,7 @@ fn parse_date_with_pattern(value: &str, pattern: DatePattern) -> Option<SimpleDa
     }
 }
 
+/// Handles `make_date` in the extended UI workflow.
 fn make_date(year: i32, month: u32, day: u32) -> Option<SimpleDate> {
     if !(1..=12).contains(&month) {
         return None;
@@ -3240,10 +3269,12 @@ fn make_date(year: i32, month: u32, day: u32) -> Option<SimpleDate> {
     Some(SimpleDate { year, month, day })
 }
 
+/// Handles `is_leap_year` in the extended UI workflow.
 fn is_leap_year(year: i32) -> bool {
     (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
 }
 
+/// Handles `days_in_month` in the extended UI workflow.
 fn days_in_month(year: i32, month: u32) -> u32 {
     match month {
         1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
@@ -3254,6 +3285,7 @@ fn days_in_month(year: i32, month: u32) -> u32 {
     }
 }
 
+/// Handles `shift_month` in the extended UI workflow.
 fn shift_month(year: i32, month: u32, delta: i32) -> (i32, u32) {
     let idx = year * 12 + (month as i32 - 1) + delta;
     let new_year = idx.div_euclid(12);
@@ -3261,6 +3293,7 @@ fn shift_month(year: i32, month: u32, delta: i32) -> (i32, u32) {
     (new_year, new_month as u32)
 }
 
+/// Handles `day_of_week` in the extended UI workflow.
 fn day_of_week(date: SimpleDate) -> u32 {
     let mut y = date.year;
     let mut m = date.month as i32;
@@ -3275,6 +3308,7 @@ fn day_of_week(date: SimpleDate) -> u32 {
     ((h + 6) % 7) as u32
 }
 
+/// Handles `build_calendar_cells` in the extended UI workflow.
 fn build_calendar_cells(year: i32, month: u32) -> Vec<CalendarCell> {
     let first_sunday_index = day_of_week(SimpleDate {
         year,
@@ -3329,6 +3363,7 @@ fn build_calendar_cells(year: i32, month: u32) -> Vec<CalendarCell> {
     cells
 }
 
+/// Handles `visible_calendar_row_count` in the extended UI workflow.
 fn visible_calendar_row_count(year: i32, month: u32) -> usize {
     let first_sunday_index = day_of_week(SimpleDate {
         year,
@@ -3341,6 +3376,7 @@ fn visible_calendar_row_count(year: i32, month: u32) -> usize {
     weeks.max(5)
 }
 
+/// Handles `is_date_allowed` in the extended UI workflow.
 fn is_date_allowed(date: SimpleDate, min: Option<SimpleDate>, max: Option<SimpleDate>) -> bool {
     if let Some(min) = min {
         if date < min {
@@ -3355,6 +3391,7 @@ fn is_date_allowed(date: SimpleDate, min: Option<SimpleDate>, max: Option<Simple
     true
 }
 
+/// Handles `clamp_date_to_bounds` in the extended UI workflow.
 fn clamp_date_to_bounds(
     mut date: SimpleDate,
     min: Option<SimpleDate>,
@@ -3377,6 +3414,7 @@ fn clamp_date_to_bounds(
     }
 }
 
+/// Handles `month_name` in the extended UI workflow.
 fn month_name(month: u32) -> &'static str {
     match month {
         1 => "January",
@@ -3395,6 +3433,7 @@ fn month_name(month: u32) -> &'static str {
     }
 }
 
+/// Handles `month_short_name` in the extended UI workflow.
 fn month_short_name(month: u32) -> &'static str {
     match month {
         1 => "Jan",
@@ -3413,6 +3452,7 @@ fn month_short_name(month: u32) -> &'static str {
     }
 }
 
+/// Handles `is_month_allowed` in the extended UI workflow.
 fn is_month_allowed(
     year: i32,
     month: u32,
@@ -3440,6 +3480,7 @@ fn is_month_allowed(
     true
 }
 
+/// Handles `resolve_year_range` in the extended UI workflow.
 fn resolve_year_range(
     min: Option<SimpleDate>,
     max: Option<SimpleDate>,
@@ -3459,6 +3500,7 @@ fn resolve_year_range(
     (start, end)
 }
 
+/// Handles `today_utc_date` in the extended UI workflow.
 #[cfg(not(target_arch = "wasm32"))]
 fn today_utc_date() -> SimpleDate {
     let Ok(duration) = SystemTime::now().duration_since(UNIX_EPOCH) else {
@@ -3474,6 +3516,7 @@ fn today_utc_date() -> SimpleDate {
     SimpleDate { year, month, day }
 }
 
+/// Handles `today_utc_date` in the extended UI workflow.
 #[cfg(target_arch = "wasm32")]
 fn today_utc_date() -> SimpleDate {
     let ms = Date::now();
@@ -3491,6 +3534,7 @@ fn today_utc_date() -> SimpleDate {
     SimpleDate { year, month, day }
 }
 
+/// Handles `civil_from_days` in the extended UI workflow.
 fn civil_from_days(days_since_epoch: i64) -> (i32, u32, u32) {
     let z = days_since_epoch + 719_468;
     let era = if z >= 0 { z } else { z - 146_096 } / 146_097;

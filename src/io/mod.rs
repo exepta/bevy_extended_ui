@@ -1,5 +1,3 @@
-mod unit_tests;
-
 #[cfg(feature = "svg")]
 use bevy::asset::RenderAssetUsages;
 use bevy::asset::io::Reader;
@@ -203,13 +201,13 @@ fn register_default_css_asset(mut commands: Commands, mut css_assets: ResMut<Ass
 }
 
 /// Resolves a relative path against a base directory.
-fn resolve_relative(base_dir: &PathBuf, raw: &str) -> PathBuf {
+pub fn resolve_relative(base_dir: &PathBuf, raw: &str) -> PathBuf {
     let p = PathBuf::from(raw.trim());
     if p.is_absolute() { p } else { base_dir.join(p) }
 }
 
 /// Extracts CSS link hrefs from an HTML string using a lenient scan.
-fn extract_css_links_lenient(html: &str) -> Vec<String> {
+pub fn extract_css_links_lenient(html: &str) -> Vec<String> {
     let mut out = Vec::new();
 
     for chunk in html.split("<link").skip(1) {
@@ -233,7 +231,7 @@ fn extract_css_links_lenient(html: &str) -> Vec<String> {
 }
 
 /// Extracts a quoted attribute value from an HTML tag string.
-fn extract_attr(tag: &str, name: &str) -> Option<String> {
+pub fn extract_attr(tag: &str, name: &str) -> Option<String> {
     let needle = format!("{name}=");
     let idx = tag.find(&needle)?;
     let rest = &tag[idx + needle.len()..].trim_start();

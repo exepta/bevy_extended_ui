@@ -3,7 +3,7 @@ use bevy_extended_ui::html::{
     HtmlMouseDown, HtmlMouseUp, HtmlSource, HtmlTouchEnd, HtmlTouchMove, HtmlTouchStart, HtmlWheel,
 };
 use bevy_extended_ui::io::HtmlAsset;
-use bevy_extended_ui::registry::UiRegistry;
+use bevy_extended_ui::old::registry::UiRegistry;
 use bevy_extended_ui::styles::CssID;
 use bevy_extended_ui::widgets::{Badge, Paragraph, Slider, SliderType};
 use bevy_extended_ui::{ExtendedCam, ExtendedUiConfiguration, ExtendedUiPlugin};

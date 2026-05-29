@@ -1,0 +1,50 @@
+[package]
+name = "bevy_extended_ui_tests"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+name = "bevy_extended_ui_tests"
+path = "src/lib.rs"
+
+[features]
+default = ["css-breakpoints", "fluent", "providers", "svg", "extended-dialog"]
+css-breakpoints = ["bevy_extended_ui/css-breakpoints"]
+wasm-breakpoints = ["bevy_extended_ui/wasm-breakpoints"]
+wasm-default = ["bevy_extended_ui/wasm-default"]
+fluent = ["bevy_extended_ui/fluent"]
+properties-lang = ["bevy_extended_ui/properties-lang"]
+clipboard-wasm = ["bevy_extended_ui/clipboard-wasm"]
+providers = ["bevy_extended_ui/providers"]
+svg = ["bevy_extended_ui/svg"]
+extended-dialog = ["bevy_extended_ui/extended-dialog"]
+extended-framework = ["bevy_extended_ui/extended-framework"]
+extended_framework = ["bevy_extended_ui/extended_framework"]
+
+[dependencies]
+bevy_extended_ui = { path = "..", default-features = false }
+bevy = { version = "0.18.1", default-features = false, features = [
+    "bevy_asset",
+    "bevy_color",
+    "bevy_core_pipeline",
+    "bevy_ui_render",
+    "bevy_render",
+    "bevy_text",
+    "bevy_ui",
+    "default_font",
+    "multi_threaded",
+    "picking",
+    "ui_picking",
+    "png",
+    "jpeg",
+    "gif",
+    "ico",
+    "webp",
+    "bevy_picking",
+    "custom_cursor",
+    "bevy_winit",
+    "x11",
+    "bevy_log",
+] }
+kuchiki = "0.8.1"

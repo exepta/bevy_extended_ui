@@ -55,17 +55,22 @@ impl Plugin for ScrollWidget {
 /// Initializes UI nodes for scrollbar widgets.
 fn internal_node_creation_system(
     mut commands: Commands,
-    query: Query<(Entity, &Scrollbar, Option<&CssSource>), (With<Scrollbar>, Without<ScrollBase>)>,
+    query: Query<
+        (Entity, &Scrollbar, Option<&CssSource>, Option<&CssClass>),
+        (With<Scrollbar>, Without<ScrollBase>),
+    >,
     config: Res<ExtendedUiConfiguration>,
 ) {
     let layer = *config.render_layers.first().unwrap_or(&1);
 
-    for (entity, scroll, source_opt) in query.iter() {
+    for (entity, scroll, source_opt, class_opt) in query.iter() {
         let css_source = source_opt.cloned().unwrap_or_default();
 
-        let mut class = CssClass(vec![]);
+        let mut classes = class_opt.map(|class| class.0.clone()).unwrap_or_default();
         if !scroll.vertical {
-            class = CssClass(vec!["scroll-horizontal".into()]);
+            if !classes.iter().any(|class| class == "scroll-horizontal") {
+                classes.push("scroll-horizontal".to_string());
+            }
         }
         commands
             .entity(entity)
@@ -80,7 +85,7 @@ fn internal_node_creation_system(
                 BorderColor::default(),
                 ZIndex::default(),
                 css_source.clone(),
-                class,
+                CssClass(classes),
                 PreviousScrollState {
                     value: scroll.value,
                     max: scroll.max,
