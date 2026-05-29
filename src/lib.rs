@@ -35,7 +35,6 @@ pub mod providers;
 pub mod registry;
 pub mod services;
 pub mod styles;
-mod unit_tests;
 pub mod utils;
 pub mod widgets;
 
@@ -129,7 +128,7 @@ impl Default for CurrentWidgetState {
 
 /// Marker component for the UI camera entity.
 #[derive(Component)]
-struct UiCamera;
+pub struct UiCamera;
 
 /// Bevy plugin that wires up all extended UI subsystems.
 pub struct ExtendedUiPlugin;
@@ -170,7 +169,7 @@ impl Plugin for ExtendedUiPlugin {
 /// Manages the lifecycle and configuration of the UI camera.
 ///
 /// Uses `ExtendedUiConfiguration.camera` to decide which camera setup is active.
-fn load_ui_camera_system(
+pub fn load_ui_camera_system(
     mut commands: Commands,
     configuration: Res<ExtendedUiConfiguration>,
     mut query: Query<(Entity, &mut Camera, &mut RenderLayers), With<UiCamera>>,

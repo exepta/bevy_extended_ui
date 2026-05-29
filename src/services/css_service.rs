@@ -361,7 +361,7 @@ fn resolve_breakpoint_viewport(
 }
 
 /// Returns the CSS asset ids whose media rules change match state between two viewports.
-pub(crate) fn collect_assets_with_changed_media_matches(
+pub fn collect_assets_with_changed_media_matches(
     css_users: &CssUsers,
     css_assets: &Assets<CssAsset>,
     prev_viewport: Vec2,

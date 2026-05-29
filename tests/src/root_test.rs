@@ -9,6 +9,7 @@ mod tests {
     use crate::old::registry::{ExtendedRegistryPlugin, UiInitResource, UiRegistry};
     use crate::utils::keycode_to_char;
     use bevy::camera::visibility::RenderLayers;
+    use bevy::prelude::*;
     use bevy::render::view::Hdr;
 
     #[cfg(not(feature = "extended-framework"))]

@@ -183,10 +183,10 @@ struct CssCursorState {
 
 /// Marker to force a style application pass when a UI node was just created.
 #[derive(Component)]
-pub(crate) struct StyleRefreshOnNodeAdded;
+pub struct StyleRefreshOnNodeAdded;
 
 #[derive(Component, Debug, Clone, Default)]
-pub(crate) struct TextTransformState {
+pub struct TextTransformState {
     source: String,
     last_rendered: String,
 }

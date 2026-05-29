@@ -1,7 +1,6 @@
 pub mod components;
 pub mod paint;
 pub mod parser;
-mod unit_tests;
 
 use crate::io::CssAsset;
 use crate::styles::components::UiStyle;

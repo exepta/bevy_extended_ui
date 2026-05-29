@@ -7,7 +7,7 @@ use crate::widgets::{
 };
 
 /// Evaluates a widget's validation state for the given rules and values.
-pub(crate) fn evaluate_validation_state(
+pub fn evaluate_validation_state(
     rules: &ValidationRules,
     state: &UIWidgetState,
     input_value: Option<&InputValue>,

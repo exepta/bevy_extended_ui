@@ -4,7 +4,7 @@ use bevy::prelude::*;
 use std::collections::HashMap;
 
 #[derive(Resource, Default)]
-pub(crate) struct BoundStateIndex {
+pub struct BoundStateIndex {
     by_widget: HashMap<usize, Vec<Entity>>,
     by_entity: HashMap<Entity, usize>,
 }

@@ -1,18 +1,15 @@
-mod body;
-mod content;
-mod controls;
+pub mod body;
+pub mod content;
+pub mod controls;
 pub(crate) mod default_style;
-mod div;
+pub mod div;
 mod form;
-mod unit_tests;
-mod validation;
-mod widget_util;
+pub mod validation;
+pub mod widget_util;
 
 use crate::old::registry::*;
 use crate::styles::IconPlace;
 use crate::widgets::body::BodyWidget;
-use crate::widgets::content::ExtendedContentWidgets;
-use crate::widgets::controls::ExtendedControlWidgets;
 use crate::widgets::div::DivWidget;
 use crate::widgets::form::FormWidget;
 use bevy::prelude::*;
@@ -20,7 +17,9 @@ use std::any::Any;
 use std::fmt;
 use std::sync::Arc;
 
-pub(crate) use validation::evaluate_validation_state;
+pub use content::ExtendedContentWidgets;
+pub use controls::ExtendedControlWidgets;
+pub use validation::evaluate_validation_state;
 
 /// Marker component for UI elements that should ignore the parent widget state.
 ///
@@ -30,7 +29,7 @@ pub struct IgnoreParentState;
 
 /// Tracks the currently hovered scrollable widget so wheel input is routed once.
 #[derive(Resource, Default)]
-pub(crate) struct ActiveScrollTarget {
+pub struct ActiveScrollTarget {
     pub entity: Option<Entity>,
 }
 

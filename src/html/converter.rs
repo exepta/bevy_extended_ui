@@ -1967,7 +1967,7 @@ fn parse_icon_and_text(node: &NodeRef) -> (Option<String>, IconPlace) {
 }
 
 /// Builds the per-widget inner content payload.
-fn parse_inner_content(node: &NodeRef) -> HtmlInnerContent {
+pub fn parse_inner_content(node: &NodeRef) -> HtmlInnerContent {
     let inner_text = node.text_contents();
     let inner_html = node
         .children()
@@ -2003,7 +2003,7 @@ fn parse_tooltip_triggers(value: &str) -> Vec<ToolTipTrigger> {
 }
 
 /// Extracts unique `{{...}}` placeholders from serialized content.
-fn extract_inner_bindings(content: &str) -> Vec<String> {
+pub fn extract_inner_bindings(content: &str) -> Vec<String> {
     let mut out = Vec::new();
     let mut seen = HashSet::new();
 
@@ -2019,37 +2019,6 @@ fn extract_inner_bindings(content: &str) -> Vec<String> {
     }
 
     out
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn extract_inner_bindings_returns_unique_placeholders() {
-        let src = "<p>{{user.name}} {{ user.name }} {{ user.name }} {{user.id}}</p>";
-        let bindings = extract_inner_bindings(src);
-
-        assert_eq!(
-            bindings,
-            vec![
-                "{{user.name}}".to_string(),
-                "{{ user.name }}".to_string(),
-                "{{user.id}}".to_string()
-            ]
-        );
-    }
-
-    #[test]
-    fn parse_inner_content_collects_text_html_and_bindings() {
-        let doc = kuchiki::parse_html().one("<p>Hello <b>{{ user.name }}</b>!</p>");
-        let node = doc.select_first("p").unwrap();
-        let content = parse_inner_content(node.as_node());
-
-        assert!(content.inner_text().contains("Hello"));
-        assert!(content.inner_html().contains("<b>{{ user.name }}</b>"));
-        assert_eq!(content.inner_bindings(), &["{{ user.name }}".to_string()]);
-    }
 }
 
 /// Converts an HTML option's `value` string into a [`WidgetValue`] using the

@@ -16,6 +16,7 @@ exclude = [
     "assets/lang/**",
     "crates/local-examples/**",
     "crates/local-wasm-examples/**",
+    "tests/**",
 ]
 
 [lib]
@@ -41,7 +42,7 @@ extended_framework = ["extended-framework"]
 ############################################
 
 [workspace]
-members = ["crates/bevy_extended_ui_macros"]
+members = ["crates/bevy_extended_ui_macros", "tests"]
 
 [dependencies.bevy_extended_ui_macros]
 path = "crates/bevy_extended_ui_macros"
@@ -88,7 +89,7 @@ version = "0.8.1"
 version = "1.0.0-alpha.71"
 
 [dependencies.once_cell]
-version = "1.21.3"
+version = "1.21.4"
 
 [dependencies.regex]
 version = "1.12.3"
@@ -97,7 +98,7 @@ version = "1.12.3"
 version = "0.22.1"
 
 [dependencies.inventory]
-version = "0.3.22"
+version = "0.3.24"
 
 [dependencies.resvg]
 version = "0.47.0"
@@ -135,12 +136,12 @@ optional = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 arboard = "3.5.0"
-rfd = { version = "0.15.4", optional = true }
+rfd = { version = "0.17.2", optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen = { version = "0.2.92", optional = true }
-wasm-bindgen-futures = { version = "0.4.64", optional = true }
+wasm-bindgen-futures = { version = "0.4.65", optional = true }
 web-sys = { version = "0.3.69", features = ["Navigator", "Clipboard", "Window", "Document", "Element", "HtmlElement", "HtmlInputElement", "Event", "File", "FileList", "FileReader", "Blob", "Url"], optional = true }
 js-sys = "0.3.69"
 # `lightningcss -> ahash` pulls `getrandom` on wasm; opt into JS backend for wasm32-unknown-unknown.
-getrandom = { version = "0.3.4", features = ["wasm_js"] }
+getrandom = { version = "0.4.2", features = ["wasm_js"] }
