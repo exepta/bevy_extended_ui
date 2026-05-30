@@ -28,7 +28,10 @@ pub struct SwitchButtonWidget;
 impl Plugin for SwitchButtonWidget {
     /// Registers systems for switch button setup and interaction.
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (internal_node_creation_system, update_switch_button_system));
+        app.add_systems(
+            Update,
+            (internal_node_creation_system, update_switch_button_system),
+        );
     }
 }
 
@@ -163,7 +166,11 @@ fn internal_node_creation_system(
 fn update_switch_button_system(
     mut switch_q: Query<
         (&SwitchButton, &UIGenID, &mut UIWidgetState),
-        (With<SwitchButton>, With<SwitchButtonBase>, Changed<SwitchButton>),
+        (
+            With<SwitchButton>,
+            With<SwitchButtonBase>,
+            Changed<SwitchButton>,
+        ),
     >,
     mut label_q: Query<(&BindToID, &mut Text), With<SwitchButtonLabel>>,
 ) {

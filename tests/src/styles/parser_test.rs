@@ -59,6 +59,72 @@ mod tests {
     }
 
     #[test]
+    fn evaluates_width_range_breakpoint_operators() {
+        let parsed = load_css(
+            r#"
+            @media (width > 800px) {
+                .gt-width { display: none; }
+            }
+            @media (width < 800px) {
+                .lt-width { display: none; }
+            }
+        "#,
+        );
+
+        let gt = parsed
+            .styles
+            .values()
+            .find(|pair| pair.selector == ".gt-width")
+            .expect("missing parsed .gt-width style");
+        let lt = parsed
+            .styles
+            .values()
+            .find(|pair| pair.selector == ".lt-width")
+            .expect("missing parsed .lt-width style");
+
+        let gt_media = gt.media.as_ref().expect("missing gt media condition");
+        assert!(gt_media.matches_viewport(Vec2::new(960.0, 600.0)));
+        assert!(!gt_media.matches_viewport(Vec2::new(700.0, 600.0)));
+
+        let lt_media = lt.media.as_ref().expect("missing lt media condition");
+        assert!(lt_media.matches_viewport(Vec2::new(700.0, 600.0)));
+        assert!(!lt_media.matches_viewport(Vec2::new(960.0, 600.0)));
+    }
+
+    #[test]
+    fn evaluates_prefixed_breakpoint_operators() {
+        let parsed = load_css(
+            r#"
+            @media (min-width > 800px) {
+                .min-gt { display: none; }
+            }
+            @media (max-width < 800px) {
+                .max-lt { display: none; }
+            }
+        "#,
+        );
+
+        let min_gt = parsed
+            .styles
+            .values()
+            .find(|pair| pair.selector == ".min-gt")
+            .expect("missing parsed .min-gt style");
+        let max_lt = parsed
+            .styles
+            .values()
+            .find(|pair| pair.selector == ".max-lt")
+            .expect("missing parsed .max-lt style");
+
+        let min_gt_media = min_gt.media.as_ref().expect("missing min-gt media");
+        assert!(min_gt_media.matches_viewport(Vec2::new(900.0, 600.0)));
+        assert!(!min_gt_media.matches_viewport(Vec2::new(700.0, 600.0)));
+
+        let max_lt_media = max_lt.media.as_ref().expect("missing max-lt media");
+        assert!(max_lt_media.matches_viewport(Vec2::new(700.0, 600.0)));
+        assert!(!max_lt_media.matches_viewport(Vec2::new(900.0, 600.0)));
+    }
+
+    #[test]
     fn background_image_gradient_preserves_existing_color() {
         let mut style = Style::default();
         apply_property_to_style(&mut style, "background-color", "rgba(16, 24, 40, 45)");

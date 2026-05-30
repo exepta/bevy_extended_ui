@@ -24,7 +24,10 @@ pub struct CheckBoxWidget;
 impl Plugin for CheckBoxWidget {
     /// Registers systems for checkbox widget setup.
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (internal_node_creation_system, update_check_box_system));
+        app.add_systems(
+            Update,
+            (internal_node_creation_system, update_check_box_system),
+        );
     }
 }
 

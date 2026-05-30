@@ -654,7 +654,9 @@ fn update_with_meta<T: Component>(
     if let Some(validation) = &meta.validation {
         commands.entity(entity).insert(validation.clone());
     } else {
-        commands.entity(entity).remove::<crate::widgets::ValidationRules>();
+        commands
+            .entity(entity)
+            .remove::<crate::widgets::ValidationRules>();
     }
 
     if states.hidden {
