@@ -46,6 +46,17 @@
       ]
     },
     {
+      "name": "listbox",
+      "examples": [
+        {
+          "id": "listbox",
+          "iframe_src": "{base.url}/examples/base",
+          "html": "<listbox id=\"difficulty\"><option value=\"easy\">Easy</option><option selected value=\"normal\">Normal</option><option value=\"hard\">Hard</option></listbox>",
+          "css": "column, al:center"
+        }
+      ]
+    },
+    {
       "name": "colorpicker",
       "examples": [
         {
