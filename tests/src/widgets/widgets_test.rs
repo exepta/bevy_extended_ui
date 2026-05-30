@@ -725,4 +725,33 @@ mod tests {
         assert_eq!(rb.value_as_str(), None);
         assert!(rb.get_reflected().is_none());
     }
+
+    #[test]
+    fn slider_type_parser_accepts_default_and_range() {
+        assert_eq!(SliderType::from_str("default"), Some(SliderType::Default));
+        assert_eq!(SliderType::from_str("range"), Some(SliderType::Range));
+        assert_eq!(SliderType::from_str(" RANGE "), Some(SliderType::Range));
+        assert_eq!(SliderType::from_str("unknown"), None);
+    }
+
+    #[test]
+    fn slider_dot_anchor_parser_accepts_top_and_bottom() {
+        assert_eq!(SliderDotAnchor::from_str("top"), Some(SliderDotAnchor::Top));
+        assert_eq!(
+            SliderDotAnchor::from_str("bottom"),
+            Some(SliderDotAnchor::Bottom)
+        );
+        assert_eq!(SliderDotAnchor::from_str("BOTTOM"), Some(SliderDotAnchor::Bottom));
+        assert_eq!(SliderDotAnchor::from_str("left"), None);
+    }
+
+    #[test]
+    fn slider_default_values_are_sane() {
+        let slider = Slider::default();
+        assert_eq!(slider.slider_type, SliderType::Default);
+        assert!(slider.max >= slider.min);
+        assert!(slider.step > 0.0);
+        assert!(slider.range_start <= slider.range_end);
+        assert!(slider.value >= slider.min && slider.value <= slider.max);
+    }
 }

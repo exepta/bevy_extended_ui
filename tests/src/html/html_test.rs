@@ -8,7 +8,7 @@ mod tests {
     use crate::html::converter::{self, HtmlConverterSystem};
     use crate::html::reload::{CssDirty, HtmlReloadPlugin};
     use crate::io::{CssAsset, DefaultCssHandle, HtmlAsset};
-    use crate::lang::{UILang, UiLangState, UiLangVariables};
+    use crate::lang::{UILang, UiLangState, UiLangVariables, UiSharedValues};
     #[cfg(feature = "providers")]
     use crate::providers::{ThemeProvider, UiProviderRegistry};
     use crate::styles::{CssClass, CssID, CssSource, IconPlace};
@@ -219,6 +219,7 @@ mod tests {
         app.init_resource::<UILang>();
         app.init_resource::<UiLangState>();
         app.init_resource::<UiLangVariables>();
+        app.init_resource::<UiSharedValues>();
 
         let default_css = {
             let mut css_assets = app.world_mut().resource_mut::<Assets<CssAsset>>();

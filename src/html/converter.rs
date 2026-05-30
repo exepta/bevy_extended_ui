@@ -22,7 +22,10 @@ use crate::html::{
     HtmlStructureMap, HtmlStyle, HtmlSystemSet, HtmlWidgetNode,
 };
 use crate::io::{CssAsset, DefaultCssHandle, HtmlAsset};
-use crate::lang::{UILang, UiLangState, UiLangVariables, localize_html, vars_fingerprint};
+use crate::lang::{
+    UILang, UiLangState, UiLangVariables, UiSharedValues, localize_html,
+    shared_values_fingerprint, vars_fingerprint,
+};
 #[cfg(feature = "providers")]
 use crate::providers::{
     ProviderChildPolicy, ProviderResolveContext, ThemeProviderState, UiProvider, UiProviderRegistry,
@@ -70,6 +73,13 @@ struct HtmlSourceQueries<'w, 's> {
     all: Query<'w, 's, (Entity, &'static HtmlSource)>,
 }
 
+/// Bundled template data inputs for converter systems.
+#[derive(SystemParam)]
+struct TemplateInputs<'w> {
+    lang_vars: Res<'w, UiLangVariables>,
+    shared_values: Res<'w, UiSharedValues>,
+}
+
 /// Converts HtmlAsset content into HtmlStructureMap entries.
 /// Also resolves <link rel="stylesheet" href="..."> into Handle<CssAsset>.
 /// Updates parsed HTML structures from assets and language state.
@@ -80,7 +90,7 @@ fn update_html_ui(
     mut ui_lang: ResMut<UILang>,
     mut lang_state: ResMut<UiLangState>,
 
-    lang_vars: Res<UiLangVariables>,
+    template_inputs: TemplateInputs,
     config: Res<ExtendedUiConfiguration>,
     asset_server: Res<AssetServer>,
     html_assets: Res<Assets<HtmlAsset>>,
@@ -115,7 +125,7 @@ fn update_html_ui(
     }
     let resolved = ui_lang.resolved().map(|lang| lang.to_string());
     let mut lang_dirty = false;
-    let vars_hash = vars_fingerprint(&lang_vars);
+    let vars_hash = vars_fingerprint(&template_inputs.lang_vars);
 
     if lang_state.last_resolved != resolved {
         lang_state.last_resolved = resolved;
@@ -131,6 +141,12 @@ fn update_html_ui(
 
     if lang_state.last_vars_fingerprint != Some(vars_hash) {
         lang_state.last_vars_fingerprint = Some(vars_hash);
+        lang_dirty = true;
+    }
+
+    let shared_hash = shared_values_fingerprint(&template_inputs.shared_values);
+    if lang_state.last_shared_fingerprint != Some(shared_hash) {
+        lang_state.last_shared_fingerprint = Some(shared_hash);
         lang_dirty = true;
     }
 
@@ -204,9 +220,14 @@ fn update_html_ui(
             &content,
             ui_lang.resolved(),
             &config.language_path,
-            &lang_vars,
+            &template_inputs.lang_vars,
         );
-        let template_resolved = preprocess_template_directives(&localized, &lang_vars);
+        let template_resolved =
+            preprocess_template_directives_with_shared(
+                &localized,
+                &template_inputs.lang_vars,
+                &template_inputs.shared_values,
+            );
         let document = if template_resolved == content {
             raw_document
         } else {
@@ -2031,6 +2052,17 @@ fn extract_direct_child_tags(inner_html: &str) -> Vec<String> {
 }
 
 const TEMPLATE_MAX_RECURSION: usize = 64;
+static TEMPLATE_USE_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r#"(?m)^[ \t]*@use[ \t]+"([^"]+)"[ \t]+as[ \t]+([A-Za-z_][A-Za-z0-9_]*|\*)[ \t]*;[ \t]*\r?$"#)
+        .unwrap()
+});
+
+#[derive(Debug, Clone)]
+struct TemplateUseDirective {
+    target: String,
+    alias: String,
+    wildcard: bool,
+}
 
 #[derive(Debug, Clone)]
 struct TemplateValueContext {
@@ -2038,11 +2070,75 @@ struct TemplateValueContext {
 }
 
 impl TemplateValueContext {
-    fn from_lang_vars(vars: &UiLangVariables) -> Self {
+    fn from_sources(
+        vars: &UiLangVariables,
+        shared: &UiSharedValues,
+        use_directives: &[TemplateUseDirective],
+    ) -> Self {
         let mut values = HashMap::new();
         for (key, value) in &vars.vars {
             values.insert(key.clone(), parse_template_context_value(value));
         }
+
+        for (alias, target) in &shared.auto_use_aliases {
+            if let Some(shared_value) = shared.values.get(target) {
+                if values.contains_key(alias) {
+                    warn!(
+                        "Auto use alias '{}' skipped because value already exists in template context",
+                        alias
+                    );
+                    continue;
+                }
+                values.insert(alias.clone(), shared_value.clone());
+            }
+        }
+
+        for directive in use_directives {
+            let Some(shared_value) = shared.values.get(&directive.target) else {
+                if !shared.known_types.contains(&directive.target) {
+                    warn!("Unknown @use target '{}'", directive.target);
+                }
+                continue;
+            };
+
+            if directive.wildcard {
+                let Some(map) = shared_value.as_object() else {
+                    warn!(
+                        "@use \"{}\" as * requires an object/struct value",
+                        directive.target
+                    );
+                    continue;
+                };
+
+                for (field, field_value) in map {
+                    if values.contains_key(field) {
+                        warn!(
+                            "Duplicate @use field '{}' ignored (target '{}')",
+                            field, directive.target
+                        );
+                        continue;
+                    }
+                    values.insert(field.clone(), field_value.clone());
+                }
+            } else {
+                if shared
+                    .auto_use_aliases
+                    .get(&directive.alias)
+                    .is_some_and(|target| target == &directive.target)
+                {
+                    // Redundant explicit import for an already auto-imported alias.
+                    continue;
+                }
+                if values.contains_key(&directive.alias) {
+                    warn!(
+                        "Alias '{}' from @use \"{}\" already exists in template context",
+                        directive.alias, directive.target
+                    );
+                }
+                values.insert(directive.alias.clone(), shared_value.clone());
+            }
+        }
+
         Self { values }
     }
 
@@ -2142,8 +2238,19 @@ impl<'a> TemplateCursor<'a> {
 /// - method calls on values: `startsWidth`, `endsWidth`, `contains`
 ///   (`startsWith` / `endsWith` aliases are accepted too)
 pub fn preprocess_template_directives(template: &str, vars: &UiLangVariables) -> String {
-    let context = TemplateValueContext::from_lang_vars(vars);
-    render_template_with_context(template, &context, 0)
+    let shared = UiSharedValues::default();
+    preprocess_template_directives_with_shared(template, vars, &shared)
+}
+
+/// Preprocesses template directives with typed shared values and `@use` imports.
+pub fn preprocess_template_directives_with_shared(
+    template: &str,
+    vars: &UiLangVariables,
+    shared: &UiSharedValues,
+) -> String {
+    let (use_directives, cleaned_template) = extract_template_use_directives(template);
+    let context = TemplateValueContext::from_sources(vars, shared, &use_directives);
+    render_template_with_context(&cleaned_template, &context, 0)
 }
 
 fn render_template_with_context(
@@ -2174,7 +2281,7 @@ fn render_template_segment(
         }
 
         if cursor.starts_with("{{") {
-            output.push_str(&consume_moustache(cursor));
+            output.push_str(&render_moustache(cursor, context));
             continue;
         }
 
@@ -2322,6 +2429,28 @@ fn parse_for_header(header: &str) -> Option<(String, Option<String>, String)> {
     Some((item_name, index_name, iterable_expression))
 }
 
+fn extract_template_use_directives(template: &str) -> (Vec<TemplateUseDirective>, String) {
+    let mut directives = Vec::new();
+
+    for captures in TEMPLATE_USE_RE.captures_iter(template) {
+        let Some(target) = captures.get(1).map(|m| m.as_str().trim().to_string()) else {
+            continue;
+        };
+        let Some(alias_raw) = captures.get(2).map(|m| m.as_str().trim().to_string()) else {
+            continue;
+        };
+
+        directives.push(TemplateUseDirective {
+            target,
+            alias: alias_raw.clone(),
+            wildcard: alias_raw == "*",
+        });
+    }
+
+    let cleaned = TEMPLATE_USE_RE.replace_all(template, "").into_owned();
+    (directives, cleaned)
+}
+
 fn iterable_items(value: JsonValue) -> Vec<JsonValue> {
     match value {
         JsonValue::Array(items) => items,
@@ -2330,26 +2459,46 @@ fn iterable_items(value: JsonValue) -> Vec<JsonValue> {
     }
 }
 
-fn consume_moustache(cursor: &mut TemplateCursor) -> String {
-    let mut out = String::new();
+fn render_moustache(cursor: &mut TemplateCursor, context: &TemplateValueContext) -> String {
+    let (raw, expression) = consume_moustache(cursor);
+    let Some(expression) = expression else {
+        return raw;
+    };
 
-    if !cursor.consume_str("{{") {
-        return out;
+    let expression = expression.trim();
+    if expression.is_empty() {
+        return raw;
     }
 
-    out.push_str("{{");
+    let Some(evaluated) = evaluate_expression(expression, context) else {
+        return raw;
+    };
+
+    value_to_inline_string(&evaluated).unwrap_or(raw)
+}
+
+fn consume_moustache(cursor: &mut TemplateCursor) -> (String, Option<String>) {
+    let mut raw = String::new();
+    let mut expression = String::new();
+
+    if !cursor.consume_str("{{") {
+        return (raw, None);
+    }
+
+    raw.push_str("{{");
     while !cursor.is_eof() {
         if cursor.starts_with("}}") {
             cursor.consume_str("}}");
-            out.push_str("}}");
-            break;
+            raw.push_str("}}");
+            return (raw, Some(expression));
         }
         if let Some(ch) = cursor.next_char() {
-            out.push(ch);
+            raw.push(ch);
+            expression.push(ch);
         }
     }
 
-    out
+    (raw, None)
 }
 
 fn extract_group_content(cursor: &mut TemplateCursor, open: char, close: char) -> Option<String> {

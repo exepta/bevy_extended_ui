@@ -38,7 +38,7 @@ pub mod styles;
 pub mod utils;
 pub mod widgets;
 
-pub use lang::{UILang, UiLangVariables};
+pub use lang::{UILang, UiLangVariables, UiSharedValues};
 
 /// A cache mapping image paths to their loaded handles,
 /// preventing duplicate loads and allowing cleanup of unused images.

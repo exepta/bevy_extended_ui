@@ -1,12 +1,20 @@
+@use "Info" as info;
 <div id="framework-root" oninit="init_main">
   <h3>Extended Framework Active</h3>
   <p>This UI was booted from index.html and app-main component.</p>
   <button>Component Button</button>
 
-  @if(state) {
+  @if(player.state) {
   <switch checked onclick="check_state">On / Off</switch>
   <app-test />
   } @else {
   <switch onclick="check_state">On / Off</switch>
+  }
+
+  <h4>{{ info.display }}</h4>
+  <p>Player Name: {{ player.name }}</p>
+
+  @for (entry, index in player.list) {
+    <p>Entry: {{ entry }}</p>
   }
 </div>

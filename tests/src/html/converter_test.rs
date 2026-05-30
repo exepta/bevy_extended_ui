@@ -2,8 +2,9 @@
 mod tests {
     use super::super::converter::{
         extract_inner_bindings, parse_inner_content, preprocess_template_directives,
+        preprocess_template_directives_with_shared,
     };
-    use crate::lang::UiLangVariables;
+    use crate::lang::{UiLangVariables, UiSharedValues};
     use kuchiki::traits::TendrilSink;
 
     #[test]
@@ -74,5 +75,50 @@ mod tests {
 
         assert!(rendered.contains("<p>0:Alice</p>"));
         assert!(rendered.contains("<p>1:Bob</p>"));
+    }
+
+    #[test]
+    fn preprocess_template_directives_resolves_use_alias_and_wildcard() {
+        let vars = UiLangVariables::default();
+        let mut shared = UiSharedValues::default();
+        shared.values.insert(
+            "Player".to_string(),
+            crate::lang::serde_json::from_str(r#"{"state":true,"name":"NetRunner"}"#).unwrap(),
+        );
+
+        let template = r#"
+            @use "Player" as player;
+            @if(player.state && player.name.startsWidth("Net")) {
+              <p>Alias Works</p>
+            }
+            @use "Player" as *;
+            @if(state && name.endsWidth("Runner")) {
+              <p>Wildcard Works</p>
+            }
+        "#;
+
+        let rendered = preprocess_template_directives_with_shared(template, &vars, &shared);
+
+        assert!(rendered.contains("<p>Alias Works</p>"));
+        assert!(rendered.contains("<p>Wildcard Works</p>"));
+        assert!(!rendered.contains("@use"));
+    }
+
+    #[test]
+    fn preprocess_template_directives_interpolates_moustache_from_shared_alias() {
+        let vars = UiLangVariables::default();
+        let mut shared = UiSharedValues::default();
+        shared.values.insert(
+            "Player".to_string(),
+            crate::lang::serde_json::from_str(r#"{"name":"NetRunner"}"#).unwrap(),
+        );
+
+        let template = r#"
+            @use "Player" as player;
+            <p>Player Name: {{ player.name }}</p>
+        "#;
+
+        let rendered = preprocess_template_directives_with_shared(template, &vars, &shared);
+        assert!(rendered.contains("<p>Player Name: NetRunner</p>"));
     }
 }
