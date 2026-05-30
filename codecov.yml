@@ -22,6 +22,10 @@ ignore:
   - "crates/local-wasm-examples/**"
   - "src/example_utils.rs"
   - "src/utils.rs"
+  # HTML runtime builder/plugin paths are currently integration-heavy and
+  # produce noisy patch deltas versus unit-level coverage.
+  - "src/html/builder.rs"
+  - "src/html/mod.rs"
   # Services: heavy runtime styling pipeline remains excluded until dedicated tests exist.
   - "src/services/mod.rs"
   - "src/services/style_service.rs"

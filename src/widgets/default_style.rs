@@ -1250,7 +1250,7 @@ slider {
             width: 0;
             background: var(--primary);
             border-radius: 5px;
-            transition: all 0.3s;
+            transition: background 0.3s;
             z-index: 2;
         }
 
@@ -1261,7 +1261,7 @@ slider {
             border-radius: 50%;
             position: absolute;
             box-shadow: 0 0 1px 1px #303033;
-            transition: all 0.3s;
+            transition: background 0.3s, box-shadow 0.3s, transform 0.3s;
             z-index: 4;
 
             > .slider-thumb-tooltip {

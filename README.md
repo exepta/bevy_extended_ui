@@ -376,10 +376,12 @@ If anyone has any ideas, I'd be happy to hear them.
 ### Compatibility
 
 > _Note:_ This project is currently under construction and not suitable for large projects!.
+> The new component system is still in development and may change in the future. Do not use it in production!
 
 | `Bevy` version | `bevy_extended_ui` version |
 |----------------|----------------------------|
-| 0.18.1         | 1.2.0 - 1.5.0              |
+| 0.19.0         | 1.6.1 - main               |
+| 0.18.1         | 1.2.0 - 1.6.0              |
 | 0.17.0         | 1.0.0 - 1.1.0              |
 | 0.16.0         | 0.1.0 - 0.2.2              |
 

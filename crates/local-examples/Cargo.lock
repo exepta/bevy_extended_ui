@@ -783,6 +783,7 @@ dependencies = [
  "bevy",
  "bevy_extended_ui",
  "bevy_extended_ui_macros",
+ "serde",
 ]
 
 [[package]]
