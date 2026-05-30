@@ -1085,4 +1085,63 @@ mod tests {
             Some(&tag)
         ));
     }
+
+    #[test]
+    fn matches_selector_ignores_pseudo_and_attribute_suffixes() {
+        let id = CssID("cta".to_string());
+        let classes = CssClass(vec!["btn".to_string(), "primary".to_string()]);
+        let tag = TagName("button".to_string());
+
+        assert!(matches_selector(
+            "button.btn.primary:hover",
+            Some(&id),
+            Some(&classes),
+            Some(&tag)
+        ));
+        assert!(matches_selector(
+            ".btn.primary[data-kind='main']",
+            Some(&id),
+            Some(&classes),
+            Some(&tag)
+        ));
+    }
+
+    #[test]
+    fn matches_selector_handles_case_insensitive_tag_names() {
+        let tag = TagName("Div".to_string());
+        assert!(matches_selector("div", None, None, Some(&tag)));
+        assert!(matches_selector("DIV", None, None, Some(&tag)));
+        assert!(matches_selector(
+            "dIv.card",
+            None,
+            Some(&CssClass(vec!["card".to_string()])),
+            Some(&tag)
+        ));
+    }
+
+    #[test]
+    fn matches_selector_rejects_invalid_selector_tokens() {
+        let id = CssID("main".to_string());
+        let classes = CssClass(vec!["card".to_string()]);
+        let tag = TagName("div".to_string());
+
+        assert!(!matches_selector(
+            "..card",
+            Some(&id),
+            Some(&classes),
+            Some(&tag)
+        ));
+        assert!(!matches_selector(
+            "div#",
+            Some(&id),
+            Some(&classes),
+            Some(&tag)
+        ));
+        assert!(!matches_selector(
+            ".",
+            Some(&id),
+            Some(&classes),
+            Some(&tag)
+        ));
+    }
 }

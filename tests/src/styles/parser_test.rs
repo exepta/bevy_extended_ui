@@ -125,6 +125,75 @@ mod tests {
     }
 
     #[test]
+    fn evaluates_prefixed_breakpoint_operators_with_equals() {
+        let parsed = load_css(
+            r#"
+            @media (min-width >= 800px) {
+                .min-ge { display: none; }
+            }
+            @media (max-width <= 800px) {
+                .max-le { display: none; }
+            }
+        "#,
+        );
+
+        let min_ge = parsed
+            .styles
+            .values()
+            .find(|pair| pair.selector == ".min-ge")
+            .expect("missing parsed .min-ge style");
+        let max_le = parsed
+            .styles
+            .values()
+            .find(|pair| pair.selector == ".max-le")
+            .expect("missing parsed .max-le style");
+
+        let min_ge_media = min_ge.media.as_ref().expect("missing min-ge media");
+        assert!(min_ge_media.matches_viewport(Vec2::new(800.0, 600.0)));
+        assert!(!min_ge_media.matches_viewport(Vec2::new(799.0, 600.0)));
+
+        let max_le_media = max_le.media.as_ref().expect("missing max-le media");
+        assert!(max_le_media.matches_viewport(Vec2::new(800.0, 600.0)));
+        assert!(!max_le_media.matches_viewport(Vec2::new(801.0, 600.0)));
+    }
+
+    #[test]
+    fn evaluates_height_range_breakpoint_operators() {
+        let parsed = load_css(
+            r#"
+            @media (height > 500px) {
+                .gt-height { display: none; }
+            }
+            @media (max-height < 500px) {
+                .max-lt-height { display: none; }
+            }
+        "#,
+        );
+
+        let gt_height = parsed
+            .styles
+            .values()
+            .find(|pair| pair.selector == ".gt-height")
+            .expect("missing parsed .gt-height style");
+        let max_lt_height = parsed
+            .styles
+            .values()
+            .find(|pair| pair.selector == ".max-lt-height")
+            .expect("missing parsed .max-lt-height style");
+
+        let gt_height_media = gt_height.media.as_ref().expect("missing gt-height media");
+        assert!(gt_height_media.matches_viewport(Vec2::new(900.0, 650.0)));
+        assert!(!gt_height_media.matches_viewport(Vec2::new(900.0, 480.0)));
+
+        let max_lt_height_media = max_lt_height
+            .media
+            .as_ref()
+            .expect("missing max-lt-height media");
+        assert!(max_lt_height_media.matches_viewport(Vec2::new(900.0, 480.0)));
+        assert!(!max_lt_height_media.matches_viewport(Vec2::new(900.0, 650.0)));
+    }
+
+    #[test]
     fn background_image_gradient_preserves_existing_color() {
         let mut style = Style::default();
         apply_property_to_style(&mut style, "background-color", "rgba(16, 24, 40, 45)");
