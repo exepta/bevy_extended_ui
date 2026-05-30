@@ -28,7 +28,7 @@ pub struct SwitchButtonWidget;
 impl Plugin for SwitchButtonWidget {
     /// Registers systems for switch button setup and interaction.
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, internal_node_creation_system);
+        app.add_systems(Update, (internal_node_creation_system, update_switch_button_system));
     }
 }
 
@@ -157,6 +157,23 @@ fn internal_node_creation_system(
             .observe(on_internal_click)
             .observe(on_internal_cursor_entered)
             .observe(on_internal_cursor_leave);
+    }
+}
+
+fn update_switch_button_system(
+    mut switch_q: Query<
+        (&SwitchButton, &UIGenID, &mut UIWidgetState),
+        (With<SwitchButton>, With<SwitchButtonBase>, Changed<SwitchButton>),
+    >,
+    mut label_q: Query<(&BindToID, &mut Text), With<SwitchButtonLabel>>,
+) {
+    for (switch_button, id, mut state) in switch_q.iter_mut() {
+        state.checked = switch_button.selected;
+        for (bind_to, mut text) in label_q.iter_mut() {
+            if bind_to.0 == id.0 {
+                text.0 = switch_button.label.clone();
+            }
+        }
     }
 }
 

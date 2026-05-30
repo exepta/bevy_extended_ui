@@ -31,7 +31,7 @@ impl Plugin for RadioButtonWidget {
     /// Registers systems for radio button setup and selection logic.
     fn build(&self, app: &mut App) {
         app.init_resource::<RadioMissingFieldSetWarned>();
-        app.add_systems(Update, internal_node_creation_system);
+        app.add_systems(Update, (internal_node_creation_system, update_radio_button_system));
         app.add_systems(Update, ensure_checked_dots_system);
         app.add_systems(Update, ensure_fieldset_selection_system);
     }
@@ -157,6 +157,23 @@ fn internal_node_creation_system(
             .observe(on_internal_click)
             .observe(on_internal_cursor_entered)
             .observe(on_internal_cursor_leave);
+    }
+}
+
+fn update_radio_button_system(
+    mut radio_q: Query<
+        (&RadioButton, &UIGenID, &mut UIWidgetState),
+        (With<RadioButton>, With<RadioButtonBase>, Changed<RadioButton>),
+    >,
+    mut label_q: Query<(&BindToID, &mut Text), With<RadioButtonLabel>>,
+) {
+    for (radio_button, id, mut state) in radio_q.iter_mut() {
+        state.checked = radio_button.selected;
+        for (bind_to, mut text) in label_q.iter_mut() {
+            if bind_to.0 == id.0 {
+                text.0 = radio_button.label.clone();
+            }
+        }
     }
 }
 
