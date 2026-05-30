@@ -177,7 +177,10 @@ fn internal_node_creation_system(
                         css_source.clone(),
                         CssClass(vec!["slider-track".to_string()]),
                         RenderLayers::layer(layer),
-                        Pickable::default(),
+                        Pickable {
+                            should_block_lower: false,
+                            is_hoverable: true,
+                        },
                         SliderTrackContainer,
                         BindToID(id.0),
                     ))
@@ -617,7 +620,10 @@ fn apply_from_track_pointer(
 fn on_thumb_drag(
     mut event: On<Pointer<Drag>>,
     parent_q: Query<&ChildOf>,
-    track_q: Query<(&ComputedNode, &BindToID), With<SliderTrackContainer>>,
+    track_q: Query<
+        (&ComputedNode, &BindToID, &RelativeCursorPosition),
+        With<SliderTrackContainer>,
+    >,
     thumb_node_q: Query<&ComputedNode, With<SliderThumb>>,
     mut slider_q: Query<(&mut Slider, &UIGenID), With<Slider>>,
     slider_state_q: Query<(&UIGenID, &UIWidgetState), With<Slider>>,
@@ -646,7 +652,7 @@ fn on_thumb_drag(
     let Ok(parent) = parent_q.get(event.entity) else {
         return;
     };
-    let Ok((track_node, bind)) = track_q.get(parent.parent()) else {
+    let Ok((track_node, bind, rel)) = track_q.get(parent.parent()) else {
         return;
     };
 
@@ -662,17 +668,24 @@ fn on_thumb_drag(
     let thumb_width = (thumb_node.size().x / sf).max(1.0);
     let half = thumb_width * 0.5;
 
-    let dx = event.event.delta.x / sf;
-
     let Ok((_, thumb, _, _, _)) = thumb_q.get(event.entity) else {
         return;
     };
-    let current_left = thumb.current_center_x - half;
+    let desired_left = if let Some(n) = rel.normalized {
+        let t = (n.x + 0.5).clamp(0.0, 1.0);
+        let click_x = t * track_width;
+        click_x - half
+    } else {
+        // Fallback for edge-cases where relative cursor data is temporarily unavailable.
+        let dx = event.event.delta.x / sf;
+        let current_left = thumb.current_center_x - half;
+        current_left + dx
+    };
 
     apply_from_track_left_x(
         bind.0,
         Some(thumb.role),
-        current_left + dx,
+        desired_left,
         track_width,
         thumb_width,
         &mut slider_q,
