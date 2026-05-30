@@ -580,9 +580,7 @@ pub fn refresh_shared_values(world: &mut World) {
                 if previous != name {
                     warn!(
                         "Duplicate #[html_use] alias '{}' for '{}' ignored (already used by '{}')",
-                        alias,
-                        name,
-                        previous
+                        alias, name, previous
                     );
                     continue;
                 }

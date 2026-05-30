@@ -741,7 +741,10 @@ mod tests {
             SliderDotAnchor::from_str("bottom"),
             Some(SliderDotAnchor::Bottom)
         );
-        assert_eq!(SliderDotAnchor::from_str("BOTTOM"), Some(SliderDotAnchor::Bottom));
+        assert_eq!(
+            SliderDotAnchor::from_str("BOTTOM"),
+            Some(SliderDotAnchor::Bottom)
+        );
         assert_eq!(SliderDotAnchor::from_str("left"), None);
     }
 

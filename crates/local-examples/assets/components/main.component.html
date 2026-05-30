@@ -1,20 +1,22 @@
 @use "Info" as info;
+@use "Player" as player;
 <div id="framework-root" oninit="init_main">
-  <h3>Extended Framework Active</h3>
-  <p>This UI was booted from index.html and app-main component.</p>
-  <button>Component Button</button>
+    <h3>Extended Framework Active</h3>
+    <p>This UI was booted from index.html and app-main component.</p>
+    <button>Component Button</button>
+    <switch checked onclick="check_state">{{ player.state }}</switch>
 
-  @if(player.state) {
-  <switch checked onclick="check_state">On / Off</switch>
-  <app-test />
-  } @else {
-  <switch onclick="check_state">On / Off</switch>
-  }
+    @if(player.state) {
+        <app-test></app-test>
+    } @else {
+        <slider></slider>
+    }
+    <h4>{{ info.display }}</h4>
+    <p>Player Name: {{ player.name }}</p>
 
-  <h4>{{ info.display }}</h4>
-  <p>Player Name: {{ player.name }}</p>
+    @for (entry, index in player.list) {
+        <p>Entry: {{ entry }}</p>
+    }
 
-  @for (entry, index in player.list) {
-    <p>Entry: {{ entry }}</p>
-  }
+    <app-help></app-help>
 </div>

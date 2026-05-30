@@ -16,10 +16,22 @@ pub const MAIN_COMPONENT: MainComponent = MainComponent {
     styles: &["main.component.css"],
 };
 
+/// Represents a player entity with a state, name, and a list of associated data.
+///
+/// The `Player` struct is marked with the `#[html_use]` attribute, indicating potential use
+/// in an HTML-related context. Additionally, it derives the `Serialize` trait, enabling
+/// it to be serialized into formats such as JSON.
+///
+/// # Fields
+/// * `state` - A boolean representing the state of the player (e.g., active or inactive).
+/// * `name` - A `String` representing the player's name.
+/// * `list` - A vector of strings containing additional data or attributes related to the player.
 #[html_use]
 #[derive(Serialize)]
 pub struct Player {
+    /// The state of display the test area.
     pub state: bool,
+    /// The name of the player.
     pub name: String,
     pub list: Vec<String>,
 }
@@ -34,16 +46,28 @@ impl Default for Player {
     }
 }
 
+/// Structure representing information for shared HTML rendering.
+///
+/// This struct is annotated with the `#[html_shared]` attribute, which indicates
+/// that it is intended to be used in the context of shared HTML resources.
+/// The `Serialize` trait enables the struct to be serialized into formats such as JSON.
+///
+/// # Fields
+///
+/// * `display` - A `String` that represents the main content or data to be displayed.
+/// * `see_mee` - A `String` containing additional information or metadata related to the `display`.
 #[html_shared]
 #[derive(Serialize)]
 pub struct Info {
     pub display: String,
+    pub see_mee: String
 }
 
 impl Default for Info {
     fn default() -> Self {
         Self {
             display: "Hello World!".to_string(),
+            see_mee: "See mee!".to_string(),
         }
     }
 }

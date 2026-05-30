@@ -68,7 +68,8 @@ mod shared_state_tests {
         let mut vars = UiLangVariables::default();
         let model = serde_json::json!({"name":"runner","enabled":true});
 
-        vars.set_json("model", &model).expect("json encode should work");
+        vars.set_json("model", &model)
+            .expect("json encode should work");
         let decoded: Option<serde_json::Value> = vars.get_json("model");
         assert_eq!(decoded, Some(model));
     }

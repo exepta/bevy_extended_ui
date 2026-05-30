@@ -23,8 +23,8 @@ use crate::html::{
 };
 use crate::io::{CssAsset, DefaultCssHandle, HtmlAsset};
 use crate::lang::{
-    UILang, UiLangState, UiLangVariables, UiSharedValues, localize_html,
-    shared_values_fingerprint, vars_fingerprint,
+    UILang, UiLangState, UiLangVariables, UiSharedValues, localize_html, shared_values_fingerprint,
+    vars_fingerprint,
 };
 #[cfg(feature = "providers")]
 use crate::providers::{
@@ -222,12 +222,11 @@ fn update_html_ui(
             &config.language_path,
             &template_inputs.lang_vars,
         );
-        let template_resolved =
-            preprocess_template_directives_with_shared(
-                &localized,
-                &template_inputs.lang_vars,
-                &template_inputs.shared_values,
-            );
+        let template_resolved = preprocess_template_directives_with_shared(
+            &localized,
+            &template_inputs.lang_vars,
+            &template_inputs.shared_values,
+        );
         let document = if template_resolved == content {
             raw_document
         } else {
@@ -546,17 +545,15 @@ fn parse_html_node(
             let mut children = Vec::new();
             for (index, child) in node.children().enumerate() {
                 let child_path = format!("{path}.{index}");
-                if let Some(parsed) =
-                    parse_html_node(
-                        &child,
-                        css_sources,
-                        label_map,
-                        key,
-                        html,
-                        type_registry,
-                        child_path.as_str(),
-                    )
-                {
+                if let Some(parsed) = parse_html_node(
+                    &child,
+                    css_sources,
+                    label_map,
+                    key,
+                    html,
+                    type_registry,
+                    child_path.as_str(),
+                ) {
                     children.push(parsed);
                 }
             }
@@ -576,17 +573,15 @@ fn parse_html_node(
             let mut children = Vec::new();
             for (index, child) in node.children().enumerate() {
                 let child_path = format!("{path}.{index}");
-                if let Some(parsed) =
-                    parse_html_node(
-                        &child,
-                        css_sources,
-                        label_map,
-                        key,
-                        html,
-                        type_registry,
-                        child_path.as_str(),
-                    )
-                {
+                if let Some(parsed) = parse_html_node(
+                    &child,
+                    css_sources,
+                    label_map,
+                    key,
+                    html,
+                    type_registry,
+                    child_path.as_str(),
+                ) {
                     children.push(parsed);
                 }
             }
@@ -622,17 +617,15 @@ fn parse_html_node(
             let mut children = Vec::new();
             for (index, child) in node.children().enumerate() {
                 let child_path = format!("{path}.{index}");
-                if let Some(parsed) =
-                    parse_html_node(
-                        &child,
-                        css_sources,
-                        label_map,
-                        key,
-                        html,
-                        type_registry,
-                        child_path.as_str(),
-                    )
-                {
+                if let Some(parsed) = parse_html_node(
+                    &child,
+                    css_sources,
+                    label_map,
+                    key,
+                    html,
+                    type_registry,
+                    child_path.as_str(),
+                ) {
                     children.push(parsed);
                 }
             }
@@ -678,17 +671,15 @@ fn parse_html_node(
             let mut children = Vec::new();
             for (index, child) in node.children().enumerate() {
                 let child_path = format!("{path}.{index}");
-                if let Some(parsed) =
-                    parse_html_node(
-                        &child,
-                        css_sources,
-                        label_map,
-                        key,
-                        html,
-                        type_registry,
-                        child_path.as_str(),
-                    )
-                {
+                if let Some(parsed) = parse_html_node(
+                    &child,
+                    css_sources,
+                    label_map,
+                    key,
+                    html,
+                    type_registry,
+                    child_path.as_str(),
+                ) {
                     children.push(parsed);
                 }
             }
@@ -712,17 +703,15 @@ fn parse_html_node(
             let mut children = Vec::new();
             for (index, child) in node.children().enumerate() {
                 let child_path = format!("{path}.{index}");
-                if let Some(parsed) =
-                    parse_html_node(
-                        &child,
-                        css_sources,
-                        label_map,
-                        key,
-                        html,
-                        type_registry,
-                        child_path.as_str(),
-                    )
-                {
+                if let Some(parsed) = parse_html_node(
+                    &child,
+                    css_sources,
+                    label_map,
+                    key,
+                    html,
+                    type_registry,
+                    child_path.as_str(),
+                ) {
                     children.push(parsed);
                 }
             }
@@ -746,17 +735,15 @@ fn parse_html_node(
             let mut children = Vec::new();
             for (index, child) in node.children().enumerate() {
                 let child_path = format!("{path}.{index}");
-                if let Some(parsed) =
-                    parse_html_node(
-                        &child,
-                        css_sources,
-                        label_map,
-                        key,
-                        html,
-                        type_registry,
-                        child_path.as_str(),
-                    )
-                {
+                if let Some(parsed) = parse_html_node(
+                    &child,
+                    css_sources,
+                    label_map,
+                    key,
+                    html,
+                    type_registry,
+                    child_path.as_str(),
+                ) {
                     children.push(parsed);
                 }
             }
@@ -806,17 +793,15 @@ fn parse_html_node(
                     }
                 }
                 let child_path = format!("{path}.{index}");
-                if let Some(parsed) =
-                    parse_html_node(
-                        &child,
-                        css_sources,
-                        label_map,
-                        key,
-                        html,
-                        type_registry,
-                        child_path.as_str(),
-                    )
-                {
+                if let Some(parsed) = parse_html_node(
+                    &child,
+                    css_sources,
+                    label_map,
+                    key,
+                    html,
+                    type_registry,
+                    child_path.as_str(),
+                ) {
                     children.push(parsed);
                 }
             }
@@ -2080,16 +2065,30 @@ impl TemplateValueContext {
             values.insert(key.clone(), parse_template_context_value(value));
         }
 
-        for (alias, target) in &shared.auto_use_aliases {
+        let mut auto_use_entries: Vec<_> = shared.auto_use_aliases.iter().collect();
+        auto_use_entries.sort_by(|(a, _), (b, _)| a.cmp(b));
+
+        for (alias, target) in auto_use_entries {
             if let Some(shared_value) = shared.values.get(target) {
                 if values.contains_key(alias) {
                     warn!(
                         "Auto use alias '{}' skipped because value already exists in template context",
                         alias
                     );
-                    continue;
+                } else {
+                    values.insert(alias.clone(), shared_value.clone());
                 }
-                values.insert(alias.clone(), shared_value.clone());
+
+                // Keep fields from #[html_use] values available as direct placeholders.
+                // This preserves legacy {{name}}-style access while retaining alias usage.
+                if let Some(map) = shared_value.as_object() {
+                    for (field, field_value) in map {
+                        if values.contains_key(field) {
+                            continue;
+                        }
+                        values.insert(field.clone(), field_value.clone());
+                    }
+                }
             }
         }
 

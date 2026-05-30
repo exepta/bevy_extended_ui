@@ -239,8 +239,7 @@ fn reconcile_node_children(
 
             final_children.push(existing_entity);
         } else {
-            let spawned =
-                spawn_widget_node(commands, new_node, asset_server, Some(parent), false);
+            let spawned = spawn_widget_node(commands, new_node, asset_server, Some(parent), false);
             final_children.push(spawned);
         }
     }
@@ -600,30 +599,26 @@ fn spawn_widget_node(
                 start_hidden,
             )
         }
-        HtmlWidgetNode::Img(img, meta, states, functions, widget, id) => {
-            spawn_with_meta(
-                commands,
-                img.clone(),
-                meta,
-                states,
-                functions,
-                widget,
-                id,
-                start_hidden,
-            )
-        }
-        HtmlWidgetNode::Input(input, meta, states, functions, widget, id) => {
-            spawn_with_meta(
-                commands,
-                input.clone(),
-                meta,
-                states,
-                functions,
-                widget,
-                id,
-                start_hidden,
-            )
-        }
+        HtmlWidgetNode::Img(img, meta, states, functions, widget, id) => spawn_with_meta(
+            commands,
+            img.clone(),
+            meta,
+            states,
+            functions,
+            widget,
+            id,
+            start_hidden,
+        ),
+        HtmlWidgetNode::Input(input, meta, states, functions, widget, id) => spawn_with_meta(
+            commands,
+            input.clone(),
+            meta,
+            states,
+            functions,
+            widget,
+            id,
+            start_hidden,
+        ),
         HtmlWidgetNode::Paragraph(paragraph, meta, states, functions, widget, id) => {
             spawn_with_meta(
                 commands,
@@ -646,18 +641,16 @@ fn spawn_widget_node(
             id,
             start_hidden,
         ),
-        HtmlWidgetNode::Badge(badge, meta, states, functions, widget, id) => {
-            spawn_with_meta(
-                commands,
-                badge.clone(),
-                meta,
-                states,
-                functions,
-                widget,
-                id,
-                start_hidden,
-            )
-        }
+        HtmlWidgetNode::Badge(badge, meta, states, functions, widget, id) => spawn_with_meta(
+            commands,
+            badge.clone(),
+            meta,
+            states,
+            functions,
+            widget,
+            id,
+            start_hidden,
+        ),
         HtmlWidgetNode::ProgressBar(progress_bar, meta, states, functions, widget, id) => {
             spawn_with_meta(
                 commands,

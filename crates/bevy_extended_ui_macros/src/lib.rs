@@ -147,6 +147,15 @@ pub fn ui_component(_attr: TokenStream, item: TokenStream) -> TokenStream {
     item
 }
 
+/// Marks module entries that register `*.component.rs` files in a Rust build.
+///
+/// This marker is intentionally a passthrough and can be used for tooling that
+/// injects/updates entries in `assets_components.rs` (or equivalent files).
+#[proc_macro_attribute]
+pub fn beu_registry(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
 /// Registers a typed struct as shared template state (`@use "Type" as alias;`).
 #[proc_macro_attribute]
 pub fn html_shared(_attr: TokenStream, item: TokenStream) -> TokenStream {

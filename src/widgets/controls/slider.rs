@@ -620,10 +620,7 @@ fn apply_from_track_pointer(
 fn on_thumb_drag(
     mut event: On<Pointer<Drag>>,
     parent_q: Query<&ChildOf>,
-    track_q: Query<
-        (&ComputedNode, &BindToID, &RelativeCursorPosition),
-        With<SliderTrackContainer>,
-    >,
+    track_q: Query<(&ComputedNode, &BindToID, &RelativeCursorPosition), With<SliderTrackContainer>>,
     thumb_node_q: Query<&ComputedNode, With<SliderThumb>>,
     mut slider_q: Query<(&mut Slider, &UIGenID), With<Slider>>,
     slider_state_q: Query<(&UIGenID, &UIWidgetState), With<Slider>>,

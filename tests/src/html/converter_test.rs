@@ -121,4 +121,26 @@ mod tests {
         let rendered = preprocess_template_directives_with_shared(template, &vars, &shared);
         assert!(rendered.contains("<p>Player Name: NetRunner</p>"));
     }
+
+    #[test]
+    fn preprocess_template_directives_interpolates_moustache_from_html_use_fields() {
+        let vars = UiLangVariables::default();
+        let mut shared = UiSharedValues::default();
+        shared.values.insert(
+            "Player".to_string(),
+            crate::lang::serde_json::from_str(r#"{"name":"NetRunner","state":true}"#).unwrap(),
+        );
+        shared
+            .auto_use_aliases
+            .insert("player".to_string(), "Player".to_string());
+
+        let template = r#"
+            <p>Player Name: {{ name }}</p>
+            @if(state) { <p>Enabled</p> }
+        "#;
+
+        let rendered = preprocess_template_directives_with_shared(template, &vars, &shared);
+        assert!(rendered.contains("<p>Player Name: NetRunner</p>"));
+        assert!(rendered.contains("<p>Enabled</p>"));
+    }
 }
