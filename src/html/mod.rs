@@ -9,7 +9,7 @@ use crate::html::bindings::HtmlEventBindingsPlugin;
 use crate::html::builder::HtmlBuilderSystem;
 use crate::html::converter::HtmlConverterSystem;
 use crate::html::reload::HtmlReloadPlugin;
-use crate::lang::{UILang, UiLangState, UiLangVariables};
+use crate::lang::{UILang, UiLangState, UiLangVariables, UiSharedValues, refresh_shared_values};
 use bevy::ecs::system::SystemId;
 use bevy::prelude::*;
 use std::collections::{HashMap, HashSet};
@@ -1010,6 +1010,7 @@ impl Plugin for ExtendedUiHtmlPlugin {
         app.init_resource::<UILang>();
         app.init_resource::<UiLangState>();
         app.init_resource::<UiLangVariables>();
+        app.init_resource::<UiSharedValues>();
 
         app.register_type::<HtmlEventBindings>();
         app.register_type::<HtmlSource>();
@@ -1033,8 +1034,14 @@ impl Plugin for ExtendedUiHtmlPlugin {
             HtmlEventBindingsPlugin,
         ));
 
+        app.add_systems(PreUpdate, sync_shared_values_system);
+
         app.add_systems(Startup, register_html_fns);
     }
+}
+
+fn sync_shared_values_system(world: &mut World) {
+    refresh_shared_values(world);
 }
 
 /// Registers all HTML event handlers collected via `inventory`.

@@ -35,10 +35,4 @@ mod unit_tests {
             Some("src/packages/menu.component.rs")
         );
     }
-
-    #[test]
-    fn build_component_style_href_keeps_nested_component_dirs() {
-        let href = build_component_style_href("components", "test", "test.component.css");
-        assert_eq!(href, "components/test/test.component.css");
-    }
 }

@@ -1,7 +1,7 @@
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
 use syn::{
-    FnArg, GenericArgument, ItemFn, LitStr, PathArguments, Result, Type, TypePath,
+    FnArg, GenericArgument, ItemFn, ItemStruct, LitStr, PathArguments, Result, Type, TypePath,
     parse::{Parse, ParseStream},
     parse_macro_input,
     token::Eq,
@@ -145,4 +145,89 @@ fn extract_event_type(input_fn: &ItemFn) -> Result<Option<(syn::Ident, Type)>> {
 #[proc_macro_attribute]
 pub fn ui_component(_attr: TokenStream, item: TokenStream) -> TokenStream {
     item
+}
+
+/// Marks module entries that register `*.component.rs` files in a Rust build.
+///
+/// This marker is intentionally a passthrough and can be used for tooling that
+/// injects/updates entries in `assets_components.rs` (or equivalent files).
+#[proc_macro_attribute]
+pub fn beu_registry(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
+/// Registers a typed struct as shared template state (`@use "Type" as alias;`).
+#[proc_macro_attribute]
+pub fn html_shared(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    expand_html_shared(item, false)
+}
+
+/// Like `html_shared`, but auto-imports the struct with its default alias.
+#[proc_macro_attribute]
+pub fn html_use(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    expand_html_shared(item, true)
+}
+
+fn expand_html_shared(item: TokenStream, auto_use: bool) -> TokenStream {
+    let input = parse_macro_input!(item as ItemStruct);
+
+    if !input.generics.params.is_empty() {
+        let err = syn::Error::new_spanned(
+            &input.ident,
+            "#[html_shared]/#[html_use] currently do not support generic structs",
+        )
+        .to_compile_error();
+        return TokenStream::from(quote! { #err #input });
+    }
+
+    let struct_ident = input.ident.clone();
+    let shared_name = struct_ident.to_string();
+    let default_alias = to_default_alias(shared_name.as_str());
+
+    let name_lit = LitStr::new(shared_name.as_str(), struct_ident.span());
+    let alias_lit = LitStr::new(default_alias.as_str(), struct_ident.span());
+    let capture_ident = format_ident!("__html_shared_capture_{}", default_alias);
+
+    let expanded = quote! {
+        #input
+
+        impl bevy::prelude::Resource for #struct_ident {}
+
+        #[doc(hidden)]
+        fn #capture_ident(
+            world: &bevy::prelude::World,
+        ) -> Option<bevy_extended_ui::lang::serde_json::Value> {
+            world
+                .get_resource::<#struct_ident>()
+                .and_then(|value| bevy_extended_ui::lang::serde_json::to_value(value).ok())
+        }
+
+        bevy_extended_ui::lang::inventory::submit! {
+            bevy_extended_ui::lang::HtmlSharedRegistration::Shared {
+                name: #name_lit,
+                alias: #alias_lit,
+                auto_use: #auto_use,
+                capture: #capture_ident,
+            }
+        }
+    };
+
+    expanded.into()
+}
+
+fn to_default_alias(type_name: &str) -> String {
+    let mut out = String::new();
+    for (index, ch) in type_name.chars().enumerate() {
+        if ch.is_uppercase() {
+            if index != 0 {
+                out.push('_');
+            }
+            for lower in ch.to_lowercase() {
+                out.push(lower);
+            }
+        } else {
+            out.push(ch);
+        }
+    }
+    out
 }

@@ -1,10 +1,13 @@
 use bevy::prelude::*;
+use std::collections::HashMap;
 
 use crate::html::{
     HtmlAllWidgetsSpawned, HtmlAllWidgetsVisible, HtmlDirty, HtmlEventBindings, HtmlID, HtmlMeta,
     HtmlStates, HtmlStructureMap, HtmlSystemSet, HtmlWidgetNode, NeedHidden, ShowWidgetsTimer,
 };
 use crate::styles::{CssClass, CssID, CssSource};
+use crate::widgets::body::BodyContentRoot;
+use crate::widgets::div::DivContentRoot;
 use crate::widgets::{Body, UIWidgetState, Widget};
 
 /// Plugin that spawns Bevy UI entities from parsed HTML node structures.
@@ -46,7 +49,11 @@ pub fn build_html_source(
     mut html_dirty: ResMut<HtmlDirty>,
     asset_server: Res<AssetServer>,
     mut event_writer: MessageWriter<HtmlAllWidgetsSpawned>,
-    body_query: Query<(Entity, &Body)>,
+    body_query: Query<(Entity, &Body, Option<&HtmlID>)>,
+    children_query: Query<&Children>,
+    html_id_query: Query<&HtmlID>,
+    body_content_root_query: Query<&BodyContentRoot>,
+    div_content_root_query: Query<&DivContentRoot>,
 ) {
     // Only rebuild if marked dirty.
     if !html_dirty.0 {
@@ -78,16 +85,40 @@ pub fn build_html_source(
         return;
     }
 
-    // Despawn only the active UI roots that actually changed.
-    for (entity, body) in body_query.iter() {
-        if let Some(key) = body.html_key.as_deref() {
-            if rebuild_keys.iter().any(|dirty_key| dirty_key == key) {
-                commands.entity(entity).despawn();
+    for active in &rebuild_keys {
+        let mut matching_entities = Vec::new();
+        let mut existing_live_root = None;
+
+        for (entity, body, html_id) in body_query.iter() {
+            if body.html_key.as_deref() != Some(active.as_str()) {
+                continue;
+            }
+
+            matching_entities.push(entity);
+            if html_id.is_some() {
+                existing_live_root = Some(entity);
             }
         }
-    }
 
-    for active in &rebuild_keys {
+        if let Some(root) = existing_live_root {
+            rebuild_structure_children_for_active(
+                &mut commands,
+                root,
+                active,
+                &structure_map,
+                &asset_server,
+                &children_query,
+                &html_id_query,
+                &body_content_root_query,
+                &div_content_root_query,
+            );
+            continue;
+        }
+
+        for entity in matching_entities {
+            commands.entity(entity).despawn();
+        }
+
         spawn_structure_for_active(
             &mut commands,
             active,
@@ -108,11 +139,175 @@ fn spawn_structure_for_active(
 ) {
     if let Some(structure) = structure_map.html_map.get(active) {
         for node in structure {
-            spawn_widget_node(commands, node, asset_server, None);
+            spawn_widget_node(commands, node, asset_server, None, true);
         }
         event_writer.write(HtmlAllWidgetsSpawned);
     } else {
         warn!("No structure found for active: {}", active);
+    }
+}
+
+fn rebuild_structure_children_for_active(
+    commands: &mut Commands,
+    root: Entity,
+    active: &str,
+    structure_map: &Res<HtmlStructureMap>,
+    asset_server: &Res<AssetServer>,
+    children_query: &Query<&Children>,
+    html_id_query: &Query<&HtmlID>,
+    body_content_root_query: &Query<&BodyContentRoot>,
+    div_content_root_query: &Query<&DivContentRoot>,
+) {
+    let Some(structure) = structure_map.html_map.get(active) else {
+        warn!("No structure found for active: {}", active);
+        return;
+    };
+
+    let Some(HtmlWidgetNode::Body(_, _, _, new_children, _, _, _)) = structure.first() else {
+        warn!(
+            "No root <body> node found for active '{}' during in-place rebuild",
+            active
+        );
+        return;
+    };
+
+    let content_parent = body_content_root_query
+        .get(root)
+        .map(|content| content.0)
+        .unwrap_or(root);
+
+    reconcile_node_children(
+        commands,
+        content_parent,
+        new_children,
+        asset_server,
+        children_query,
+        html_id_query,
+        body_content_root_query,
+        div_content_root_query,
+    );
+}
+
+fn reconcile_node_children(
+    commands: &mut Commands,
+    parent: Entity,
+    new_nodes: &Vec<HtmlWidgetNode>,
+    asset_server: &AssetServer,
+    children_query: &Query<&Children>,
+    html_id_query: &Query<&HtmlID>,
+    body_content_root_query: &Query<&BodyContentRoot>,
+    div_content_root_query: &Query<&DivContentRoot>,
+) {
+    let existing_children: Vec<Entity> = children_query
+        .get(parent)
+        .map(|children| children.iter().collect())
+        .unwrap_or_default();
+
+    let mut existing_by_id: HashMap<usize, Entity> = HashMap::new();
+    let mut existing_without_id: Vec<Entity> = Vec::new();
+    for child in &existing_children {
+        if let Ok(id) = html_id_query.get(*child) {
+            existing_by_id.insert(id.0, *child);
+        } else {
+            existing_without_id.push(*child);
+        }
+    }
+
+    let mut final_children: Vec<Entity> =
+        Vec::with_capacity(new_nodes.len() + existing_without_id.len());
+
+    for new_node in new_nodes {
+        let node_id = get_node_id(new_node).0;
+        if let Some(existing_entity) = existing_by_id.remove(&node_id) {
+            if let Some(children) = get_node_children(new_node) {
+                let nested_parent = resolve_content_parent(
+                    existing_entity,
+                    body_content_root_query,
+                    div_content_root_query,
+                );
+                reconcile_node_children(
+                    commands,
+                    nested_parent,
+                    children,
+                    asset_server,
+                    children_query,
+                    html_id_query,
+                    body_content_root_query,
+                    div_content_root_query,
+                );
+            }
+
+            final_children.push(existing_entity);
+        } else {
+            let spawned = spawn_widget_node(commands, new_node, asset_server, Some(parent), false);
+            final_children.push(spawned);
+        }
+    }
+
+    for stale in existing_by_id.into_values() {
+        commands.entity(stale).despawn();
+    }
+
+    final_children.extend(existing_without_id);
+    if final_children != existing_children {
+        commands.entity(parent).replace_children(&final_children);
+    }
+}
+
+fn resolve_content_parent(
+    entity: Entity,
+    body_content_root_query: &Query<&BodyContentRoot>,
+    div_content_root_query: &Query<&DivContentRoot>,
+) -> Entity {
+    if let Ok(content) = body_content_root_query.get(entity) {
+        return content.0;
+    }
+    if let Ok(content) = div_content_root_query.get(entity) {
+        return content.0;
+    }
+    entity
+}
+
+fn get_node_children(node: &HtmlWidgetNode) -> Option<&Vec<HtmlWidgetNode>> {
+    match node {
+        HtmlWidgetNode::Body(_, _, _, children, _, _, _)
+        | HtmlWidgetNode::Div(_, _, _, children, _, _, _)
+        | HtmlWidgetNode::Form(_, _, _, children, _, _, _)
+        | HtmlWidgetNode::FieldSet(_, _, _, children, _, _, _) => Some(children),
+        #[cfg(feature = "extended-dialog")]
+        HtmlWidgetNode::Dialog(_, _, _, children, _, _, _) => Some(children),
+        _ => None,
+    }
+}
+
+fn get_node_id(node: &HtmlWidgetNode) -> &HtmlID {
+    match node {
+        HtmlWidgetNode::Body(_, _, _, _, _, _, id)
+        | HtmlWidgetNode::Button(_, _, _, _, _, id)
+        | HtmlWidgetNode::CheckBox(_, _, _, _, _, id)
+        | HtmlWidgetNode::ColorPicker(_, _, _, _, _, id)
+        | HtmlWidgetNode::ChoiceBox(_, _, _, _, _, id)
+        | HtmlWidgetNode::DatePicker(_, _, _, _, _, id)
+        | HtmlWidgetNode::Divider(_, _, _, _, _, id)
+        | HtmlWidgetNode::Headline(_, _, _, _, _, id)
+        | HtmlWidgetNode::HyperLink(_, _, _, _, _, id)
+        | HtmlWidgetNode::Img(_, _, _, _, _, id)
+        | HtmlWidgetNode::Input(_, _, _, _, _, id)
+        | HtmlWidgetNode::Paragraph(_, _, _, _, _, id)
+        | HtmlWidgetNode::ToolTip(_, _, _, _, _, id)
+        | HtmlWidgetNode::Badge(_, _, _, _, _, id)
+        | HtmlWidgetNode::ProgressBar(_, _, _, _, _, id)
+        | HtmlWidgetNode::RadioButton(_, _, _, _, _, id)
+        | HtmlWidgetNode::Scrollbar(_, _, _, _, _, id)
+        | HtmlWidgetNode::Slider(_, _, _, _, _, id)
+        | HtmlWidgetNode::SwitchButton(_, _, _, _, _, id)
+        | HtmlWidgetNode::ToggleButton(_, _, _, _, _, id)
+        | HtmlWidgetNode::ListBox(_, _, _, _, _, id)
+        | HtmlWidgetNode::Div(_, _, _, _, _, _, id)
+        | HtmlWidgetNode::Form(_, _, _, _, _, _, id)
+        | HtmlWidgetNode::FieldSet(_, _, _, _, _, _, id) => id,
+        #[cfg(feature = "extended-dialog")]
+        HtmlWidgetNode::Dialog(_, _, _, _, _, _, id) => id,
     }
 }
 
@@ -122,9 +317,9 @@ fn show_all_widgets_start(
     mut timer: ResMut<ShowWidgetsTimer>,
 ) {
     for _event in events.read() {
-        timer.timer = Timer::from_seconds(0.1, TimerMode::Once);
+        timer.timer = Timer::from_seconds(0.0, TimerMode::Once);
         timer.active = true;
-        debug!("Starting 100ms timer before showing widgets");
+        debug!("Starting reveal timer before showing widgets");
     }
 }
 
@@ -232,14 +427,22 @@ fn spawn_widget_node(
     node: &HtmlWidgetNode,
     asset_server: &AssetServer,
     parent: Option<Entity>,
+    start_hidden: bool,
 ) -> Entity {
     let entity = match node {
         HtmlWidgetNode::Body(body, meta, states, children, functions, widget, id) => {
-            let entity =
-                spawn_with_meta(commands, body.clone(), meta, states, functions, widget, id);
+            let entity = spawn_with_meta(
+                commands,
+                body.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+                start_hidden,
+            );
             for child in children {
-                let child_entity = spawn_widget_node(commands, child, asset_server, Some(entity));
-                commands.entity(entity).add_child(child_entity);
+                spawn_widget_node(commands, child, asset_server, Some(entity), start_hidden);
             }
             entity
         }
@@ -251,6 +454,7 @@ fn spawn_widget_node(
             functions,
             widget,
             id,
+            start_hidden,
         ),
         HtmlWidgetNode::CheckBox(checkbox, meta, states, functions, widget, id) => spawn_with_meta(
             commands,
@@ -260,6 +464,7 @@ fn spawn_widget_node(
             functions,
             widget,
             id,
+            start_hidden,
         ),
         HtmlWidgetNode::ColorPicker(color_picker, meta, states, functions, widget, id) => {
             spawn_with_meta(
@@ -270,6 +475,7 @@ fn spawn_widget_node(
                 functions,
                 widget,
                 id,
+                start_hidden,
             )
         }
         HtmlWidgetNode::ChoiceBox(choice_box, meta, states, functions, widget, id) => {
@@ -281,6 +487,7 @@ fn spawn_widget_node(
                 functions,
                 widget,
                 id,
+                start_hidden,
             )
         }
         HtmlWidgetNode::DatePicker(date_picker, meta, states, functions, widget, id) => {
@@ -292,23 +499,38 @@ fn spawn_widget_node(
                 functions,
                 widget,
                 id,
+                start_hidden,
             )
         }
         HtmlWidgetNode::Div(div, meta, states, children, functions, widget, id) => {
-            let entity =
-                spawn_with_meta(commands, div.clone(), meta, states, functions, widget, id);
+            let entity = spawn_with_meta(
+                commands,
+                div.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+                start_hidden,
+            );
             for child in children {
-                let child_entity = spawn_widget_node(commands, child, asset_server, Some(entity));
-                commands.entity(entity).add_child(child_entity);
+                spawn_widget_node(commands, child, asset_server, Some(entity), start_hidden);
             }
             entity
         }
         HtmlWidgetNode::Form(form, meta, states, children, functions, widget, id) => {
-            let entity =
-                spawn_with_meta(commands, form.clone(), meta, states, functions, widget, id);
+            let entity = spawn_with_meta(
+                commands,
+                form.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+                start_hidden,
+            );
             for child in children {
-                let child_entity = spawn_widget_node(commands, child, asset_server, Some(entity));
-                commands.entity(entity).add_child(child_entity);
+                spawn_widget_node(commands, child, asset_server, Some(entity), start_hidden);
             }
             entity
         }
@@ -322,10 +544,10 @@ fn spawn_widget_node(
                 functions,
                 widget,
                 id,
+                start_hidden,
             );
             for child in children {
-                let child_entity = spawn_widget_node(commands, child, asset_server, Some(entity));
-                commands.entity(entity).add_child(child_entity);
+                spawn_widget_node(commands, child, asset_server, Some(entity), start_hidden);
             }
             entity
         }
@@ -337,6 +559,7 @@ fn spawn_widget_node(
             functions,
             widget,
             id,
+            start_hidden,
         ),
         HtmlWidgetNode::FieldSet(fieldset, meta, states, children, functions, widget, id) => {
             let entity = spawn_with_meta(
@@ -347,10 +570,10 @@ fn spawn_widget_node(
                 functions,
                 widget,
                 id,
+                start_hidden,
             );
             for child in children {
-                let child_entity = spawn_widget_node(commands, child, asset_server, Some(entity));
-                commands.entity(entity).add_child(child_entity);
+                spawn_widget_node(commands, child, asset_server, Some(entity), start_hidden);
             }
             entity
         }
@@ -362,6 +585,7 @@ fn spawn_widget_node(
             functions,
             widget,
             id,
+            start_hidden,
         ),
         HtmlWidgetNode::HyperLink(hyper_link, meta, states, functions, widget, id) => {
             spawn_with_meta(
@@ -372,14 +596,29 @@ fn spawn_widget_node(
                 functions,
                 widget,
                 id,
+                start_hidden,
             )
         }
-        HtmlWidgetNode::Img(img, meta, states, functions, widget, id) => {
-            spawn_with_meta(commands, img.clone(), meta, states, functions, widget, id)
-        }
-        HtmlWidgetNode::Input(input, meta, states, functions, widget, id) => {
-            spawn_with_meta(commands, input.clone(), meta, states, functions, widget, id)
-        }
+        HtmlWidgetNode::Img(img, meta, states, functions, widget, id) => spawn_with_meta(
+            commands,
+            img.clone(),
+            meta,
+            states,
+            functions,
+            widget,
+            id,
+            start_hidden,
+        ),
+        HtmlWidgetNode::Input(input, meta, states, functions, widget, id) => spawn_with_meta(
+            commands,
+            input.clone(),
+            meta,
+            states,
+            functions,
+            widget,
+            id,
+            start_hidden,
+        ),
         HtmlWidgetNode::Paragraph(paragraph, meta, states, functions, widget, id) => {
             spawn_with_meta(
                 commands,
@@ -389,6 +628,7 @@ fn spawn_widget_node(
                 functions,
                 widget,
                 id,
+                start_hidden,
             )
         }
         HtmlWidgetNode::ToolTip(tooltip, meta, states, functions, widget, id) => spawn_with_meta(
@@ -399,10 +639,18 @@ fn spawn_widget_node(
             functions,
             widget,
             id,
+            start_hidden,
         ),
-        HtmlWidgetNode::Badge(badge, meta, states, functions, widget, id) => {
-            spawn_with_meta(commands, badge.clone(), meta, states, functions, widget, id)
-        }
+        HtmlWidgetNode::Badge(badge, meta, states, functions, widget, id) => spawn_with_meta(
+            commands,
+            badge.clone(),
+            meta,
+            states,
+            functions,
+            widget,
+            id,
+            start_hidden,
+        ),
         HtmlWidgetNode::ProgressBar(progress_bar, meta, states, functions, widget, id) => {
             spawn_with_meta(
                 commands,
@@ -412,6 +660,7 @@ fn spawn_widget_node(
                 functions,
                 widget,
                 id,
+                start_hidden,
             )
         }
         HtmlWidgetNode::RadioButton(radio_button, meta, states, functions, widget, id) => {
@@ -423,6 +672,7 @@ fn spawn_widget_node(
                 functions,
                 widget,
                 id,
+                start_hidden,
             )
         }
         HtmlWidgetNode::Scrollbar(scroll_bar, meta, states, functions, widget, id) => {
@@ -434,6 +684,7 @@ fn spawn_widget_node(
                 functions,
                 widget,
                 id,
+                start_hidden,
             )
         }
         HtmlWidgetNode::Slider(slider, meta, states, functions, widget, id) => spawn_with_meta(
@@ -444,6 +695,7 @@ fn spawn_widget_node(
             functions,
             widget,
             id,
+            start_hidden,
         ),
         HtmlWidgetNode::SwitchButton(switch_button, meta, states, functions, widget, id) => {
             spawn_with_meta(
@@ -454,6 +706,7 @@ fn spawn_widget_node(
                 functions,
                 widget,
                 id,
+                start_hidden,
             )
         }
         HtmlWidgetNode::ToggleButton(toggle_button, meta, states, functions, widget, id) => {
@@ -465,6 +718,7 @@ fn spawn_widget_node(
                 functions,
                 widget,
                 id,
+                start_hidden,
             )
         }
         HtmlWidgetNode::ListBox(list_box, meta, states, functions, widget, id) => spawn_with_meta(
@@ -475,6 +729,7 @@ fn spawn_widget_node(
             functions,
             widget,
             id,
+            start_hidden,
         ),
     };
 
@@ -494,6 +749,7 @@ fn spawn_with_meta<T: Component>(
     functions: &HtmlEventBindings,
     widget: &Widget,
     id: &HtmlID,
+    start_hidden: bool,
 ) -> Entity {
     let mut ui_state = UIWidgetState::default();
     ui_state.readonly = states.readonly;
@@ -511,7 +767,11 @@ fn spawn_with_meta<T: Component>(
             CssClass(meta.class.clone().unwrap_or_default()),
             CssID(meta.id.clone().unwrap_or_default()),
             ui_state,
-            Visibility::Hidden,
+            if start_hidden || states.hidden {
+                Visibility::Hidden
+            } else {
+                Visibility::Inherited
+            },
         ))
         .id();
 

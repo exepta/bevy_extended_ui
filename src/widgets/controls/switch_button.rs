@@ -35,8 +35,14 @@ impl Plugin for SwitchButtonWidget {
 /// Initializes UI nodes for switch button widgets.
 fn internal_node_creation_system(
     mut commands: Commands,
-    query: Query<
-        (Entity, &UIGenID, &SwitchButton, Option<&CssSource>),
+    mut query: Query<
+        (
+            Entity,
+            &UIGenID,
+            &SwitchButton,
+            Option<&CssSource>,
+            &mut UIWidgetState,
+        ),
         (With<SwitchButton>, Without<SwitchButtonBase>),
     >,
     config: Res<ExtendedUiConfiguration>,
@@ -46,11 +52,12 @@ fn internal_node_creation_system(
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
 
-    for (entity, id, switch_button, source_opt) in query.iter() {
+    for (entity, id, switch_button, source_opt, mut state) in query.iter_mut() {
         let mut css_source = CssSource::default();
         if let Some(source) = source_opt {
             css_source = source.clone();
         }
+        state.checked = switch_button.selected;
 
         let dot_icon = switch_button.icon.as_ref().map(|icon_path| {
             get_or_load_image(icon_path, &mut image_cache, &mut images, &asset_server)
