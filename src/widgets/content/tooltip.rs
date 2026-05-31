@@ -191,13 +191,14 @@ fn internal_node_creation_system(
 
 /// Tracks click state used for trigger="click".
 fn track_click_trigger(
-    ev: On<Pointer<Click>>,
+    click_event: On<Pointer<Click>>,
     mut trigger_state: ResMut<ToolTipTriggerState>,
     parents_q: Query<&ChildOf>,
     widget_q: Query<(), With<WidgetId>>,
     body_q: Query<(), With<Body>>,
 ) {
-    let Some(owner) = resolve_owner_widget(ev.event_target(), &parents_q, &widget_q, &body_q)
+    let Some(owner) =
+        resolve_owner_widget(click_event.event_target(), &parents_q, &widget_q, &body_q)
     else {
         trigger_state.clicked.clear();
         return;
@@ -213,26 +214,36 @@ fn track_click_trigger(
 
 /// Tracks drag start state used for trigger="drag".
 fn track_drag_start_trigger(
-    ev: On<Pointer<DragStart>>,
+    drag_start_event: On<Pointer<DragStart>>,
     mut trigger_state: ResMut<ToolTipTriggerState>,
     parents_q: Query<&ChildOf>,
     widget_q: Query<(), With<WidgetId>>,
     body_q: Query<(), With<Body>>,
 ) {
-    if let Some(owner) = resolve_owner_widget(ev.event_target(), &parents_q, &widget_q, &body_q) {
+    if let Some(owner) = resolve_owner_widget(
+        drag_start_event.event_target(),
+        &parents_q,
+        &widget_q,
+        &body_q,
+    ) {
         trigger_state.dragging.insert(owner);
     }
 }
 
 /// Tracks drag end state used for trigger="drag".
 fn track_drag_end_trigger(
-    ev: On<Pointer<DragEnd>>,
+    drag_end_event: On<Pointer<DragEnd>>,
     mut trigger_state: ResMut<ToolTipTriggerState>,
     parents_q: Query<&ChildOf>,
     widget_q: Query<(), With<WidgetId>>,
     body_q: Query<(), With<Body>>,
 ) {
-    if let Some(owner) = resolve_owner_widget(ev.event_target(), &parents_q, &widget_q, &body_q) {
+    if let Some(owner) = resolve_owner_widget(
+        drag_end_event.event_target(),
+        &parents_q,
+        &widget_q,
+        &body_q,
+    ) {
         trigger_state.dragging.remove(&owner);
     }
 }

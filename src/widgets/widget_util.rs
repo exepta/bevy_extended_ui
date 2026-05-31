@@ -250,28 +250,28 @@ pub(crate) fn find_ancestor_with_component<Marker: Component>(
 
 /// Ensures scrollbar node display and visibility match current scroll range.
 pub(crate) fn set_scrollbar_display_and_visibility<T>(
-    sb_node_q: &mut Query<&mut Node, With<Scrollbar>>,
-    sb_vis_q: &mut Query<&mut Visibility, With<Scrollbar>>,
-    sb: &T,
+    scrollbar_node_query: &mut Query<&mut Node, With<Scrollbar>>,
+    scrollbar_visibility_query: &mut Query<&mut Visibility, With<Scrollbar>>,
+    scrollbar_owner: &T,
     max_scroll: f32,
 ) where
     T: Deref<Target = Entity>,
 {
-    if let Ok(mut sb_node) = sb_node_q.get_mut(**sb) {
-        if sb_node.display != Display::Flex {
-            sb_node.display = Display::Flex;
+    if let Ok(mut scrollbar_node) = scrollbar_node_query.get_mut(**scrollbar_owner) {
+        if scrollbar_node.display != Display::Flex {
+            scrollbar_node.display = Display::Flex;
         }
     }
 
-    if let Ok(mut vis) = sb_vis_q.get_mut(**sb) {
+    if let Ok(mut visibility) = scrollbar_visibility_query.get_mut(**scrollbar_owner) {
         let want_visible = max_scroll > 0.5;
-        let new_vis = if want_visible {
+        let next_visibility = if want_visible {
             Visibility::Visible
         } else {
             Visibility::Hidden
         };
-        if *vis != new_vis {
-            *vis = new_vis;
+        if *visibility != next_visibility {
+            *visibility = next_visibility;
         }
     }
 }
@@ -284,8 +284,8 @@ pub(crate) fn first_child_logical_height<F: QueryFilter>(
 ) -> Option<f32> {
     for (computed, child_of) in query.iter() {
         if child_of.parent() == parent {
-            let inv_sf = computed.inverse_scale_factor.max(f32::EPSILON);
-            return Some((computed.size().y * inv_sf).max(min_height));
+            let inverse_scale_factor = computed.inverse_scale_factor.max(f32::EPSILON);
+            return Some((computed.size().y * inverse_scale_factor).max(min_height));
         }
     }
     None

@@ -234,37 +234,57 @@ fn on_internal_click(
         return;
     }
 
-    let (gen_id, radio_entry, css_source, should_check, should_uncheck) = {
-        let Ok((_e, mut st, gen_id, mut rb, css)) = radio_q.get_mut(clicked) else {
+    let (widget_id, radio_entry, css_source, should_check, should_uncheck) = {
+        let Ok((_entity, mut widget_state, widget_id, mut radio_button, css_source)) =
+            radio_q.get_mut(clicked)
+        else {
             trigger.propagate(false);
             return;
         };
 
-        if st.disabled {
+        if widget_state.disabled {
             trigger.propagate(false);
             return;
         }
 
-        current_widget_state.widget_id = gen_id.0;
+        current_widget_state.widget_id = widget_id.0;
 
-        if st.checked {
+        if widget_state.checked {
             if fieldset.allow_none {
-                st.checked = false;
-                rb.selected = false;
-                (gen_id.0, rb.entry, css.clone(), false, true)
+                widget_state.checked = false;
+                radio_button.selected = false;
+                (
+                    widget_id.0,
+                    radio_button.entry,
+                    css_source.clone(),
+                    false,
+                    true,
+                )
             } else {
-                (gen_id.0, rb.entry, css.clone(), false, false)
+                (
+                    widget_id.0,
+                    radio_button.entry,
+                    css_source.clone(),
+                    false,
+                    false,
+                )
             }
         } else {
-            st.checked = true;
-            rb.selected = true;
-            (gen_id.0, rb.entry, css.clone(), true, false)
+            widget_state.checked = true;
+            radio_button.selected = true;
+            (
+                widget_id.0,
+                radio_button.entry,
+                css_source.clone(),
+                true,
+                false,
+            )
         }
     };
 
     if should_check {
         add_checked_dot_to_radio(
-            gen_id,
+            widget_id,
             radio_entry,
             &css_source,
             &dot_q,
@@ -272,7 +292,7 @@ fn on_internal_click(
             &config,
         );
     } else if should_uncheck {
-        remove_checked_dot_by_bind_id(gen_id, &dot_q, &mut commands);
+        remove_checked_dot_by_bind_id(widget_id, &dot_q, &mut commands);
     }
 
     if should_check {
@@ -288,25 +308,37 @@ fn on_internal_click(
     }
 
     if should_check {
-        let radio_entities: Vec<Entity> = radio_q.iter().map(|(e, _, _, _, _)| e).collect();
+        let radio_entities: Vec<Entity> = radio_q
+            .iter()
+            .map(|(radio_entity, _, _, _, _)| radio_entity)
+            .collect();
 
-        for e in radio_entities {
-            if e == clicked {
+        for radio_entity in radio_entities {
+            if radio_entity == clicked {
                 continue;
             }
 
-            let Some(fs) = find_fieldset_ancestor(e, &parents, &fieldset_tag_q) else {
+            let Some(ancestor_fieldset) =
+                find_fieldset_ancestor(radio_entity, &parents, &fieldset_tag_q)
+            else {
                 continue;
             };
-            if fs != fieldset_entity {
+            if ancestor_fieldset != fieldset_entity {
                 continue;
             }
 
-            if let Ok((_re, mut st, other_gen_id, mut other_rb, _css)) = radio_q.get_mut(e) {
-                if st.checked {
-                    st.checked = false;
-                    other_rb.selected = false;
-                    remove_checked_dot_by_bind_id(other_gen_id.0, &dot_q, &mut commands);
+            if let Ok((
+                _other_entity,
+                mut other_widget_state,
+                other_widget_id,
+                mut other_radio_button,
+                _other_css_source,
+            )) = radio_q.get_mut(radio_entity)
+            {
+                if other_widget_state.checked {
+                    other_widget_state.checked = false;
+                    other_radio_button.selected = false;
+                    remove_checked_dot_by_bind_id(other_widget_id.0, &dot_q, &mut commands);
                 }
             }
         }

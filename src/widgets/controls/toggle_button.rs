@@ -270,14 +270,16 @@ fn on_internal_click(
 
     // Standalone Toggle
     if fs_entity_opt.is_none() {
-        if let Ok((_e, mut st, gen_id, mut tb)) = toggles_q.get_mut(clicked) {
-            if st.disabled {
+        if let Ok((_entity, mut widget_state, widget_id, mut toggle_button)) =
+            toggles_q.get_mut(clicked)
+        {
+            if widget_state.disabled {
                 trigger.propagate(false);
                 return;
             }
-            current_widget_state.widget_id = gen_id.0;
-            st.checked = !st.checked;
-            tb.selected = st.checked;
+            current_widget_state.widget_id = widget_id.0;
+            widget_state.checked = !widget_state.checked;
+            toggle_button.selected = widget_state.checked;
         }
         trigger.propagate(false);
         return;
@@ -289,63 +291,65 @@ fn on_internal_click(
         return;
     };
 
-    let checked_in_fieldset = toggles_q
+    let checked_in_fieldset_count = toggles_q
         .iter()
-        .filter(|(e, state, _, _)| {
+        .filter(|(toggle_entity, state, _, _)| {
             if !state.checked {
                 return false;
             }
-            find_fieldset_ancestor_optional(*e, &parents, &fieldset_tag_q) == Some(fs_entity)
+            find_fieldset_ancestor_optional(*toggle_entity, &parents, &fieldset_tag_q)
+                == Some(fs_entity)
         })
         .count();
 
     // Fetch clicked toggle
-    let Ok((_e, mut st, gen_id, mut tb)) = toggles_q.get_mut(clicked) else {
+    let Ok((_entity, mut widget_state, widget_id, mut toggle_button)) = toggles_q.get_mut(clicked)
+    else {
         trigger.propagate(false);
         return;
     };
 
-    if st.disabled {
+    if widget_state.disabled {
         trigger.propagate(false);
         return;
     }
 
-    current_widget_state.widget_id = gen_id.0;
+    current_widget_state.widget_id = widget_id.0;
 
     let mut should_check = false;
     let mut should_uncheck = false;
 
     match fieldset.field_mode {
         FieldMode::Single => {
-            if st.checked {
+            if widget_state.checked {
                 if fieldset.allow_none {
-                    st.checked = false;
-                    tb.selected = false;
+                    widget_state.checked = false;
+                    toggle_button.selected = false;
                     should_uncheck = true;
                 } // else: stay checked, no change
             } else {
-                st.checked = true;
-                tb.selected = true;
+                widget_state.checked = true;
+                toggle_button.selected = true;
                 should_check = true;
             }
         }
         FieldMode::Multi => {
-            st.checked = !st.checked;
-            tb.selected = st.checked;
-            if st.checked {
+            widget_state.checked = !widget_state.checked;
+            toggle_button.selected = widget_state.checked;
+            if widget_state.checked {
                 should_check = true;
             } else {
                 should_uncheck = true;
             }
         }
         FieldMode::Count(limit) => {
-            if st.checked {
-                st.checked = false;
-                tb.selected = false;
+            if widget_state.checked {
+                widget_state.checked = false;
+                toggle_button.selected = false;
                 should_uncheck = true;
-            } else if checked_in_fieldset < usize::from(limit) {
-                st.checked = true;
-                tb.selected = true;
+            } else if checked_in_fieldset_count < usize::from(limit) {
+                widget_state.checked = true;
+                toggle_button.selected = true;
                 should_check = true;
             }
         }
@@ -378,22 +382,32 @@ fn on_internal_click(
 
     // Enforce single mode: uncheck others in the same FieldSet
     if fieldset.field_mode == FieldMode::Single && should_check {
-        let toggle_entities: Vec<Entity> = toggles_q.iter().map(|(e, _, _, _)| e).collect();
-        for e in toggle_entities {
-            if e == clicked {
+        let toggle_entities: Vec<Entity> = toggles_q
+            .iter()
+            .map(|(toggle_entity, _, _, _)| toggle_entity)
+            .collect();
+        for toggle_entity in toggle_entities {
+            if toggle_entity == clicked {
                 continue;
             }
-            let Some(fs_other) = find_fieldset_ancestor_optional(e, &parents, &fieldset_tag_q)
+            let Some(other_fieldset_entity) =
+                find_fieldset_ancestor_optional(toggle_entity, &parents, &fieldset_tag_q)
             else {
                 continue;
             };
-            if fs_other != fs_entity {
+            if other_fieldset_entity != fs_entity {
                 continue;
             }
-            if let Ok((_oe, mut st_o, _other_gen, mut tb_o)) = toggles_q.get_mut(e) {
-                if st_o.checked {
-                    st_o.checked = false;
-                    tb_o.selected = false;
+            if let Ok((
+                _other_entity,
+                mut other_widget_state,
+                _other_widget_id,
+                mut other_toggle_button,
+            )) = toggles_q.get_mut(toggle_entity)
+            {
+                if other_widget_state.checked {
+                    other_widget_state.checked = false;
+                    other_toggle_button.selected = false;
                 }
             }
         }
