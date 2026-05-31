@@ -1600,12 +1600,28 @@ fn parse_validation_attributes(attributes: &Attributes) -> Option<ValidationRule
 
 /// Parses boolean attributes with `true`/`false` semantics.
 fn parse_bool_attribute(attributes: &Attributes, key: &str) -> bool {
-    let Some(value) = attributes.get(key) else {
+    if !attributes.contains(key) {
         return false;
+    }
+
+    let Some(value) = attributes.get(key) else {
+        // Standalone boolean attribute without explicit value (`checked`, `disabled`, ...)
+        return true;
     };
 
     let normalized = value.trim().to_ascii_lowercase();
-    normalized.is_empty() || normalized == "true"
+    if normalized.is_empty() {
+        return true;
+    }
+
+    if matches!(normalized.as_str(), "false" | "0" | "no" | "off") {
+        return false;
+    }
+
+    matches!(
+        normalized.as_str(),
+        "true" | "1" | "yes" | "on" | "checked" | "selected"
+    )
 }
 
 /// Parses `extensions` values from either a single token or list syntax.

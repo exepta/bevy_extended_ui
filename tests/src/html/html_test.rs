@@ -925,6 +925,54 @@ mod tests {
     }
 
     #[test]
+    fn converter_parses_switch_checked_boolean_attribute_values() {
+        let mut app = setup_converter_app();
+        let html = r#"
+        <html>
+          <head>
+            <meta name="switch-checked-key" />
+          </head>
+          <body>
+            <switch id="switch-false" checked="false">False</switch>
+            <switch id="switch-standalone" checked>Standalone</switch>
+            <switch id="switch-empty" checked="">Empty</switch>
+          </body>
+        </html>
+        "#;
+
+        add_html_source(
+            &mut app,
+            "examples/switch_checked_fixture.html",
+            html,
+            "switch-checked-key",
+            None,
+        );
+        app.update();
+
+        let structure_map = app.world().resource::<HtmlStructureMap>();
+        let nodes = structure_map
+            .html_map
+            .get("switch-checked-key")
+            .expect("expected parsed html structure for switch-checked-key");
+
+        let mut all = Vec::new();
+        collect_nodes(nodes, &mut all);
+
+        let mut by_id = std::collections::HashMap::new();
+        for node in all {
+            if let HtmlWidgetNode::SwitchButton(switch_button, meta, _, _, _, _) = node {
+                if let Some(id) = meta.id.clone() {
+                    by_id.insert(id, switch_button.selected);
+                }
+            }
+        }
+
+        assert_eq!(by_id.get("switch-false"), Some(&false));
+        assert_eq!(by_id.get("switch-standalone"), Some(&true));
+        assert_eq!(by_id.get("switch-empty"), Some(&true));
+    }
+
+    #[test]
     fn converter_expands_if_and_for_directives_before_widget_parsing() {
         let mut app = setup_converter_app();
         app.world_mut().resource_mut::<UiLangVariables>().set(
