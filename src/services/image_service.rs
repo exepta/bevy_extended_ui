@@ -3,7 +3,6 @@ use base64::Engine;
 use bevy::asset::RenderAssetUsages;
 use bevy::image::{CompressedImageFormats, ImageSampler, ImageType};
 use bevy::prelude::*;
-#[cfg(all(feature = "svg", not(target_arch = "wasm32")))]
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 #[cfg(all(feature = "svg", not(target_arch = "wasm32")))]
 use resvg::{tiny_skia::Pixmap, usvg::Options};
