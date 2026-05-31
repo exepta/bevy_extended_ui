@@ -265,6 +265,31 @@ mod tests {
         handle
     }
 
+    fn collect_body_entities(world: &mut World) -> Vec<(Entity, String)> {
+        let mut body_query = world.query::<(Entity, &Body)>();
+        body_query
+            .iter(world)
+            .map(|(entity, body)| (entity, body.html_key.clone().unwrap_or_default()))
+            .collect()
+    }
+
+    fn has_css_handle_path(handles: &[Handle<CssAsset>], expected_path: &str) -> bool {
+        handles.iter().any(|handle| {
+            handle
+                .path()
+                .map(|path| path.path().to_string_lossy().replace('\\', "/"))
+                .as_deref()
+                == Some(expected_path)
+        })
+    }
+
+    fn add_test_css_asset(app: &mut App, css_text: &str) -> Handle<CssAsset> {
+        let mut css_assets = app.world_mut().resource_mut::<Assets<CssAsset>>();
+        css_assets.add(CssAsset {
+            text: css_text.to_string(),
+        })
+    }
+
     fn collect_nodes<'a>(nodes: &'a [HtmlWidgetNode], out: &mut Vec<&'a HtmlWidgetNode>) {
         for node in nodes {
             out.push(node);
@@ -1032,11 +1057,7 @@ mod tests {
 
         app.update();
 
-        let mut body_query = app.world_mut().query::<(Entity, &Body)>();
-        let all_bodies: Vec<(Entity, String)> = body_query
-            .iter(app.world())
-            .map(|(entity, body)| (entity, body.html_key.clone().unwrap_or_default()))
-            .collect();
+        let all_bodies = collect_body_entities(app.world_mut());
 
         assert_eq!(all_bodies.len(), 1);
         assert_eq!(all_bodies[0].1, "build-key");
@@ -1110,11 +1131,7 @@ mod tests {
 
         app.update();
 
-        let mut body_query = app.world_mut().query::<(Entity, &Body)>();
-        let all_bodies: Vec<(Entity, String)> = body_query
-            .iter(app.world())
-            .map(|(entity, body)| (entity, body.html_key.clone().unwrap_or_default()))
-            .collect();
+        let all_bodies = collect_body_entities(app.world_mut());
 
         assert_eq!(
             all_bodies
@@ -1510,13 +1527,7 @@ mod tests {
             "expected provider-wrapped body children to remain visible"
         );
 
-        let has_theme_css = body_meta.css.iter().any(|handle| {
-            handle
-                .path()
-                .map(|path| path.path().to_string_lossy().replace('\\', "/"))
-                .as_deref()
-                == Some("themes/night.css")
-        });
+        let has_theme_css = has_css_handle_path(&body_meta.css, "themes/night.css");
         assert!(has_theme_css, "expected themes/night.css to be applied");
     }
 
@@ -1563,13 +1574,7 @@ mod tests {
             panic!("expected body as root node");
         };
 
-        let has_theme_css = body_meta.css.iter().any(|handle| {
-            handle
-                .path()
-                .map(|path| path.path().to_string_lossy().replace('\\', "/"))
-                .as_deref()
-                == Some("themes/night.css")
-        });
+        let has_theme_css = has_css_handle_path(&body_meta.css, "themes/night.css");
         assert!(
             !has_theme_css,
             "did not expect themes/night.css when provider is placed in <head>"
@@ -1582,12 +1587,7 @@ mod tests {
         app.add_plugins((MinimalPlugins, AssetPlugin::default(), HtmlReloadPlugin));
         app.init_asset::<CssAsset>();
 
-        let changed_handle = {
-            let mut css_assets = app.world_mut().resource_mut::<Assets<CssAsset>>();
-            css_assets.add(CssAsset {
-                text: "a { color: red; }".to_string(),
-            })
-        };
+        let changed_handle = add_test_css_asset(&mut app, "a { color: red; }");
         let unchanged_handle = {
             let mut css_assets = app.world_mut().resource_mut::<Assets<CssAsset>>();
             css_assets.add(CssAsset {
@@ -1622,12 +1622,7 @@ mod tests {
         app.add_plugins((MinimalPlugins, AssetPlugin::default(), HtmlReloadPlugin));
         app.init_asset::<CssAsset>();
 
-        let removed_handle = {
-            let mut css_assets = app.world_mut().resource_mut::<Assets<CssAsset>>();
-            css_assets.add(CssAsset {
-                text: "a { color: red; }".to_string(),
-            })
-        };
+        let removed_handle = add_test_css_asset(&mut app, "a { color: red; }");
 
         let affected = app
             .world_mut()

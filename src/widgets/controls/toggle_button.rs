@@ -1,6 +1,7 @@
 use crate::styles::paint::Colored;
 use crate::styles::{CssClass, CssSource, IconPlace, TagName};
 use crate::widgets::controls::place_icon_if;
+use crate::widgets::widget_util::find_ancestor_with_component;
 use crate::widgets::{
     BindToID, FieldMode, FieldSelectionMulti, FieldSelectionSingle, FieldSet, InFieldSet,
     ToggleButton, UIGenID, UIWidgetState, WidgetId, WidgetKind,
@@ -122,19 +123,16 @@ fn internal_node_creation_system(
                 ToggleButtonBase,
             ))
             .with_children(|builder| {
-                place_icon_if(
+                place_toggle_icon(
                     builder,
-                    toggle_button.icon_place,
                     IconPlace::Left,
-                    &toggle_button.icon_path,
-                    toggle_button.entry,
+                    &toggle_button,
                     &asset_server,
                     &mut image_cache,
                     &mut images,
-                    vec!["button-text".to_string()],
                     id.0,
                     *layer,
-                    css_source.clone(),
+                    &css_source,
                 );
 
                 builder.spawn((
@@ -153,19 +151,16 @@ fn internal_node_creation_system(
                     ToggleButtonText,
                 ));
 
-                place_icon_if(
+                place_toggle_icon(
                     builder,
-                    toggle_button.icon_place,
                     IconPlace::Right,
-                    &toggle_button.icon_path,
-                    toggle_button.entry,
+                    &toggle_button,
                     &asset_server,
                     &mut image_cache,
                     &mut images,
-                    vec!["button-text".to_string()],
                     id.0,
                     *layer,
-                    css_source.clone(),
+                    &css_source,
                 );
             })
             .observe(on_internal_click)
@@ -193,6 +188,33 @@ fn update_toggle_button_system(
             }
         }
     }
+}
+
+fn place_toggle_icon(
+    builder: &mut ChildSpawnerCommands,
+    side: IconPlace,
+    toggle_button: &ToggleButton,
+    asset_server: &Res<AssetServer>,
+    image_cache: &mut ResMut<ImageCache>,
+    images: &mut ResMut<Assets<Image>>,
+    bind_id: usize,
+    layer: usize,
+    css_source: &CssSource,
+) {
+    place_icon_if(
+        builder,
+        toggle_button.icon_place,
+        side,
+        &toggle_button.icon_path,
+        toggle_button.entry,
+        asset_server,
+        image_cache,
+        images,
+        vec!["button-text".to_string()],
+        bind_id,
+        layer,
+        css_source.clone(),
+    );
 }
 
 /// Ensures field set selection state stays in sync with toggle buttons.
@@ -410,18 +432,9 @@ fn on_internal_cursor_leave(
 
 /// Finds an optional ancestor field set for the entity.
 fn find_fieldset_ancestor_optional(
-    mut entity: Entity,
+    entity: Entity,
     parents: &Query<&ChildOf>,
     fieldsets: &Query<(), With<FieldSet>>,
 ) -> Option<Entity> {
-    loop {
-        let Ok(p) = parents.get(entity) else {
-            return None;
-        };
-        let parent = p.parent();
-        if fieldsets.get(parent).is_ok() {
-            return Some(parent);
-        }
-        entity = parent;
-    }
+    find_ancestor_with_component::<FieldSet>(entity, parents, fieldsets)
 }

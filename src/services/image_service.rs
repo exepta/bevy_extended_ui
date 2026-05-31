@@ -242,6 +242,23 @@ fn resolve_asset_fs_path(path: &str) -> PathBuf {
     Path::new("assets").join(raw)
 }
 
+/// Builds an sRGB RGBA texture with linear sampling from raw pixel bytes.
+fn rgba8_srgb_linear_image(width: u32, height: u32, data: Vec<u8>) -> Image {
+    let mut image = Image::new(
+        Extent3d {
+            width,
+            height,
+            depth_or_array_layers: 1,
+        },
+        TextureDimension::D2,
+        data,
+        TextureFormat::Rgba8UnormSrgb,
+        RenderAssetUsages::default(),
+    );
+    image.sampler = ImageSampler::linear();
+    image
+}
+
 /// Handles `path_is_svg` in the extended UI workflow.
 #[cfg(all(feature = "svg", not(target_arch = "wasm32")))]
 fn path_is_svg(path: &str) -> bool {
@@ -267,18 +284,7 @@ fn load_svg_image_from_project(path: &str, images: &mut Assets<Image>) -> Option
         &mut pixmap.as_mut(),
     );
 
-    let mut image = Image::new(
-        Extent3d {
-            width: size.width(),
-            height: size.height(),
-            depth_or_array_layers: 1,
-        },
-        TextureDimension::D2,
-        pixmap.take(),
-        TextureFormat::Rgba8UnormSrgb,
-        RenderAssetUsages::default(),
-    );
-    image.sampler = ImageSampler::linear();
+    let image = rgba8_srgb_linear_image(size.width(), size.height(), pixmap.take());
     Some(images.add(image))
 }
 

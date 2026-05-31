@@ -1,13 +1,13 @@
 #[cfg(test)]
 mod tests {
     use super::super::css_service::{
-        CssService, CssUsers, collect_assets_with_changed_media_matches,
+        collect_assets_with_changed_media_matches, CssService, CssUsers,
     };
     use super::super::image_service::{get_or_load_image, pre_load_assets};
-    use super::super::state_service::{StateService, update_widget_states};
+    use super::super::state_service::{update_widget_states, StateService};
     use super::super::style_service::{
-        LastUiTransform, StyleTransition, propagate_style_inheritance, sync_last_ui_transform,
-        update_widget_styles_system,
+        propagate_style_inheritance, sync_last_ui_transform, update_widget_styles_system,
+        LastUiTransform, StyleTransition,
     };
     use crate::io::CssAsset;
     use crate::styles::components::UiStyle;
@@ -43,6 +43,22 @@ mod tests {
             std::process::id(),
             nanos
         ))
+    }
+
+    fn load_image_for_test(app: &mut App, path: &str, asset_server: &AssetServer) -> Handle<Image> {
+        app.world_mut()
+            .resource_scope(|world, mut cache: Mut<ImageCache>| {
+                let mut images = world.resource_mut::<Assets<Image>>();
+                get_or_load_image(path, &mut cache, &mut images, asset_server)
+            })
+    }
+
+    fn set_entity_ui_styles(app: &mut App, entity: Entity, styles: HashMap<String, StylePair>) {
+        if let Some(mut ui_style) = app.world_mut().entity_mut(entity).get_mut::<UiStyle>() {
+            ui_style.styles = styles;
+        } else {
+            panic!("missing UiStyle");
+        }
     }
 
     #[test]
@@ -103,7 +119,11 @@ mod tests {
         let (first, second) = {
             let id1 = app.world().get::<UIGenID>(e1).expect("id1 missing").get();
             let id2 = app.world().get::<UIGenID>(e2).expect("id2 missing").get();
-            if id1 <= id2 { (e1, e2) } else { (e2, e1) }
+            if id1 <= id2 {
+                (e1, e2)
+            } else {
+                (e2, e1)
+            }
         };
 
         app.world_mut()
@@ -241,19 +261,8 @@ mod tests {
         let path = "service/unit/icon.png";
         let asset_server = app.world().resource::<AssetServer>().clone();
 
-        let first = app
-            .world_mut()
-            .resource_scope(|world, mut cache: Mut<ImageCache>| {
-                let mut images = world.resource_mut::<Assets<Image>>();
-                get_or_load_image(path, &mut cache, &mut images, &asset_server)
-            });
-
-        let second = app
-            .world_mut()
-            .resource_scope(|world, mut cache: Mut<ImageCache>| {
-                let mut images = world.resource_mut::<Assets<Image>>();
-                get_or_load_image(path, &mut cache, &mut images, &asset_server)
-            });
+        let first = load_image_for_test(&mut app, path, &asset_server);
+        let second = load_image_for_test(&mut app, path, &asset_server);
 
         assert_eq!(first.id(), second.id());
         let cache = app.world().resource::<ImageCache>();
@@ -377,10 +386,9 @@ mod tests {
         app.add_plugins((MinimalPlugins, AssetPlugin::default(), CssService));
         app.init_asset::<CssAsset>();
 
-        assert!(
-            app.world()
-                .contains_resource::<crate::styles::ExistingCssIDs>()
-        );
+        assert!(app
+            .world()
+            .contains_resource::<crate::styles::ExistingCssIDs>());
         assert!(app.world().contains_resource::<CssUsers>());
     }
 
@@ -863,11 +871,7 @@ mod tests {
                 ..default()
             },
         );
-        if let Some(mut ui_style) = app.world_mut().entity_mut(entity).get_mut::<UiStyle>() {
-            ui_style.styles = reset_styles;
-        } else {
-            panic!("missing UiStyle");
-        }
+        set_entity_ui_styles(&mut app, entity, reset_styles);
 
         app.update();
 
@@ -945,11 +949,7 @@ mod tests {
             },
         );
 
-        if let Some(mut ui_style) = app.world_mut().entity_mut(entity).get_mut::<UiStyle>() {
-            ui_style.styles = reset_styles;
-        } else {
-            panic!("missing UiStyle");
-        }
+        set_entity_ui_styles(&mut app, entity, reset_styles);
 
         app.update();
 

@@ -271,15 +271,23 @@ fn resolve_content_parent(
 }
 
 fn get_node_children(node: &HtmlWidgetNode) -> Option<&Vec<HtmlWidgetNode>> {
-    match node {
-        HtmlWidgetNode::Body(_, _, _, children, _, _, _)
-        | HtmlWidgetNode::Div(_, _, _, children, _, _, _)
-        | HtmlWidgetNode::Form(_, _, _, children, _, _, _)
-        | HtmlWidgetNode::FieldSet(_, _, _, children, _, _, _) => Some(children),
-        #[cfg(feature = "extended-dialog")]
-        HtmlWidgetNode::Dialog(_, _, _, children, _, _, _) => Some(children),
-        _ => None,
+    if let HtmlWidgetNode::Body(_, _, _, children, _, _, _) = node {
+        return Some(children);
     }
+    if let HtmlWidgetNode::Div(_, _, _, children, _, _, _) = node {
+        return Some(children);
+    }
+    if let HtmlWidgetNode::Form(_, _, _, children, _, _, _) = node {
+        return Some(children);
+    }
+    if let HtmlWidgetNode::FieldSet(_, _, _, children, _, _, _) = node {
+        return Some(children);
+    }
+    #[cfg(feature = "extended-dialog")]
+    if let HtmlWidgetNode::Dialog(_, _, _, children, _, _, _) = node {
+        return Some(children);
+    }
+    None
 }
 
 fn update_existing_widget_node(

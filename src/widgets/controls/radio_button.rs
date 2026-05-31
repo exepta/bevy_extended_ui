@@ -1,5 +1,6 @@
 use crate::styles::paint::Colored;
 use crate::styles::{CssClass, CssSource, TagName};
+use crate::widgets::widget_util::find_ancestor_with_component;
 use crate::widgets::{
     BindToID, FieldMode, FieldSelectionSingle, FieldSet, InFieldSet, RadioButton, UIGenID,
     UIWidgetState, WidgetId, WidgetKind,
@@ -176,10 +177,19 @@ fn update_radio_button_system(
 ) {
     for (radio_button, id, mut state) in radio_q.iter_mut() {
         state.checked = radio_button.selected;
-        for (bind_to, mut text) in label_q.iter_mut() {
-            if bind_to.0 == id.0 {
-                text.0 = radio_button.label.clone();
-            }
+        set_radio_label_text_for_id(id.0, &radio_button.label, &mut label_q);
+    }
+}
+
+/// Updates the label text node bound to a radio widget id.
+fn set_radio_label_text_for_id(
+    bind_id: usize,
+    value: &str,
+    label_q: &mut Query<(&BindToID, &mut Text), With<RadioButtonLabel>>,
+) {
+    for (bind_to, mut text) in label_q.iter_mut() {
+        if bind_to.0 == bind_id {
+            text.0 = value.to_string();
         }
     }
 }
@@ -318,11 +328,7 @@ fn on_internal_cursor_entered(
     mut query: Query<&mut UIWidgetState, With<RadioButton>>,
 ) {
     if let Ok(mut state) = query.get_mut(trigger.entity) {
-        if state.disabled {
-            state.hovered = false;
-        } else {
-            state.hovered = true;
-        }
+        state.hovered = !state.disabled;
     }
 
     trigger.propagate(false);
@@ -349,24 +355,11 @@ fn on_internal_cursor_leave(
 
 /// Finds the nearest ancestor field set entity.
 fn find_fieldset_ancestor(
-    mut entity: Entity,
+    entity: Entity,
     parents: &Query<&ChildOf>,
     fieldsets: &Query<(), With<FieldSet>>,
 ) -> Option<Entity> {
-    // climb up until root
-    loop {
-        // parent of current?
-        let Ok(p) = parents.get(entity) else {
-            return None;
-        };
-        let parent = p.parent();
-
-        if fieldsets.get(parent).is_ok() {
-            return Some(parent);
-        }
-
-        entity = parent;
-    }
+    find_ancestor_with_component::<FieldSet>(entity, parents, fieldsets)
 }
 
 /// Adds a visual dot to the selected radio button.

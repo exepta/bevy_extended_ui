@@ -450,13 +450,7 @@ fn update_que(
 
     let Some(active_names) = ui_registry.current.clone() else {
         for (entity, html_source) in query.iter() {
-            for (_, mut body_vis, body) in body_query.iter_mut() {
-                if let Some(bind) = body.html_key.as_ref() {
-                    if bind == &html_source.source_id {
-                        *body_vis = Visibility::Hidden;
-                    }
-                }
-            }
+            hide_bound_bodies_for_source(&html_source.source_id, &mut body_query);
 
             commands.entity(entity).despawn();
         }
@@ -500,18 +494,24 @@ fn update_que(
 
     for (entity, html_source) in query.iter() {
         if !active_set.contains(&html_source.source_id) {
-            for (_, mut body_vis, body) in body_query.iter_mut() {
-                if let Some(bind) = body.html_key.as_ref() {
-                    if bind == &html_source.source_id {
-                        *body_vis = Visibility::Hidden;
-                    }
-                }
-            }
+            hide_bound_bodies_for_source(&html_source.source_id, &mut body_query);
             commands.entity(entity).despawn();
         }
     }
 
     ui_registry.ui_update = false;
+}
+
+#[cfg(not(feature = "extended-framework"))]
+fn hide_bound_bodies_for_source(
+    source_id: &str,
+    body_query: &mut Query<(Entity, &mut Visibility, &Body), (Without<HtmlSource>, With<Body>)>,
+) {
+    for (_, mut body_vis, body) in body_query.iter_mut() {
+        if body.html_key.as_deref() == Some(source_id) {
+            *body_vis = Visibility::Hidden;
+        }
+    }
 }
 
 /// Spawns a UI entity from a registered HTML source by name.

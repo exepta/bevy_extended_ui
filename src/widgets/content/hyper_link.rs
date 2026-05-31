@@ -350,6 +350,22 @@ fn open_with_system_browser(href: &str) -> bool {
     false
 }
 
+/// Tries to launch a browser binary by name if it exists in PATH.
+#[cfg(not(target_arch = "wasm32"))]
+fn try_open_browser_binary_candidate(candidate: &str, href: &str) -> BrowserAttempt {
+    if !command_exists(candidate) {
+        return BrowserAttempt::NotInstalled;
+    }
+
+    let mut command = Command::new(candidate);
+    command.arg(href);
+    if spawn_silent(&mut command) {
+        BrowserAttempt::Opened
+    } else {
+        BrowserAttempt::LaunchFailed
+    }
+}
+
 /// Handles `try_open_specific_browser` in the extended UI workflow.
 #[cfg(not(target_arch = "wasm32"))]
 fn try_open_specific_browser(browser: &str, href: &str) -> BrowserAttempt {
@@ -377,14 +393,9 @@ fn try_open_specific_browser(browser: &str, href: &str) -> BrowserAttempt {
 fn try_open_browser_linux(browser: &str, href: &str) -> BrowserAttempt {
     let candidates = browser_binary_candidates(browser);
     for candidate in candidates {
-        if command_exists(&candidate) {
-            let mut command = Command::new(&candidate);
-            command.arg(href);
-            return if spawn_silent(&mut command) {
-                BrowserAttempt::Opened
-            } else {
-                BrowserAttempt::LaunchFailed
-            };
+        let attempt = try_open_browser_binary_candidate(&candidate, href);
+        if !matches!(attempt, BrowserAttempt::NotInstalled) {
+            return attempt;
         }
     }
     BrowserAttempt::NotInstalled
@@ -431,14 +442,9 @@ fn try_open_browser_windows(browser: &str, href: &str) -> BrowserAttempt {
     }
 
     for candidate in browser_binary_candidates(browser) {
-        if command_exists(&candidate) {
-            let mut command = Command::new(&candidate);
-            command.arg(href);
-            return if spawn_silent(&mut command) {
-                BrowserAttempt::Opened
-            } else {
-                BrowserAttempt::LaunchFailed
-            };
+        let attempt = try_open_browser_binary_candidate(&candidate, href);
+        if !matches!(attempt, BrowserAttempt::NotInstalled) {
+            return attempt;
         }
     }
 

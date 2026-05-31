@@ -124,27 +124,9 @@ fn parse_component_definition_file(
     })?;
     ensure_ui_component_macro_used(path, &text)?;
 
-    let template_name = TEMPLATE_NAME_RE
-        .captures(&text)
-        .and_then(|caps| caps.get(1).map(|m| m.as_str().trim().to_string()))
-        .filter(|value| !value.is_empty())
-        .ok_or_else(|| {
-            format!(
-                "Missing required field `template_name` in `{}`.",
-                path.display()
-            )
-        })?;
+    let template_name = required_captured_field(&TEMPLATE_NAME_RE, &text, "template_name", path)?;
 
-    let template_file = TEMPLATE_FILE_RE
-        .captures(&text)
-        .and_then(|caps| caps.get(1).map(|m| m.as_str().trim().to_string()))
-        .filter(|value| !value.is_empty())
-        .ok_or_else(|| {
-            format!(
-                "Missing required field `template_file` in `{}`.",
-                path.display()
-            )
-        })?;
+    let template_file = required_captured_field(&TEMPLATE_FILE_RE, &text, "template_file", path)?;
 
     let styles = STYLES_RE
         .captures(&text)
@@ -171,6 +153,25 @@ fn parse_component_definition_file(
         styles,
         source_dir_rel,
     })
+}
+
+/// Extracts a required capture group (index 1) and trims it.
+fn required_captured_field(
+    pattern: &Regex,
+    text: &str,
+    field_name: &str,
+    path: &Path,
+) -> Result<String, String> {
+    pattern
+        .captures(text)
+        .and_then(|caps| caps.get(1).map(|m| m.as_str().trim().to_string()))
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            format!(
+                "Missing required field `{field_name}` in `{}`.",
+                path.display()
+            )
+        })
 }
 
 /// Handles `ensure_ui_component_macro_used` in the extended UI workflow.

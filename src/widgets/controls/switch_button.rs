@@ -176,10 +176,18 @@ fn update_switch_button_system(
 ) {
     for (switch_button, id, mut state) in switch_q.iter_mut() {
         state.checked = switch_button.selected;
-        for (bind_to, mut text) in label_q.iter_mut() {
-            if bind_to.0 == id.0 {
-                text.0 = switch_button.label.clone();
-            }
+        set_switch_label_text_for_id(id.0, &switch_button.label, &mut label_q);
+    }
+}
+
+fn set_switch_label_text_for_id(
+    bind_id: usize,
+    value: &str,
+    label_q: &mut Query<(&BindToID, &mut Text), With<SwitchButtonLabel>>,
+) {
+    for (bind_to, mut text) in label_q.iter_mut() {
+        if bind_to.0 == bind_id {
+            text.0 = value.to_string();
         }
     }
 }

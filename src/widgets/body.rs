@@ -5,7 +5,10 @@ use crate::old::registry::UiRegistry;
 use crate::styles::{CssClass, CssSource, Style, TagName};
 use crate::widgets::controls::choice_box::ChoiceLayoutBoxBase;
 use crate::widgets::div::DivContentRoot;
-use crate::widgets::widget_util::{wheel_delta_x, wheel_delta_y};
+use crate::widgets::widget_util::{
+    apply_wheel_scroll_events_for_root, can_scroll_axis, find_owner_with_scroll_and_bar,
+    max_scroll_for_extents, set_scrollbar_display_and_visibility,
+};
 use crate::widgets::{
     ActiveScrollTarget, BindToID, Body, Div, Scrollbar, UIGenID, UIWidgetState, WidgetId,
     WidgetKind,
@@ -566,40 +569,8 @@ fn route_hover_from_pointer_messages(
     mut body_state_q: Query<&mut UIWidgetState, With<Body>>,
     mut hovered: ResMut<HoveredBodyTracker>,
 ) {
-    /// Walks up the hierarchy to find the owning body entity.
-    fn find_owner_body(
-        mut e: Entity,
-        parents: &Query<&ChildOf>,
-        is_body_q: &Query<(), With<Body>>,
-        is_scroll_content_q: &Query<(), With<BodyScrollContent>>,
-        scroll_owner_q: &Query<&BodyContentOwner, With<BodyScrollContent>>,
-        sb_owner_q: &Query<&BodyScrollbarOwner>,
-    ) -> Option<Entity> {
-        loop {
-            if let Ok(owner) = sb_owner_q.get(e) {
-                return Some(**owner);
-            }
-
-            if is_body_q.get(e).is_ok() {
-                return Some(e);
-            }
-
-            if is_scroll_content_q.get(e).is_ok() {
-                if let Ok(owner) = scroll_owner_q.get(e) {
-                    return Some(**owner);
-                }
-            }
-
-            if let Ok(p) = parents.get(e) {
-                e = p.parent();
-            } else {
-                return None;
-            }
-        }
-    }
-
     for msg in over.read() {
-        let Some(body) = find_owner_body(
+        let Some(body) = find_owner_with_scroll_and_bar(
             msg.entity,
             &parents,
             &is_body_q,
@@ -620,7 +591,7 @@ fn route_hover_from_pointer_messages(
     }
 
     for msg in out.read() {
-        let Some(body) = find_owner_body(
+        let Some(body) = find_owner_with_scroll_and_bar(
             msg.entity,
             &parents,
             &is_body_q,
@@ -686,22 +657,18 @@ pub fn handle_body_scroll_wheel(
         };
 
         let inv_sf = computed.inverse_scale_factor.max(f32::EPSILON);
-
-        let can_scroll_y = if node.overflow.y == OverflowAxis::Scroll {
-            let viewport_h = (computed.size().y * inv_sf).max(1.0);
-            let content_h = (computed.content_size.y * inv_sf).max(viewport_h);
-            (content_h - viewport_h).max(0.0) > 0.5
-        } else {
-            false
-        };
-
-        let can_scroll_x = if node.overflow.x == OverflowAxis::Scroll {
-            let viewport_w = (computed.size().x * inv_sf).max(1.0);
-            let content_w = (computed.content_size.x * inv_sf).max(viewport_w);
-            (content_w - viewport_w).max(0.0) > 0.5
-        } else {
-            false
-        };
+        let can_scroll_y = can_scroll_axis(
+            node.overflow.y,
+            computed.size().y,
+            computed.content_size.y,
+            inv_sf,
+        );
+        let can_scroll_x = can_scroll_axis(
+            node.overflow.x,
+            computed.size().x,
+            computed.content_size.x,
+            inv_sf,
+        );
 
         can_scroll_x || can_scroll_y
     });
@@ -721,22 +688,18 @@ pub fn handle_body_scroll_wheel(
                     return false;
                 }
                 let inv_sf = computed.inverse_scale_factor.max(f32::EPSILON);
-
-                let can_scroll_y = if node.overflow.y == OverflowAxis::Scroll {
-                    let viewport_h = (computed.size().y * inv_sf).max(1.0);
-                    let content_h = (computed.content_size.y * inv_sf).max(viewport_h);
-                    (content_h - viewport_h).max(0.0) > 0.5
-                } else {
-                    false
-                };
-
-                let can_scroll_x = if node.overflow.x == OverflowAxis::Scroll {
-                    let viewport_w = (computed.size().x * inv_sf).max(1.0);
-                    let content_w = (computed.content_size.x * inv_sf).max(viewport_w);
-                    (content_w - viewport_w).max(0.0) > 0.5
-                } else {
-                    false
-                };
+                let can_scroll_y = can_scroll_axis(
+                    node.overflow.y,
+                    computed.size().y,
+                    computed.content_size.y,
+                    inv_sf,
+                );
+                let can_scroll_x = can_scroll_axis(
+                    node.overflow.x,
+                    computed.size().x,
+                    computed.content_size.x,
+                    inv_sf,
+                );
 
                 can_scroll_x || can_scroll_y
             });
@@ -768,44 +731,12 @@ pub fn handle_body_scroll_wheel(
         return;
     };
 
-    for event in wheel_events.read() {
-        let Ok((node, computed, mut scroll)) = content_q.get_mut(**root) else {
-            continue;
-        };
-
-        let can_scroll_y = node.overflow.y == OverflowAxis::Scroll;
-        let can_scroll_x = node.overflow.x == OverflowAxis::Scroll;
-        if !can_scroll_x && !can_scroll_y {
-            continue;
-        }
-
-        let inv_sf = computed.inverse_scale_factor.max(f32::EPSILON);
-        let shift = keyboard.as_ref().is_some_and(|keys| {
-            keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight)
-        });
-
-        let mut delta_x = -wheel_delta_x(event, inv_sf);
-        let mut delta_y = -wheel_delta_y(event, inv_sf);
-
-        if shift && delta_x.abs() <= f32::EPSILON && can_scroll_x {
-            delta_x = delta_y;
-            delta_y = 0.0;
-        }
-
-        if can_scroll_y && delta_y.abs() > f32::EPSILON {
-            let viewport_h = (computed.size().y * inv_sf).max(1.0);
-            let content_h = (computed.content_size.y * inv_sf).max(viewport_h);
-            let max_scroll_y = (content_h - viewport_h).max(0.0);
-            scroll.y = (scroll.y + delta_y).clamp(0.0, max_scroll_y);
-        }
-
-        if can_scroll_x && delta_x.abs() > f32::EPSILON {
-            let viewport_w = (computed.size().x * inv_sf).max(1.0);
-            let content_w = (computed.content_size.x * inv_sf).max(viewport_w);
-            let max_scroll_x = (content_w - viewport_w).max(0.0);
-            scroll.x = (scroll.x + delta_x).clamp(0.0, max_scroll_x);
-        }
-    }
+    apply_wheel_scroll_events_for_root(
+        **root,
+        &mut wheel_events,
+        keyboard.as_deref(),
+        &mut content_q,
+    );
 }
 
 /// Synchronizes body content scroll positions from scrollbar widget values.
@@ -841,7 +772,7 @@ fn sync_body_content_from_scrollbar(
             if let Ok(scrollbar) = scroll_q.get(**sb) {
                 let viewport_h = viewport.y.max(1.0);
                 let content_h = content.y.max(viewport_h);
-                let max_scroll = (content_h - viewport_h).max(0.0);
+                let max_scroll = max_scroll_for_extents(viewport_h, content_h);
                 pos.y = scrollbar.value.clamp(0.0, max_scroll);
             }
         }
@@ -850,7 +781,7 @@ fn sync_body_content_from_scrollbar(
             if let Ok(scrollbar) = scroll_q.get(**sb) {
                 let viewport_w = viewport.x.max(1.0);
                 let content_w = content.x.max(viewport_w);
-                let max_scroll = (content_w - viewport_w).max(0.0);
+                let max_scroll = max_scroll_for_extents(viewport_w, content_w);
                 pos.x = scrollbar.value.clamp(0.0, max_scroll);
             }
         }
@@ -893,9 +824,9 @@ fn sync_body_scrollbar_from_content(
         if let Some(sb) = sb_y_opt {
             let viewport_h = viewport.y.max(1.0);
             let content_h = content.y.max(viewport_h);
-            let max_scroll = (content_h - viewport_h).max(0.0);
+            let max_scroll = max_scroll_for_extents(viewport_h, content_h);
 
-            check_scroll_bar_state(&mut sb_node_q, &mut sb_vis_q, sb, max_scroll);
+            set_scrollbar_display_and_visibility(&mut sb_node_q, &mut sb_vis_q, sb, max_scroll);
 
             if let Ok(mut scrollbar) = scroll_q.get_mut(**sb) {
                 scrollbar.entity = Some(**root);
@@ -911,9 +842,9 @@ fn sync_body_scrollbar_from_content(
         if let Some(sb) = sb_x_opt {
             let viewport_w = viewport.x.max(1.0);
             let content_w = content.x.max(viewport_w);
-            let max_scroll = (content_w - viewport_w).max(0.0);
+            let max_scroll = max_scroll_for_extents(viewport_w, content_w);
 
-            check_scroll_bar_state(&mut sb_node_q, &mut sb_vis_q, sb, max_scroll);
+            set_scrollbar_display_and_visibility(&mut sb_node_q, &mut sb_vis_q, sb, max_scroll);
 
             if let Ok(mut scrollbar) = scroll_q.get_mut(**sb) {
                 scrollbar.entity = Some(**root);
@@ -923,34 +854,6 @@ fn sync_body_scrollbar_from_content(
                 scrollbar.content_extent = content_w;
                 scrollbar.value = scroll_pos.x.clamp(0.0, max_scroll);
             }
-        }
-    }
-}
-
-/// Updates scrollbar visibility if content dimensions have changed.
-fn check_scroll_bar_state<T>(
-    sb_node_q: &mut Query<&mut Node, With<Scrollbar>>,
-    sb_vis_q: &mut Query<&mut Visibility, With<Scrollbar>>,
-    sb: &T,
-    max_scroll: f32,
-) where
-    T: std::ops::Deref<Target = Entity>,
-{
-    if let Ok(mut sb_node) = sb_node_q.get_mut(**sb) {
-        if sb_node.display != Display::Flex {
-            sb_node.display = Display::Flex;
-        }
-    }
-
-    if let Ok(mut vis) = sb_vis_q.get_mut(**sb) {
-        let want_visible = max_scroll > 0.5;
-        let new_vis = if want_visible {
-            Visibility::Visible
-        } else {
-            Visibility::Hidden
-        };
-        if *vis != new_vis {
-            *vis = new_vis;
         }
     }
 }
