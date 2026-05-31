@@ -219,6 +219,8 @@ fn reconcile_node_children(
     for new_node in new_nodes {
         let node_id = get_node_id(new_node).0;
         if let Some(existing_entity) = existing_by_id.remove(&node_id) {
+            update_existing_widget_node(commands, existing_entity, new_node, false);
+
             if let Some(children) = get_node_children(new_node) {
                 let nested_parent = resolve_content_parent(
                     existing_entity,
@@ -277,6 +279,390 @@ fn get_node_children(node: &HtmlWidgetNode) -> Option<&Vec<HtmlWidgetNode>> {
         #[cfg(feature = "extended-dialog")]
         HtmlWidgetNode::Dialog(_, _, _, children, _, _, _) => Some(children),
         _ => None,
+    }
+}
+
+fn update_existing_widget_node(
+    commands: &mut Commands,
+    entity: Entity,
+    node: &HtmlWidgetNode,
+    start_hidden: bool,
+) {
+    match node {
+        HtmlWidgetNode::Body(body, meta, states, _, functions, widget, id) => {
+            update_with_meta(
+                commands,
+                entity,
+                body.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+                start_hidden,
+            );
+        }
+        HtmlWidgetNode::Button(button, meta, states, functions, widget, id) => {
+            update_with_meta(
+                commands,
+                entity,
+                button.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+                start_hidden,
+            );
+        }
+        HtmlWidgetNode::CheckBox(checkbox, meta, states, functions, widget, id) => {
+            update_with_meta(
+                commands,
+                entity,
+                checkbox.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+                start_hidden,
+            );
+        }
+        HtmlWidgetNode::ColorPicker(color_picker, meta, states, functions, widget, id) => {
+            update_with_meta(
+                commands,
+                entity,
+                color_picker.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+                start_hidden,
+            );
+        }
+        HtmlWidgetNode::ChoiceBox(choice_box, meta, states, functions, widget, id) => {
+            update_with_meta(
+                commands,
+                entity,
+                choice_box.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+                start_hidden,
+            );
+        }
+        HtmlWidgetNode::DatePicker(date_picker, meta, states, functions, widget, id) => {
+            update_with_meta(
+                commands,
+                entity,
+                date_picker.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+                start_hidden,
+            );
+        }
+        HtmlWidgetNode::Div(div, meta, states, _, functions, widget, id) => {
+            update_with_meta(
+                commands,
+                entity,
+                div.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+                start_hidden,
+            );
+        }
+        HtmlWidgetNode::Form(form, meta, states, _, functions, widget, id) => {
+            update_with_meta(
+                commands,
+                entity,
+                form.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+                start_hidden,
+            );
+        }
+        #[cfg(feature = "extended-dialog")]
+        HtmlWidgetNode::Dialog(dialog, meta, states, _, functions, widget, id) => {
+            update_with_meta(
+                commands,
+                entity,
+                dialog.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+                start_hidden,
+            );
+        }
+        HtmlWidgetNode::Divider(divider, meta, states, functions, widget, id) => {
+            update_with_meta(
+                commands,
+                entity,
+                divider.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+                start_hidden,
+            );
+        }
+        HtmlWidgetNode::FieldSet(fieldset, meta, states, _, functions, widget, id) => {
+            update_with_meta(
+                commands,
+                entity,
+                fieldset.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+                start_hidden,
+            );
+        }
+        HtmlWidgetNode::Headline(headline, meta, states, functions, widget, id) => {
+            update_with_meta(
+                commands,
+                entity,
+                headline.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+                start_hidden,
+            );
+        }
+        HtmlWidgetNode::HyperLink(hyper_link, meta, states, functions, widget, id) => {
+            update_with_meta(
+                commands,
+                entity,
+                hyper_link.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+                start_hidden,
+            );
+        }
+        HtmlWidgetNode::Img(img, meta, states, functions, widget, id) => {
+            update_with_meta(
+                commands,
+                entity,
+                img.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+                start_hidden,
+            );
+        }
+        HtmlWidgetNode::Input(input, meta, states, functions, widget, id) => {
+            update_with_meta(
+                commands,
+                entity,
+                input.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+                start_hidden,
+            );
+        }
+        HtmlWidgetNode::Paragraph(paragraph, meta, states, functions, widget, id) => {
+            update_with_meta(
+                commands,
+                entity,
+                paragraph.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+                start_hidden,
+            );
+        }
+        HtmlWidgetNode::ToolTip(tooltip, meta, states, functions, widget, id) => {
+            update_with_meta(
+                commands,
+                entity,
+                tooltip.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+                start_hidden,
+            );
+        }
+        HtmlWidgetNode::Badge(badge, meta, states, functions, widget, id) => {
+            update_with_meta(
+                commands,
+                entity,
+                badge.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+                start_hidden,
+            );
+        }
+        HtmlWidgetNode::ProgressBar(progress_bar, meta, states, functions, widget, id) => {
+            update_with_meta(
+                commands,
+                entity,
+                progress_bar.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+                start_hidden,
+            );
+        }
+        HtmlWidgetNode::RadioButton(radio_button, meta, states, functions, widget, id) => {
+            update_with_meta(
+                commands,
+                entity,
+                radio_button.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+                start_hidden,
+            );
+        }
+        HtmlWidgetNode::Scrollbar(scroll_bar, meta, states, functions, widget, id) => {
+            update_with_meta(
+                commands,
+                entity,
+                scroll_bar.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+                start_hidden,
+            );
+        }
+        HtmlWidgetNode::Slider(slider, meta, states, functions, widget, id) => {
+            update_with_meta(
+                commands,
+                entity,
+                slider.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+                start_hidden,
+            );
+        }
+        HtmlWidgetNode::SwitchButton(switch_button, meta, states, functions, widget, id) => {
+            update_with_meta(
+                commands,
+                entity,
+                switch_button.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+                start_hidden,
+            );
+        }
+        HtmlWidgetNode::ToggleButton(toggle_button, meta, states, functions, widget, id) => {
+            update_with_meta(
+                commands,
+                entity,
+                toggle_button.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+                start_hidden,
+            );
+        }
+        HtmlWidgetNode::ListBox(list_box, meta, states, functions, widget, id) => {
+            update_with_meta(
+                commands,
+                entity,
+                list_box.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+                start_hidden,
+            );
+        }
+    }
+}
+
+fn update_with_meta<T: Component>(
+    commands: &mut Commands,
+    entity: Entity,
+    component: T,
+    meta: &HtmlMeta,
+    states: &HtmlStates,
+    functions: &HtmlEventBindings,
+    widget: &Widget,
+    id: &HtmlID,
+    start_hidden: bool,
+) {
+    commands.entity(entity).insert((
+        component,
+        functions.clone(),
+        widget.clone(),
+        id.clone(),
+        meta.inner_content.clone(),
+        CssSource(meta.css.clone()),
+        CssClass(meta.class.clone().unwrap_or_default()),
+        CssID(meta.id.clone().unwrap_or_default()),
+        if start_hidden || states.hidden {
+            Visibility::Hidden
+        } else {
+            Visibility::Inherited
+        },
+    ));
+
+    if let Some(inline_style) = &meta.style {
+        commands.entity(entity).insert(inline_style.clone());
+    } else {
+        commands.entity(entity).remove::<crate::html::HtmlStyle>();
+    }
+
+    if let Some(validation) = &meta.validation {
+        commands.entity(entity).insert(validation.clone());
+    } else {
+        commands
+            .entity(entity)
+            .remove::<crate::widgets::ValidationRules>();
+    }
+
+    if states.hidden {
+        commands.entity(entity).insert(NeedHidden);
+    } else {
+        commands.entity(entity).remove::<NeedHidden>();
     }
 }
 

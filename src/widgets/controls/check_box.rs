@@ -24,7 +24,10 @@ pub struct CheckBoxWidget;
 impl Plugin for CheckBoxWidget {
     /// Registers systems for checkbox widget setup.
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, internal_node_creation_system);
+        app.add_systems(
+            Update,
+            (internal_node_creation_system, update_check_box_system),
+        );
     }
 }
 
@@ -151,6 +154,23 @@ fn internal_node_creation_system(
             .observe(on_internal_click)
             .observe(on_internal_cursor_entered)
             .observe(on_internal_cursor_leave);
+    }
+}
+
+fn update_check_box_system(
+    mut check_q: Query<
+        (&CheckBox, &UIGenID, &mut UIWidgetState),
+        (With<CheckBox>, With<CheckBoxBase>, Changed<CheckBox>),
+    >,
+    mut label_q: Query<(&BindToID, &mut Text), With<CheckBoxLabel>>,
+) {
+    for (check_box, id, mut state) in check_q.iter_mut() {
+        state.checked = check_box.checked;
+        for (bind_to, mut text) in label_q.iter_mut() {
+            if bind_to.0 == id.0 {
+                text.0 = check_box.label.clone();
+            }
+        }
     }
 }
 

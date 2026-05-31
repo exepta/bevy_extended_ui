@@ -872,35 +872,115 @@ fn matches_selector(
     class_opt: Option<&CssClass>,
     tag_opt: Option<&TagName>,
 ) -> bool {
-    let base = selector.split(':').next().unwrap_or(selector);
+    let Some(requirements) = parse_simple_selector(selector) else {
+        return false;
+    };
 
-    if base == "*" {
-        return true;
-    }
-
-    if let (Some(id), Some(rest)) = (id_opt, base.strip_prefix('#')) {
-        if rest == id.0 {
-            return true;
+    if let Some(expected_tag) = requirements.tag {
+        let Some(tag) = tag_opt else {
+            return false;
+        };
+        if !tag.0.eq_ignore_ascii_case(expected_tag) {
+            return false;
         }
     }
 
-    if let Some(classes) = class_opt {
-        if let Some(rest) = base.strip_prefix('.') {
-            for c in &classes.0 {
-                if rest == c {
-                    return true;
-                }
+    if let Some(expected_id) = requirements.id {
+        let Some(id) = id_opt else {
+            return false;
+        };
+        if id.0 != expected_id {
+            return false;
+        }
+    }
+
+    if !requirements.classes.is_empty() {
+        let Some(classes) = class_opt else {
+            return false;
+        };
+
+        for expected in requirements.classes {
+            if !classes.0.iter().any(|existing| existing == expected) {
+                return false;
             }
         }
     }
 
-    if let Some(tag) = tag_opt {
-        if base == tag.0 {
-            return true;
+    true
+}
+
+/// Parsed requirements for a simple selector token like `div.card#main`.
+#[derive(Default)]
+struct SimpleSelectorRequirements<'a> {
+    tag: Option<&'a str>,
+    id: Option<&'a str>,
+    classes: Vec<&'a str>,
+}
+
+/// Strips pseudo and attribute suffixes from one selector token.
+fn strip_selector_suffixes(selector: &str) -> &str {
+    let mut end = selector.len();
+    for (idx, ch) in selector.char_indices() {
+        if ch == ':' || ch == '[' {
+            end = idx;
+            break;
+        }
+    }
+    selector[..end].trim()
+}
+
+/// Parses a simple selector token into tag/id/class requirements.
+fn parse_simple_selector(selector: &str) -> Option<SimpleSelectorRequirements<'_>> {
+    let base = strip_selector_suffixes(selector);
+    if base.is_empty() || base == "*" {
+        return Some(SimpleSelectorRequirements::default());
+    }
+
+    let mut requirements = SimpleSelectorRequirements::default();
+    let bytes = base.as_bytes();
+    let len = bytes.len();
+    let mut i = 0usize;
+
+    if bytes[0] != b'.' && bytes[0] != b'#' {
+        let mut end = 0usize;
+        while end < len && bytes[end] != b'.' && bytes[end] != b'#' {
+            end += 1;
+        }
+        if end == 0 {
+            return None;
+        }
+        requirements.tag = Some(&base[..end]);
+        i = end;
+    }
+
+    while i < len {
+        let prefix = bytes[i];
+        if prefix != b'.' && prefix != b'#' {
+            return None;
+        }
+        i += 1;
+
+        let start = i;
+        while i < len && bytes[i] != b'.' && bytes[i] != b'#' {
+            i += 1;
+        }
+        if start == i {
+            return None;
+        }
+
+        let token = &base[start..i];
+        if prefix == b'.' {
+            requirements.classes.push(token);
+        } else if let Some(existing) = requirements.id {
+            if existing != token {
+                return None;
+            }
+        } else {
+            requirements.id = Some(token);
         }
     }
 
-    false
+    Some(requirements)
 }
 
 /// Defines the available `SelectorCombinator` variants for this part of the UI runtime.
@@ -947,4 +1027,121 @@ fn parse_selector_steps(selector: &str) -> Vec<SelectorStep> {
     }
 
     steps
+}
+
+#[cfg(test)]
+mod tests {
+    use super::matches_selector;
+    use crate::styles::{CssClass, CssID, TagName};
+
+    #[test]
+    fn matches_selector_supports_compound_selectors() {
+        let id = CssID("main-card".to_string());
+        let classes = CssClass(vec!["card".to_string(), "active".to_string()]);
+        let tag = TagName("div".to_string());
+
+        assert!(matches_selector(
+            ".card.active",
+            Some(&id),
+            Some(&classes),
+            Some(&tag)
+        ));
+        assert!(matches_selector(
+            "div.card#main-card",
+            Some(&id),
+            Some(&classes),
+            Some(&tag)
+        ));
+        assert!(matches_selector(
+            "#main-card.active:hover",
+            Some(&id),
+            Some(&classes),
+            Some(&tag)
+        ));
+    }
+
+    #[test]
+    fn matches_selector_rejects_missing_compound_parts() {
+        let id = CssID("main-card".to_string());
+        let classes = CssClass(vec!["card".to_string()]);
+        let tag = TagName("div".to_string());
+
+        assert!(!matches_selector(
+            ".card.active",
+            Some(&id),
+            Some(&classes),
+            Some(&tag)
+        ));
+        assert!(!matches_selector(
+            "span.card#main-card",
+            Some(&id),
+            Some(&classes),
+            Some(&tag)
+        ));
+        assert!(!matches_selector(
+            "#other.card",
+            Some(&id),
+            Some(&classes),
+            Some(&tag)
+        ));
+    }
+
+    #[test]
+    fn matches_selector_ignores_pseudo_and_attribute_suffixes() {
+        let id = CssID("cta".to_string());
+        let classes = CssClass(vec!["btn".to_string(), "primary".to_string()]);
+        let tag = TagName("button".to_string());
+
+        assert!(matches_selector(
+            "button.btn.primary:hover",
+            Some(&id),
+            Some(&classes),
+            Some(&tag)
+        ));
+        assert!(matches_selector(
+            ".btn.primary[data-kind='main']",
+            Some(&id),
+            Some(&classes),
+            Some(&tag)
+        ));
+    }
+
+    #[test]
+    fn matches_selector_handles_case_insensitive_tag_names() {
+        let tag = TagName("Div".to_string());
+        assert!(matches_selector("div", None, None, Some(&tag)));
+        assert!(matches_selector("DIV", None, None, Some(&tag)));
+        assert!(matches_selector(
+            "dIv.card",
+            None,
+            Some(&CssClass(vec!["card".to_string()])),
+            Some(&tag)
+        ));
+    }
+
+    #[test]
+    fn matches_selector_rejects_invalid_selector_tokens() {
+        let id = CssID("main".to_string());
+        let classes = CssClass(vec!["card".to_string()]);
+        let tag = TagName("div".to_string());
+
+        assert!(!matches_selector(
+            "..card",
+            Some(&id),
+            Some(&classes),
+            Some(&tag)
+        ));
+        assert!(!matches_selector(
+            "div#",
+            Some(&id),
+            Some(&classes),
+            Some(&tag)
+        ));
+        assert!(!matches_selector(
+            ".",
+            Some(&id),
+            Some(&classes),
+            Some(&tag)
+        ));
+    }
 }

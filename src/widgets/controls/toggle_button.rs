@@ -23,7 +23,10 @@ pub struct ToggleButtonWidget;
 impl Plugin for ToggleButtonWidget {
     /// Registers systems for toggle button setup and selection logic.
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, internal_node_creation_system);
+        app.add_systems(
+            Update,
+            (internal_node_creation_system, update_toggle_button_system),
+        );
         app.add_systems(Update, ensure_fieldset_selection_system);
     }
 }
@@ -168,6 +171,27 @@ fn internal_node_creation_system(
             .observe(on_internal_click)
             .observe(on_internal_cursor_entered)
             .observe(on_internal_cursor_leave);
+    }
+}
+
+fn update_toggle_button_system(
+    mut toggle_q: Query<
+        (&ToggleButton, &UIGenID, &mut UIWidgetState),
+        (
+            With<ToggleButton>,
+            With<ToggleButtonBase>,
+            Changed<ToggleButton>,
+        ),
+    >,
+    mut text_q: Query<(&BindToID, &mut Text), With<ToggleButtonText>>,
+) {
+    for (toggle_button, id, mut state) in toggle_q.iter_mut() {
+        state.checked = toggle_button.selected;
+        for (bind_to, mut text) in text_q.iter_mut() {
+            if bind_to.0 == id.0 {
+                text.0 = toggle_button.label.clone();
+            }
+        }
     }
 }
 

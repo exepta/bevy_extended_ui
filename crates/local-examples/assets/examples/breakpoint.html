@@ -1,0 +1,36 @@
+<html>
+<head>
+  <meta name="breakpoint-demo" />
+  <link rel="stylesheet" href="breakpoint.css" />
+</head>
+<body>
+<div class="page-head">
+  <h3>Breakpoint / Media Query Demo</h3>
+  <p>Resize the window to verify media rules and selector matching.</p>
+</div>
+
+<div class="hint-row">
+  <div class="bp-note small">Active: max-width: 900px</div>
+  <div class="bp-note large">Active: width > 900px</div>
+  <div class="bp-note huge">Active: min-width > 1200px</div>
+  <div class="bp-note tiny">Active: max-width &lt; 700px</div>
+</div>
+
+<div class="breakpoint-grid">
+  <div id="primary-box" class="bp-box shared">
+    <h5>#primary-box.shared</h5>
+    <p>Combined selector #primary-box.shared</p>
+  </div>
+
+  <div class="bp-box shared">
+    <h5>.bp-box.shared #1</h5>
+    <p>Should match exactly like all shared boxes.</p>
+  </div>
+
+  <div class="bp-box shared">
+    <h5>.bp-box.shared #2</h5>
+    <p>Checks class + class selectors.</p>
+  </div>
+</div>
+</body>
+</html>

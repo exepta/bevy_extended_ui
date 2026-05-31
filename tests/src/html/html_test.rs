@@ -15,8 +15,8 @@ mod tests {
     use crate::widgets::{
         BadgeAnchor, Body, Button, ButtonType, DateFormat, FieldMode, FormValidationMode,
         HyperLinkBrowsers, InputCap, InputField, InputType, Paragraph, RadioButton, Scrollbar,
-        Slider, SliderDotAnchor, SliderType, ToggleButton, ToolTipAlignment, ToolTipPriority,
-        ToolTipTrigger, ToolTipVariant, UIWidgetState, Widget,
+        Slider, SliderDotAnchor, SliderType, SwitchButton, ToggleButton, ToolTipAlignment,
+        ToolTipPriority, ToolTipTrigger, ToolTipVariant, UIWidgetState, Widget,
     };
     use bevy::asset::{AssetEvent, AssetPlugin};
     use bevy::ecs::message::Messages;
@@ -1139,6 +1139,81 @@ mod tests {
             app.world().entities().contains(old_body_b),
             "clean active body should be left untouched"
         );
+    }
+
+    #[test]
+    fn builder_updates_existing_nodes_when_template_values_change() {
+        let mut app = setup_converter_app();
+        app.add_message::<HtmlAllWidgetsSpawned>();
+        app.add_systems(Update, builder::build_html_source);
+
+        app.world_mut()
+            .resource_mut::<UiLangVariables>()
+            .set("data", r#"{"text":"First","state":false}"#);
+
+        add_html_source(
+            &mut app,
+            "examples/build_dynamic_fixture.html",
+            r#"
+            <html>
+              <head><meta name="build-dynamic-key" /></head>
+              <body>
+                <button>{{ data.text }}</button>
+                <switch>{{ data.state }}</switch>
+              </body>
+            </html>
+            "#,
+            "build-dynamic-key",
+            None,
+        );
+
+        app.update();
+
+        {
+            let mut map = app.world_mut().resource_mut::<HtmlStructureMap>();
+            map.active = Some(vec!["build-dynamic-key".to_string()]);
+        }
+        app.world_mut().resource_mut::<HtmlDirty>().0 = true;
+        app.update();
+
+        let mut button_query = app.world_mut().query::<(Entity, &Button)>();
+        let (old_button_entity, old_button) = button_query
+            .iter(app.world())
+            .next()
+            .expect("expected initial button entity");
+        assert_eq!(old_button.text, "First");
+
+        let mut switch_query = app.world_mut().query::<(Entity, &SwitchButton)>();
+        let (old_switch_entity, old_switch) = switch_query
+            .iter(app.world())
+            .next()
+            .expect("expected initial switch entity");
+        assert_eq!(old_switch.label, "false");
+
+        app.world_mut()
+            .resource_mut::<UiLangVariables>()
+            .set("data", r#"{"text":"Second","state":true}"#);
+
+        // 1) converter reparses on vars fingerprint change
+        // 2) builder rebuilds dirty active UI
+        app.update();
+        app.update();
+
+        let mut button_query = app.world_mut().query::<(Entity, &Button)>();
+        let (new_button_entity, new_button) = button_query
+            .iter(app.world())
+            .next()
+            .expect("expected rebuilt button entity");
+        assert_eq!(new_button.text, "Second");
+        assert_eq!(old_button_entity, new_button_entity);
+
+        let mut switch_query = app.world_mut().query::<(Entity, &SwitchButton)>();
+        let (new_switch_entity, new_switch) = switch_query
+            .iter(app.world())
+            .next()
+            .expect("expected rebuilt switch entity");
+        assert_eq!(new_switch.label, "true");
+        assert_eq!(old_switch_entity, new_switch_entity);
     }
 
     #[test]
