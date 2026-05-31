@@ -2,7 +2,10 @@ use std::collections::HashMap;
 
 use crate::styles::paint::Colored;
 use crate::styles::{CssClass, CssSource, TagName};
-use crate::widgets::widget_util::{wheel_delta_x, wheel_delta_y};
+use crate::widgets::widget_util::{
+    apply_wheel_scroll_events_for_root, find_owner_with_scroll_and_bar, max_scroll_for_extents,
+    set_scrollbar_display_and_visibility,
+};
 use crate::widgets::{
     ActiveScrollTarget, BindToID, Div, Scrollbar, UIGenID, UIWidgetState, WidgetId, WidgetKind,
 };
@@ -425,38 +428,6 @@ fn route_hover_from_pointer_messages(
     div_with_scroll_q: Query<&DivContentRoot, With<Div>>,
     mut hovered: ResMut<HoveredDivTracker>,
 ) {
-    /// Walks up the hierarchy to find the owning div entity.
-    fn find_owner_div(
-        mut e: Entity,
-        parents: &Query<&ChildOf>,
-        is_div_q: &Query<(), With<Div>>,
-        is_scroll_content_q: &Query<(), With<DivScrollContent>>,
-        scroll_owner_q: &Query<&DivContentOwner, With<DivScrollContent>>,
-        sb_owner_q: &Query<&DivScrollbarOwner>,
-    ) -> Option<Entity> {
-        loop {
-            if let Ok(owner) = sb_owner_q.get(e) {
-                return Some(**owner);
-            }
-
-            if is_div_q.get(e).is_ok() {
-                return Some(e);
-            }
-
-            if is_scroll_content_q.get(e).is_ok() {
-                if let Ok(owner) = scroll_owner_q.get(e) {
-                    return Some(**owner);
-                }
-            }
-
-            if let Ok(p) = parents.get(e) {
-                e = p.parent();
-            } else {
-                return None;
-            }
-        }
-    }
-
     /// Finds all ancestor Div entities up the parent chain.
     fn find_all_ancestor_divs(
         mut e: Entity,
@@ -473,8 +444,31 @@ fn route_hover_from_pointer_messages(
         ancestors
     }
 
+    /// Decrements hover ref-count and updates state when it reaches zero.
+    fn decrement_div_hover(
+        target: Entity,
+        div_ref: &mut HashMap<Entity, u32>,
+        last_div: &mut Option<Entity>,
+        div_state_q: &mut Query<&mut UIWidgetState, With<Div>>,
+    ) {
+        if let Some(depth) = div_ref.get_mut(&target) {
+            *depth = depth.saturating_sub(1);
+            if *depth == 0 {
+                div_ref.remove(&target);
+
+                if let Ok(mut state) = div_state_q.get_mut(target) {
+                    state.hovered = false;
+                }
+
+                if *last_div == Some(target) {
+                    *last_div = div_ref.keys().next().copied();
+                }
+            }
+        }
+    }
+
     for msg in over.read() {
-        let Some(div) = find_owner_div(
+        let Some(div) = find_owner_with_scroll_and_bar(
             msg.entity,
             &parents,
             &is_div_q,
@@ -519,7 +513,7 @@ fn route_hover_from_pointer_messages(
     }
 
     for msg in out.read() {
-        let Some(div) = find_owner_div(
+        let Some(div) = find_owner_with_scroll_and_bar(
             msg.entity,
             &parents,
             &is_div_q,
@@ -530,38 +524,13 @@ fn route_hover_from_pointer_messages(
             continue;
         };
 
-        if let Some(d) = hovered.div_ref.get_mut(&div) {
-            *d = d.saturating_sub(1);
-            if *d == 0 {
-                hovered.div_ref.remove(&div);
-
-                if let Ok(mut state) = div_state_q.get_mut(div) {
-                    state.hovered = false;
-                }
-
-                if hovered.last_div == Some(div) {
-                    hovered.last_div = hovered.div_ref.keys().next().copied();
-                }
-            }
-        }
+        let HoveredDivTracker { div_ref, last_div } = &mut *hovered;
+        decrement_div_hover(div, div_ref, last_div, &mut div_state_q);
 
         // Also unmark ancestor divs
         let ancestors = find_all_ancestor_divs(div, &parents, &is_div_q);
         for ancestor_div in ancestors {
-            if let Some(d) = hovered.div_ref.get_mut(&ancestor_div) {
-                *d = d.saturating_sub(1);
-                if *d == 0 {
-                    hovered.div_ref.remove(&ancestor_div);
-
-                    if let Ok(mut state) = div_state_q.get_mut(ancestor_div) {
-                        state.hovered = false;
-                    }
-
-                    if hovered.last_div == Some(ancestor_div) {
-                        hovered.last_div = hovered.div_ref.keys().next().copied();
-                    }
-                }
-            }
+            decrement_div_hover(ancestor_div, div_ref, last_div, &mut div_state_q);
         }
     }
 }
@@ -594,44 +563,12 @@ fn handle_div_scroll_wheel(
         return;
     }
 
-    for event in wheel_events.read() {
-        let Ok((node, computed, mut scroll)) = content_q.get_mut(**root) else {
-            continue;
-        };
-
-        let can_scroll_y = node.overflow.y == OverflowAxis::Scroll;
-        let can_scroll_x = node.overflow.x == OverflowAxis::Scroll;
-        if !can_scroll_x && !can_scroll_y {
-            continue;
-        }
-
-        let inv_sf = computed.inverse_scale_factor.max(f32::EPSILON);
-        let shift = keyboard.as_ref().is_some_and(|keys| {
-            keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight)
-        });
-
-        let mut delta_x = -wheel_delta_x(event, inv_sf);
-        let mut delta_y = -wheel_delta_y(event, inv_sf);
-
-        if shift && delta_x.abs() <= f32::EPSILON && can_scroll_x {
-            delta_x = delta_y;
-            delta_y = 0.0;
-        }
-
-        if can_scroll_y && delta_y.abs() > f32::EPSILON {
-            let viewport_h = (computed.size().y * inv_sf).max(1.0);
-            let content_h = (computed.content_size.y * inv_sf).max(viewport_h);
-            let max_scroll_y = (content_h - viewport_h).max(0.0);
-            scroll.y = (scroll.y + delta_y).clamp(0.0, max_scroll_y);
-        }
-
-        if can_scroll_x && delta_x.abs() > f32::EPSILON {
-            let viewport_w = (computed.size().x * inv_sf).max(1.0);
-            let content_w = (computed.content_size.x * inv_sf).max(viewport_w);
-            let max_scroll_x = (content_w - viewport_w).max(0.0);
-            scroll.x = (scroll.x + delta_x).clamp(0.0, max_scroll_x);
-        }
-    }
+    apply_wheel_scroll_events_for_root(
+        **root,
+        &mut wheel_events,
+        keyboard.as_deref(),
+        &mut content_q,
+    );
 }
 
 /// Synchronizes scrollbar values from scrollable content.
@@ -670,9 +607,9 @@ fn sync_scrollbar_from_content(
         if let Some(sb) = sb_y_opt {
             let viewport_h = viewport.y.max(1.0);
             let content_h = content.y.max(viewport_h);
-            let max_scroll = (content_h - viewport_h).max(0.0);
+            let max_scroll = max_scroll_for_extents(viewport_h, content_h);
 
-            check_scroll_bar_state(&mut sb_node_q, &mut sb_vis_q, sb, max_scroll);
+            set_scrollbar_display_and_visibility(&mut sb_node_q, &mut sb_vis_q, sb, max_scroll);
 
             if let Ok(mut scrollbar) = scroll_q.get_mut(**sb) {
                 scrollbar.min = 0.0;
@@ -688,9 +625,9 @@ fn sync_scrollbar_from_content(
         if let Some(sb) = sb_x_opt {
             let viewport_w = viewport.x.max(1.0);
             let content_w = content.x.max(viewport_w);
-            let max_scroll = (content_w - viewport_w).max(0.0);
+            let max_scroll = max_scroll_for_extents(viewport_w, content_w);
 
-            check_scroll_bar_state(&mut sb_node_q, &mut sb_vis_q, sb, max_scroll);
+            set_scrollbar_display_and_visibility(&mut sb_node_q, &mut sb_vis_q, sb, max_scroll);
 
             if let Ok(mut scrollbar) = scroll_q.get_mut(**sb) {
                 scrollbar.min = 0.0;
@@ -704,33 +641,6 @@ fn sync_scrollbar_from_content(
     }
 }
 
-/// Updates scrollbar state if content dimensions have changed.
-fn check_scroll_bar_state<T>(
-    sb_node_q: &mut Query<&mut Node, With<Scrollbar>>,
-    sb_vis_q: &mut Query<&mut Visibility, With<Scrollbar>>,
-    sb: &T,
-    max_scroll: f32,
-) where
-    T: std::ops::Deref<Target = Entity>,
-{
-    if let Ok(mut sb_node) = sb_node_q.get_mut(**sb) {
-        if sb_node.display != Display::Flex {
-            sb_node.display = Display::Flex;
-        }
-    }
-
-    if let Ok(mut vis) = sb_vis_q.get_mut(**sb) {
-        let want_visible = max_scroll > 0.5;
-        let new_vis = if want_visible {
-            Visibility::Visible
-        } else {
-            Visibility::Hidden
-        };
-        if *vis != new_vis {
-            *vis = new_vis;
-        }
-    }
-}
 // -------------------- Events --------------------
 
 /// Sets focus on div click and updates the current widget state.

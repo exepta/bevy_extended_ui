@@ -1,6 +1,7 @@
 use crate::styles::components::UiStyle;
 use crate::styles::paint::Colored;
 use crate::styles::{CssClass, CssSource, TagName};
+use crate::widgets::widget_util::{apply_overlay_state_for_bind, set_z_index_pair};
 use crate::widgets::{
     BindToID, ColorPicker, UIGenID, UIWidgetState, WidgetId, WidgetKind, hsv_to_rgb_u8,
 };
@@ -411,30 +412,11 @@ fn update_modal_visibility(
 
         for (mut z, mut global_z, z_id) in root_z_q.iter_mut() {
             if z_id.0 == id.0 {
-                if state.open {
-                    z.0 = COLOR_PICKER_MODAL_ROOT_Z;
-                    global_z.0 = COLOR_PICKER_MODAL_ROOT_Z;
-                } else {
-                    z.0 = 0;
-                    global_z.0 = 0;
-                }
+                set_z_index_pair(&mut z, &mut global_z, state.open, COLOR_PICKER_MODAL_ROOT_Z);
             }
         }
 
-        for (mut visibility, mut modal_z, mut modal_global_z, bind) in modal_q.iter_mut() {
-            if bind.0 != id.0 {
-                continue;
-            }
-            if state.open {
-                *visibility = Visibility::Inherited;
-                modal_z.0 = COLOR_PICKER_MODAL_Z;
-                modal_global_z.0 = COLOR_PICKER_MODAL_Z;
-            } else {
-                *visibility = Visibility::Hidden;
-                modal_z.0 = 0;
-                modal_global_z.0 = 0;
-            }
-        }
+        apply_overlay_state_for_bind(id.0, state.open, COLOR_PICKER_MODAL_Z, &mut modal_q);
     }
 }
 

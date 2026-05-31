@@ -2,7 +2,10 @@ use crate::services::image_service::{DEFAULT_CHOICE_BOX_KEY, get_or_load_image};
 use crate::styles::components::UiStyle;
 use crate::styles::paint::Colored;
 use crate::styles::{CssClass, CssSource, FontVal, TagName};
-use crate::widgets::widget_util::wheel_delta_y;
+use crate::widgets::widget_util::{
+    apply_overlay_state_for_bind, clear_active_scroll_target_for_entity,
+    first_child_logical_height, set_z_index_pair, wheel_delta_y,
+};
 use crate::widgets::{
     ActiveScrollTarget, BindToID, ChoiceBox, ChoiceOption, IgnoreParentState, UIGenID,
     UIWidgetState, WidgetId, WidgetKind,
@@ -392,33 +395,20 @@ fn update_content_box_visibility(
             if root_id.0 != gen_id.0 {
                 continue;
             }
-
-            if state.open {
-                root_z.0 = CHOICE_BOX_OVERLAY_ROOT_Z;
-                root_global_z.0 = CHOICE_BOX_OVERLAY_ROOT_Z;
-            } else {
-                root_z.0 = 0;
-                root_global_z.0 = 0;
-            }
+            set_z_index_pair(
+                &mut root_z,
+                &mut root_global_z,
+                state.open,
+                CHOICE_BOX_OVERLAY_ROOT_Z,
+            );
         }
 
-        for (mut visibility, mut content_z, mut content_global_z, bind_to_id) in
-            content_query.iter_mut()
-        {
-            if bind_to_id.0 != gen_id.0 {
-                continue;
-            }
-
-            if state.open {
-                *visibility = Visibility::Inherited;
-                content_z.0 = CHOICE_BOX_OVERLAY_CONTENT_Z;
-                content_global_z.0 = CHOICE_BOX_OVERLAY_CONTENT_Z;
-            } else {
-                *visibility = Visibility::Hidden;
-                content_z.0 = 0;
-                content_global_z.0 = 0;
-            }
-        }
+        apply_overlay_state_for_bind(
+            gen_id.0,
+            state.open,
+            CHOICE_BOX_OVERLAY_CONTENT_Z,
+            &mut content_query,
+        );
     }
 }
 
@@ -483,14 +473,7 @@ fn handle_scroll_events(
             }
 
             // Determine the actual option height from the first option under this layout.
-            let mut option_height = None;
-            for (opt_computed, parent) in option_query.iter() {
-                if parent.parent() == layout_entity {
-                    let opt_inv_sf = opt_computed.inverse_scale_factor.max(f32::EPSILON);
-                    option_height = Some((opt_computed.size().y * opt_inv_sf).max(1.0));
-                    break;
-                }
-            }
+            let option_height = first_child_logical_height(layout_entity, &option_query, 1.0);
 
             // Fallback if we couldn't find an option size (shouldn't happen).
             let option_h = option_height.unwrap_or(50.0);
@@ -608,8 +591,24 @@ fn on_layout_cursor_leave(
 ) {
     if let Ok(mut state) = query.get_mut(trigger.entity) {
         state.hovered = false;
-        if active_scroll_target.entity == Some(trigger.entity) {
-            active_scroll_target.entity = None;
+        clear_active_scroll_target_for_entity(&mut active_scroll_target, trigger.entity);
+    }
+}
+
+/// Sets hovered state on an option and its immediate visual children.
+fn set_option_hover_state(
+    entity: Entity,
+    hovered: bool,
+    query: &mut Query<(&mut UIWidgetState, &Children), With<ChoiceOptionBase>>,
+    inner_query: &mut Query<&mut UIWidgetState, Without<ChoiceOptionBase>>,
+) {
+    if let Ok((mut state, children)) = query.get_mut(entity) {
+        state.hovered = hovered;
+
+        for child in children.iter() {
+            if let Ok(mut inner_state) = inner_query.get_mut(child) {
+                inner_state.hovered = hovered;
+            }
         }
     }
 }
@@ -722,15 +721,7 @@ fn on_internal_option_cursor_entered(
     mut query: Query<(&mut UIWidgetState, &Children), With<ChoiceOptionBase>>,
     mut inner_query: Query<&mut UIWidgetState, Without<ChoiceOptionBase>>,
 ) {
-    if let Ok((mut state, children)) = query.get_mut(trigger.entity) {
-        state.hovered = true;
-
-        for child in children.iter() {
-            if let Ok(mut inner_state) = inner_query.get_mut(child) {
-                inner_state.hovered = true;
-            }
-        }
-    }
+    set_option_hover_state(trigger.entity, true, &mut query, &mut inner_query);
 }
 
 /// Sets `hovered = false` on a [`ChoiceOptionBase`] and its visual children when unhovered.
@@ -746,15 +737,7 @@ fn on_internal_option_cursor_leave(
     mut query: Query<(&mut UIWidgetState, &Children), With<ChoiceOptionBase>>,
     mut inner_query: Query<&mut UIWidgetState, Without<ChoiceOptionBase>>,
 ) {
-    if let Ok((mut state, children)) = query.get_mut(trigger.entity) {
-        state.hovered = false;
-
-        for child in children.iter() {
-            if let Ok(mut inner_state) = inner_query.get_mut(child) {
-                inner_state.hovered = false;
-            }
-        }
-    }
+    set_option_hover_state(trigger.entity, false, &mut query, &mut inner_query);
 }
 
 // ===============================================

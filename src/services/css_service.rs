@@ -44,6 +44,33 @@ struct CssViewportTracker {
     height: f32,
 }
 
+type CssApplyTrigger = Or<(
+    Changed<CssSource>,
+    Added<CssSource>,
+    Added<CssDirty>,
+    Changed<CssClass>,
+    Changed<CssID>,
+    Changed<TagName>,
+    Changed<ChildOf>,
+)>;
+
+type CssSourceEntry<'a> = (
+    Entity,
+    &'a CssSource,
+    Option<&'a CssID>,
+    Option<&'a CssClass>,
+    Option<&'a TagName>,
+    Option<&'a ChildOf>,
+    Option<&'a CssDirty>,
+);
+
+type CssParentSelectorEntry<'a> = (
+    Option<&'a CssID>,
+    Option<&'a CssClass>,
+    Option<&'a TagName>,
+    Option<&'a ChildOf>,
+);
+
 impl Default for CssViewportTracker {
     /// Handles `default` in the extended UI workflow.
     fn default() -> Self {
@@ -88,22 +115,105 @@ impl Plugin for CssService {
     }
 }
 
+/// Reads a clone from an RwLock-backed cache.
+fn read_cached<K, V>(cache: &RwLock<HashMap<K, V>>, key: &K) -> Option<V>
+where
+    K: Eq + Hash,
+    V: Clone,
+{
+    cache.read().ok().and_then(|map| map.get(key).cloned())
+}
+
+/// Extracts the CSS asset id when the asset event affects content.
+fn css_asset_id_from_event(event: &AssetEvent<CssAsset>) -> Option<AssetId<CssAsset>> {
+    match event {
+        AssetEvent::Added { id } | AssetEvent::Modified { id } | AssetEvent::Removed { id } => {
+            Some(*id)
+        }
+        _ => None,
+    }
+}
+
+/// Collects dirty entities from source/component changes and CSS asset events.
+fn collect_dirty_entities(
+    query_changed_source: &Query<(Entity, Option<&CssDirty>), CssApplyTrigger>,
+    css_events: &mut MessageReader<AssetEvent<CssAsset>>,
+    css_users: &CssUsers,
+) -> HashSet<Entity> {
+    let mut dirty: HashSet<Entity> = HashSet::new();
+
+    for (entity, _) in query_changed_source.iter() {
+        dirty.insert(entity);
+    }
+
+    for event in css_events.read() {
+        let Some(asset_id) = css_asset_id_from_event(event) else {
+            continue;
+        };
+
+        if let Some(users) = css_users.users.get(&asset_id) {
+            dirty.extend(users.iter().copied());
+        }
+    }
+
+    dirty
+}
+
+/// Applies or clears CSS style state for one entity depending on actual style changes.
+fn apply_entity_style_state(
+    commands: &mut Commands,
+    style_query: &Query<Option<&UiStyle>>,
+    entity: Entity,
+    dirty_marker: Option<&CssDirty>,
+    final_style: UiStyle,
+) {
+    match style_query.get(entity) {
+        Ok(Some(existing))
+            if existing.styles != final_style.styles
+                || existing.keyframes != final_style.keyframes =>
+        {
+            commands
+                .entity(entity)
+                .queue_silenced(move |mut ew: EntityWorldMut| {
+                    ew.insert(final_style);
+                    ew.remove::<CssDirty>();
+                });
+        }
+        Ok(None) => {
+            commands
+                .entity(entity)
+                .queue_silenced(move |mut ew: EntityWorldMut| {
+                    ew.insert(final_style);
+                    ew.remove::<CssDirty>();
+                });
+        }
+        _ => {
+            if dirty_marker.is_some() {
+                commands
+                    .entity(entity)
+                    .queue_silenced(|mut ew: EntityWorldMut| {
+                        ew.remove::<CssDirty>();
+                    });
+            }
+        }
+    }
+}
+
 /// Invalidates cached parsed CSS when assets change.
 fn invalidate_css_cache_on_asset_change(mut ev: MessageReader<AssetEvent<CssAsset>>) {
-    for e in ev.read() {
-        match e {
-            AssetEvent::Added { id } | AssetEvent::Modified { id } | AssetEvent::Removed { id } => {
-                if let Ok(mut cache) = PARSED_CSS_CACHE.write() {
-                    cache.remove(id);
-                }
-                if let Ok(mut cache) = ROOT_CSS_VARS_CACHE.write() {
-                    cache.remove(id);
-                }
-                if let Ok(mut cache) = PARSED_CSS_WITH_VARS_CACHE.write() {
-                    cache.retain(|key, _| key.asset_id != *id);
-                }
-            }
-            _ => {}
+    for event in ev.read() {
+        let Some(asset_id) = css_asset_id_from_event(event) else {
+            continue;
+        };
+
+        if let Ok(mut cache) = PARSED_CSS_CACHE.write() {
+            cache.remove(&asset_id);
+        }
+        if let Ok(mut cache) = ROOT_CSS_VARS_CACHE.write() {
+            cache.remove(&asset_id);
+        }
+        if let Ok(mut cache) = PARSED_CSS_WITH_VARS_CACHE.write() {
+            cache.retain(|key, _| key.asset_id != asset_id);
         }
     }
 }
@@ -113,11 +223,7 @@ fn get_or_parse_css_by_id(
     asset_id: AssetId<CssAsset>,
     css_assets: &Assets<CssAsset>,
 ) -> Option<ParsedCss> {
-    if let Some(cached) = PARSED_CSS_CACHE
-        .read()
-        .ok()
-        .and_then(|cache| cache.get(&asset_id).cloned())
-    {
+    if let Some(cached) = read_cached(&PARSED_CSS_CACHE, &asset_id) {
         return Some(cached);
     }
 
@@ -154,11 +260,7 @@ fn get_or_collect_root_vars(
 ) -> Option<HashMap<String, String>> {
     let asset_id = handle.id();
 
-    if let Some(cached) = ROOT_CSS_VARS_CACHE
-        .read()
-        .ok()
-        .and_then(|cache| cache.get(&asset_id).cloned())
-    {
+    if let Some(cached) = read_cached(&ROOT_CSS_VARS_CACHE, &asset_id) {
         return Some(cached);
     }
 
@@ -188,11 +290,7 @@ fn get_or_parse_css_with_root_vars(
         vars_hash,
     };
 
-    if let Some(cached) = PARSED_CSS_WITH_VARS_CACHE
-        .read()
-        .ok()
-        .and_then(|cache| cache.get(&cache_key).cloned())
-    {
+    if let Some(cached) = read_cached(&PARSED_CSS_WITH_VARS_CACHE, &cache_key) {
         return Some(cached);
     }
 
@@ -411,62 +509,15 @@ fn apply_css_to_entities(
     css_users: Res<CssUsers>,
 
     // CHANGED: include entities that got CssDirty added
-    query_changed_source: Query<
-        (Entity, Option<&CssDirty>),
-        Or<(
-            Changed<CssSource>,
-            Added<CssSource>,
-            Added<CssDirty>,
-            Changed<CssClass>,
-            Changed<CssID>,
-            Changed<TagName>,
-            Changed<ChildOf>,
-        )>,
-    >,
-    query_all_source: Query<
-        (
-            Entity,
-            &CssSource,
-            Option<&CssID>,
-            Option<&CssClass>,
-            Option<&TagName>,
-            Option<&ChildOf>,
-            Option<&CssDirty>,
-        ),
-        With<CssSource>,
-    >,
+    query_changed_source: Query<(Entity, Option<&CssDirty>), CssApplyTrigger>,
+    query_all_source: Query<CssSourceEntry<'_>, With<CssSource>>,
     window_query: Query<&Window, With<PrimaryWindow>>,
 
-    parent_query: Query<(
-        Option<&CssID>,
-        Option<&CssClass>,
-        Option<&TagName>,
-        Option<&ChildOf>,
-    )>,
+    parent_query: Query<CssParentSelectorEntry<'_>>,
 
     style_query: Query<Option<&UiStyle>>,
 ) {
-    let mut dirty: HashSet<Entity> = HashSet::new();
-
-    // Entities whose CssSource changed / was added / got CssDirty
-    for (e, _) in query_changed_source.iter() {
-        dirty.insert(e);
-    }
-
-    // Entities affected by CssAsset events (via CssUsers index)
-    for ev in css_events.read() {
-        let id = match ev {
-            AssetEvent::Added { id } | AssetEvent::Modified { id } | AssetEvent::Removed { id } => {
-                Some(*id)
-            }
-            _ => None,
-        };
-        let Some(id) = id else { continue };
-
-        if let Some(users) = css_users.users.get(&id) {
-            dirty.extend(users.iter().copied());
-        }
-    }
+    let dirty = collect_dirty_entities(&query_changed_source, &mut css_events, &css_users);
 
     if dirty.is_empty() {
         return;
@@ -501,36 +552,13 @@ fn apply_css_to_entities(
             active_style: None,
         };
 
-        match style_query.get(entity) {
-            Ok(Some(existing))
-                if existing.styles != final_style.styles
-                    || existing.keyframes != final_style.keyframes =>
-            {
-                commands
-                    .entity(entity)
-                    .queue_silenced(move |mut ew: EntityWorldMut| {
-                        ew.insert(final_style);
-                        ew.remove::<CssDirty>();
-                    });
-            }
-            Ok(None) => {
-                commands
-                    .entity(entity)
-                    .queue_silenced(move |mut ew: EntityWorldMut| {
-                        ew.insert(final_style);
-                        ew.remove::<CssDirty>();
-                    });
-            }
-            _ => {
-                if dirty_marker.is_some() {
-                    commands
-                        .entity(entity)
-                        .queue_silenced(|mut ew: EntityWorldMut| {
-                            ew.remove::<CssDirty>();
-                        });
-                }
-            }
-        }
+        apply_entity_style_state(
+            &mut commands,
+            &style_query,
+            entity,
+            dirty_marker,
+            final_style,
+        );
     }
 }
 
@@ -543,57 +571,12 @@ fn apply_css_to_entities_legacy(
     css_assets: Res<Assets<CssAsset>>,
     mut css_events: MessageReader<AssetEvent<CssAsset>>,
     css_users: Res<CssUsers>,
-    query_changed_source: Query<
-        (Entity, Option<&CssDirty>),
-        Or<(
-            Changed<CssSource>,
-            Added<CssSource>,
-            Added<CssDirty>,
-            Changed<CssClass>,
-            Changed<CssID>,
-            Changed<TagName>,
-            Changed<ChildOf>,
-        )>,
-    >,
-    query_all_source: Query<
-        (
-            Entity,
-            &CssSource,
-            Option<&CssID>,
-            Option<&CssClass>,
-            Option<&TagName>,
-            Option<&ChildOf>,
-            Option<&CssDirty>,
-        ),
-        With<CssSource>,
-    >,
-    parent_query: Query<(
-        Option<&CssID>,
-        Option<&CssClass>,
-        Option<&TagName>,
-        Option<&ChildOf>,
-    )>,
+    query_changed_source: Query<(Entity, Option<&CssDirty>), CssApplyTrigger>,
+    query_all_source: Query<CssSourceEntry<'_>, With<CssSource>>,
+    parent_query: Query<CssParentSelectorEntry<'_>>,
     style_query: Query<Option<&UiStyle>>,
 ) {
-    let mut dirty: HashSet<Entity> = HashSet::new();
-
-    for (e, _) in query_changed_source.iter() {
-        dirty.insert(e);
-    }
-
-    for ev in css_events.read() {
-        let id = match ev {
-            AssetEvent::Added { id } | AssetEvent::Modified { id } | AssetEvent::Removed { id } => {
-                Some(*id)
-            }
-            _ => None,
-        };
-        let Some(id) = id else { continue };
-
-        if let Some(users) = css_users.users.get(&id) {
-            dirty.extend(users.iter().copied());
-        }
-    }
+    let dirty = collect_dirty_entities(&query_changed_source, &mut css_events, &css_users);
 
     if dirty.is_empty() {
         return;
@@ -624,36 +607,93 @@ fn apply_css_to_entities_legacy(
             active_style: None,
         };
 
-        match style_query.get(entity) {
-            Ok(Some(existing))
-                if existing.styles != final_style.styles
-                    || existing.keyframes != final_style.keyframes =>
-            {
-                commands
-                    .entity(entity)
-                    .queue_silenced(move |mut ew: EntityWorldMut| {
-                        ew.insert(final_style);
-                        ew.remove::<CssDirty>();
-                    });
-            }
-            Ok(None) => {
-                commands
-                    .entity(entity)
-                    .queue_silenced(move |mut ew: EntityWorldMut| {
-                        ew.insert(final_style);
-                        ew.remove::<CssDirty>();
-                    });
-            }
-            _ => {
-                if dirty_marker.is_some() {
-                    commands
-                        .entity(entity)
-                        .queue_silenced(|mut ew: EntityWorldMut| {
-                            ew.remove::<CssDirty>();
-                        });
+        apply_entity_style_state(
+            &mut commands,
+            &style_query,
+            entity,
+            dirty_marker,
+            final_style,
+        );
+    }
+}
+
+/// Loads and merges CSS styles from multiple sources with selector matching.
+fn merge_style_for_selector(
+    merged_styles: &mut HashMap<String, StylePair>,
+    selector_key: &str,
+    new_style: &StylePair,
+    source_index: usize,
+) {
+    merged_styles
+        .entry(selector_key.to_string())
+        .and_modify(|existing| {
+            existing.normal.merge(&new_style.normal);
+            existing.important.merge(&new_style.important);
+            existing.origin = source_index; // Update origin to the latest source
+        })
+        .or_insert_with(|| {
+            let mut style = new_style.clone();
+            style.origin = source_index;
+            style
+        });
+}
+
+/// Handles `load_and_merge_styles_from_assets_common` in the extended UI workflow.
+fn load_and_merge_styles_from_assets_common(
+    sources: &[Handle<CssAsset>],
+    css_assets: &Assets<CssAsset>,
+    id: Option<&CssID>,
+    class: Option<&CssClass>,
+    tag: Option<&TagName>,
+    parent: Option<&ChildOf>,
+    parent_query: &Query<(
+        Option<&CssID>,
+        Option<&CssClass>,
+        Option<&TagName>,
+        Option<&ChildOf>,
+    )>,
+    viewport: Option<Vec2>,
+) -> ParsedCss {
+    let mut merged_styles: HashMap<String, StylePair> = HashMap::new();
+    let mut merged_keyframes: HashMap<String, Vec<AnimationKeyframe>> = HashMap::new();
+    let global_root_vars = collect_global_root_vars_for_sources(sources, css_assets);
+
+    for (index, handle) in sources.iter().enumerate() {
+        let Some(parsed_map) =
+            get_or_parse_css_with_root_vars(handle, css_assets, &global_root_vars)
+        else {
+            continue;
+        };
+
+        for (selector_key, new_style) in parsed_map.styles.iter() {
+            if let Some(viewport) = viewport {
+                if let Some(media) = &new_style.media {
+                    if !media.matches_viewport(viewport) {
+                        continue;
+                    }
                 }
             }
+
+            let selector = if new_style.selector.is_empty() {
+                selector_key.as_str()
+            } else {
+                new_style.selector.as_str()
+            };
+            let selector_parts = parse_selector_steps(selector);
+
+            if matches_selector_chain(&selector_parts, id, class, tag, parent, parent_query) {
+                merge_style_for_selector(&mut merged_styles, selector_key, new_style, index);
+            }
         }
+
+        for (name, keyframes) in parsed_map.keyframes.iter() {
+            merged_keyframes.insert(name.clone(), keyframes.clone());
+        }
+    }
+
+    ParsedCss {
+        styles: merged_styles,
+        keyframes: merged_keyframes,
     }
 }
 
@@ -665,64 +705,19 @@ fn load_and_merge_styles_from_assets(
     class: Option<&CssClass>,
     tag: Option<&TagName>,
     parent: Option<&ChildOf>,
-    parent_query: &Query<(
-        Option<&CssID>,
-        Option<&CssClass>,
-        Option<&TagName>,
-        Option<&ChildOf>,
-    )>,
+    parent_query: &Query<CssParentSelectorEntry<'_>>,
     viewport: Vec2,
 ) -> ParsedCss {
-    let mut merged_styles: HashMap<String, StylePair> = HashMap::new();
-    let mut merged_keyframes: HashMap<String, Vec<AnimationKeyframe>> = HashMap::new();
-    let global_root_vars = collect_global_root_vars_for_sources(sources, css_assets);
-
-    for (index, handle) in sources.iter().enumerate() {
-        let Some(parsed_map) =
-            get_or_parse_css_with_root_vars(handle, css_assets, &global_root_vars)
-        else {
-            continue;
-        };
-
-        for (selector_key, new_style) in parsed_map.styles.iter() {
-            if let Some(media) = &new_style.media {
-                if !media.matches_viewport(viewport) {
-                    continue;
-                }
-            }
-
-            let selector = if new_style.selector.is_empty() {
-                selector_key.as_str()
-            } else {
-                new_style.selector.as_str()
-            };
-            let selector_parts = parse_selector_steps(selector);
-
-            if matches_selector_chain(&selector_parts, id, class, tag, parent, parent_query) {
-                merged_styles
-                    .entry(selector_key.clone())
-                    .and_modify(|existing| {
-                        existing.normal.merge(&new_style.normal);
-                        existing.important.merge(&new_style.important);
-                        existing.origin = index; // Update origin to the latest source
-                    })
-                    .or_insert_with(|| {
-                        let mut s = new_style.clone();
-                        s.origin = index;
-                        s
-                    });
-            }
-        }
-
-        for (name, keyframes) in parsed_map.keyframes.iter() {
-            merged_keyframes.insert(name.clone(), keyframes.clone());
-        }
-    }
-
-    ParsedCss {
-        styles: merged_styles,
-        keyframes: merged_keyframes,
-    }
+    load_and_merge_styles_from_assets_common(
+        sources,
+        css_assets,
+        id,
+        class,
+        tag,
+        parent,
+        parent_query,
+        Some(viewport),
+    )
 }
 
 /// Handles `load_and_merge_styles_from_assets_legacy` in the extended UI workflow.
@@ -734,57 +729,18 @@ fn load_and_merge_styles_from_assets_legacy(
     class: Option<&CssClass>,
     tag: Option<&TagName>,
     parent: Option<&ChildOf>,
-    parent_query: &Query<(
-        Option<&CssID>,
-        Option<&CssClass>,
-        Option<&TagName>,
-        Option<&ChildOf>,
-    )>,
+    parent_query: &Query<CssParentSelectorEntry<'_>>,
 ) -> ParsedCss {
-    let mut merged_styles: HashMap<String, StylePair> = HashMap::new();
-    let mut merged_keyframes: HashMap<String, Vec<AnimationKeyframe>> = HashMap::new();
-    let global_root_vars = collect_global_root_vars_for_sources(sources, css_assets);
-
-    for (index, handle) in sources.iter().enumerate() {
-        let Some(parsed_map) =
-            get_or_parse_css_with_root_vars(handle, css_assets, &global_root_vars)
-        else {
-            continue;
-        };
-
-        for (selector_key, new_style) in parsed_map.styles.iter() {
-            let selector = if new_style.selector.is_empty() {
-                selector_key.as_str()
-            } else {
-                new_style.selector.as_str()
-            };
-            let selector_parts = parse_selector_steps(selector);
-
-            if matches_selector_chain(&selector_parts, id, class, tag, parent, parent_query) {
-                merged_styles
-                    .entry(selector_key.clone())
-                    .and_modify(|existing| {
-                        existing.normal.merge(&new_style.normal);
-                        existing.important.merge(&new_style.important);
-                        existing.origin = index;
-                    })
-                    .or_insert_with(|| {
-                        let mut s = new_style.clone();
-                        s.origin = index;
-                        s
-                    });
-            }
-        }
-
-        for (name, keyframes) in parsed_map.keyframes.iter() {
-            merged_keyframes.insert(name.clone(), keyframes.clone());
-        }
-    }
-
-    ParsedCss {
-        styles: merged_styles,
-        keyframes: merged_keyframes,
-    }
+    load_and_merge_styles_from_assets_common(
+        sources,
+        css_assets,
+        id,
+        class,
+        tag,
+        parent,
+        parent_query,
+        None,
+    )
 }
 
 /// Recursively matches a selector chain against an element and its parents.
@@ -909,6 +865,17 @@ fn matches_selector(
     true
 }
 
+/// Exposes simple selector matching for integration tests and external validation.
+#[doc(hidden)]
+pub fn matches_css_selector_token(
+    selector: &str,
+    id_opt: Option<&CssID>,
+    class_opt: Option<&CssClass>,
+    tag_opt: Option<&TagName>,
+) -> bool {
+    matches_selector(selector, id_opt, class_opt, tag_opt)
+}
+
 /// Parsed requirements for a simple selector token like `div.card#main`.
 #[derive(Default)]
 struct SimpleSelectorRequirements<'a> {
@@ -1027,121 +994,4 @@ fn parse_selector_steps(selector: &str) -> Vec<SelectorStep> {
     }
 
     steps
-}
-
-#[cfg(test)]
-mod tests {
-    use super::matches_selector;
-    use crate::styles::{CssClass, CssID, TagName};
-
-    #[test]
-    fn matches_selector_supports_compound_selectors() {
-        let id = CssID("main-card".to_string());
-        let classes = CssClass(vec!["card".to_string(), "active".to_string()]);
-        let tag = TagName("div".to_string());
-
-        assert!(matches_selector(
-            ".card.active",
-            Some(&id),
-            Some(&classes),
-            Some(&tag)
-        ));
-        assert!(matches_selector(
-            "div.card#main-card",
-            Some(&id),
-            Some(&classes),
-            Some(&tag)
-        ));
-        assert!(matches_selector(
-            "#main-card.active:hover",
-            Some(&id),
-            Some(&classes),
-            Some(&tag)
-        ));
-    }
-
-    #[test]
-    fn matches_selector_rejects_missing_compound_parts() {
-        let id = CssID("main-card".to_string());
-        let classes = CssClass(vec!["card".to_string()]);
-        let tag = TagName("div".to_string());
-
-        assert!(!matches_selector(
-            ".card.active",
-            Some(&id),
-            Some(&classes),
-            Some(&tag)
-        ));
-        assert!(!matches_selector(
-            "span.card#main-card",
-            Some(&id),
-            Some(&classes),
-            Some(&tag)
-        ));
-        assert!(!matches_selector(
-            "#other.card",
-            Some(&id),
-            Some(&classes),
-            Some(&tag)
-        ));
-    }
-
-    #[test]
-    fn matches_selector_ignores_pseudo_and_attribute_suffixes() {
-        let id = CssID("cta".to_string());
-        let classes = CssClass(vec!["btn".to_string(), "primary".to_string()]);
-        let tag = TagName("button".to_string());
-
-        assert!(matches_selector(
-            "button.btn.primary:hover",
-            Some(&id),
-            Some(&classes),
-            Some(&tag)
-        ));
-        assert!(matches_selector(
-            ".btn.primary[data-kind='main']",
-            Some(&id),
-            Some(&classes),
-            Some(&tag)
-        ));
-    }
-
-    #[test]
-    fn matches_selector_handles_case_insensitive_tag_names() {
-        let tag = TagName("Div".to_string());
-        assert!(matches_selector("div", None, None, Some(&tag)));
-        assert!(matches_selector("DIV", None, None, Some(&tag)));
-        assert!(matches_selector(
-            "dIv.card",
-            None,
-            Some(&CssClass(vec!["card".to_string()])),
-            Some(&tag)
-        ));
-    }
-
-    #[test]
-    fn matches_selector_rejects_invalid_selector_tokens() {
-        let id = CssID("main".to_string());
-        let classes = CssClass(vec!["card".to_string()]);
-        let tag = TagName("div".to_string());
-
-        assert!(!matches_selector(
-            "..card",
-            Some(&id),
-            Some(&classes),
-            Some(&tag)
-        ));
-        assert!(!matches_selector(
-            "div#",
-            Some(&id),
-            Some(&classes),
-            Some(&tag)
-        ));
-        assert!(!matches_selector(
-            ".",
-            Some(&id),
-            Some(&classes),
-            Some(&tag)
-        ));
-    }
 }

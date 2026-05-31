@@ -2509,6 +2509,28 @@ fn on_internal_release(
 
 /// Handles click events on input fields.
 /// Focuses the input field on click and updates the current widget state.
+fn handle_input_click_target(
+    state: &mut UIWidgetState,
+    gen_id: &UIGenID,
+    field: &InputField,
+    current_widget_state: &mut CurrentWidgetState,
+    file_dialog_bridge: &InputFileDialogBridge,
+) {
+    if state.disabled {
+        return;
+    }
+
+    current_widget_state.widget_id = gen_id.0;
+    if field.input_type == InputType::File {
+        state.focused = false;
+        open_file_picker(gen_id.0, field, file_dialog_bridge);
+    } else {
+        state.focused = true;
+    }
+}
+
+/// Handles click events on input fields.
+/// Focuses the input field on click and updates the current widget state.
 fn on_internal_click(
     mut trigger: On<Pointer<Click>>,
     mut query: Query<(&mut UIWidgetState, &UIGenID, &InputField), With<InputField>>,
@@ -2518,27 +2540,23 @@ fn on_internal_click(
 ) {
     let target = trigger.event_target();
     if let Ok((mut state, gen_id, field)) = query.get_mut(target) {
-        if !state.disabled {
-            current_widget_state.widget_id = gen_id.0;
-            if field.input_type == InputType::File {
-                state.focused = false;
-                open_file_picker(gen_id.0, field, &file_dialog_bridge);
-            } else {
-                state.focused = true;
-            }
-        }
+        handle_input_click_target(
+            &mut state,
+            gen_id,
+            field,
+            &mut current_widget_state,
+            &file_dialog_bridge,
+        );
     } else if let Ok(bind) = bind_query.get(target) {
         if let Some((mut state, gen_id, field)) = query.iter_mut().find(|(_, id, _)| id.0 == bind.0)
         {
-            if !state.disabled {
-                current_widget_state.widget_id = gen_id.0;
-                if field.input_type == InputType::File {
-                    state.focused = false;
-                    open_file_picker(gen_id.0, field, &file_dialog_bridge);
-                } else {
-                    state.focused = true;
-                }
-            }
+            handle_input_click_target(
+                &mut state,
+                gen_id,
+                field,
+                &mut current_widget_state,
+                &file_dialog_bridge,
+            );
         }
     }
 

@@ -1,5 +1,6 @@
 use crate::styles::paint::Colored;
 use crate::styles::{CssClass, CssSource, TagName};
+use crate::widgets::widget_util::find_ancestor_with_component;
 use crate::widgets::{
     BindToID, FieldMode, FieldSelectionSingle, FieldSet, InFieldSet, RadioButton, UIGenID,
     UIWidgetState, WidgetId, WidgetKind,
@@ -176,10 +177,19 @@ fn update_radio_button_system(
 ) {
     for (radio_button, id, mut state) in radio_q.iter_mut() {
         state.checked = radio_button.selected;
-        for (bind_to, mut text) in label_q.iter_mut() {
-            if bind_to.0 == id.0 {
-                text.0 = radio_button.label.clone();
-            }
+        set_radio_label_text_for_id(id.0, &radio_button.label, &mut label_q);
+    }
+}
+
+/// Updates the label text node bound to a radio widget id.
+fn set_radio_label_text_for_id(
+    bind_id: usize,
+    value: &str,
+    label_q: &mut Query<(&BindToID, &mut Text), With<RadioButtonLabel>>,
+) {
+    for (bind_to, mut text) in label_q.iter_mut() {
+        if bind_to.0 == bind_id {
+            text.0 = value.to_string();
         }
     }
 }
@@ -224,37 +234,57 @@ fn on_internal_click(
         return;
     }
 
-    let (gen_id, radio_entry, css_source, should_check, should_uncheck) = {
-        let Ok((_e, mut st, gen_id, mut rb, css)) = radio_q.get_mut(clicked) else {
+    let (widget_id, radio_entry, css_source, should_check, should_uncheck) = {
+        let Ok((_entity, mut widget_state, widget_id, mut radio_button, css_source)) =
+            radio_q.get_mut(clicked)
+        else {
             trigger.propagate(false);
             return;
         };
 
-        if st.disabled {
+        if widget_state.disabled {
             trigger.propagate(false);
             return;
         }
 
-        current_widget_state.widget_id = gen_id.0;
+        current_widget_state.widget_id = widget_id.0;
 
-        if st.checked {
+        if widget_state.checked {
             if fieldset.allow_none {
-                st.checked = false;
-                rb.selected = false;
-                (gen_id.0, rb.entry, css.clone(), false, true)
+                widget_state.checked = false;
+                radio_button.selected = false;
+                (
+                    widget_id.0,
+                    radio_button.entry,
+                    css_source.clone(),
+                    false,
+                    true,
+                )
             } else {
-                (gen_id.0, rb.entry, css.clone(), false, false)
+                (
+                    widget_id.0,
+                    radio_button.entry,
+                    css_source.clone(),
+                    false,
+                    false,
+                )
             }
         } else {
-            st.checked = true;
-            rb.selected = true;
-            (gen_id.0, rb.entry, css.clone(), true, false)
+            widget_state.checked = true;
+            radio_button.selected = true;
+            (
+                widget_id.0,
+                radio_button.entry,
+                css_source.clone(),
+                true,
+                false,
+            )
         }
     };
 
     if should_check {
         add_checked_dot_to_radio(
-            gen_id,
+            widget_id,
             radio_entry,
             &css_source,
             &dot_q,
@@ -262,7 +292,7 @@ fn on_internal_click(
             &config,
         );
     } else if should_uncheck {
-        remove_checked_dot_by_bind_id(gen_id, &dot_q, &mut commands);
+        remove_checked_dot_by_bind_id(widget_id, &dot_q, &mut commands);
     }
 
     if should_check {
@@ -278,25 +308,37 @@ fn on_internal_click(
     }
 
     if should_check {
-        let radio_entities: Vec<Entity> = radio_q.iter().map(|(e, _, _, _, _)| e).collect();
+        let radio_entities: Vec<Entity> = radio_q
+            .iter()
+            .map(|(radio_entity, _, _, _, _)| radio_entity)
+            .collect();
 
-        for e in radio_entities {
-            if e == clicked {
+        for radio_entity in radio_entities {
+            if radio_entity == clicked {
                 continue;
             }
 
-            let Some(fs) = find_fieldset_ancestor(e, &parents, &fieldset_tag_q) else {
+            let Some(ancestor_fieldset) =
+                find_fieldset_ancestor(radio_entity, &parents, &fieldset_tag_q)
+            else {
                 continue;
             };
-            if fs != fieldset_entity {
+            if ancestor_fieldset != fieldset_entity {
                 continue;
             }
 
-            if let Ok((_re, mut st, other_gen_id, mut other_rb, _css)) = radio_q.get_mut(e) {
-                if st.checked {
-                    st.checked = false;
-                    other_rb.selected = false;
-                    remove_checked_dot_by_bind_id(other_gen_id.0, &dot_q, &mut commands);
+            if let Ok((
+                _other_entity,
+                mut other_widget_state,
+                other_widget_id,
+                mut other_radio_button,
+                _other_css_source,
+            )) = radio_q.get_mut(radio_entity)
+            {
+                if other_widget_state.checked {
+                    other_widget_state.checked = false;
+                    other_radio_button.selected = false;
+                    remove_checked_dot_by_bind_id(other_widget_id.0, &dot_q, &mut commands);
                 }
             }
         }
@@ -318,11 +360,7 @@ fn on_internal_cursor_entered(
     mut query: Query<&mut UIWidgetState, With<RadioButton>>,
 ) {
     if let Ok(mut state) = query.get_mut(trigger.entity) {
-        if state.disabled {
-            state.hovered = false;
-        } else {
-            state.hovered = true;
-        }
+        state.hovered = !state.disabled;
     }
 
     trigger.propagate(false);
@@ -349,24 +387,11 @@ fn on_internal_cursor_leave(
 
 /// Finds the nearest ancestor field set entity.
 fn find_fieldset_ancestor(
-    mut entity: Entity,
+    entity: Entity,
     parents: &Query<&ChildOf>,
     fieldsets: &Query<(), With<FieldSet>>,
 ) -> Option<Entity> {
-    // climb up until root
-    loop {
-        // parent of current?
-        let Ok(p) = parents.get(entity) else {
-            return None;
-        };
-        let parent = p.parent();
-
-        if fieldsets.get(parent).is_ok() {
-            return Some(parent);
-        }
-
-        entity = parent;
-    }
+    find_ancestor_with_component::<FieldSet>(entity, parents, fieldsets)
 }
 
 /// Adds a visual dot to the selected radio button.
