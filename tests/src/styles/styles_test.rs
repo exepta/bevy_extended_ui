@@ -365,6 +365,42 @@ mod tests {
     }
 
     #[test]
+    fn ui_style_filtered_clone_supports_prefixed_classes_and_selector_key_fallback() {
+        let mut styles = HashMap::new();
+        styles.insert(
+            ".btn".to_string(),
+            StylePair {
+                selector: String::new(),
+                origin: 0,
+                ..default()
+            },
+        );
+        styles.insert(
+            "#main".to_string(),
+            StylePair {
+                selector: String::new(),
+                origin: 1,
+                ..default()
+            },
+        );
+
+        let ui = UiStyle {
+            css: Handle::default(),
+            styles,
+            keyframes: HashMap::new(),
+            active_style: None,
+        };
+
+        let id = CssID("main".to_string());
+        let classes = CssClass(vec![".btn".to_string()]);
+
+        let filtered = ui.filtered_clone(Some(&id), Some(&classes), None);
+        assert_eq!(filtered.styles.len(), 2);
+        assert!(filtered.styles.contains_key(".btn"));
+        assert!(filtered.styles.contains_key("#main"));
+    }
+
+    #[test]
     fn colored_hex_and_named_parsing_work() {
         let short_hex = Colored::hex_to_color("#0f0");
         let short = short_hex.to_srgba();
