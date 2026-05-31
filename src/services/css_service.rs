@@ -865,6 +865,17 @@ fn matches_selector(
     true
 }
 
+/// Exposes simple selector matching for integration tests and external validation.
+#[doc(hidden)]
+pub fn matches_css_selector_token(
+    selector: &str,
+    id_opt: Option<&CssID>,
+    class_opt: Option<&CssClass>,
+    tag_opt: Option<&TagName>,
+) -> bool {
+    matches_selector(selector, id_opt, class_opt, tag_opt)
+}
+
 /// Parsed requirements for a simple selector token like `div.card#main`.
 #[derive(Default)]
 struct SimpleSelectorRequirements<'a> {
@@ -983,121 +994,4 @@ fn parse_selector_steps(selector: &str) -> Vec<SelectorStep> {
     }
 
     steps
-}
-
-#[cfg(test)]
-mod tests {
-    use super::matches_selector;
-    use crate::styles::{CssClass, CssID, TagName};
-
-    #[test]
-    fn matches_selector_supports_compound_selectors() {
-        let id = CssID("main-card".to_string());
-        let classes = CssClass(vec!["card".to_string(), "active".to_string()]);
-        let tag = TagName("div".to_string());
-
-        assert!(matches_selector(
-            ".card.active",
-            Some(&id),
-            Some(&classes),
-            Some(&tag)
-        ));
-        assert!(matches_selector(
-            "div.card#main-card",
-            Some(&id),
-            Some(&classes),
-            Some(&tag)
-        ));
-        assert!(matches_selector(
-            "#main-card.active:hover",
-            Some(&id),
-            Some(&classes),
-            Some(&tag)
-        ));
-    }
-
-    #[test]
-    fn matches_selector_rejects_missing_compound_parts() {
-        let id = CssID("main-card".to_string());
-        let classes = CssClass(vec!["card".to_string()]);
-        let tag = TagName("div".to_string());
-
-        assert!(!matches_selector(
-            ".card.active",
-            Some(&id),
-            Some(&classes),
-            Some(&tag)
-        ));
-        assert!(!matches_selector(
-            "span.card#main-card",
-            Some(&id),
-            Some(&classes),
-            Some(&tag)
-        ));
-        assert!(!matches_selector(
-            "#other.card",
-            Some(&id),
-            Some(&classes),
-            Some(&tag)
-        ));
-    }
-
-    #[test]
-    fn matches_selector_ignores_pseudo_and_attribute_suffixes() {
-        let id = CssID("cta".to_string());
-        let classes = CssClass(vec!["btn".to_string(), "primary".to_string()]);
-        let tag = TagName("button".to_string());
-
-        assert!(matches_selector(
-            "button.btn.primary:hover",
-            Some(&id),
-            Some(&classes),
-            Some(&tag)
-        ));
-        assert!(matches_selector(
-            ".btn.primary[data-kind='main']",
-            Some(&id),
-            Some(&classes),
-            Some(&tag)
-        ));
-    }
-
-    #[test]
-    fn matches_selector_handles_case_insensitive_tag_names() {
-        let tag = TagName("Div".to_string());
-        assert!(matches_selector("div", None, None, Some(&tag)));
-        assert!(matches_selector("DIV", None, None, Some(&tag)));
-        assert!(matches_selector(
-            "dIv.card",
-            None,
-            Some(&CssClass(vec!["card".to_string()])),
-            Some(&tag)
-        ));
-    }
-
-    #[test]
-    fn matches_selector_rejects_invalid_selector_tokens() {
-        let id = CssID("main".to_string());
-        let classes = CssClass(vec!["card".to_string()]);
-        let tag = TagName("div".to_string());
-
-        assert!(!matches_selector(
-            "..card",
-            Some(&id),
-            Some(&classes),
-            Some(&tag)
-        ));
-        assert!(!matches_selector(
-            "div#",
-            Some(&id),
-            Some(&classes),
-            Some(&tag)
-        ));
-        assert!(!matches_selector(
-            ".",
-            Some(&id),
-            Some(&classes),
-            Some(&tag)
-        ));
-    }
 }
