@@ -136,6 +136,7 @@ pub struct UiSharedValues {
 pub enum HtmlSharedRegistration {
     Shared {
         name: &'static str,
+        path: &'static str,
         alias: &'static str,
         auto_use: bool,
         capture: fn(&World) -> Option<JsonValue>,
@@ -569,12 +570,14 @@ pub fn refresh_shared_values(world: &mut World) {
     for registration in inventory::iter::<HtmlSharedRegistration> {
         let HtmlSharedRegistration::Shared {
             name,
+            path,
             alias,
             auto_use,
             capture,
         } = registration;
 
         known_types.insert((*name).to_string());
+        known_types.insert((*path).to_string());
         if *auto_use {
             if let Some(previous) = aliases.get(*alias) {
                 if previous != name {
@@ -589,6 +592,7 @@ pub fn refresh_shared_values(world: &mut World) {
         }
 
         if let Some(value) = (*capture)(&*world) {
+            values.insert((*path).to_string(), value.clone());
             values.insert((*name).to_string(), value);
         }
     }

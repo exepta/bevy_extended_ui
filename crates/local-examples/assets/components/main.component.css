@@ -8,6 +8,7 @@ body {
   padding: 24px;
   gap: 12px;
   background: #3c3c4e;
+  overflow-y: scroll;
 }
 
 #framework-root {

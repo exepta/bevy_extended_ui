@@ -10,7 +10,10 @@ use serde::de::DeserializeSeed;
 use serde_json::Value as JsonValue;
 use std::collections::{HashMap, HashSet};
 #[cfg(feature = "extended-framework")]
-use std::path::PathBuf;
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 use crate::ExtendedUiConfiguration;
 #[cfg(feature = "extended-dialog")]
@@ -222,10 +225,24 @@ fn update_html_ui(
             &config.language_path,
             &template_inputs.lang_vars,
         );
-        let template_resolved = preprocess_template_directives_with_shared(
+        #[cfg(feature = "extended-framework")]
+        let component_local_type_names = {
+            let mut names = component_local_type_names(&source_path, &framework_config);
+            names.extend(component_local_type_names_from_rust_paths(
+                &framework_compiled.component_controllers,
+            ));
+            names.sort();
+            names.dedup();
+            names
+        };
+        #[cfg(not(feature = "extended-framework"))]
+        let component_local_type_names = Vec::<String>::new();
+
+        let template_resolved = preprocess_template_directives_with_shared_and_local_types(
             &localized,
             &template_inputs.lang_vars,
             &template_inputs.shared_values,
+            &component_local_type_names,
         );
         let document = if template_resolved == content {
             raw_document
@@ -1401,7 +1418,11 @@ fn parse_html_node(
             } else {
                 Some(icon_attr.to_string())
             };
-            let selected = parse_bool_attribute(&attributes, "checked");
+            let selected = if attributes.contains("value") {
+                parse_bool_attribute(&attributes, "value")
+            } else {
+                parse_bool_attribute(&attributes, "checked")
+            };
 
             Some(HtmlWidgetNode::SwitchButton(
                 SwitchButton {
@@ -1600,12 +1621,28 @@ fn parse_validation_attributes(attributes: &Attributes) -> Option<ValidationRule
 
 /// Parses boolean attributes with `true`/`false` semantics.
 fn parse_bool_attribute(attributes: &Attributes, key: &str) -> bool {
-    let Some(value) = attributes.get(key) else {
+    if !attributes.contains(key) {
         return false;
+    }
+
+    let Some(value) = attributes.get(key) else {
+        // Standalone boolean attribute without explicit value (`checked`, `disabled`, ...)
+        return true;
     };
 
     let normalized = value.trim().to_ascii_lowercase();
-    normalized.is_empty() || normalized == "true"
+    if normalized.is_empty() {
+        return true;
+    }
+
+    if matches!(normalized.as_str(), "false" | "0" | "no" | "off") {
+        return false;
+    }
+
+    matches!(
+        normalized.as_str(),
+        "true" | "1" | "yes" | "on" | "checked" | "selected"
+    )
 }
 
 /// Parses `extensions` values from either a single token or list syntax.
@@ -2038,8 +2075,14 @@ fn extract_direct_child_tags(inner_html: &str) -> Vec<String> {
 
 const TEMPLATE_MAX_RECURSION: usize = 64;
 static TEMPLATE_USE_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r#"(?m)^[ \t]*@use[ \t]+"([^"]+)"[ \t]+as[ \t]+([A-Za-z_][A-Za-z0-9_]*|\*)[ \t]*;[ \t]*\r?$"#)
+    Regex::new(r#"(?m)^[ \t]*@use[ \t]+"([^"]+)"(?:[ \t]+as[ \t]+([A-Za-z_][A-Za-z0-9_]*|\*))?[ \t]*;[ \t]*\r?$"#)
         .unwrap()
+});
+static TEMPLATE_USE_ITEM_ALIAS_RE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r#"(?s)^\s*(.*?)\s+as\s+([A-Za-z_][A-Za-z0-9_]*|\*)\s*$"#).unwrap());
+#[cfg(feature = "extended-framework")]
+static COMPONENT_LOCAL_TYPE_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r#"(?m)^\s*(?:pub\s+)?(?:struct|enum)\s+([A-Za-z_][A-Za-z0-9_]*)\b"#).unwrap()
 });
 
 #[derive(Debug, Clone)]
@@ -2047,6 +2090,13 @@ struct TemplateUseDirective {
     target: String,
     alias: String,
     wildcard: bool,
+    path_wildcard: bool,
+}
+
+#[derive(Debug, Clone)]
+struct ExpandedUseTarget {
+    target: String,
+    alias: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -2059,6 +2109,7 @@ impl TemplateValueContext {
         vars: &UiLangVariables,
         shared: &UiSharedValues,
         use_directives: &[TemplateUseDirective],
+        local_use_aliases: &HashMap<String, String>,
     ) -> Self {
         let mut values = HashMap::new();
         for (key, value) in &vars.vars {
@@ -2092,9 +2143,34 @@ impl TemplateValueContext {
             }
         }
 
+        let mut local_use_entries: Vec<_> = local_use_aliases.iter().collect();
+        local_use_entries.sort_by(|(a, _), (b, _)| a.cmp(b));
+
+        for (alias, target) in local_use_entries {
+            if let Some((_resolved_target, shared_value)) =
+                resolve_shared_use_target(shared, target)
+            {
+                if values.contains_key(alias) {
+                    warn!(
+                        "Component local alias '{}' skipped because value already exists in template context",
+                        alias
+                    );
+                } else {
+                    values.insert(alias.clone(), shared_value.clone());
+                }
+            }
+        }
+
         for directive in use_directives {
-            let Some(shared_value) = shared.values.get(&directive.target) else {
-                if !shared.known_types.contains(&directive.target) {
+            if directive.path_wildcard {
+                import_shared_path_wildcard(&mut values, shared, &directive.target);
+                continue;
+            }
+
+            let Some((resolved_target, shared_value)) =
+                resolve_shared_use_target(shared, &directive.target)
+            else {
+                if !shared_use_target_known(shared, &directive.target) {
                     warn!("Unknown @use target '{}'", directive.target);
                 }
                 continue;
@@ -2123,9 +2199,16 @@ impl TemplateValueContext {
                 if shared
                     .auto_use_aliases
                     .get(&directive.alias)
-                    .is_some_and(|target| target == &directive.target)
+                    .is_some_and(|target| shared_targets_match(target, &resolved_target))
                 {
                     // Redundant explicit import for an already auto-imported alias.
+                    continue;
+                }
+                if local_use_aliases
+                    .get(&directive.alias)
+                    .is_some_and(|target| shared_targets_match(target, &resolved_target))
+                {
+                    // Redundant explicit import for a type from this component.rs.
                     continue;
                 }
                 if values.contains_key(&directive.alias) {
@@ -2233,6 +2316,7 @@ impl<'a> TemplateCursor<'a> {
 /// - object paths (`data.user.name`)
 /// - unary negation (`!state`)
 /// - equality (`==`)
+/// - enum variant literals (`DataState::Inactive`)
 /// - logical `&&` / `||`
 /// - method calls on values: `startsWidth`, `endsWidth`, `contains`
 ///   (`startsWith` / `endsWith` aliases are accepted too)
@@ -2247,8 +2331,26 @@ pub fn preprocess_template_directives_with_shared(
     vars: &UiLangVariables,
     shared: &UiSharedValues,
 ) -> String {
+    preprocess_template_directives_with_shared_and_local_types(
+        template,
+        vars,
+        shared,
+        &Vec::<String>::new(),
+    )
+}
+
+/// Preprocesses template directives with typed shared values, `@use` imports,
+/// and implicit aliases for types declared in the matching `*.component.rs`.
+pub fn preprocess_template_directives_with_shared_and_local_types<T: AsRef<str>>(
+    template: &str,
+    vars: &UiLangVariables,
+    shared: &UiSharedValues,
+    local_type_names: &[T],
+) -> String {
     let (use_directives, cleaned_template) = extract_template_use_directives(template);
-    let context = TemplateValueContext::from_sources(vars, shared, &use_directives);
+    let local_use_aliases = build_local_use_aliases(shared, local_type_names);
+    let context =
+        TemplateValueContext::from_sources(vars, shared, &use_directives, &local_use_aliases);
     render_template_with_context(&cleaned_template, &context, 0)
 }
 
@@ -2435,19 +2537,389 @@ fn extract_template_use_directives(template: &str) -> (Vec<TemplateUseDirective>
         let Some(target) = captures.get(1).map(|m| m.as_str().trim().to_string()) else {
             continue;
         };
-        let Some(alias_raw) = captures.get(2).map(|m| m.as_str().trim().to_string()) else {
-            continue;
-        };
+        let line_alias = captures.get(2).map(|m| m.as_str().trim().to_string());
+        let expanded_targets = expand_use_targets(&target);
 
-        directives.push(TemplateUseDirective {
-            target,
-            alias: alias_raw.clone(),
-            wildcard: alias_raw == "*",
-        });
+        if line_alias.is_some() && expanded_targets.len() > 1 {
+            warn!(
+                "@use \"{}\" imports multiple targets; ignoring shared alias",
+                target
+            );
+        }
+
+        for expanded_target in expanded_targets {
+            let path_wildcard = is_path_wildcard_use_target(&expanded_target.target);
+            if path_wildcard && (line_alias.is_some() || expanded_target.alias.as_ref().is_some()) {
+                warn!(
+                    "@use \"{}\" imports a path wildcard; ignoring alias",
+                    expanded_target.target
+                );
+            }
+            let alias = if path_wildcard {
+                String::new()
+            } else {
+                expanded_target
+                    .alias
+                    .or_else(|| {
+                        line_alias
+                            .clone()
+                            .filter(|_| !is_grouped_use_target(&target))
+                    })
+                    .unwrap_or_else(|| default_use_alias(&expanded_target.target))
+            };
+
+            directives.push(TemplateUseDirective {
+                target: expanded_target.target,
+                wildcard: alias == "*" && !path_wildcard,
+                path_wildcard,
+                alias,
+            });
+        }
     }
 
     let cleaned = TEMPLATE_USE_RE.replace_all(template, "").into_owned();
     (directives, cleaned)
+}
+
+fn expand_use_targets(target: &str) -> Vec<ExpandedUseTarget> {
+    let target = target.trim();
+    let Some((prefix, group)) = split_grouped_use_target(target) else {
+        return vec![ExpandedUseTarget {
+            target: target.to_string(),
+            alias: None,
+        }];
+    };
+
+    let expanded = group
+        .split(',')
+        .filter_map(|item| parse_grouped_use_item(prefix, item))
+        .collect::<Vec<_>>();
+
+    if expanded.is_empty() {
+        vec![ExpandedUseTarget {
+            target: target.to_string(),
+            alias: None,
+        }]
+    } else {
+        expanded
+    }
+}
+
+fn parse_grouped_use_item(prefix: &str, item: &str) -> Option<ExpandedUseTarget> {
+    let item = item.trim();
+    if item.is_empty() {
+        return None;
+    }
+
+    let (item_target, alias) = split_use_item_alias(item);
+    let item_target = item_target.trim();
+    if item_target.is_empty() {
+        return None;
+    }
+
+    let target = if item_target == "self" {
+        prefix.to_string()
+    } else {
+        format!("{prefix}::{item_target}")
+    };
+
+    Some(ExpandedUseTarget { target, alias })
+}
+
+fn split_use_item_alias(item: &str) -> (&str, Option<String>) {
+    let Some(captures) = TEMPLATE_USE_ITEM_ALIAS_RE.captures(item) else {
+        return (item, None);
+    };
+    let Some(target) = captures.get(1).map(|m| m.as_str()) else {
+        return (item, None);
+    };
+    let Some(alias) = captures.get(2).map(|m| m.as_str().trim().to_string()) else {
+        return (item, None);
+    };
+
+    (target, Some(alias))
+}
+
+fn split_grouped_use_target(target: &str) -> Option<(&str, &str)> {
+    let target = target.trim();
+    let group_end = target.rfind('}')?;
+    if !target[group_end + 1..].trim().is_empty() {
+        return None;
+    }
+
+    let group_start = target[..group_end].rfind('{')?;
+    let prefix = target[..group_start].trim();
+    let prefix = prefix.strip_suffix("::")?.trim();
+    let group = &target[group_start + 1..group_end];
+
+    if prefix.is_empty() {
+        None
+    } else {
+        Some((prefix, group))
+    }
+}
+
+fn is_grouped_use_target(target: &str) -> bool {
+    split_grouped_use_target(target).is_some()
+}
+
+fn is_path_wildcard_use_target(target: &str) -> bool {
+    wildcard_use_prefix(target).is_some()
+}
+
+fn wildcard_use_prefix(target: &str) -> Option<&str> {
+    let prefix = target.trim().strip_suffix("::*")?.trim();
+    if prefix.is_empty() {
+        None
+    } else {
+        Some(prefix)
+    }
+}
+
+fn import_shared_path_wildcard(
+    values: &mut HashMap<String, JsonValue>,
+    shared: &UiSharedValues,
+    target: &str,
+) {
+    let mut matches = shared_path_wildcard_targets(shared, target);
+    if matches.is_empty() {
+        warn!("Unknown @use wildcard target '{}'", target);
+        return;
+    }
+
+    matches.sort_by(|(left, _), (right, _)| left.cmp(right));
+    for (registered, value) in matches {
+        let alias = default_use_alias(&registered);
+        if values.contains_key(&alias) {
+            warn!(
+                "Duplicate @use wildcard alias '{}' ignored (target '{}')",
+                alias, registered
+            );
+            continue;
+        }
+        values.insert(alias, value.clone());
+    }
+}
+
+fn shared_path_wildcard_targets<'a>(
+    shared: &'a UiSharedValues,
+    target: &str,
+) -> Vec<(String, &'a JsonValue)> {
+    let Some(prefix) = wildcard_use_prefix(target) else {
+        return Vec::new();
+    };
+
+    shared
+        .values
+        .iter()
+        .filter(|(registered, _)| shared_path_prefix_matches(registered, prefix))
+        .map(|(registered, value)| (registered.clone(), value))
+        .collect()
+}
+
+fn shared_path_prefix_matches(registered: &str, requested_prefix: &str) -> bool {
+    let Some((registered_prefix, _type_name)) = registered.trim().rsplit_once("::") else {
+        return false;
+    };
+
+    if registered_prefix == requested_prefix {
+        return true;
+    }
+
+    let Some(requested_without_crate) = requested_prefix.trim().strip_prefix("crate::") else {
+        return false;
+    };
+
+    registered_prefix == requested_without_crate
+        || registered_prefix
+            .trim()
+            .ends_with(format!("::{requested_without_crate}").as_str())
+}
+
+fn build_local_use_aliases<T: AsRef<str>>(
+    shared: &UiSharedValues,
+    local_type_names: &[T],
+) -> HashMap<String, String> {
+    let mut aliases = HashMap::new();
+
+    for type_name in local_type_names {
+        let type_name = simple_type_name(type_name.as_ref()).trim();
+        if type_name.is_empty() || resolve_shared_use_target(shared, type_name).is_none() {
+            continue;
+        }
+
+        aliases
+            .entry(default_use_alias(type_name))
+            .or_insert_with(|| type_name.to_string());
+    }
+
+    aliases
+}
+
+#[cfg(feature = "extended-framework")]
+fn component_local_type_names(
+    source_path: &str,
+    config: &ExtendedFrameworkConfiguration,
+) -> Vec<String> {
+    let Some(component_path) = component_rust_path_for_template(source_path, config) else {
+        return Vec::new();
+    };
+    let Ok(component_source) = fs::read_to_string(&component_path) else {
+        return Vec::new();
+    };
+
+    let mut names = COMPONENT_LOCAL_TYPE_RE
+        .captures_iter(&component_source)
+        .filter_map(|captures| captures.get(1).map(|matched| matched.as_str().to_string()))
+        .collect::<Vec<_>>();
+    names.sort();
+    names.dedup();
+    names
+}
+
+#[cfg(feature = "extended-framework")]
+fn component_local_type_names_from_rust_paths<T: AsRef<str>>(paths: &[T]) -> Vec<String> {
+    let mut names = Vec::new();
+    for path in paths {
+        let Ok(component_source) = fs::read_to_string(path.as_ref()) else {
+            continue;
+        };
+        names.extend(
+            COMPONENT_LOCAL_TYPE_RE
+                .captures_iter(&component_source)
+                .filter_map(|captures| captures.get(1).map(|matched| matched.as_str().to_string())),
+        );
+    }
+    names.sort();
+    names.dedup();
+    names
+}
+
+#[cfg(feature = "extended-framework")]
+fn component_rust_path_for_template(
+    source_path: &str,
+    config: &ExtendedFrameworkConfiguration,
+) -> Option<PathBuf> {
+    let source = normalize_component_scope_path(source_path);
+    let root = normalize_component_scope_path(&config.assets_component_root);
+    if root.is_empty() {
+        return None;
+    }
+
+    let root_prefix = format!("{root}/");
+    let relative_template = source.strip_prefix(&root_prefix).or_else(|| {
+        let nested_prefix = format!("/{root}/");
+        source
+            .split_once(&nested_prefix)
+            .map(|(_, relative)| relative)
+    })?;
+
+    let relative_rust = relative_template
+        .strip_suffix(".component.html")
+        .map(|base| format!("{base}.component.rs"))?;
+
+    Some(Path::new(&config.rust_component_root).join(relative_rust))
+}
+
+#[cfg(feature = "extended-framework")]
+fn normalize_component_scope_path(path: &str) -> String {
+    let mut normalized = path.replace('\\', "/");
+    while let Some(rest) = normalized.strip_prefix("./") {
+        normalized = rest.to_string();
+    }
+    if let Some(rest) = normalized.strip_prefix("assets/") {
+        normalized = rest.to_string();
+    }
+    normalized.trim_matches('/').to_string()
+}
+
+fn resolve_shared_use_target<'a>(
+    shared: &'a UiSharedValues,
+    target: &str,
+) -> Option<(String, &'a JsonValue)> {
+    if let Some(value) = shared.values.get(target) {
+        return Some((target.to_string(), value));
+    }
+
+    if target.contains("::") {
+        let mut path_matches: Vec<_> = shared
+            .values
+            .iter()
+            .filter(|(registered, _)| shared_paths_match(registered, target))
+            .collect();
+        path_matches.sort_by(|(left, _), (right, _)| left.cmp(right));
+
+        if let Some((registered, value)) = path_matches.first() {
+            if path_matches.len() > 1 {
+                warn!(
+                    "Ambiguous @use target '{}' matched multiple shared paths; using '{}'",
+                    target, registered
+                );
+            }
+            return Some(((*registered).clone(), *value));
+        }
+    }
+
+    let simple_name = simple_type_name(target);
+    shared
+        .values
+        .get(simple_name)
+        .map(|value| (simple_name.to_string(), value))
+}
+
+fn shared_use_target_known(shared: &UiSharedValues, target: &str) -> bool {
+    shared.known_types.contains(target)
+        || shared
+            .known_types
+            .iter()
+            .any(|registered| shared_paths_match(registered, target))
+        || shared.known_types.contains(simple_type_name(target))
+}
+
+fn shared_targets_match(left: &str, right: &str) -> bool {
+    left == right
+        || shared_paths_match(left, right)
+        || simple_type_name(left) == simple_type_name(right)
+}
+
+fn shared_paths_match(registered: &str, requested: &str) -> bool {
+    if registered == requested {
+        return true;
+    }
+
+    let Some(requested_without_crate) = requested.trim().strip_prefix("crate::") else {
+        return false;
+    };
+
+    registered == requested_without_crate
+        || registered
+            .trim()
+            .ends_with(format!("::{requested_without_crate}").as_str())
+}
+
+fn default_use_alias(target: &str) -> String {
+    to_template_alias(simple_type_name(target))
+}
+
+fn simple_type_name(target: &str) -> &str {
+    target.trim().rsplit("::").next().unwrap_or(target).trim()
+}
+
+fn to_template_alias(type_name: &str) -> String {
+    let mut out = String::new();
+    for (index, ch) in type_name.chars().enumerate() {
+        if ch.is_uppercase() {
+            if index != 0 {
+                out.push('_');
+            }
+            for lower in ch.to_lowercase() {
+                out.push(lower);
+            }
+        } else {
+            out.push(ch);
+        }
+    }
+    out
 }
 
 fn iterable_items(value: JsonValue) -> Vec<JsonValue> {
@@ -2628,6 +3100,7 @@ enum ExprToken {
     LParen,
     RParen,
     Dot,
+    ColonColon,
     Comma,
     LBracket,
     RBracket,
@@ -2695,6 +3168,15 @@ fn tokenize_expression(expression: &str) -> Option<Vec<ExprToken>> {
         if ch == '.' {
             chars.next();
             tokens.push(ExprToken::Dot);
+            continue;
+        }
+
+        if ch == ':' {
+            chars.next();
+            if chars.next()? != ':' {
+                return None;
+            }
+            tokens.push(ExprToken::ColonColon);
             continue;
         }
 
@@ -2917,6 +3399,10 @@ impl<'a> ExpressionParser<'a> {
             _ => return None,
         };
 
+        if self.peek() == Some(&ExprToken::ColonColon) {
+            return self.parse_rust_path_literal(base_name);
+        }
+
         let mut current = self
             .context
             .values
@@ -2969,6 +3455,19 @@ impl<'a> ExpressionParser<'a> {
         }
 
         Some(current)
+    }
+
+    fn parse_rust_path_literal(&mut self, base_name: String) -> Option<JsonValue> {
+        let mut last_segment = base_name;
+
+        while self.consume(ExprToken::ColonColon) {
+            last_segment = match self.next()? {
+                ExprToken::Identifier(name) => name.clone(),
+                _ => return None,
+            };
+        }
+
+        Some(JsonValue::String(last_segment))
     }
 
     fn parse_call_arguments(&mut self) -> Option<Vec<JsonValue>> {
@@ -3062,8 +3561,17 @@ fn evaluate_value_method(target: &JsonValue, method: &str, args: &[JsonValue]) -
                 _ => JsonValue::Bool(false),
             }
         }
+        _ if args.is_empty() => evaluate_zero_arg_getter(target, method.as_str()),
         _ => JsonValue::Null,
     }
+}
+
+fn evaluate_zero_arg_getter(target: &JsonValue, method: &str) -> JsonValue {
+    let Some(field_name) = method.strip_prefix("get_") else {
+        return JsonValue::Null;
+    };
+
+    resolve_json_property(target, field_name)
 }
 
 fn json_as_string(value: &JsonValue) -> Option<String> {

@@ -73,23 +73,30 @@ fn load_framework_index(
 pub fn load_component_definitions(
     config: &ExtendedFrameworkConfiguration,
 ) -> Result<Vec<ComponentDefinition>, String> {
-    let root = PathBuf::from(&config.rust_component_root);
-    if !root.exists() {
+    let component_root = PathBuf::from(&config.rust_component_root);
+    if !component_root.exists() {
         return Err(format!(
             "Rust component root not found: `{}`",
-            root.display()
+            component_root.display()
         ));
     }
 
-    let mut rs_files = Vec::new();
-    collect_component_rs_files(&root, &mut rs_files)
-        .map_err(|err| format!("Failed to read component root `{}`: {err}", root.display()))?;
+    let mut component_files = Vec::new();
+    collect_component_rs_files(&component_root, &mut component_files).map_err(|err| {
+        format!(
+            "Failed to read component root `{}`: {err}",
+            component_root.display()
+        )
+    })?;
 
-    let mut defs = Vec::new();
-    for file in rs_files {
-        defs.push(parse_component_definition_file(&file, &root)?);
+    let mut definitions = Vec::new();
+    for component_file in component_files {
+        definitions.push(parse_component_definition_file(
+            &component_file,
+            &component_root,
+        )?);
     }
-    Ok(defs)
+    Ok(definitions)
 }
 
 /// Handles `collect_component_rs_files` in the extended UI workflow.
@@ -124,27 +131,9 @@ fn parse_component_definition_file(
     })?;
     ensure_ui_component_macro_used(path, &text)?;
 
-    let template_name = TEMPLATE_NAME_RE
-        .captures(&text)
-        .and_then(|caps| caps.get(1).map(|m| m.as_str().trim().to_string()))
-        .filter(|value| !value.is_empty())
-        .ok_or_else(|| {
-            format!(
-                "Missing required field `template_name` in `{}`.",
-                path.display()
-            )
-        })?;
+    let template_name = required_captured_field(&TEMPLATE_NAME_RE, &text, "template_name", path)?;
 
-    let template_file = TEMPLATE_FILE_RE
-        .captures(&text)
-        .and_then(|caps| caps.get(1).map(|m| m.as_str().trim().to_string()))
-        .filter(|value| !value.is_empty())
-        .ok_or_else(|| {
-            format!(
-                "Missing required field `template_file` in `{}`.",
-                path.display()
-            )
-        })?;
+    let template_file = required_captured_field(&TEMPLATE_FILE_RE, &text, "template_file", path)?;
 
     let styles = STYLES_RE
         .captures(&text)
@@ -171,6 +160,25 @@ fn parse_component_definition_file(
         styles,
         source_dir_rel,
     })
+}
+
+/// Extracts a required capture group (index 1) and trims it.
+fn required_captured_field(
+    pattern: &Regex,
+    text: &str,
+    field_name: &str,
+    path: &Path,
+) -> Result<String, String> {
+    pattern
+        .captures(text)
+        .and_then(|caps| caps.get(1).map(|m| m.as_str().trim().to_string()))
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            format!(
+                "Missing required field `{field_name}` in `{}`.",
+                path.display()
+            )
+        })
 }
 
 /// Handles `ensure_ui_component_macro_used` in the extended UI workflow.
@@ -212,22 +220,23 @@ fn validate_component_name_contract(path: &Path, template_file: &str) -> Result<
 
 /// Validates that all component HTML/CSS files referenced by definitions exist.
 pub fn validate_component_assets(
-    defs: &[ComponentDefinition],
+    definitions: &[ComponentDefinition],
     config: &ExtendedFrameworkConfiguration,
 ) -> Result<(), String> {
-    let root =
+    let assets_root =
         PathBuf::from(&config.asset_root_fs_path).join(trim_slashes(&config.assets_component_root));
 
     let mut seen_tags = HashSet::new();
-    for def in defs {
-        if !seen_tags.insert(def.template_name.clone()) {
+    for definition in definitions {
+        if !seen_tags.insert(definition.template_name.clone()) {
             return Err(format!(
                 "Duplicate template_name found: `{}`.",
-                def.template_name
+                definition.template_name
             ));
         }
 
-        let template_path = resolve_component_asset_candidate(&root, def, &def.template_file);
+        let template_path =
+            resolve_component_asset_candidate(&assets_root, definition, &definition.template_file);
         if !template_path.exists() {
             return Err(format!(
                 "Component template missing: `{}`.",
@@ -235,8 +244,9 @@ pub fn validate_component_assets(
             ));
         }
 
-        for style in &def.styles {
-            let style_path = resolve_component_asset_candidate(&root, def, style);
+        for style_file in &definition.styles {
+            let style_path =
+                resolve_component_asset_candidate(&assets_root, definition, style_file);
             if !style_path.exists() {
                 return Err(format!(
                     "Component style missing: `{}`.",
@@ -251,14 +261,19 @@ pub fn validate_component_assets(
 
 /// Loads one component html snippet by its configured template file.
 pub fn load_component_template_html(
-    def: &ComponentDefinition,
+    definition: &ComponentDefinition,
     config: &ExtendedFrameworkConfiguration,
 ) -> Result<String, String> {
-    let root =
+    let assets_root =
         PathBuf::from(&config.asset_root_fs_path).join(trim_slashes(&config.assets_component_root));
-    let path = resolve_component_asset_candidate(&root, def, &def.template_file);
-    fs::read_to_string(&path)
-        .map_err(|err| format!("Failed to read component html `{}`: {err}", path.display()))
+    let template_path =
+        resolve_component_asset_candidate(&assets_root, definition, &definition.template_file);
+    fs::read_to_string(&template_path).map_err(|err| {
+        format!(
+            "Failed to read component html `{}`: {err}",
+            template_path.display()
+        )
+    })
 }
 
 /// Handles `trim_slashes` in the extended UI workflow.
@@ -274,21 +289,23 @@ fn normalize_path_like(path: &str) -> String {
 /// Handles `resolve_component_asset_candidate` in the extended UI workflow.
 fn resolve_component_asset_candidate(
     root: &Path,
-    def: &ComponentDefinition,
-    file: &str,
+    definition: &ComponentDefinition,
+    file_name: &str,
 ) -> PathBuf {
-    let normalized = normalize_path_like(file);
-    if normalized.contains('/') {
-        return root.join(normalized);
+    let normalized_file_name = normalize_path_like(file_name);
+    if normalized_file_name.contains('/') {
+        return root.join(normalized_file_name);
     }
 
-    if def.source_dir_rel.is_empty() {
-        return root.join(normalized);
+    if definition.source_dir_rel.is_empty() {
+        return root.join(normalized_file_name);
     }
 
-    let scoped = root.join(&def.source_dir_rel).join(&normalized);
-    if scoped.exists() {
-        return scoped;
+    let scoped_path = root
+        .join(&definition.source_dir_rel)
+        .join(&normalized_file_name);
+    if scoped_path.exists() {
+        return scoped_path;
     }
-    root.join(normalized)
+    root.join(normalized_file_name)
 }

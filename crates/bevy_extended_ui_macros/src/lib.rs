@@ -1,7 +1,8 @@
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
 use syn::{
-    FnArg, GenericArgument, ItemFn, ItemStruct, LitStr, PathArguments, Result, Type, TypePath,
+    FnArg, GenericArgument, Item, ItemEnum, ItemFn, ItemStruct, ItemUse, LitStr, PathArguments,
+    Result, Type, TypePath, UseTree,
     parse::{Parse, ParseStream},
     parse_macro_input,
     token::Eq,
@@ -47,7 +48,6 @@ pub fn html_fn(attr: TokenStream, item: TokenStream) -> TokenStream {
             return TokenStream::from(quote! { #err_tokens });
         }
     };
-
     let expanded = quote! {
         #input_fn
 
@@ -65,6 +65,136 @@ pub fn html_fn(attr: TokenStream, item: TokenStream) -> TokenStream {
     };
 
     expanded.into()
+}
+
+/// Registers a component constructor that runs once during Bevy `Startup`.
+#[proc_macro_attribute]
+pub fn component_init(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let input_fn = parse_macro_input!(item as ItemFn);
+    let fn_ident = input_fn.sig.ident.clone();
+    let builder_ident = format_ident!("__component_init_build_{}", fn_ident);
+    let shared_registrations =
+        expand_resource_shared_registrations("component_init", &fn_ident, &input_fn);
+
+    quote! {
+        #input_fn
+
+        #shared_registrations
+
+        #[doc(hidden)]
+        fn #builder_ident(world: &mut bevy::prelude::World) -> bevy::ecs::system::SystemId<(), ()> {
+            world.register_system(#fn_ident)
+        }
+
+        bevy_extended_ui::html::inventory::submit! {
+            bevy_extended_ui::html::ComponentInitRegistration {
+                name: stringify!(#fn_ident),
+                build: #builder_ident,
+            }
+        }
+    }
+    .into()
+}
+
+fn expand_resource_shared_registrations(
+    capture_prefix: &str,
+    fn_ident: &syn::Ident,
+    input_fn: &ItemFn,
+) -> proc_macro2::TokenStream {
+    let mut registrations = Vec::new();
+    let mut seen = Vec::<String>::new();
+
+    for arg in &input_fn.sig.inputs {
+        let FnArg::Typed(pat_type) = arg else {
+            continue;
+        };
+        let Some(resource_ty) = extract_read_resource_type(&pat_type.ty) else {
+            continue;
+        };
+        let Some(shared_name) = simple_type_name_from_type(&resource_ty) else {
+            continue;
+        };
+
+        let type_key = quote!(#resource_ty).to_string();
+        if seen.iter().any(|seen| seen == &type_key) {
+            continue;
+        }
+        seen.push(type_key.clone());
+
+        let default_alias = to_default_alias(&shared_name);
+        let name_lit = LitStr::new(&shared_name, fn_ident.span());
+        let alias_lit = LitStr::new(&default_alias, fn_ident.span());
+        let capture_ident = format_ident!(
+            "__{}_shared_capture_{}_{}",
+            capture_prefix,
+            fn_ident,
+            sanitize_capture_ident(&type_key)
+        );
+
+        registrations.push(quote! {
+            #[doc(hidden)]
+            #[allow(non_snake_case)]
+            fn #capture_ident(
+                world: &bevy::prelude::World,
+            ) -> Option<bevy_extended_ui::lang::serde_json::Value> {
+                world
+                    .get_resource::<#resource_ty>()
+                    .and_then(|value| bevy_extended_ui::lang::serde_json::to_value(value).ok())
+            }
+
+            bevy_extended_ui::lang::inventory::submit! {
+                bevy_extended_ui::lang::HtmlSharedRegistration::Shared {
+                    name: #name_lit,
+                    path: concat!(module_path!(), "::", stringify!(#resource_ty)),
+                    alias: #alias_lit,
+                    auto_use: false,
+                    capture: #capture_ident,
+                }
+            }
+        });
+    }
+
+    quote! { #(#registrations)* }
+}
+
+fn extract_read_resource_type(ty: &Type) -> Option<Type> {
+    let Type::Path(TypePath { path, .. }) = ty else {
+        return None;
+    };
+    let segment = path.segments.last()?;
+    let ident = segment.ident.to_string();
+
+    if ident == "Option" {
+        let PathArguments::AngleBracketed(args) = &segment.arguments else {
+            return None;
+        };
+        let Some(GenericArgument::Type(inner)) = args.args.first() else {
+            return None;
+        };
+        return extract_read_resource_type(inner);
+    }
+
+    if ident != "Res" && ident != "ResMut" {
+        return None;
+    }
+
+    let PathArguments::AngleBracketed(args) = &segment.arguments else {
+        return None;
+    };
+    let Some(GenericArgument::Type(inner)) = args.args.first() else {
+        return None;
+    };
+
+    Some(inner.clone())
+}
+
+fn simple_type_name_from_type(ty: &Type) -> Option<String> {
+    let Type::Path(TypePath { path, .. }) = ty else {
+        return None;
+    };
+    path.segments
+        .last()
+        .map(|segment| segment.ident.to_string())
 }
 
 /// Extracts the expected HTML event type from the first function argument.
@@ -156,63 +286,185 @@ pub fn beu_registry(_attr: TokenStream, item: TokenStream) -> TokenStream {
     item
 }
 
-/// Registers a typed struct as shared template state (`@use "Type" as alias;`).
+/// Registers a typed item as shared template state (`@use "Type" as alias;`).
 #[proc_macro_attribute]
 pub fn html_shared(_attr: TokenStream, item: TokenStream) -> TokenStream {
     expand_html_shared(item, false)
 }
 
-/// Like `html_shared`, but auto-imports the struct with its default alias.
+/// Like `html_shared`, but auto-imports the type with its default alias.
 #[proc_macro_attribute]
 pub fn html_use(_attr: TokenStream, item: TokenStream) -> TokenStream {
     expand_html_shared(item, true)
 }
 
 fn expand_html_shared(item: TokenStream, auto_use: bool) -> TokenStream {
-    let input = parse_macro_input!(item as ItemStruct);
+    let input = parse_macro_input!(item as Item);
 
+    match input {
+        Item::Struct(input) => expand_html_shared_nominal(input, auto_use).into(),
+        Item::Enum(input) => expand_html_shared_enum(input, auto_use).into(),
+        Item::Use(input) => match expand_html_shared_use(input, auto_use) {
+            Ok(tokens) => tokens.into(),
+            Err(err) => err.to_compile_error().into(),
+        },
+        other => {
+            let err = syn::Error::new_spanned(
+                &other,
+                "#[html_shared]/#[html_use] support structs, enums, and single type imports",
+            )
+            .to_compile_error();
+            TokenStream::from(quote! { #err #other })
+        }
+    }
+}
+
+fn expand_html_shared_nominal(input: ItemStruct, auto_use: bool) -> proc_macro2::TokenStream {
     if !input.generics.params.is_empty() {
         let err = syn::Error::new_spanned(
             &input.ident,
             "#[html_shared]/#[html_use] currently do not support generic structs",
         )
         .to_compile_error();
-        return TokenStream::from(quote! { #err #input });
+        return quote! { #err #input };
     }
 
-    let struct_ident = input.ident.clone();
-    let shared_name = struct_ident.to_string();
+    let ident = input.ident.clone();
+    expand_html_shared_for_type(
+        quote! { #input },
+        quote! { #ident },
+        ident.to_string(),
+        quote! { concat!(module_path!(), "::", stringify!(#ident)) },
+        auto_use,
+        ident.span(),
+    )
+}
+
+fn expand_html_shared_enum(input: ItemEnum, auto_use: bool) -> proc_macro2::TokenStream {
+    if !input.generics.params.is_empty() {
+        let err = syn::Error::new_spanned(
+            &input.ident,
+            "#[html_shared]/#[html_use] currently do not support generic enums",
+        )
+        .to_compile_error();
+        return quote! { #err #input };
+    }
+
+    let ident = input.ident.clone();
+    expand_html_shared_for_type(
+        quote! { #input },
+        quote! { #ident },
+        ident.to_string(),
+        quote! { concat!(module_path!(), "::", stringify!(#ident)) },
+        auto_use,
+        ident.span(),
+    )
+}
+
+fn expand_html_shared_use(input: ItemUse, auto_use: bool) -> Result<proc_macro2::TokenStream> {
+    let imported = extract_single_type_import(&input.tree)?;
+    let local_ident = imported.local_ident;
+    let type_name = imported.type_name;
+    let path_lit = LitStr::new(&imported.target_path, local_ident.span());
+
+    Ok(expand_html_shared_for_type(
+        quote! { #input },
+        quote! { #local_ident },
+        type_name,
+        quote! { #path_lit },
+        auto_use,
+        local_ident.span(),
+    ))
+}
+
+fn expand_html_shared_for_type(
+    item_tokens: proc_macro2::TokenStream,
+    type_tokens: proc_macro2::TokenStream,
+    shared_name: String,
+    shared_path: proc_macro2::TokenStream,
+    auto_use: bool,
+    span: proc_macro2::Span,
+) -> proc_macro2::TokenStream {
     let default_alias = to_default_alias(shared_name.as_str());
 
-    let name_lit = LitStr::new(shared_name.as_str(), struct_ident.span());
-    let alias_lit = LitStr::new(default_alias.as_str(), struct_ident.span());
-    let capture_ident = format_ident!("__html_shared_capture_{}", default_alias);
+    let name_lit = LitStr::new(shared_name.as_str(), span);
+    let alias_lit = LitStr::new(default_alias.as_str(), span);
+    let capture_ident = format_ident!(
+        "__html_shared_capture_{}",
+        sanitize_capture_ident(shared_path.to_string().as_str())
+    );
 
-    let expanded = quote! {
-        #input
+    quote! {
+        #item_tokens
 
-        impl bevy::prelude::Resource for #struct_ident {}
+        impl bevy::prelude::Resource for #type_tokens {}
 
         #[doc(hidden)]
         fn #capture_ident(
             world: &bevy::prelude::World,
         ) -> Option<bevy_extended_ui::lang::serde_json::Value> {
             world
-                .get_resource::<#struct_ident>()
+                .get_resource::<#type_tokens>()
                 .and_then(|value| bevy_extended_ui::lang::serde_json::to_value(value).ok())
         }
 
         bevy_extended_ui::lang::inventory::submit! {
             bevy_extended_ui::lang::HtmlSharedRegistration::Shared {
                 name: #name_lit,
+                path: #shared_path,
                 alias: #alias_lit,
                 auto_use: #auto_use,
                 capture: #capture_ident,
             }
         }
-    };
+    }
+}
 
-    expanded.into()
+struct ImportedType {
+    target_path: String,
+    local_ident: syn::Ident,
+    type_name: String,
+}
+
+fn extract_single_type_import(tree: &UseTree) -> Result<ImportedType> {
+    extract_single_type_import_inner(tree, String::new())
+}
+
+fn extract_single_type_import_inner(tree: &UseTree, prefix: String) -> Result<ImportedType> {
+    match tree {
+        UseTree::Path(path) => {
+            let next = append_path_segment(prefix, path.ident.to_string());
+            extract_single_type_import_inner(&path.tree, next)
+        }
+        UseTree::Name(name) => {
+            let type_name = name.ident.to_string();
+            Ok(ImportedType {
+                target_path: append_path_segment(prefix, type_name.clone()),
+                local_ident: name.ident.clone(),
+                type_name,
+            })
+        }
+        UseTree::Rename(rename) => {
+            let type_name = rename.ident.to_string();
+            Ok(ImportedType {
+                target_path: append_path_segment(prefix, type_name.clone()),
+                local_ident: rename.rename.clone(),
+                type_name,
+            })
+        }
+        other => Err(syn::Error::new_spanned(
+            other,
+            "#[html_shared]/#[html_use] on use items requires a single type import",
+        )),
+    }
+}
+
+fn append_path_segment(prefix: String, segment: String) -> String {
+    if prefix.is_empty() {
+        segment
+    } else {
+        format!("{prefix}::{segment}")
+    }
 }
 
 fn to_default_alias(type_name: &str) -> String {
@@ -230,4 +482,19 @@ fn to_default_alias(type_name: &str) -> String {
         }
     }
     out
+}
+
+fn sanitize_capture_ident(raw: &str) -> String {
+    let mut out = String::new();
+    for ch in raw.chars() {
+        if ch.is_ascii_alphanumeric() {
+            out.push(ch);
+        } else {
+            out.push('_');
+        }
+    }
+    while out.contains("__") {
+        out = out.replace("__", "_");
+    }
+    out.trim_matches('_').to_string()
 }

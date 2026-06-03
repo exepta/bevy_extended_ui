@@ -1,0 +1,98 @@
+body {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 16px;
+    padding: 24px;
+    background: #101523;
+}
+
+.page-head > h3 {
+    margin: 0;
+    color: #f5f7ff;
+}
+
+.page-head > p {
+    margin: 0;
+    color: #b7c0de;
+}
+
+.hint-row {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.bp-note {
+    display: none;
+    min-height: 28px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 1px #324061;
+    background: #1a2338;
+    color: #dce6ff;
+    justify-content: center;
+    align-items: center;
+}
+
+.breakpoint-grid {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.bp-box.shared {
+    width: 320px;
+    min-height: 128px;
+    padding: 12px;
+    border-radius: 10px;
+    border: 2px #3a4d7c;
+    background: #1a253d;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.bp-box.shared > h5 {
+    margin: 0;
+    color: #f4f7ff;
+}
+
+.bp-box.shared > p {
+    margin: 0;
+    color: #c2cfef;
+}
+
+#primary-box.shared {
+    border: 2px #5674bc;
+    background: #1f2f55;
+}
+
+@media (max-width: 900px) {
+    .bp-note.small {
+        display: flex;
+    }
+}
+
+@media (width > 900px) {
+    .bp-note.large {
+        display: flex;
+    }
+}
+
+@media (min-width > 1200px) {
+    .bp-note.huge {
+        display: flex;
+    }
+}
+
+@media (max-width < 700px) {
+    .bp-note.tiny {
+        display: flex;
+    }
+}

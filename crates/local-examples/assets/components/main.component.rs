@@ -1,3 +1,4 @@
+use crate::data_structs::{DataPack, DataState};
 use bevy::prelude::*;
 use bevy_extended_ui::html::{HtmlClick, HtmlInit};
 use bevy_extended_ui_macros::*;
@@ -16,18 +17,35 @@ pub const MAIN_COMPONENT: MainComponent = MainComponent {
     styles: &["main.component.css"],
 };
 
+#[component_init]
+pub fn constructor(
+    mut commands: Commands,
+    player: Option<Res<Player>>,
+    info: Option<Res<Info>>,
+    data_pack: Option<Res<DataPack>>,
+    data_state: Option<Res<DataState>>,
+) {
+    if player.is_none() {
+        commands.insert_resource(Player::default());
+    }
+    if info.is_none() {
+        commands.insert_resource(Info::default());
+    }
+    if data_pack.is_none() {
+        commands.insert_resource(DataPack::default());
+    }
+    if data_state.is_none() {
+        commands.insert_resource(DataState::default());
+    }
+}
+
 /// Represents a player entity with a state, name, and a list of associated data.
 ///
-/// The `Player` struct is marked with the `#[html_use]` attribute, indicating potential use
-/// in an HTML-related context. Additionally, it derives the `Serialize` trait, enabling
-/// it to be serialized into formats such as JSON.
-///
 /// # Fields
-/// * `state` - A boolean representing the state of the player (e.g., active or inactive).
+/// * `state` - A boolean representing the state of the player.
 /// * `name` - A `String` representing the player's name.
-/// * `list` - A vector of strings containing additional data or attributes related to the player.
-#[html_use]
-#[derive(Serialize)]
+/// * `list` - A vector of strings containing additional data related to the player.
+#[derive(Resource, Serialize)]
 pub struct Player {
     /// The state of display the test area.
     pub state: bool,
@@ -39,7 +57,7 @@ pub struct Player {
 impl Default for Player {
     fn default() -> Self {
         Self {
-            state: true,
+            state: false,
             name: "John".to_string(),
             list: vec!["Alice".to_string(), "Bob".to_string()],
         }
@@ -48,19 +66,14 @@ impl Default for Player {
 
 /// Structure representing information for shared HTML rendering.
 ///
-/// This struct is annotated with the `#[html_shared]` attribute, which indicates
-/// that it is intended to be used in the context of shared HTML resources.
-/// The `Serialize` trait enables the struct to be serialized into formats such as JSON.
-///
 /// # Fields
 ///
 /// * `display` - A `String` that represents the main content or data to be displayed.
-/// * `see_mee` - A `String` containing additional information or metadata related to the `display`.
-#[html_shared]
-#[derive(Serialize)]
+/// * `see_mee` - A `String` containing additional information related to the `display`.
+#[derive(Resource, Serialize)]
 pub struct Info {
     pub display: String,
-    pub see_mee: String
+    pub see_mee: String,
 }
 
 impl Default for Info {
@@ -78,18 +91,6 @@ pub fn check_state(In(_): In<HtmlClick>, mut player: ResMut<Player>) {
 }
 
 #[html_fn("init_main")]
-pub fn init_main(
-    In(_): In<HtmlInit>,
-    mut commands: Commands,
-    player: Option<Res<Player>>,
-    info: Option<Res<Info>>,
-) {
-    if player.is_none() {
-        commands.insert_resource(Player::default());
-    }
-    if info.is_none() {
-        commands.insert_resource(Info::default());
-    }
-
+pub fn init_main(In(_): In<HtmlInit>) {
     println!("init_main: hello world!");
 }

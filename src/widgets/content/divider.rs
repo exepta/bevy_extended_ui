@@ -71,35 +71,35 @@ fn internal_node_creation_system(
 
 /// Updates CSS classes when the divider alignment changes.
 fn update_divider_alignment(
-    mut q: Query<
+    mut divider_query: Query<
         (&Divider, &mut CssClass, &mut PrevDividerAlignment),
         (With<DividerBase>, Changed<Divider>),
     >,
 ) {
-    for (divider, mut classes, mut prev) in q.iter_mut() {
-        if **prev == divider.alignment {
+    for (divider, mut classes, mut previous_alignment) in divider_query.iter_mut() {
+        if **previous_alignment == divider.alignment {
             continue;
         }
 
         set_alignment_class(&mut classes, &divider.alignment);
-        **prev = divider.alignment.clone();
+        **previous_alignment = divider.alignment.clone();
 
         info!("divider alignment -> {:?}", divider.alignment);
     }
 }
 
 /// Returns the CSS class name for a given alignment.
-fn alignment_class(a: &DividerAlignment) -> &'static str {
-    match a {
+fn alignment_class(alignment: &DividerAlignment) -> &'static str {
+    match alignment {
         DividerAlignment::Vertical => "divider-vert",
         DividerAlignment::Horizontal => "divider-hori",
     }
 }
 
 /// Applies the alignment class to a CSS class list.
-fn set_alignment_class(classes: &mut CssClass, a: &DividerAlignment) {
+fn set_alignment_class(classes: &mut CssClass, alignment: &DividerAlignment) {
     classes
         .0
         .retain(|c| c != "divider-vert" && c != "divider-hori");
-    classes.0.push(alignment_class(a).to_string());
+    classes.0.push(alignment_class(alignment).to_string());
 }

@@ -82,10 +82,12 @@ fn parse_css(
     mut css_vars: HashMap<String, String>,
     allow_root_var_collection: bool,
 ) -> ParsedCss {
+    let normalized_css = normalize_media_range_prefix_syntax(css);
+
     let mut options = ParserOptions::default();
     options.flags.insert(ParserFlags::NESTING);
 
-    let stylesheet = match StyleSheet::parse(css, options) {
+    let stylesheet = match StyleSheet::parse(&normalized_css, options) {
         Ok(stylesheet) => stylesheet,
         Err(err) => {
             error!("Css Parsing failed: {:?}", err);
@@ -118,6 +120,24 @@ fn parse_css(
         styles: style_map,
         keyframes: keyframes_map,
     }
+}
+
+/// Rewrites non-standard breakpoint expressions like `(min-width > 900px)` to `(width > 900px)`.
+fn normalize_media_range_prefix_syntax(css: &str) -> String {
+    let pattern = match Regex::new(r"\(\s*(min|max)-(width|height)\s*(<=|>=|<|>)\s*([^\)]+?)\s*\)")
+    {
+        Ok(regex) => regex,
+        Err(_) => return css.to_string(),
+    };
+
+    pattern
+        .replace_all(css, |caps: &regex::Captures<'_>| {
+            let axis = caps.get(2).map(|m| m.as_str()).unwrap_or_default();
+            let op = caps.get(3).map(|m| m.as_str()).unwrap_or_default();
+            let value = caps.get(4).map(|m| m.as_str()).unwrap_or_default();
+            format!("({axis} {op} {value})")
+        })
+        .into_owned()
 }
 
 /// Handles `collect_css_rules` in the extended UI workflow.
@@ -374,17 +394,52 @@ fn match_media_feature(
     value: &MediaFeatureValue<'_>,
     comparison: Option<MediaFeatureComparison>,
 ) -> MediaQueryCondition {
-    match name {
-        MediaFeatureName::Standard(MediaFeatureId::Width)
-        | MediaFeatureName::Standard(MediaFeatureId::DeviceWidth) => {
-            map_length_feature(value, comparison, true)
-        }
-        MediaFeatureName::Standard(MediaFeatureId::Height)
-        | MediaFeatureName::Standard(MediaFeatureId::DeviceHeight) => {
-            map_length_feature(value, comparison, false)
-        }
-        MediaFeatureName::Standard(MediaFeatureId::Orientation) => map_orientation_feature(value),
+    let feature_name = name
+        .to_css_string(PrinterOptions::default())
+        .ok()
+        .map(|text| text.to_ascii_lowercase());
+
+    match feature_name.as_deref() {
+        Some("width") | Some("device-width") => map_length_feature(value, comparison, true),
+        Some("height") | Some("device-height") => map_length_feature(value, comparison, false),
+        Some("min-width") => map_prefixed_length_feature(value, comparison, true, true),
+        Some("max-width") => map_prefixed_length_feature(value, comparison, true, false),
+        Some("min-height") => map_prefixed_length_feature(value, comparison, false, true),
+        Some("max-height") => map_prefixed_length_feature(value, comparison, false, false),
+        Some("orientation") => map_orientation_feature(value),
         _ => MediaQueryCondition::Never,
+    }
+}
+
+/// Maps prefixed width/height features (`min-*` / `max-*`) including range operators.
+fn map_prefixed_length_feature(
+    value: &MediaFeatureValue<'_>,
+    comparison: Option<MediaFeatureComparison>,
+    is_width: bool,
+    is_min: bool,
+) -> MediaQueryCondition {
+    if let Some(op) = comparison {
+        return map_length_feature(value, Some(op), is_width);
+    }
+
+    let MediaFeatureValue::Length(length) = value else {
+        return MediaQueryCondition::Never;
+    };
+
+    let Some(px) = length.to_px() else {
+        return MediaQueryCondition::Never;
+    };
+
+    if is_width {
+        if is_min {
+            MediaQueryCondition::MinWidth(px)
+        } else {
+            MediaQueryCondition::MaxWidth(px)
+        }
+    } else if is_min {
+        MediaQueryCondition::MinHeight(px)
+    } else {
+        MediaQueryCondition::MaxHeight(px)
     }
 }
 

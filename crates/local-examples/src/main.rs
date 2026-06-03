@@ -1,5 +1,7 @@
 #[cfg(feature = "extended-framework")]
 mod assets_components;
+mod breakpoint_example;
+mod data_structs;
 mod framework_example;
 mod theming_provider_example;
 mod typed_values_example;
@@ -41,13 +43,17 @@ fn run_example(selection: &str) -> bool {
             framework_example::run();
             true
         }
+        "breakpoint_example" | "breakpoint" | "media-breakpoint" => {
+            breakpoint_example::run();
+            true
+        }
         _ => false,
     }
 }
 
 fn print_usage(program: &str) {
     eprintln!(
-        "Usage: {program} [widget-overview|theming-provider|typed-values|framework]"
+        "Usage: {program} [widget-overview|theming-provider|typed-values|framework|breakpoint]"
     );
 }
 

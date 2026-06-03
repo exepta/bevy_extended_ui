@@ -15,8 +15,8 @@ mod tests {
     use crate::widgets::{
         BadgeAnchor, Body, Button, ButtonType, DateFormat, FieldMode, FormValidationMode,
         HyperLinkBrowsers, InputCap, InputField, InputType, Paragraph, RadioButton, Scrollbar,
-        Slider, SliderDotAnchor, SliderType, ToggleButton, ToolTipAlignment, ToolTipPriority,
-        ToolTipTrigger, ToolTipVariant, UIWidgetState, Widget,
+        Slider, SliderDotAnchor, SliderType, SwitchButton, ToggleButton, ToolTipAlignment,
+        ToolTipPriority, ToolTipTrigger, ToolTipVariant, UIWidgetState, Widget,
     };
     use bevy::asset::{AssetEvent, AssetPlugin};
     use bevy::ecs::message::Messages;
@@ -263,6 +263,31 @@ mod tests {
         });
 
         handle
+    }
+
+    fn collect_body_entities(world: &mut World) -> Vec<(Entity, String)> {
+        let mut body_query = world.query::<(Entity, &Body)>();
+        body_query
+            .iter(world)
+            .map(|(entity, body)| (entity, body.html_key.clone().unwrap_or_default()))
+            .collect()
+    }
+
+    fn has_css_handle_path(handles: &[Handle<CssAsset>], expected_path: &str) -> bool {
+        handles.iter().any(|handle| {
+            handle
+                .path()
+                .map(|path| path.path().to_string_lossy().replace('\\', "/"))
+                .as_deref()
+                == Some(expected_path)
+        })
+    }
+
+    fn add_test_css_asset(app: &mut App, css_text: &str) -> Handle<CssAsset> {
+        let mut css_assets = app.world_mut().resource_mut::<Assets<CssAsset>>();
+        css_assets.add(CssAsset {
+            text: css_text.to_string(),
+        })
     }
 
     fn collect_nodes<'a>(nodes: &'a [HtmlWidgetNode], out: &mut Vec<&'a HtmlWidgetNode>) {
@@ -900,6 +925,65 @@ mod tests {
     }
 
     #[test]
+    fn converter_parses_switch_checked_boolean_attribute_values() {
+        let mut app = setup_converter_app();
+        app.world_mut()
+            .resource_mut::<UiLangVariables>()
+            .set("enabled", "true");
+        let html = r#"
+        <html>
+          <head>
+            <meta name="switch-checked-key" />
+          </head>
+          <body>
+            <switch id="switch-false" checked="false">False</switch>
+            <switch id="switch-standalone" checked>Standalone</switch>
+            <switch id="switch-empty" checked="">Empty</switch>
+            <switch id="switch-value-false" value="false">Value False</switch>
+            <switch id="switch-value-true" value="true">Value True</switch>
+            <switch id="switch-value-overrides-checked" checked value="false">Value Wins</switch>
+            <switch id="switch-value-template" value="{{ enabled }}">Value Template</switch>
+          </body>
+        </html>
+        "#;
+
+        add_html_source(
+            &mut app,
+            "examples/switch_checked_fixture.html",
+            html,
+            "switch-checked-key",
+            None,
+        );
+        app.update();
+
+        let structure_map = app.world().resource::<HtmlStructureMap>();
+        let nodes = structure_map
+            .html_map
+            .get("switch-checked-key")
+            .expect("expected parsed html structure for switch-checked-key");
+
+        let mut all = Vec::new();
+        collect_nodes(nodes, &mut all);
+
+        let mut by_id = std::collections::HashMap::new();
+        for node in all {
+            if let HtmlWidgetNode::SwitchButton(switch_button, meta, _, _, _, _) = node {
+                if let Some(id) = meta.id.clone() {
+                    by_id.insert(id, switch_button.selected);
+                }
+            }
+        }
+
+        assert_eq!(by_id.get("switch-false"), Some(&false));
+        assert_eq!(by_id.get("switch-standalone"), Some(&true));
+        assert_eq!(by_id.get("switch-empty"), Some(&true));
+        assert_eq!(by_id.get("switch-value-false"), Some(&false));
+        assert_eq!(by_id.get("switch-value-true"), Some(&true));
+        assert_eq!(by_id.get("switch-value-overrides-checked"), Some(&false));
+        assert_eq!(by_id.get("switch-value-template"), Some(&true));
+    }
+
+    #[test]
     fn converter_expands_if_and_for_directives_before_widget_parsing() {
         let mut app = setup_converter_app();
         app.world_mut().resource_mut::<UiLangVariables>().set(
@@ -1032,11 +1116,7 @@ mod tests {
 
         app.update();
 
-        let mut body_query = app.world_mut().query::<(Entity, &Body)>();
-        let all_bodies: Vec<(Entity, String)> = body_query
-            .iter(app.world())
-            .map(|(entity, body)| (entity, body.html_key.clone().unwrap_or_default()))
-            .collect();
+        let all_bodies = collect_body_entities(app.world_mut());
 
         assert_eq!(all_bodies.len(), 1);
         assert_eq!(all_bodies[0].1, "build-key");
@@ -1110,11 +1190,7 @@ mod tests {
 
         app.update();
 
-        let mut body_query = app.world_mut().query::<(Entity, &Body)>();
-        let all_bodies: Vec<(Entity, String)> = body_query
-            .iter(app.world())
-            .map(|(entity, body)| (entity, body.html_key.clone().unwrap_or_default()))
-            .collect();
+        let all_bodies = collect_body_entities(app.world_mut());
 
         assert_eq!(
             all_bodies
@@ -1139,6 +1215,81 @@ mod tests {
             app.world().entities().contains(old_body_b),
             "clean active body should be left untouched"
         );
+    }
+
+    #[test]
+    fn builder_updates_existing_nodes_when_template_values_change() {
+        let mut app = setup_converter_app();
+        app.add_message::<HtmlAllWidgetsSpawned>();
+        app.add_systems(Update, builder::build_html_source);
+
+        app.world_mut()
+            .resource_mut::<UiLangVariables>()
+            .set("data", r#"{"text":"First","state":false}"#);
+
+        add_html_source(
+            &mut app,
+            "examples/build_dynamic_fixture.html",
+            r#"
+            <html>
+              <head><meta name="build-dynamic-key" /></head>
+              <body>
+                <button>{{ data.text }}</button>
+                <switch>{{ data.state }}</switch>
+              </body>
+            </html>
+            "#,
+            "build-dynamic-key",
+            None,
+        );
+
+        app.update();
+
+        {
+            let mut map = app.world_mut().resource_mut::<HtmlStructureMap>();
+            map.active = Some(vec!["build-dynamic-key".to_string()]);
+        }
+        app.world_mut().resource_mut::<HtmlDirty>().0 = true;
+        app.update();
+
+        let mut button_query = app.world_mut().query::<(Entity, &Button)>();
+        let (old_button_entity, old_button) = button_query
+            .iter(app.world())
+            .next()
+            .expect("expected initial button entity");
+        assert_eq!(old_button.text, "First");
+
+        let mut switch_query = app.world_mut().query::<(Entity, &SwitchButton)>();
+        let (old_switch_entity, old_switch) = switch_query
+            .iter(app.world())
+            .next()
+            .expect("expected initial switch entity");
+        assert_eq!(old_switch.label, "false");
+
+        app.world_mut()
+            .resource_mut::<UiLangVariables>()
+            .set("data", r#"{"text":"Second","state":true}"#);
+
+        // 1) converter reparses on vars fingerprint change
+        // 2) builder rebuilds dirty active UI
+        app.update();
+        app.update();
+
+        let mut button_query = app.world_mut().query::<(Entity, &Button)>();
+        let (new_button_entity, new_button) = button_query
+            .iter(app.world())
+            .next()
+            .expect("expected rebuilt button entity");
+        assert_eq!(new_button.text, "Second");
+        assert_eq!(old_button_entity, new_button_entity);
+
+        let mut switch_query = app.world_mut().query::<(Entity, &SwitchButton)>();
+        let (new_switch_entity, new_switch) = switch_query
+            .iter(app.world())
+            .next()
+            .expect("expected rebuilt switch entity");
+        assert_eq!(new_switch.label, "true");
+        assert_eq!(old_switch_entity, new_switch_entity);
     }
 
     #[test]
@@ -1435,13 +1586,7 @@ mod tests {
             "expected provider-wrapped body children to remain visible"
         );
 
-        let has_theme_css = body_meta.css.iter().any(|handle| {
-            handle
-                .path()
-                .map(|path| path.path().to_string_lossy().replace('\\', "/"))
-                .as_deref()
-                == Some("themes/night.css")
-        });
+        let has_theme_css = has_css_handle_path(&body_meta.css, "themes/night.css");
         assert!(has_theme_css, "expected themes/night.css to be applied");
     }
 
@@ -1488,13 +1633,7 @@ mod tests {
             panic!("expected body as root node");
         };
 
-        let has_theme_css = body_meta.css.iter().any(|handle| {
-            handle
-                .path()
-                .map(|path| path.path().to_string_lossy().replace('\\', "/"))
-                .as_deref()
-                == Some("themes/night.css")
-        });
+        let has_theme_css = has_css_handle_path(&body_meta.css, "themes/night.css");
         assert!(
             !has_theme_css,
             "did not expect themes/night.css when provider is placed in <head>"
@@ -1507,12 +1646,7 @@ mod tests {
         app.add_plugins((MinimalPlugins, AssetPlugin::default(), HtmlReloadPlugin));
         app.init_asset::<CssAsset>();
 
-        let changed_handle = {
-            let mut css_assets = app.world_mut().resource_mut::<Assets<CssAsset>>();
-            css_assets.add(CssAsset {
-                text: "a { color: red; }".to_string(),
-            })
-        };
+        let changed_handle = add_test_css_asset(&mut app, "a { color: red; }");
         let unchanged_handle = {
             let mut css_assets = app.world_mut().resource_mut::<Assets<CssAsset>>();
             css_assets.add(CssAsset {
@@ -1547,12 +1681,7 @@ mod tests {
         app.add_plugins((MinimalPlugins, AssetPlugin::default(), HtmlReloadPlugin));
         app.init_asset::<CssAsset>();
 
-        let removed_handle = {
-            let mut css_assets = app.world_mut().resource_mut::<Assets<CssAsset>>();
-            css_assets.add(CssAsset {
-                text: "a { color: red; }".to_string(),
-            })
-        };
+        let removed_handle = add_test_css_asset(&mut app, "a { color: red; }");
 
         let affected = app
             .world_mut()
