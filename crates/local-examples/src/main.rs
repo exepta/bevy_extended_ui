@@ -1,6 +1,7 @@
 #[cfg(feature = "extended-framework")]
 mod assets_components;
 mod breakpoint_example;
+mod data_structs;
 mod framework_example;
 mod theming_provider_example;
 mod typed_values_example;

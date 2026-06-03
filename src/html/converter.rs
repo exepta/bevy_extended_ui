@@ -1,9 +1,9 @@
 use bevy::asset::AssetEvent;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
-use bevy::reflect::TypeRegistry;
 use bevy::reflect::serde::TypedReflectDeserializer;
-use kuchiki::{Attributes, NodeRef, traits::TendrilSink};
+use bevy::reflect::TypeRegistry;
+use kuchiki::{traits::TendrilSink, Attributes, NodeRef};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::de::DeserializeSeed;
@@ -12,28 +12,28 @@ use std::collections::{HashMap, HashSet};
 #[cfg(feature = "extended-framework")]
 use std::path::PathBuf;
 
-use crate::ExtendedUiConfiguration;
 #[cfg(feature = "extended-dialog")]
 use crate::dialog::{DialogProvider, DialogWidget, DialogWidgetType};
 #[cfg(feature = "extended-framework")]
-use crate::framework::{ExtendedFrameworkConfiguration, compile_framework_template};
+use crate::framework::{compile_framework_template, ExtendedFrameworkConfiguration};
 use crate::html::{
     HtmlDirty, HtmlEventBindings, HtmlID, HtmlInnerContent, HtmlMeta, HtmlSource, HtmlStates,
     HtmlStructureMap, HtmlStyle, HtmlSystemSet, HtmlWidgetNode,
 };
 use crate::io::{CssAsset, DefaultCssHandle, HtmlAsset};
 use crate::lang::{
-    UILang, UiLangState, UiLangVariables, UiSharedValues, localize_html, shared_values_fingerprint,
-    vars_fingerprint,
+    localize_html, shared_values_fingerprint, vars_fingerprint, UILang, UiLangState,
+    UiLangVariables, UiSharedValues,
 };
 #[cfg(feature = "providers")]
 use crate::providers::{
     ProviderChildPolicy, ProviderResolveContext, ThemeProviderState, UiProvider, UiProviderRegistry,
 };
-use crate::styles::IconPlace;
 use crate::styles::parser::convert_to_color;
+use crate::styles::IconPlace;
 use crate::widgets::Button;
 use crate::widgets::*;
+use crate::ExtendedUiConfiguration;
 
 /// Legacy identifier for the built-in embedded default stylesheet.
 pub const DEFAULT_UI_CSS: &str = "embedded/default_style";
@@ -1401,7 +1401,11 @@ fn parse_html_node(
             } else {
                 Some(icon_attr.to_string())
             };
-            let selected = parse_bool_attribute(&attributes, "checked");
+            let selected = if attributes.contains("value") {
+                parse_bool_attribute(&attributes, "value")
+            } else {
+                parse_bool_attribute(&attributes, "checked")
+            };
 
             Some(HtmlWidgetNode::SwitchButton(
                 SwitchButton {
@@ -2054,7 +2058,7 @@ fn extract_direct_child_tags(inner_html: &str) -> Vec<String> {
 
 const TEMPLATE_MAX_RECURSION: usize = 64;
 static TEMPLATE_USE_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r#"(?m)^[ \t]*@use[ \t]+"([^"]+)"[ \t]+as[ \t]+([A-Za-z_][A-Za-z0-9_]*|\*)[ \t]*;[ \t]*\r?$"#)
+    Regex::new(r#"(?m)^[ \t]*@use[ \t]+"([^"]+)"(?:[ \t]+as[ \t]+([A-Za-z_][A-Za-z0-9_]*|\*))?[ \t]*;[ \t]*\r?$"#)
         .unwrap()
 });
 
@@ -2109,8 +2113,10 @@ impl TemplateValueContext {
         }
 
         for directive in use_directives {
-            let Some(shared_value) = shared.values.get(&directive.target) else {
-                if !shared.known_types.contains(&directive.target) {
+            let Some((resolved_target, shared_value)) =
+                resolve_shared_use_target(shared, &directive.target)
+            else {
+                if !shared_use_target_known(shared, &directive.target) {
                     warn!("Unknown @use target '{}'", directive.target);
                 }
                 continue;
@@ -2139,7 +2145,7 @@ impl TemplateValueContext {
                 if shared
                     .auto_use_aliases
                     .get(&directive.alias)
-                    .is_some_and(|target| target == &directive.target)
+                    .is_some_and(|target| shared_targets_match(target, &resolved_target))
                 {
                     // Redundant explicit import for an already auto-imported alias.
                     continue;
@@ -2451,9 +2457,10 @@ fn extract_template_use_directives(template: &str) -> (Vec<TemplateUseDirective>
         let Some(target) = captures.get(1).map(|m| m.as_str().trim().to_string()) else {
             continue;
         };
-        let Some(alias_raw) = captures.get(2).map(|m| m.as_str().trim().to_string()) else {
-            continue;
-        };
+        let alias_raw = captures
+            .get(2)
+            .map(|m| m.as_str().trim().to_string())
+            .unwrap_or_else(|| default_use_alias(&target));
 
         directives.push(TemplateUseDirective {
             target,
@@ -2464,6 +2471,95 @@ fn extract_template_use_directives(template: &str) -> (Vec<TemplateUseDirective>
 
     let cleaned = TEMPLATE_USE_RE.replace_all(template, "").into_owned();
     (directives, cleaned)
+}
+
+fn resolve_shared_use_target<'a>(
+    shared: &'a UiSharedValues,
+    target: &str,
+) -> Option<(String, &'a JsonValue)> {
+    if let Some(value) = shared.values.get(target) {
+        return Some((target.to_string(), value));
+    }
+
+    if target.contains("::") {
+        let mut path_matches: Vec<_> = shared
+            .values
+            .iter()
+            .filter(|(registered, _)| shared_paths_match(registered, target))
+            .collect();
+        path_matches.sort_by(|(left, _), (right, _)| left.cmp(right));
+
+        if let Some((registered, value)) = path_matches.first() {
+            if path_matches.len() > 1 {
+                warn!(
+                    "Ambiguous @use target '{}' matched multiple shared paths; using '{}'",
+                    target, registered
+                );
+            }
+            return Some(((*registered).clone(), *value));
+        }
+    }
+
+    let simple_name = simple_type_name(target);
+    shared
+        .values
+        .get(simple_name)
+        .map(|value| (simple_name.to_string(), value))
+}
+
+fn shared_use_target_known(shared: &UiSharedValues, target: &str) -> bool {
+    shared.known_types.contains(target)
+        || shared
+            .known_types
+            .iter()
+            .any(|registered| shared_paths_match(registered, target))
+        || shared.known_types.contains(simple_type_name(target))
+}
+
+fn shared_targets_match(left: &str, right: &str) -> bool {
+    left == right
+        || shared_paths_match(left, right)
+        || simple_type_name(left) == simple_type_name(right)
+}
+
+fn shared_paths_match(registered: &str, requested: &str) -> bool {
+    if registered == requested {
+        return true;
+    }
+
+    let Some(requested_without_crate) = requested.trim().strip_prefix("crate::") else {
+        return false;
+    };
+
+    registered == requested_without_crate
+        || registered
+            .trim()
+            .ends_with(format!("::{requested_without_crate}").as_str())
+}
+
+fn default_use_alias(target: &str) -> String {
+    to_template_alias(simple_type_name(target))
+}
+
+fn simple_type_name(target: &str) -> &str {
+    target.trim().rsplit("::").next().unwrap_or(target).trim()
+}
+
+fn to_template_alias(type_name: &str) -> String {
+    let mut out = String::new();
+    for (index, ch) in type_name.chars().enumerate() {
+        if ch.is_uppercase() {
+            if index != 0 {
+                out.push('_');
+            }
+            for lower in ch.to_lowercase() {
+                out.push(lower);
+            }
+        } else {
+            out.push(ch);
+        }
+    }
+    out
 }
 
 fn iterable_items(value: JsonValue) -> Vec<JsonValue> {
@@ -3078,8 +3174,17 @@ fn evaluate_value_method(target: &JsonValue, method: &str, args: &[JsonValue]) -
                 _ => JsonValue::Bool(false),
             }
         }
+        _ if args.is_empty() => evaluate_zero_arg_getter(target, method.as_str()),
         _ => JsonValue::Null,
     }
+}
+
+fn evaluate_zero_arg_getter(target: &JsonValue, method: &str) -> JsonValue {
+    let Some(field_name) = method.strip_prefix("get_") else {
+        return JsonValue::Null;
+    };
+
+    resolve_json_property(target, field_name)
 }
 
 fn json_as_string(value: &JsonValue) -> Option<String> {

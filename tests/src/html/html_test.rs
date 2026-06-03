@@ -927,6 +927,9 @@ mod tests {
     #[test]
     fn converter_parses_switch_checked_boolean_attribute_values() {
         let mut app = setup_converter_app();
+        app.world_mut()
+            .resource_mut::<UiLangVariables>()
+            .set("enabled", "true");
         let html = r#"
         <html>
           <head>
@@ -936,6 +939,10 @@ mod tests {
             <switch id="switch-false" checked="false">False</switch>
             <switch id="switch-standalone" checked>Standalone</switch>
             <switch id="switch-empty" checked="">Empty</switch>
+            <switch id="switch-value-false" value="false">Value False</switch>
+            <switch id="switch-value-true" value="true">Value True</switch>
+            <switch id="switch-value-overrides-checked" checked value="false">Value Wins</switch>
+            <switch id="switch-value-template" value="{{ enabled }}">Value Template</switch>
           </body>
         </html>
         "#;
@@ -970,6 +977,10 @@ mod tests {
         assert_eq!(by_id.get("switch-false"), Some(&false));
         assert_eq!(by_id.get("switch-standalone"), Some(&true));
         assert_eq!(by_id.get("switch-empty"), Some(&true));
+        assert_eq!(by_id.get("switch-value-false"), Some(&false));
+        assert_eq!(by_id.get("switch-value-true"), Some(&true));
+        assert_eq!(by_id.get("switch-value-overrides-checked"), Some(&false));
+        assert_eq!(by_id.get("switch-value-template"), Some(&true));
     }
 
     #[test]

@@ -105,6 +105,59 @@ mod tests {
     }
 
     #[test]
+    fn preprocess_template_directives_resolves_use_with_default_alias() {
+        let vars = UiLangVariables::default();
+        let mut shared = UiSharedValues::default();
+        shared.values.insert(
+            "DataPack".to_string(),
+            crate::lang::serde_json::from_str(r#"{"version":"1.0.0","used":false}"#).unwrap(),
+        );
+
+        let template = r#"
+            @use "DataPack";
+            <p>Version: {{ data_pack.version }}</p>
+            @if(!data_pack.used) {
+              <p>Unused</p>
+            }
+        "#;
+
+        let rendered = preprocess_template_directives_with_shared(template, &vars, &shared);
+
+        assert!(rendered.contains("<p>Version: 1.0.0</p>"));
+        assert!(rendered.contains("<p>Unused</p>"));
+        assert!(!rendered.contains("@use"));
+    }
+
+    #[test]
+    fn preprocess_template_directives_resolves_use_path_with_default_alias() {
+        let vars = UiLangVariables::default();
+        let mut shared = UiSharedValues::default();
+        shared.values.insert(
+            "bevy_extended_ui_tests::data_structs::DataPack".to_string(),
+            crate::lang::serde_json::from_str(r#"{"version":"1.0.0","data":[0,2,1]}"#).unwrap(),
+        );
+        shared
+            .known_types
+            .insert("bevy_extended_ui_tests::data_structs::DataPack".to_string());
+
+        let template = r#"
+            @use "crate::data_structs::DataPack";
+            <p>Version: {{ data_pack.version }}</p>
+            @for (entry in data_pack.get_data()) {
+              <span>{{ entry }}</span>
+            }
+        "#;
+
+        let rendered = preprocess_template_directives_with_shared(template, &vars, &shared);
+
+        assert!(rendered.contains("<p>Version: 1.0.0</p>"));
+        assert!(rendered.contains("<span>0</span>"));
+        assert!(rendered.contains("<span>2</span>"));
+        assert!(rendered.contains("<span>1</span>"));
+        assert!(!rendered.contains("@use"));
+    }
+
+    #[test]
     fn preprocess_template_directives_interpolates_moustache_from_shared_alias() {
         let vars = UiLangVariables::default();
         let mut shared = UiSharedValues::default();

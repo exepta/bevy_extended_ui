@@ -9,7 +9,7 @@ use crate::html::bindings::HtmlEventBindingsPlugin;
 use crate::html::builder::HtmlBuilderSystem;
 use crate::html::converter::HtmlConverterSystem;
 use crate::html::reload::HtmlReloadPlugin;
-use crate::lang::{UILang, UiLangState, UiLangVariables, UiSharedValues, refresh_shared_values};
+use crate::lang::{refresh_shared_values, UILang, UiLangState, UiLangVariables, UiSharedValues};
 use bevy::ecs::system::SystemId;
 use bevy::prelude::*;
 use std::collections::{HashMap, HashSet};
@@ -18,8 +18,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 #[cfg(feature = "extended-dialog")]
 use crate::dialog::DialogWidget;
 use crate::io::{CssAsset, HtmlAsset};
-use crate::styles::Style;
 use crate::styles::parser::apply_property_to_style;
+use crate::styles::Style;
 use crate::widgets::{
     Badge, Body, Button, CheckBox, ChoiceBox, ColorPicker, DatePicker, Div, Divider, FieldSet,
     Form, Headline, HyperLink, Img, InputField, ListBox, Paragraph, ProgressBar, RadioButton,
@@ -727,6 +727,14 @@ pub enum HtmlFnRegistration {
 
 inventory::collect!(HtmlFnRegistration);
 
+/// Registry entry for component startup constructors.
+pub struct ComponentInitRegistration {
+    pub name: &'static str,
+    pub build: fn(&mut World) -> SystemId<(), ()>,
+}
+
+inventory::collect!(ComponentInitRegistration);
+
 /// Basic event wrapper passed to untyped HTML handlers.
 #[derive(Clone, Copy)]
 pub struct HtmlEvent {
@@ -1036,7 +1044,7 @@ impl Plugin for ExtendedUiHtmlPlugin {
 
         app.add_systems(PreUpdate, sync_shared_values_system);
 
-        app.add_systems(Startup, register_html_fns);
+        app.add_systems(Startup, (run_component_inits, register_html_fns));
     }
 }
 
@@ -1212,5 +1220,15 @@ pub fn register_html_fns(world: &mut World) {
         reg.out.insert(name.clone(), id);
         reg.over.insert(name.clone(), id);
         debug!("Registered html fn '{name}' with id {id:?}");
+    }
+}
+
+/// Runs all component constructors registered via `#[component_init]`.
+pub fn run_component_inits(world: &mut World) {
+    for item in inventory::iter::<ComponentInitRegistration> {
+        let id = (item.build)(world);
+        if let Err(err) = world.run_system(id) {
+            warn!("component init '{}' failed: {err}", item.name);
+        }
     }
 }
