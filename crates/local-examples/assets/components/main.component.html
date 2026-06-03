@@ -1,14 +1,12 @@
-@use "Info" as info;
-@use "Player" as player;
-@use "crate::data_structs::DataPack";
-@use "crate::data_structs::DataState";
+@use "crate::data_structs::*";
+
 <div id="framework-root" oninit="init_main">
     <h3>Extended Framework Active</h3>
     <p>This UI was booted from index.html and app-main component.</p>
     <button>Component Button</button>
     <switch value="{{ player.state }}" onclick="check_state">{{ player.state }}</switch>
 
-    @if(player.state) {
+    @if(player.state && data_state == DataState::Inactive) {
         <app-test></app-test>
     } @else {
         <slider></slider>

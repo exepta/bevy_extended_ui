@@ -9,7 +9,7 @@ use crate::html::bindings::HtmlEventBindingsPlugin;
 use crate::html::builder::HtmlBuilderSystem;
 use crate::html::converter::HtmlConverterSystem;
 use crate::html::reload::HtmlReloadPlugin;
-use crate::lang::{refresh_shared_values, UILang, UiLangState, UiLangVariables, UiSharedValues};
+use crate::lang::{UILang, UiLangState, UiLangVariables, UiSharedValues, refresh_shared_values};
 use bevy::ecs::system::SystemId;
 use bevy::prelude::*;
 use std::collections::{HashMap, HashSet};
@@ -18,8 +18,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 #[cfg(feature = "extended-dialog")]
 use crate::dialog::DialogWidget;
 use crate::io::{CssAsset, HtmlAsset};
-use crate::styles::parser::apply_property_to_style;
 use crate::styles::Style;
+use crate::styles::parser::apply_property_to_style;
 use crate::widgets::{
     Badge, Body, Button, CheckBox, ChoiceBox, ColorPicker, DatePicker, Div, Divider, FieldSet,
     Form, Headline, HyperLink, Img, InputField, ListBox, Paragraph, ProgressBar, RadioButton,

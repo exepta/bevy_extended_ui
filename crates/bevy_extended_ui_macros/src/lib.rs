@@ -1,11 +1,11 @@
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
 use syn::{
+    FnArg, GenericArgument, Item, ItemEnum, ItemFn, ItemStruct, ItemUse, LitStr, PathArguments,
+    Result, Type, TypePath, UseTree,
     parse::{Parse, ParseStream},
     parse_macro_input,
     token::Eq,
-    FnArg, GenericArgument, Item, ItemEnum, ItemFn, ItemStruct, ItemUse, LitStr, PathArguments,
-    Result, Type, TypePath, UseTree,
 };
 
 /// Parsed attribute arguments for the `html_fn` macro.

@@ -168,7 +168,14 @@ fn internal_node_creation_system(
 }
 
 fn update_switch_button_system(
-    switch_q: Query<(&SwitchButton, &UIGenID), (With<SwitchButton>, With<SwitchButtonBase>, Changed<SwitchButton>)>,
+    switch_q: Query<
+        (&SwitchButton, &UIGenID),
+        (
+            With<SwitchButton>,
+            With<SwitchButtonBase>,
+            Changed<SwitchButton>,
+        ),
+    >,
     mut label_q: Query<(&BindToID, &mut Text), With<SwitchButtonLabel>>,
 ) {
     for (switch_button, id) in switch_q.iter() {

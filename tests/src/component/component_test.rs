@@ -1,14 +1,14 @@
 #[cfg(test)]
 mod unit_tests {
     use super::super::*;
-    use bevy_extended_ui::html::HtmlSource;
-    use bevy_extended_ui::io::HtmlAsset;
+    use crate::framework::ExtendedFrameworkConfiguration;
     use bevy::asset::AssetPlugin;
     use bevy::prelude::*;
-    use crate::framework::ExtendedFrameworkConfiguration;
+    use bevy_extended_ui::html::HtmlSource;
+    use bevy_extended_ui::io::HtmlAsset;
     use std::fs;
+    use std::panic::{AssertUnwindSafe, catch_unwind};
     use std::path::{Path, PathBuf};
-    use std::panic::{catch_unwind, AssertUnwindSafe};
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn unique_temp_dir(prefix: &str) -> PathBuf {
@@ -155,7 +155,10 @@ mod unit_tests {
     fn validate_component_assets_rejects_duplicate_template_name() {
         let assets_root = unique_temp_dir("component_assets_duplicate");
         let component_assets_root = assets_root.join("assets/components");
-        write_file(&component_assets_root.join("a.component.html"), "<div>a</div>");
+        write_file(
+            &component_assets_root.join("a.component.html"),
+            "<div>a</div>",
+        );
         write_file(
             &component_assets_root.join("a.component.css"),
             "div { color: red; }",
@@ -195,7 +198,10 @@ mod unit_tests {
         let scoped_dir = component_assets_root.join(&source_dir_rel);
 
         write_file(&scoped_dir.join("main.component.html"), "<div>ok</div>");
-        write_file(&scoped_dir.join("main.component.css"), "div { color: red; }");
+        write_file(
+            &scoped_dir.join("main.component.css"),
+            "div { color: red; }",
+        );
 
         let defs = vec![ComponentDefinition {
             template_name: "card-profile".to_string(),
@@ -249,7 +255,10 @@ mod unit_tests {
         let assets_root = unique_temp_dir("component_template_read");
         let component_assets_root = assets_root.join("assets/components");
         let scoped_dir = component_assets_root.join("widgets/nav");
-        write_file(&scoped_dir.join("main.component.html"), "<section>content</section>");
+        write_file(
+            &scoped_dir.join("main.component.html"),
+            "<section>content</section>",
+        );
 
         let def = ComponentDefinition {
             template_name: "nav-main".to_string(),
@@ -408,7 +417,10 @@ mod unit_tests {
     #[test]
     fn extended_component_plugin_spawns_framework_index_source_on_startup() {
         let assets_root = unique_temp_dir("component_plugin_startup_ok");
-        write_file(&assets_root.join("index.html"), "<body><h1>Index</h1></body>");
+        write_file(
+            &assets_root.join("index.html"),
+            "<body><h1>Index</h1></body>",
+        );
 
         let mut app = App::new();
         app.add_plugins((MinimalPlugins, AssetPlugin::default()));

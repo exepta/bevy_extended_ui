@@ -38,6 +38,7 @@ impl Default for ExtendedFrameworkConfiguration {
 pub struct FrameworkCompileResult {
     pub html: String,
     pub inferred_controller: Option<String>,
+    pub component_controllers: Vec<String>,
 }
 
 /// Plugin for initializing resources used by the extended framework.
@@ -63,15 +64,17 @@ pub fn compile_framework_template(
 ) -> FrameworkCompileResult {
     let source = normalize_source_path(source_path);
     let mut html = template_html.to_string();
+    let mut component_controllers = Vec::new();
     if source == normalize_source_path(&config.index_html_file) {
-        if let Err(err) = compile_index_template(&mut html, config) {
-            panic!("extended-framework compile failed for index.html: {err}");
-        }
+        component_controllers = compile_index_template(&mut html, config).unwrap_or_else(|err| {
+            panic!("extended-framework compile failed for index.html: {err}")
+        });
     }
 
     FrameworkCompileResult {
         html,
         inferred_controller: infer_component_controller_path(source_path, config),
+        component_controllers,
     }
 }
 
@@ -140,11 +143,12 @@ fn normalize_root(path: &str) -> String {
 fn compile_index_template(
     index_html: &mut String,
     config: &ExtendedFrameworkConfiguration,
-) -> Result<(), String> {
+) -> Result<Vec<String>, String> {
     let defs = load_component_definitions(config)?;
     validate_component_assets(&defs, config)?;
 
     let mut used_style_hrefs: BTreeSet<String> = BTreeSet::new();
+    let mut used_component_controllers: BTreeSet<String> = BTreeSet::new();
 
     for _ in 0..16 {
         let mut replaced = false;
@@ -177,6 +181,11 @@ fn compile_index_template(
                         style,
                     ));
                 }
+                used_component_controllers.insert(build_component_controller_path(
+                    &config.rust_component_root,
+                    &def.source_dir_rel,
+                    &def.template_file,
+                ));
                 replaced = true;
             }
         }
@@ -187,7 +196,7 @@ fn compile_index_template(
     }
 
     inject_component_styles(index_html, used_style_hrefs);
-    Ok(())
+    Ok(used_component_controllers.into_iter().collect())
 }
 
 /// Handles `inject_component_styles` in the extended UI workflow.
@@ -237,4 +246,40 @@ fn build_component_style_href(component_root: &str, source_dir_rel: &str, style:
     } else {
         format!("{root}/{relative}")
     }
+}
+
+fn build_component_controller_path(
+    rust_root: &str,
+    source_dir_rel: &str,
+    template_file: &str,
+) -> String {
+    let rust_root = normalize_filesystem_root(rust_root);
+    let source_dir_rel = normalize_root(source_dir_rel);
+    let template_file = normalize_root(template_file);
+    let rust_file = template_file
+        .strip_suffix(".html")
+        .map(|base| format!("{base}.rs"))
+        .unwrap_or(template_file);
+
+    let relative = if rust_file.contains('/') {
+        rust_file
+    } else if source_dir_rel.is_empty() {
+        rust_file
+    } else {
+        format!("{source_dir_rel}/{rust_file}")
+    };
+
+    if rust_root.is_empty() {
+        relative
+    } else {
+        format!("{rust_root}/{relative}")
+    }
+}
+
+fn normalize_filesystem_root(path: &str) -> String {
+    let mut normalized = path.replace('\\', "/");
+    while let Some(rest) = normalized.strip_prefix("./") {
+        normalized = rest.to_string();
+    }
+    normalized.trim_end_matches('/').to_string()
 }
