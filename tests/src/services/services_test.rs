@@ -1,14 +1,13 @@
 #[cfg(test)]
 mod tests {
     use super::super::css_service::{
-        collect_assets_with_changed_media_matches, matches_css_selector_token, CssService,
-        CssUsers,
+        CssService, CssUsers, collect_assets_with_changed_media_matches, matches_css_selector_token,
     };
     use super::super::image_service::{get_or_load_image, pre_load_assets};
-    use super::super::state_service::{update_widget_states, StateService};
+    use super::super::state_service::{StateService, update_widget_states};
     use super::super::style_service::{
-        propagate_style_inheritance, sync_last_ui_transform, update_widget_styles_system,
-        LastUiTransform, StyleTransition,
+        LastUiTransform, StyleTransition, propagate_style_inheritance, sync_last_ui_transform,
+        update_widget_styles_system,
     };
     use crate::io::CssAsset;
     use crate::styles::components::UiStyle;
@@ -123,11 +122,7 @@ mod tests {
         let (first, second) = {
             let id1 = app.world().get::<UIGenID>(e1).expect("id1 missing").get();
             let id2 = app.world().get::<UIGenID>(e2).expect("id2 missing").get();
-            if id1 <= id2 {
-                (e1, e2)
-            } else {
-                (e2, e1)
-            }
+            if id1 <= id2 { (e1, e2) } else { (e2, e1) }
         };
 
         app.world_mut()
@@ -390,9 +385,10 @@ mod tests {
         app.add_plugins((MinimalPlugins, AssetPlugin::default(), CssService));
         app.init_asset::<CssAsset>();
 
-        assert!(app
-            .world()
-            .contains_resource::<crate::styles::ExistingCssIDs>());
+        assert!(
+            app.world()
+                .contains_resource::<crate::styles::ExistingCssIDs>()
+        );
         assert!(app.world().contains_resource::<CssUsers>());
     }
 

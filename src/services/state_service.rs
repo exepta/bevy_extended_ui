@@ -1,5 +1,5 @@
-use crate::widgets::{BindToID, IgnoreParentState, UIGenID, UIWidgetState};
 use crate::CurrentWidgetState;
+use crate::widgets::{BindToID, IgnoreParentState, UIGenID, UIWidgetState};
 use bevy::prelude::*;
 use std::collections::HashMap;
 

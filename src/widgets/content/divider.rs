@@ -1,6 +1,6 @@
+use crate::ExtendedUiConfiguration;
 use crate::styles::{CssClass, CssSource, TagName};
 use crate::widgets::{Divider, DividerAlignment, WidgetId, WidgetKind};
-use crate::ExtendedUiConfiguration;
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
 

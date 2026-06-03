@@ -1,3 +1,4 @@
+use crate::ExtendedUiConfiguration;
 use crate::styles::{CssClass, CssID, CssSource, TagName};
 use crate::widgets::widget_util::{
     resolve_owner_widget, resolve_owner_widget_from_parent, set_css_classes,
@@ -6,7 +7,6 @@ use crate::widgets::{
     BindToID, Body, ToolTip, ToolTipAlignment, ToolTipPriority, ToolTipTrigger, ToolTipVariant,
     UIGenID, UIWidgetState, WidgetId, WidgetKind,
 };
-use crate::ExtendedUiConfiguration;
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
 use bevy::ui::{ComputedNode, UiGlobalTransform, UiScale};
