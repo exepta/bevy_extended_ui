@@ -8,24 +8,89 @@
     <switch value="{{ player.state }}" onclick="check_state">Store state: {{ player.state }}</switch>
     <p>Store Player Name: {{ player.name }}</p>
 
+    <label for="player-name">Player Name</label>
+    <input id="player-name" type="text" value="{{ player.name }}" onchange="set_name">
+
+    <label for="slider-val">Player Name</label>
+    <input id="slider-val" type="number" value="{{ info.value }}" onchange="set_value">
+
     @if(player.state && data_state == DataState::Inactive) {
-        <app-test></app-test>
+    <app-test></app-test>
     } @else {
-        <slider value="{{ info.value }}" onchange="on_slider_change"></slider>
+    <slider value="{{ info.value }}" onchange="on_slider_change"></slider>
     }
     <h4>{{ info.display }}</h4>
     <p>Store entries are rendered from UiBindingStore:</p>
 
     @for (entry, index in player.list) {
-        <p>Entry: {{ entry }}</p>
+    <p>Entry: {{ entry }}</p>
     }
 
-    <h4>Data Pack {{ data_pack.version }}</h4>
-    <h5>Data State: {{ data_state }}</h5>
-    <p>Data Pack used: {{ data_pack.used }}</p>
-    @for (entry, index in data_pack.get_data()) {
-        <p>Data Pack Byte {{ index }}: {{ entry }}</p>
+    <label for="info-image-file">Info Image</label>
+    <input
+        id="info-image-file"
+        type="file"
+        max-size="4MB"
+        extensions="[png, jpeg, jpg]"
+        show-size="true"
+        onchange="set_image_file"
+    >
+
+    @if(info.image_file != "") {
+        <img
+            id="info-image-preview"
+            src="{{ info.image_file }}"
+            preview="info-image-file"
+            alt="Selected info image"
+        >
+    } @else {
+        <p>No image file selected.</p>
     }
 
-    <app-help></app-help>
+    <div class="date-demo">
+        <label for="info-date">Info Date</label>
+        <input
+            id="info-date"
+            type="date"
+            value="{{ info.date }}"
+            min="01.01.2022"
+            max="01.12.2026"
+            format="dd.mm.yyyy"
+            onchange="set_info_date"
+        >
+        <date-picker
+            id="info-date-picker"
+            for="#info-date"
+            value="{{ info.date }}"
+            min="01.01.2022"
+            max="01.12.2026"
+            format="dd.mm.yyyy"
+        ></date-picker>
+        <p>Selected date: {{ info.date }}</p>
+
+        <label for="info-date-range">Info Date Range</label>
+        <input
+            id="info-date-range"
+            type="range"
+            value="{{ info.date_range }}"
+            min="01.01.2022"
+            max="01.12.2026"
+            format="dd.mm.yyyy"
+            onchange="set_info_date_range"
+        >
+        <date-picker
+            id="info-date-range-picker"
+            for="#info-date-range"
+            value="{{ info.date_range }}"
+            min="01.01.2022"
+            max="01.12.2026"
+            format="dd.mm.yyyy"
+        ></date-picker>
+        <p>Selected date range: {{ info.date_range }}</p>
+
+        <h4>Date list</h4>
+        @for (date, index in info.dates_in_range) {
+            <p>Date {{ index }}: {{ date }}</p>
+        }
+    </div>
 </div>

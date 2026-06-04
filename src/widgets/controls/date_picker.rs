@@ -7,6 +7,7 @@ use crate::services::image_service::{DEFAULT_CHOICE_BOX_KEY, get_or_load_image};
 use crate::styles::components::UiStyle;
 use crate::styles::paint::Colored;
 use crate::styles::{CssClass, CssID, CssSource, FontVal, TagName};
+use crate::widgets::controls::input::InputUserChanged;
 use crate::widgets::widget_util::wheel_delta_y;
 use crate::widgets::{
     BindToID, DateFormat, DatePicker, IgnoreParentState, InputField, InputType, InputValue,
@@ -104,6 +105,12 @@ struct DatePickerDayText {
 
 const DATE_PICKER_OVERLAY_Z: i32 = 40_000;
 
+fn set_if_changed<T: PartialEq>(target: &mut T, value: T) {
+    if *target != value {
+        *target = value;
+    }
+}
+
 /// Stores the previous z-index of a bound input while its date picker is open.
 #[derive(Component, Clone, Copy, Debug)]
 struct DatePickerLiftedZ {
@@ -126,6 +133,44 @@ struct DatePickerState {
     pending_bound_write_back: bool,
     year_start: i32,
     year_end: i32,
+}
+
+/// Tracks the last visual state applied to a date picker.
+#[derive(Component, Clone, Debug, PartialEq)]
+struct DatePickerVisualSnapshot {
+    value: String,
+    input_value: String,
+    label: String,
+    placeholder: String,
+    min: Option<String>,
+    max: Option<String>,
+    format_pattern: Option<String>,
+    format: DateFormat,
+    for_id: Option<String>,
+    bound_input_type: Option<InputType>,
+    bound_date_format: Option<String>,
+    selected: Option<SimpleDate>,
+    range_start: Option<SimpleDate>,
+    range_end: Option<SimpleDate>,
+    view_year: i32,
+    view_month: u32,
+    open: bool,
+    focused: bool,
+    disabled: bool,
+}
+
+/// Tracks the last month/year panel state applied to a date picker.
+#[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
+struct DatePickerPanelSnapshot {
+    view_year: i32,
+    view_month: u32,
+    year_start: i32,
+    year_end: i32,
+    month_list_open: bool,
+    year_list_open: bool,
+    year_list_centered: bool,
+    open: bool,
+    disabled: bool,
 }
 
 /// Compact calendar date type.
@@ -1135,8 +1180,10 @@ fn sync_bound_date_picker_targets(
 
 /// Synchronizes labels, value text, calendar header, and day button states.
 fn sync_date_picker_visuals(
+    mut commands: Commands,
     mut picker_query: Query<
         (
+            Entity,
             &mut DatePicker,
             &mut DatePickerState,
             &mut InputValue,
@@ -1144,6 +1191,7 @@ fn sync_date_picker_visuals(
             &mut ZIndex,
             &mut GlobalZIndex,
             &UIGenID,
+            Option<&DatePickerVisualSnapshot>,
         ),
         (
             With<DatePickerBase>,
@@ -1203,17 +1251,18 @@ fn sync_date_picker_visuals(
         >,
     )>,
 ) {
-    for (mut picker, mut state, mut input_value, ui_state, mut root_z, mut root_global_z, ui_id) in
-        picker_query.iter_mut()
+    for (
+        entity,
+        mut picker,
+        mut state,
+        mut input_value,
+        ui_state,
+        mut root_z,
+        mut root_global_z,
+        ui_id,
+        snapshot,
+    ) in picker_query.iter_mut()
     {
-        if ui_state.open && !ui_state.disabled {
-            root_z.0 = DATE_PICKER_OVERLAY_Z;
-            root_global_z.0 = DATE_PICKER_OVERLAY_Z;
-        } else {
-            root_z.0 = 0;
-            root_global_z.0 = 0;
-        }
-
         let bound_input = picker.for_id.as_ref().and_then(|for_id| {
             input_targets
                 .iter()
@@ -1222,17 +1271,52 @@ fn sync_date_picker_visuals(
         });
         let selection_mode = resolve_selection_mode(bound_input);
         let effective_pattern = resolve_date_pattern(&picker, bound_input);
-        state.min = picker
+        let next_snapshot = DatePickerVisualSnapshot {
+            value: picker.value.clone(),
+            input_value: input_value.0.clone(),
+            label: picker.label.clone(),
+            placeholder: picker.placeholder.clone(),
+            min: picker.min.clone(),
+            max: picker.max.clone(),
+            format_pattern: picker.format_pattern.clone(),
+            format: picker.format,
+            for_id: picker.for_id.clone(),
+            bound_input_type: bound_input.map(|input| input.input_type),
+            bound_date_format: bound_input.and_then(|input| input.date_format.clone()),
+            selected: state.selected,
+            range_start: state.range_start,
+            range_end: state.range_end,
+            view_year: state.view_year,
+            view_month: state.view_month,
+            open: ui_state.open,
+            focused: ui_state.focused,
+            disabled: ui_state.disabled,
+        };
+        if snapshot.is_some_and(|snapshot| *snapshot == next_snapshot) {
+            continue;
+        }
+
+        if ui_state.open && !ui_state.disabled {
+            set_if_changed(&mut root_z.0, DATE_PICKER_OVERLAY_Z);
+            set_if_changed(&mut root_global_z.0, DATE_PICKER_OVERLAY_Z);
+        } else {
+            set_if_changed(&mut root_z.0, 0);
+            set_if_changed(&mut root_global_z.0, 0);
+        }
+
+        let min = picker
             .min
             .as_deref()
             .and_then(|value| parse_picker_date(value, effective_pattern));
-        state.max = picker
+        let max = picker
             .max
             .as_deref()
             .and_then(|value| parse_picker_date(value, effective_pattern));
+        set_if_changed(&mut state.min, min);
+        set_if_changed(&mut state.max, max);
         let (year_start, year_end) = resolve_year_range(state.min, state.max, state.view_year);
-        state.year_start = year_start;
-        state.year_end = year_end;
+        set_if_changed(&mut state.year_start, year_start);
+        set_if_changed(&mut state.year_end, year_end);
 
         match selection_mode {
             PickerSelectionMode::Single => {
@@ -1298,13 +1382,13 @@ fn sync_date_picker_visuals(
                     continue;
                 }
 
-                label_text.0 = picker.label.clone();
+                set_if_changed(&mut label_text.0, picker.label.clone());
                 if float_label {
-                    label_node.top = Val::Px(7.0);
-                    label_font.font_size = 11.0;
+                    set_if_changed(&mut label_node.top, Val::Px(7.0));
+                    set_if_changed(&mut label_font.font_size, 11.0);
                 } else {
-                    label_node.top = Val::Px(19.0);
-                    label_font.font_size = 16.0;
+                    set_if_changed(&mut label_node.top, Val::Px(19.0));
+                    set_if_changed(&mut label_font.font_size, 16.0);
                 }
 
                 if let Some(mut style) = style_opt {
@@ -1336,24 +1420,29 @@ fn sync_date_picker_visuals(
                 }
 
                 if has_value {
-                    value_text.0 = match selection_mode {
-                        PickerSelectionMode::Single => state
-                            .selected
-                            .map(|selected| format_for_display(selected, effective_pattern))
-                            .unwrap_or_default(),
-                        PickerSelectionMode::Range => format_range_for_display(
-                            state.range_start,
-                            state.range_end,
-                            effective_pattern,
-                        ),
-                    };
-                    value_color.0 = Color::srgb(0.96, 0.97, 1.0);
+                    set_if_changed(
+                        &mut value_text.0,
+                        match selection_mode {
+                            PickerSelectionMode::Single => state
+                                .selected
+                                .map(|selected| format_for_display(selected, effective_pattern))
+                                .unwrap_or_default(),
+                            PickerSelectionMode::Range => format_range_for_display(
+                                state.range_start,
+                                state.range_end,
+                                effective_pattern,
+                            ),
+                        },
+                    );
+                    set_if_changed(&mut value_color.0, Color::srgb(0.96, 0.97, 1.0));
                 } else if float_label {
-                    value_text.0 = placeholder.clone();
-                    value_color.0 = Color::srgba(0.69, 0.72, 0.82, 0.98);
+                    set_if_changed(&mut value_text.0, placeholder.clone());
+                    set_if_changed(&mut value_color.0, Color::srgba(0.69, 0.72, 0.82, 0.98));
                 } else {
                     // Keep placeholder hidden while the label is not floated to avoid overlap.
-                    value_text.0.clear();
+                    if !value_text.0.is_empty() {
+                        value_text.0.clear();
+                    }
                 }
             }
         }
@@ -1365,11 +1454,11 @@ fn sync_date_picker_visuals(
                     continue;
                 }
                 if ui_state.open && !ui_state.disabled {
-                    *visibility = Visibility::Inherited;
-                    popover_global_z.0 = DATE_PICKER_OVERLAY_Z + 1;
+                    set_if_changed(&mut *visibility, Visibility::Inherited);
+                    set_if_changed(&mut popover_global_z.0, DATE_PICKER_OVERLAY_Z + 1);
                 } else {
-                    *visibility = Visibility::Hidden;
-                    popover_global_z.0 = 0;
+                    set_if_changed(&mut *visibility, Visibility::Hidden);
+                    set_if_changed(&mut popover_global_z.0, 0);
                 }
             }
         }
@@ -1380,7 +1469,7 @@ fn sync_date_picker_visuals(
                 if bind_id.0 != ui_id.get() {
                     continue;
                 }
-                month_text.0 = month_name(state.view_month).to_string();
+                set_if_changed(&mut month_text.0, month_name(state.view_month).to_string());
             }
         }
 
@@ -1398,19 +1487,19 @@ fn sync_date_picker_visuals(
 
                 let hidden = button.index >= visible_cell_count;
                 if hidden {
-                    day_node.display = Display::None;
-                    *day_visibility = Visibility::Hidden;
-                    day_state.checked = false;
-                    day_state.readonly = true;
-                    day_state.disabled = true;
-                    day_state.hovered = false;
-                    day_state.focused = false;
-                    day_state.invalid = false;
+                    set_if_changed(&mut day_node.display, Display::None);
+                    set_if_changed(&mut *day_visibility, Visibility::Hidden);
+                    set_if_changed(&mut day_state.checked, false);
+                    set_if_changed(&mut day_state.readonly, true);
+                    set_if_changed(&mut day_state.disabled, true);
+                    set_if_changed(&mut day_state.hovered, false);
+                    set_if_changed(&mut day_state.focused, false);
+                    set_if_changed(&mut day_state.invalid, false);
                     continue;
                 }
 
-                day_node.display = Display::Flex;
-                *day_visibility = Visibility::Inherited;
+                set_if_changed(&mut day_node.display, Display::Flex);
+                set_if_changed(&mut *day_visibility, Visibility::Inherited);
 
                 let Some(cell) = cells.get(button.index) else {
                     continue;
@@ -1446,13 +1535,13 @@ fn sync_date_picker_visuals(
                 let range_start_cap = decorate_range_caps && is_range_start;
                 let range_end_cap = decorate_range_caps && is_range_end;
 
-                day_state.checked = is_endpoint;
-                day_state.readonly = readonly;
-                day_state.disabled = disabled;
-                day_state.focused = highlight_range || range_end_cap;
-                day_state.invalid = range_start_cap;
+                set_if_changed(&mut day_state.checked, is_endpoint);
+                set_if_changed(&mut day_state.readonly, readonly);
+                set_if_changed(&mut day_state.disabled, disabled);
+                set_if_changed(&mut day_state.focused, highlight_range || range_end_cap);
+                set_if_changed(&mut day_state.invalid, range_start_cap);
                 if day_state.disabled || day_state.readonly {
-                    day_state.hovered = false;
+                    set_if_changed(&mut day_state.hovered, false);
                 }
             }
         }
@@ -1468,25 +1557,27 @@ fn sync_date_picker_visuals(
 
                 let hidden = text_info.index >= visible_cell_count;
                 if hidden {
-                    text.0.clear();
-                    text_color.0 = Color::srgb(0.84, 0.86, 0.96);
-                    *visibility = Visibility::Hidden;
-                    text_state.checked = false;
-                    text_state.readonly = true;
-                    text_state.disabled = true;
-                    text_state.hovered = false;
-                    text_state.focused = false;
-                    text_state.invalid = false;
+                    if !text.0.is_empty() {
+                        text.0.clear();
+                    }
+                    set_if_changed(&mut text_color.0, Color::srgb(0.84, 0.86, 0.96));
+                    set_if_changed(&mut *visibility, Visibility::Hidden);
+                    set_if_changed(&mut text_state.checked, false);
+                    set_if_changed(&mut text_state.readonly, true);
+                    set_if_changed(&mut text_state.disabled, true);
+                    set_if_changed(&mut text_state.hovered, false);
+                    set_if_changed(&mut text_state.focused, false);
+                    set_if_changed(&mut text_state.invalid, false);
                     continue;
                 }
 
-                *visibility = Visibility::Inherited;
+                set_if_changed(&mut *visibility, Visibility::Inherited);
 
                 let Some(cell) = cells.get(text_info.index) else {
                     continue;
                 };
 
-                text.0 = cell.date.day.to_string();
+                set_if_changed(&mut text.0, cell.date.day.to_string());
                 let selected = match selection_mode {
                     PickerSelectionMode::Single => state.selected == Some(cell.date),
                     PickerSelectionMode::Range => {
@@ -1517,34 +1608,49 @@ fn sync_date_picker_visuals(
                 let range_start_cap = decorate_range_caps && is_range_start;
                 let range_end_cap = decorate_range_caps && is_range_end;
 
-                text_state.checked = selected;
-                text_state.readonly = readonly;
-                text_state.disabled = disabled;
-                text_state.focused = highlight_range || range_end_cap;
-                text_state.invalid = range_start_cap;
+                set_if_changed(&mut text_state.checked, selected);
+                set_if_changed(&mut text_state.readonly, readonly);
+                set_if_changed(&mut text_state.disabled, disabled);
+                set_if_changed(&mut text_state.focused, highlight_range || range_end_cap);
+                set_if_changed(&mut text_state.invalid, range_start_cap);
                 if disabled {
-                    text_state.hovered = false;
+                    set_if_changed(&mut text_state.hovered, false);
                 }
 
-                text_color.0 = if selected {
-                    Color::WHITE
-                } else if highlight_range {
-                    Color::srgb(0.88, 0.9, 0.98)
-                } else if disabled {
-                    Color::srgb(0.31, 0.33, 0.41)
-                } else if readonly {
-                    Color::srgb(0.29, 0.31, 0.41)
-                } else {
-                    Color::srgb(0.84, 0.86, 0.96)
-                };
+                set_if_changed(
+                    &mut text_color.0,
+                    if selected {
+                        Color::WHITE
+                    } else if highlight_range {
+                        Color::srgb(0.88, 0.9, 0.98)
+                    } else if disabled {
+                        Color::srgb(0.31, 0.33, 0.41)
+                    } else if readonly {
+                        Color::srgb(0.29, 0.31, 0.41)
+                    } else {
+                        Color::srgb(0.84, 0.86, 0.96)
+                    },
+                );
             }
         }
+
+        commands.entity(entity).insert(next_snapshot);
     }
 }
 
 /// Synchronizes month/year panel visibility and option states.
 fn sync_year_picker_panel(
-    mut picker_query: Query<(&mut DatePickerState, &UIWidgetState, &UIGenID), With<DatePickerBase>>,
+    mut commands: Commands,
+    mut picker_query: Query<
+        (
+            Entity,
+            &mut DatePickerState,
+            &UIWidgetState,
+            &UIGenID,
+            Option<&DatePickerPanelSnapshot>,
+        ),
+        With<DatePickerBase>,
+    >,
     mut month_year_params: ParamSet<(
         Query<(&mut Text, &BindToID), (With<DatePickerHeaderYearText>, Without<DatePickerBase>)>,
         Query<
@@ -1592,7 +1698,22 @@ fn sync_year_picker_panel(
         >,
     )>,
 ) {
-    for (mut state, picker_ui, picker_id) in picker_query.iter_mut() {
+    for (entity, mut state, picker_ui, picker_id, snapshot) in picker_query.iter_mut() {
+        let next_snapshot = DatePickerPanelSnapshot {
+            view_year: state.view_year,
+            view_month: state.view_month,
+            year_start: state.year_start,
+            year_end: state.year_end,
+            month_list_open: state.month_list_open,
+            year_list_open: state.year_list_open,
+            year_list_centered: state.year_list_centered,
+            open: picker_ui.open,
+            disabled: picker_ui.disabled,
+        };
+        if snapshot.is_some_and(|snapshot| *snapshot == next_snapshot) {
+            continue;
+        }
+
         let show_month_list =
             picker_ui.open && state.month_list_open && !state.year_list_open && !picker_ui.disabled;
         let show_year_list =
@@ -1605,7 +1726,7 @@ fn sync_year_picker_panel(
                 if bind_id.0 != picker_id.get() {
                     continue;
                 }
-                year_text.0 = state.view_year.to_string();
+                set_if_changed(&mut year_text.0, state.view_year.to_string());
             }
         }
 
@@ -1617,14 +1738,14 @@ fn sync_year_picker_panel(
                 }
 
                 if is_year.is_some() {
-                    button_state.checked = show_year_list;
+                    set_if_changed(&mut button_state.checked, show_year_list);
                     if !show_year_list {
-                        button_state.hovered = false;
+                        set_if_changed(&mut button_state.hovered, false);
                     }
                 } else if is_month.is_some() {
-                    button_state.checked = show_month_list;
+                    set_if_changed(&mut button_state.checked, show_month_list);
                     if !show_month_list {
-                        button_state.hovered = false;
+                        set_if_changed(&mut button_state.hovered, false);
                     }
                 }
             }
@@ -1637,11 +1758,11 @@ fn sync_year_picker_panel(
                     continue;
                 }
                 if hide_calendar {
-                    *visibility = Visibility::Hidden;
-                    node.display = Display::None;
+                    set_if_changed(&mut *visibility, Visibility::Hidden);
+                    set_if_changed(&mut node.display, Display::None);
                 } else {
-                    *visibility = Visibility::Inherited;
-                    node.display = Display::Flex;
+                    set_if_changed(&mut *visibility, Visibility::Inherited);
+                    set_if_changed(&mut node.display, Display::Flex);
                 }
             }
         }
@@ -1653,11 +1774,11 @@ fn sync_year_picker_panel(
                     continue;
                 }
                 if hide_calendar {
-                    *visibility = Visibility::Hidden;
-                    node.display = Display::None;
+                    set_if_changed(&mut *visibility, Visibility::Hidden);
+                    set_if_changed(&mut node.display, Display::None);
                 } else {
-                    *visibility = Visibility::Inherited;
-                    node.display = Display::Flex;
+                    set_if_changed(&mut *visibility, Visibility::Inherited);
+                    set_if_changed(&mut node.display, Display::Flex);
                 }
             }
         }
@@ -1671,8 +1792,8 @@ fn sync_year_picker_panel(
                     continue;
                 }
                 if show_year_list {
-                    *visibility = Visibility::Inherited;
-                    node.display = Display::Flex;
+                    set_if_changed(&mut *visibility, Visibility::Inherited);
+                    set_if_changed(&mut node.display, Display::Flex);
                     if !state.year_list_centered {
                         // One year row is 34px high with 2px vertical gap in CSS.
                         let option_h = 36.0;
@@ -1687,14 +1808,14 @@ fn sync_year_picker_panel(
                             let index = (state.view_year - state.year_start).max(0) as f32;
                             let target = (index * option_h - (viewport_h * 0.5) + (option_h * 0.5))
                                 .clamp(0.0, max_scroll);
-                            scroll.y = target;
-                            state.year_list_centered = true;
+                            set_if_changed(&mut scroll.y, target);
+                            set_if_changed(&mut state.year_list_centered, true);
                         }
                     }
                 } else {
-                    *visibility = Visibility::Hidden;
-                    node.display = Display::None;
-                    state.year_list_centered = false;
+                    set_if_changed(&mut *visibility, Visibility::Hidden);
+                    set_if_changed(&mut node.display, Display::None);
+                    set_if_changed(&mut state.year_list_centered, false);
                 }
             }
         }
@@ -1709,10 +1830,10 @@ fn sync_year_picker_panel(
                 }
 
                 let disabled = option.year < state.year_start || option.year > state.year_end;
-                option_state.checked = option.year == state.view_year;
-                option_state.disabled = disabled;
+                set_if_changed(&mut option_state.checked, option.year == state.view_year);
+                set_if_changed(&mut option_state.disabled, disabled);
                 if disabled || !show_year_list {
-                    option_state.hovered = false;
+                    set_if_changed(&mut option_state.hovered, false);
                 }
             }
         }
@@ -1724,11 +1845,11 @@ fn sync_year_picker_panel(
                     continue;
                 }
                 if show_month_list {
-                    *visibility = Visibility::Inherited;
-                    node.display = Display::Flex;
+                    set_if_changed(&mut *visibility, Visibility::Inherited);
+                    set_if_changed(&mut node.display, Display::Flex);
                 } else {
-                    *visibility = Visibility::Hidden;
-                    node.display = Display::None;
+                    set_if_changed(&mut *visibility, Visibility::Hidden);
+                    set_if_changed(&mut node.display, Display::None);
                 }
             }
         }
@@ -1742,13 +1863,25 @@ fn sync_year_picker_panel(
 
                 let disabled = picker_ui.disabled
                     || !is_month_allowed(state.view_year, option.month, state.min, state.max);
-                option_state.checked = option.month == state.view_month;
-                option_state.disabled = disabled;
+                set_if_changed(&mut option_state.checked, option.month == state.view_month);
+                set_if_changed(&mut option_state.disabled, disabled);
                 if disabled || !show_month_list {
-                    option_state.hovered = false;
+                    set_if_changed(&mut option_state.hovered, false);
                 }
             }
         }
+
+        commands.entity(entity).insert(DatePickerPanelSnapshot {
+            view_year: state.view_year,
+            view_month: state.view_month,
+            year_start: state.year_start,
+            year_end: state.year_end,
+            month_list_open: state.month_list_open,
+            year_list_open: state.year_list_open,
+            year_list_centered: state.year_list_centered,
+            open: picker_ui.open,
+            disabled: picker_ui.disabled,
+        });
     }
 }
 
@@ -2572,6 +2705,7 @@ fn on_year_list_click(
 /// Selects a day from the visible calendar grid.
 fn on_day_click(
     mut trigger: On<Pointer<Click>>,
+    mut commands: Commands,
     day_query: Query<(&BindToID, &DatePickerDayButton), With<DatePickerDayButton>>,
     mut picker_query: Query<
         (
@@ -2584,7 +2718,7 @@ fn on_day_click(
         With<DatePickerBase>,
     >,
     mut input_query: Query<
-        (&CssID, &UIGenID, &mut InputField, &mut InputValue),
+        (Entity, &CssID, &UIGenID, &mut InputField, &mut InputValue),
         (With<InputField>, Without<DatePickerBase>),
     >,
     mut current_widget_state: ResMut<CurrentWidgetState>,
@@ -2621,7 +2755,7 @@ fn on_day_click(
         let mut selection_mode = PickerSelectionMode::Single;
         let mut effective_pattern = resolve_date_pattern(&picker, None);
         if let Some(for_id) = picker.for_id.as_ref() {
-            for (css_id, _target_id, field, _field_value) in input_query.iter_mut() {
+            for (_, css_id, _target_id, field, _field_value) in input_query.iter_mut() {
                 if css_id.0 != *for_id {
                     continue;
                 }
@@ -2676,7 +2810,9 @@ fn on_day_click(
 
         let mut bound_target_widget_id: Option<usize> = None;
         if let Some(for_id) = picker.for_id.as_ref() {
-            for (css_id, target_id, mut field, mut field_value) in input_query.iter_mut() {
+            for (target_entity, css_id, target_id, mut field, mut field_value) in
+                input_query.iter_mut()
+            {
                 if css_id.0 != *for_id {
                     continue;
                 }
@@ -2686,6 +2822,7 @@ fn on_day_click(
 
                 field.text = formatted.clone();
                 field_value.0 = formatted.clone();
+                commands.entity(target_entity).insert(InputUserChanged);
                 bound_target_widget_id = Some(target_id.get());
                 break;
             }

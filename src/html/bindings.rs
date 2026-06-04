@@ -1,5 +1,6 @@
 use crate::CurrentWidgetState;
 use crate::html::*;
+use crate::widgets::controls::input::InputUserChanged;
 use crate::widgets::controls::slider::SliderUserChanged;
 use crate::widgets::{
     BindToID, Button, ButtonType, CheckBox, ChoiceBox, ColorPicker, DatePicker,
@@ -785,10 +786,24 @@ pub(crate) fn emit_color_picker_change(
 /// Emits change events for input widgets.
 pub(crate) fn emit_input_change(
     mut commands: Commands,
-    query: Query<(Entity, &HtmlEventBindings), Changed<InputValue>>,
+    query: Query<
+        (
+            Entity,
+            &HtmlEventBindings,
+            Option<&UIWidgetState>,
+            Option<&InputUserChanged>,
+        ),
+        Or<(Changed<InputValue>, With<InputUserChanged>)>,
+    >,
 ) {
-    for (entity, binding) in &query {
-        emit_change_if_bound(&mut commands, binding, entity, HtmlChangeAction::State);
+    for (entity, binding, state, user_changed) in &query {
+        let is_focused_user_edit = state.is_some_and(|state| state.focused);
+        if user_changed.is_some() || is_focused_user_edit {
+            emit_change_if_bound(&mut commands, binding, entity, HtmlChangeAction::State);
+        }
+        if user_changed.is_some() {
+            commands.entity(entity).remove::<InputUserChanged>();
+        }
     }
 }
 

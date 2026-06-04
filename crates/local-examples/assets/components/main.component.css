@@ -20,3 +20,17 @@ body {
   align-items: flex-start;
   gap: 12px;
 }
+
+img {
+  width: 128px;
+  height: 128px;
+}
+
+.date-demo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #6f7086;
+  border-radius: 8px;
+}

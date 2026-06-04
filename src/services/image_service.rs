@@ -107,6 +107,14 @@ pub fn get_or_load_image(
         );
     }
 
+    if Path::new(path).is_absolute() {
+        warn!(
+            "Image file '{}' could not be loaded from the filesystem.",
+            path
+        );
+        return Handle::default();
+    }
+
     if let Some(embedded_png) = embedded_icon_bytes(path) {
         if !asset_exists_in_project(path) {
             warn!("Image not found at '{}', using embedded fallback.", path);
@@ -308,7 +316,7 @@ fn normalize_asset_path(path: &str) -> Cow<'_, str> {
     }
 
     let absolute = Path::new(trimmed);
-    if absolute.is_absolute() && absolute.exists() {
+    if absolute.is_absolute() && !should_treat_leading_slash_as_asset_path(absolute) {
         return Cow::Borrowed(trimmed);
     }
 
@@ -317,6 +325,14 @@ fn normalize_asset_path(path: &str) -> Cow<'_, str> {
     }
 
     Cow::Borrowed(trimmed)
+}
+
+fn should_treat_leading_slash_as_asset_path(path: &Path) -> bool {
+    if path.exists() || path.parent().is_some_and(Path::exists) {
+        return false;
+    }
+
+    true
 }
 
 /// Handles `to_assets_relative_path` in the extended UI workflow.

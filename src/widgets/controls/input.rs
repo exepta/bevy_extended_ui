@@ -8,6 +8,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use crate::html::HtmlSystemSet;
 use crate::services::image_service::get_or_load_image;
 use crate::styles::components::UiStyle;
 use crate::styles::paint::Colored;
@@ -46,6 +47,10 @@ struct InputFieldIcon;
 /// Marker component for the input icon image.
 #[derive(Component)]
 struct InputFieldIconImage;
+
+/// Marker inserted when an input value changed because of user input.
+#[derive(Component)]
+pub struct InputUserChanged;
 
 /// Marker component for the blinking cursor node.
 #[derive(Component)]
@@ -281,25 +286,46 @@ impl Plugin for InputWidget {
         app.insert_resource(InputClipboard::default());
         app.insert_resource(InputFileDialogBridge::default());
         #[cfg(all(target_arch = "wasm32", feature = "clipboard-wasm"))]
-        let typing_chain = (handle_typing, sync_input_text_spans, apply_pending_paste).chain();
-
-        #[cfg(not(all(target_arch = "wasm32", feature = "clipboard-wasm")))]
-        let typing_chain = (handle_typing, sync_input_text_spans).chain();
-
         app.add_systems(
             Update,
             (
                 internal_node_creation_system,
                 apply_pending_file_selection,
-                sync_input_field_updates.after(apply_pending_file_selection),
-                sync_file_input_feedback.after(apply_pending_file_selection),
+                sync_input_field_updates,
+                sync_file_input_feedback,
+                handle_typing,
+                apply_pending_paste,
+                sync_input_text_spans,
                 update_cursor_visibility,
                 update_cursor_position,
-                typing_chain,
                 handle_input_horizontal_scroll,
                 calculate_correct_text_container_width,
                 handle_overlay_label,
-            ),
+            )
+                .chain()
+                .after(HtmlSystemSet::Build)
+                .before(HtmlSystemSet::Bindings),
+        );
+
+        #[cfg(not(all(target_arch = "wasm32", feature = "clipboard-wasm")))]
+        app.add_systems(
+            Update,
+            (
+                internal_node_creation_system,
+                apply_pending_file_selection,
+                sync_input_field_updates,
+                sync_file_input_feedback,
+                handle_typing,
+                sync_input_text_spans,
+                update_cursor_visibility,
+                update_cursor_position,
+                handle_input_horizontal_scroll,
+                calculate_correct_text_container_width,
+                handle_overlay_label,
+            )
+                .chain()
+                .after(HtmlSystemSet::Build)
+                .before(HtmlSystemSet::Bindings),
         );
     }
 }
@@ -569,6 +595,7 @@ fn sync_input_field_updates(
             &mut InputSelection,
             &InputFileState,
             &UIGenID,
+            &UIWidgetState,
             Option<&CssSource>,
         ),
         (With<InputFieldBase>, Changed<InputField>),
@@ -601,16 +628,26 @@ fn sync_input_field_updates(
         icon_entities.insert(bind.0, entity);
     }
 
-    for (entity, mut field, mut input_value, mut selection, file_state, ui_id, source_opt) in
+    for (entity, mut field, mut input_value, mut selection, file_state, ui_id, state, source_opt) in
         query.iter_mut()
     {
         let css_source = source_opt.cloned().unwrap_or_default();
 
-        field.cursor_position = field.cursor_position.min(field.text.len());
-        selection.anchor = selection.anchor.min(field.text.len());
-        selection.focus = selection.focus.min(field.text.len());
-        if field.input_type != InputType::File && input_value.0 != field.text {
-            input_value.0 = field.text.clone();
+        if state.focused && field.input_type != InputType::File {
+            // Template updates create a fresh InputField from the rendered `value` attribute.
+            // Keep the user's draft text while focused so reactive number formatting does not
+            // rewrite intermediate input like `10`, `10.`, or an empty field.
+            field.text = input_value.0.clone();
+            selection.anchor = selection.anchor.min(field.text.len());
+            selection.focus = selection.focus.min(field.text.len());
+            field.cursor_position = selection.focus;
+        } else {
+            selection.anchor = selection.anchor.min(field.text.len());
+            selection.focus = selection.focus.min(field.text.len());
+            field.cursor_position = field.cursor_position.min(field.text.len());
+            if field.input_type != InputType::File && input_value.0 != field.text {
+                input_value.0 = field.text.clone();
+            }
         }
 
         for (mut label_text, bind_id) in label_query.iter_mut() {
@@ -701,9 +738,11 @@ fn sync_input_field_updates(
 
 /// Handles `apply_pending_file_selection` in the extended UI workflow.
 fn apply_pending_file_selection(
+    mut commands: Commands,
     bridge: Res<InputFileDialogBridge>,
     mut query: Query<
         (
+            Entity,
             &UIGenID,
             &mut InputField,
             &mut InputValue,
@@ -727,6 +766,7 @@ fn apply_pending_file_selection(
 
     for selection in pending {
         if let Some((
+            entity,
             _,
             mut field,
             mut input_value,
@@ -735,7 +775,7 @@ fn apply_pending_file_selection(
             mut state,
         )) = query
             .iter_mut()
-            .find(|(ui_id, _, _, _, _, _)| ui_id.0 == selection.target)
+            .find(|(_, ui_id, _, _, _, _, _)| ui_id.0 == selection.target)
         {
             if let Some(error_message) = selection.error_message {
                 file_state.error_message = Some(error_message);
@@ -752,6 +792,7 @@ fn apply_pending_file_selection(
 
             if input_value.0 != selection.value {
                 input_value.0 = selection.value;
+                commands.entity(entity).insert(InputUserChanged);
             }
 
             state.invalid = false;
