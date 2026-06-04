@@ -1,9 +1,10 @@
 use crate::CurrentWidgetState;
 use crate::html::*;
+use crate::widgets::controls::slider::SliderUserChanged;
 use crate::widgets::{
     BindToID, Button, ButtonType, CheckBox, ChoiceBox, ColorPicker, DatePicker,
     FieldSelectionMulti, FieldSelectionSingle, Form, FormValidationMode, InputField, InputValue,
-    ListBox, RadioButton, Scrollbar, Slider, SwitchButton, ToggleButton, UIGenID, UIWidgetState,
+    ListBox, RadioButton, Scrollbar, SwitchButton, ToggleButton, UIGenID, UIWidgetState,
     ValidationRules, evaluate_validation_state,
 };
 use bevy::log::warn;
@@ -762,10 +763,11 @@ pub(crate) fn emit_field_set_change(
 /// Emits change events for slider widgets.
 pub(crate) fn emit_slider_change(
     mut commands: Commands,
-    query: Query<(Entity, &HtmlEventBindings), Changed<Slider>>,
+    query: Query<(Entity, &HtmlEventBindings), With<SliderUserChanged>>,
 ) {
     for (entity, binding) in &query {
         emit_change_if_bound(&mut commands, binding, entity, HtmlChangeAction::State);
+        commands.entity(entity).remove::<SliderUserChanged>();
     }
 }
 

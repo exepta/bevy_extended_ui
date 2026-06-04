@@ -3,16 +3,18 @@
 <div id="framework-root" oninit="init_main">
     <h3>Extended Framework Active</h3>
     <p>This UI was booted from index.html and app-main component.</p>
-    <button>Component Button</button>
-    <switch value="{{ player.state }}" onclick="check_state">{{ player.state }}</switch>
+    <button onclick="check_state">Toggle Store Player</button>
+    <button onclick="increase_value">Increase Value</button>
+    <switch value="{{ player.state }}" onclick="check_state">Store state: {{ player.state }}</switch>
+    <p>Store Player Name: {{ player.name }}</p>
 
     @if(player.state && data_state == DataState::Inactive) {
         <app-test></app-test>
     } @else {
-        <slider></slider>
+        <slider value="{{ info.value }}" onchange="on_slider_change"></slider>
     }
     <h4>{{ info.display }}</h4>
-    <p>Player Name: {{ player.name }}</p>
+    <p>Store entries are rendered from UiBindingStore:</p>
 
     @for (entry, index in player.list) {
         <p>Entry: {{ entry }}</p>

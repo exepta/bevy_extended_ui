@@ -714,8 +714,8 @@ pub fn update_style_animations(
     }
 }
 
-/// Handles `apply_calc_styles_system` in the extended UI workflow.
-fn apply_calc_styles_system(
+/// Applies deferred CSS `calc(...)` values to Bevy UI nodes after styles were resolved.
+pub fn apply_calc_styles_system(
     mut query: Query<(
         Entity,
         &UiStyle,
