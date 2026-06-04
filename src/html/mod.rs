@@ -5,6 +5,8 @@ pub mod reload;
 
 pub use inventory;
 
+#[cfg(feature = "extended-framework")]
+use crate::framework::sync_ui_binding_store_values;
 use crate::html::bindings::HtmlEventBindingsPlugin;
 use crate::html::builder::HtmlBuilderSystem;
 use crate::html::converter::HtmlConverterSystem;
@@ -1050,6 +1052,8 @@ impl Plugin for ExtendedUiHtmlPlugin {
 
 fn sync_shared_values_system(world: &mut World) {
     refresh_shared_values(world);
+    #[cfg(feature = "extended-framework")]
+    sync_ui_binding_store_values(world);
 }
 
 /// Registers all HTML event handlers collected via `inventory`.

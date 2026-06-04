@@ -1770,6 +1770,11 @@ pub fn resolve_relative_asset_path(html_path: &str, href: &str) -> String {
         href = rest.to_string();
     }
 
+    let path = std::path::Path::new(&href);
+    if path.is_absolute() && (path.exists() || path.parent().is_some_and(std::path::Path::exists)) {
+        return href;
+    }
+
     if let Some(rest) = href.strip_prefix('/') {
         return rest.to_string();
     }
@@ -3105,6 +3110,7 @@ enum ExprToken {
     LBracket,
     RBracket,
     EqEq,
+    BangEq,
     AndAnd,
     OrOr,
     Bang,
@@ -3149,6 +3155,11 @@ fn tokenize_expression(expression: &str) -> Option<Vec<ExprToken>> {
 
         if ch == '!' {
             chars.next();
+            if chars.peek() == Some(&'=') {
+                chars.next();
+                tokens.push(ExprToken::BangEq);
+                continue;
+            }
             tokens.push(ExprToken::Bang);
             continue;
         }
@@ -3344,9 +3355,20 @@ impl<'a> ExpressionParser<'a> {
 
     fn parse_equality(&mut self) -> Option<JsonValue> {
         let mut left = self.parse_unary()?;
-        while self.consume(ExprToken::EqEq) {
-            let right = self.parse_unary()?;
-            left = JsonValue::Bool(json_values_equal(&left, &right));
+        loop {
+            if self.consume(ExprToken::EqEq) {
+                let right = self.parse_unary()?;
+                left = JsonValue::Bool(json_values_equal(&left, &right));
+                continue;
+            }
+
+            if self.consume(ExprToken::BangEq) {
+                let right = self.parse_unary()?;
+                left = JsonValue::Bool(!json_values_equal(&left, &right));
+                continue;
+            }
+
+            break;
         }
         Some(left)
     }

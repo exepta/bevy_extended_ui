@@ -8,7 +8,7 @@ use crate::html::{
 use crate::styles::{CssClass, CssID, CssSource};
 use crate::widgets::body::BodyContentRoot;
 use crate::widgets::div::DivContentRoot;
-use crate::widgets::{Body, UIWidgetState, Widget};
+use crate::widgets::{Body, ColorPicker, DatePicker, InputField, UIWidgetState, Widget};
 
 /// Plugin that spawns Bevy UI entities from parsed HTML node structures.
 pub struct HtmlBuilderSystem;
@@ -52,6 +52,7 @@ pub fn build_html_source(
     body_query: Query<(Entity, &Body, Option<&HtmlID>)>,
     children_query: Query<&Children>,
     html_id_query: Query<&HtmlID>,
+    html_id_entity_query: Query<(Entity, &HtmlID)>,
     body_content_root_query: Query<&BodyContentRoot>,
     div_content_root_query: Query<&DivContentRoot>,
 ) {
@@ -109,6 +110,7 @@ pub fn build_html_source(
                 &asset_server,
                 &children_query,
                 &html_id_query,
+                &html_id_entity_query,
                 &body_content_root_query,
                 &div_content_root_query,
             );
@@ -155,6 +157,7 @@ fn rebuild_structure_children_for_active(
     asset_server: &Res<AssetServer>,
     children_query: &Query<&Children>,
     html_id_query: &Query<&HtmlID>,
+    html_id_entity_query: &Query<(Entity, &HtmlID)>,
     body_content_root_query: &Query<&BodyContentRoot>,
     div_content_root_query: &Query<&DivContentRoot>,
 ) {
@@ -183,6 +186,7 @@ fn rebuild_structure_children_for_active(
         asset_server,
         children_query,
         html_id_query,
+        html_id_entity_query,
         body_content_root_query,
         div_content_root_query,
     );
@@ -195,6 +199,7 @@ fn reconcile_node_children(
     asset_server: &AssetServer,
     children_query: &Query<&Children>,
     html_id_query: &Query<&HtmlID>,
+    html_id_entity_query: &Query<(Entity, &HtmlID)>,
     body_content_root_query: &Query<&BodyContentRoot>,
     div_content_root_query: &Query<&DivContentRoot>,
 ) {
@@ -218,6 +223,7 @@ fn reconcile_node_children(
 
     for new_node in new_nodes {
         let node_id = get_node_id(new_node).0;
+        let relocated_node = is_relocated_widget_node(new_node);
         if let Some(existing_entity) = existing_by_id.remove(&node_id) {
             update_existing_widget_node(commands, existing_entity, new_node, false);
 
@@ -234,12 +240,31 @@ fn reconcile_node_children(
                     asset_server,
                     children_query,
                     html_id_query,
+                    html_id_entity_query,
                     body_content_root_query,
                     div_content_root_query,
                 );
             }
 
             final_children.push(existing_entity);
+        } else if relocated_node {
+            if let Some(existing_entity) = find_entity_by_html_id(html_id_entity_query, node_id) {
+                update_existing_widget_node(commands, existing_entity, new_node, false);
+                update_relocated_node_descendants(
+                    commands,
+                    new_node,
+                    asset_server,
+                    children_query,
+                    html_id_query,
+                    html_id_entity_query,
+                    body_content_root_query,
+                    div_content_root_query,
+                );
+                continue;
+            }
+
+            let spawned = spawn_widget_node(commands, new_node, asset_server, Some(parent), false);
+            final_children.push(spawned);
         } else {
             let spawned = spawn_widget_node(commands, new_node, asset_server, Some(parent), false);
             final_children.push(spawned);
@@ -254,6 +279,79 @@ fn reconcile_node_children(
     if final_children != existing_children {
         commands.entity(parent).replace_children(&final_children);
     }
+}
+
+fn find_entity_by_html_id(
+    html_id_entity_query: &Query<(Entity, &HtmlID)>,
+    id: usize,
+) -> Option<Entity> {
+    html_id_entity_query
+        .iter()
+        .find_map(|(entity, html_id)| (html_id.0 == id).then_some(entity))
+}
+
+fn update_relocated_node_descendants(
+    commands: &mut Commands,
+    node: &HtmlWidgetNode,
+    asset_server: &AssetServer,
+    children_query: &Query<&Children>,
+    html_id_query: &Query<&HtmlID>,
+    html_id_entity_query: &Query<(Entity, &HtmlID)>,
+    body_content_root_query: &Query<&BodyContentRoot>,
+    div_content_root_query: &Query<&DivContentRoot>,
+) {
+    let Some(children) = get_node_children(node) else {
+        return;
+    };
+
+    for child in children {
+        let child_id = get_node_id(child).0;
+        let Some(existing_child) = find_entity_by_html_id(html_id_entity_query, child_id) else {
+            continue;
+        };
+
+        update_existing_widget_node(commands, existing_child, child, false);
+
+        if get_node_children(child).is_some() {
+            let nested_parent = resolve_content_parent(
+                existing_child,
+                body_content_root_query,
+                div_content_root_query,
+            );
+            reconcile_node_children(
+                commands,
+                nested_parent,
+                get_node_children(child).unwrap(),
+                asset_server,
+                children_query,
+                html_id_query,
+                html_id_entity_query,
+                body_content_root_query,
+                div_content_root_query,
+            );
+        }
+    }
+}
+
+fn is_bound_date_picker_node(node: &HtmlWidgetNode) -> bool {
+    matches!(
+        node,
+        HtmlWidgetNode::DatePicker(date_picker, _, _, _, _, _)
+            if date_picker.for_id.is_some()
+    )
+}
+
+fn is_relocated_widget_node(node: &HtmlWidgetNode) -> bool {
+    if is_bound_date_picker_node(node) {
+        return true;
+    }
+
+    #[cfg(feature = "extended-dialog")]
+    if matches!(node, HtmlWidgetNode::Dialog(_, _, _, _, _, _, _)) {
+        return true;
+    }
+
+    false
 }
 
 fn resolve_content_parent(
@@ -337,7 +435,7 @@ fn update_existing_widget_node(
             );
         }
         HtmlWidgetNode::ColorPicker(color_picker, meta, states, functions, widget, id) => {
-            update_with_meta(
+            update_color_picker_with_meta(
                 commands,
                 entity,
                 color_picker.clone(),
@@ -363,7 +461,7 @@ fn update_existing_widget_node(
             );
         }
         HtmlWidgetNode::DatePicker(date_picker, meta, states, functions, widget, id) => {
-            update_with_meta(
+            update_date_picker_with_meta(
                 commands,
                 entity,
                 date_picker.clone(),
@@ -403,7 +501,7 @@ fn update_existing_widget_node(
         }
         #[cfg(feature = "extended-dialog")]
         HtmlWidgetNode::Dialog(dialog, meta, states, _, functions, widget, id) => {
-            update_with_meta(
+            update_dialog_with_meta(
                 commands,
                 entity,
                 dialog.clone(),
@@ -481,7 +579,7 @@ fn update_existing_widget_node(
             );
         }
         HtmlWidgetNode::Input(input, meta, states, functions, widget, id) => {
-            update_with_meta(
+            update_input_with_meta(
                 commands,
                 entity,
                 input.clone(),
@@ -639,6 +737,202 @@ fn update_with_meta<T: Component>(
 ) {
     commands.entity(entity).insert((
         component,
+        functions.clone(),
+        widget.clone(),
+        id.clone(),
+        meta.inner_content.clone(),
+        CssSource(meta.css.clone()),
+        CssClass(meta.class.clone().unwrap_or_default()),
+        CssID(meta.id.clone().unwrap_or_default()),
+        if start_hidden || states.hidden {
+            Visibility::Hidden
+        } else {
+            Visibility::Inherited
+        },
+    ));
+
+    if let Some(inline_style) = &meta.style {
+        commands.entity(entity).insert(inline_style.clone());
+    } else {
+        commands.entity(entity).remove::<crate::html::HtmlStyle>();
+    }
+
+    if let Some(validation) = &meta.validation {
+        commands.entity(entity).insert(validation.clone());
+    } else {
+        commands
+            .entity(entity)
+            .remove::<crate::widgets::ValidationRules>();
+    }
+
+    if states.hidden {
+        commands.entity(entity).insert(NeedHidden);
+    } else {
+        commands.entity(entity).remove::<NeedHidden>();
+    }
+}
+
+fn update_input_with_meta(
+    commands: &mut Commands,
+    entity: Entity,
+    component: InputField,
+    meta: &HtmlMeta,
+    states: &HtmlStates,
+    functions: &HtmlEventBindings,
+    widget: &Widget,
+    id: &HtmlID,
+    start_hidden: bool,
+) {
+    update_meta_components(
+        commands,
+        entity,
+        meta,
+        states,
+        functions,
+        widget,
+        id,
+        start_hidden,
+    );
+
+    commands.queue(move |world: &mut World| {
+        let mut next = component;
+        if let Some(mut existing) = world.get_mut::<InputField>(entity) {
+            next.entry = existing.entry;
+            next.cursor_position = existing.cursor_position.min(next.text.len());
+            if *existing != next {
+                *existing = next;
+            }
+        } else if let Ok(mut entity_mut) = world.get_entity_mut(entity) {
+            entity_mut.insert(next);
+        }
+    });
+}
+
+fn update_date_picker_with_meta(
+    commands: &mut Commands,
+    entity: Entity,
+    component: DatePicker,
+    meta: &HtmlMeta,
+    states: &HtmlStates,
+    functions: &HtmlEventBindings,
+    widget: &Widget,
+    id: &HtmlID,
+    start_hidden: bool,
+) {
+    update_meta_components(
+        commands,
+        entity,
+        meta,
+        states,
+        functions,
+        widget,
+        id,
+        start_hidden,
+    );
+
+    commands.queue(move |world: &mut World| {
+        let mut next = component;
+        if let Some(mut existing) = world.get_mut::<DatePicker>(entity) {
+            next.entry = existing.entry;
+            if *existing != next {
+                *existing = next;
+            }
+        } else if let Ok(mut entity_mut) = world.get_entity_mut(entity) {
+            entity_mut.insert(next);
+        }
+    });
+}
+
+#[cfg(feature = "extended-dialog")]
+fn update_dialog_with_meta(
+    commands: &mut Commands,
+    entity: Entity,
+    component: crate::dialog::DialogWidget,
+    meta: &HtmlMeta,
+    states: &HtmlStates,
+    functions: &HtmlEventBindings,
+    widget: &Widget,
+    id: &HtmlID,
+    _start_hidden: bool,
+) {
+    update_meta_components(commands, entity, meta, states, functions, widget, id, true);
+    crate::dialog::apply_dialog_widget_overlay_components(commands, entity, meta.style.as_ref());
+    commands.entity(entity).insert(NeedHidden);
+
+    commands.queue(move |world: &mut World| {
+        let mut next = component;
+        if let Some(mut existing) = world.get_mut::<crate::dialog::DialogWidget>(entity) {
+            next.open = existing.open;
+            if *existing != next {
+                *existing = next;
+            }
+        } else if let Ok(mut entity_mut) = world.get_entity_mut(entity) {
+            entity_mut.insert(next);
+        }
+
+        let visibility = world
+            .get::<crate::dialog::DialogWidget>(entity)
+            .map(|dialog| {
+                if dialog.renderer == crate::dialog::DialogProvider::BevyApp && dialog.open {
+                    Visibility::Inherited
+                } else {
+                    Visibility::Hidden
+                }
+            })
+            .unwrap_or(Visibility::Hidden);
+
+        if let Ok(mut entity_mut) = world.get_entity_mut(entity) {
+            entity_mut.insert(visibility);
+        }
+    });
+}
+
+fn update_color_picker_with_meta(
+    commands: &mut Commands,
+    entity: Entity,
+    component: ColorPicker,
+    meta: &HtmlMeta,
+    states: &HtmlStates,
+    functions: &HtmlEventBindings,
+    widget: &Widget,
+    id: &HtmlID,
+    start_hidden: bool,
+) {
+    update_meta_components(
+        commands,
+        entity,
+        meta,
+        states,
+        functions,
+        widget,
+        id,
+        start_hidden,
+    );
+
+    commands.queue(move |world: &mut World| {
+        let mut next = component;
+        if let Some(mut existing) = world.get_mut::<ColorPicker>(entity) {
+            next.entry = existing.entry;
+            if *existing != next {
+                *existing = next;
+            }
+        } else if let Ok(mut entity_mut) = world.get_entity_mut(entity) {
+            entity_mut.insert(next);
+        }
+    });
+}
+
+fn update_meta_components(
+    commands: &mut Commands,
+    entity: Entity,
+    meta: &HtmlMeta,
+    states: &HtmlStates,
+    functions: &HtmlEventBindings,
+    widget: &Widget,
+    id: &HtmlID,
+    start_hidden: bool,
+) {
+    commands.entity(entity).insert((
         functions.clone(),
         widget.clone(),
         id.clone(),
@@ -938,8 +1232,9 @@ fn spawn_widget_node(
                 functions,
                 widget,
                 id,
-                start_hidden,
+                true,
             );
+            commands.entity(entity).insert(NeedHidden);
             for child in children {
                 spawn_widget_node(commands, child, asset_server, Some(entity), start_hidden);
             }

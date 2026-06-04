@@ -1,8 +1,8 @@
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
 use syn::{
-    FnArg, GenericArgument, Item, ItemEnum, ItemFn, ItemStruct, ItemUse, LitStr, PathArguments,
-    Result, Type, TypePath, UseTree,
+    Data, DeriveInput, FnArg, GenericArgument, Item, ItemEnum, ItemFn, ItemStruct, ItemUse, LitStr,
+    PathArguments, Result, Type, TypePath, UseTree,
     parse::{Parse, ParseStream},
     parse_macro_input,
     token::Eq,
@@ -284,6 +284,63 @@ pub fn ui_component(_attr: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn beu_registry(_attr: TokenStream, item: TokenStream) -> TokenStream {
     item
+}
+
+/// Derives a reactive UI binding store registration for a struct or enum.
+#[proc_macro_derive(BeuStore)]
+pub fn derive_beu_store(item: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(item as DeriveInput);
+
+    match expand_beu_store(input) {
+        Ok(tokens) => tokens.into(),
+        Err(err) => err.to_compile_error().into(),
+    }
+}
+
+fn expand_beu_store(input: DeriveInput) -> Result<proc_macro2::TokenStream> {
+    match &input.data {
+        Data::Struct(_) | Data::Enum(_) => {}
+        Data::Union(_) => {
+            return Err(syn::Error::new_spanned(
+                &input.ident,
+                "BeuStore can only be derived for structs and enums",
+            ));
+        }
+    }
+
+    if !input.generics.params.is_empty() {
+        return Err(syn::Error::new_spanned(
+            &input.ident,
+            "BeuStore currently does not support generic structs or enums",
+        ));
+    }
+
+    let ident = input.ident;
+    let register_ident = format_ident!("__beu_store_register_{}", ident);
+
+    Ok(quote! {
+        impl bevy_extended_ui::framework::BeuStore for #ident {
+            const STORE_KEY: &'static str = stringify!(#ident);
+            const STORE_PATH: &'static str = concat!(module_path!(), "::", stringify!(#ident));
+        }
+
+        #[doc(hidden)]
+        #[allow(non_snake_case)]
+        fn #register_ident(store: &mut bevy_extended_ui::framework::UiBindingStore) {
+            store.register::<#ident>();
+            if store.get_store::<#ident>().is_none() {
+                store.set_store(<#ident as Default>::default());
+            }
+        }
+
+        bevy_extended_ui::framework::inventory::submit! {
+            bevy_extended_ui::framework::UiBindingStoreRegistration {
+                key: stringify!(#ident),
+                path: concat!(module_path!(), "::", stringify!(#ident)),
+                register: #register_ident,
+            }
+        }
+    })
 }
 
 /// Registers a typed item as shared template state (`@use "Type" as alias;`).
