@@ -11,6 +11,23 @@
     <label for="player-name">Player Name</label>
     <input id="player-name" type="text" value="{{ player.name }}" onchange="set_name">
 
+    <div class="dialog-demo">
+        <h4>Player Dialogs</h4>
+        <button id="open-player-bevy-dialog">Open Bevy Dialog</button>
+        <button id="open-player-system-dialog">Open System Dialog</button>
+
+        <dialog trigger="open-player-bevy-dialog" renderer="bevy-app" type="info">
+            <div class="dialog-demo-content">
+                <h4>Player</h4>
+                <p>Player name: {{ player.name }}</p>
+            </div>
+        </dialog>
+
+        <dialog trigger="open-player-system-dialog" renderer="system" type="info">
+            Player name: {{ player.name }}
+        </dialog>
+    </div>
+
     <label for="slider-val">Player Name</label>
     <input id="slider-val" type="number" value="{{ info.value }}" onchange="set_value">
     <progressbar value="{{ info.value }}" min="0" max="100"></progressbar>
@@ -20,6 +37,25 @@
         <colorpicker id="info-color" value="{{ info.color }}" onchange="set_info_color"></colorpicker>
         <div class="color-preview" style="background-color: {{ info.color }};"></div>
         <p>Selected color: {{ info.color }}</p>
+    </div>
+
+    <div class="range-slider-demo">
+        <h4>Reactive Range Slider</h4>
+        <slider
+            id="info-range-slider"
+            type="range"
+            min="0"
+            max="100"
+            step="5"
+            value="{{ info.range_value }}"
+            dots="5"
+            show-labels="true"
+            dot-anchor="bottom"
+            onchange="set_info_range"
+        ></slider>
+        <badge for="#info-range-slider" value="{{ info.range_size }}" max="99" anchor="top right"></badge>
+        <p>Selected range: {{ info.range_value }}</p>
+        <p>Selected span: {{ info.range_size }}</p>
     </div>
 
     @if(player.state && data_state == DataState::Inactive) {

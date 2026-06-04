@@ -90,6 +90,8 @@ pub struct Info {
     pub see_mee: String,
     pub value: f32,
     pub color: String,
+    pub range_value: String,
+    pub range_size: u32,
     pub image_file: String,
     pub date: String,
     pub date_range: String,
@@ -117,6 +119,8 @@ impl Default for Info {
             see_mee: "See mee!".to_string(),
             value: 10.0,
             color: "#4285F4".to_string(),
+            range_value: "20 - 60".to_string(),
+            range_size: 40,
             image_file: String::new(),
             date: "01.01.2022".to_string(),
             date_range: "01.01.2022 - 04.06.2026".to_string(),
@@ -152,6 +156,25 @@ pub fn on_slider_change(
 
     let mut info = store.get_store::<Info>().cloned().unwrap_or_default();
     info.value = slider.value;
+    store.set_store(info);
+}
+
+#[html_fn("set_info_range")]
+pub fn set_info_range(
+    In(event): In<HtmlChange>,
+    mut store: ResMut<UiBindingStore>,
+    sliders: Query<&Slider>,
+) {
+    let Ok(slider) = sliders.get(event.entity) else {
+        return;
+    };
+
+    let range_start = slider.range_start.round() as u32;
+    let range_end = slider.range_end.round() as u32;
+
+    let mut info = store.get_store::<Info>().cloned().unwrap_or_default();
+    info.range_value = format!("{} - {}", range_start, range_end);
+    info.range_size = range_end.saturating_sub(range_start);
     store.set_store(info);
 }
 

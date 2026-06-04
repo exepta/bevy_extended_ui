@@ -8,7 +8,10 @@ publish = false
 
 [features]
 default = []
-extended-framework = ["bevy_extended_ui/extended-framework"]
+extended-framework = [
+    "bevy_extended_ui/extended-dialog",
+    "bevy_extended_ui/extended-framework",
+]
 
 [dependencies]
 bevy = "0.18.1"

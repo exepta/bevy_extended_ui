@@ -223,7 +223,7 @@ fn reconcile_node_children(
 
     for new_node in new_nodes {
         let node_id = get_node_id(new_node).0;
-        let bound_date_picker = is_bound_date_picker_node(new_node);
+        let relocated_node = is_relocated_widget_node(new_node);
         if let Some(existing_entity) = existing_by_id.remove(&node_id) {
             update_existing_widget_node(commands, existing_entity, new_node, false);
 
@@ -247,9 +247,19 @@ fn reconcile_node_children(
             }
 
             final_children.push(existing_entity);
-        } else if bound_date_picker {
+        } else if relocated_node {
             if let Some(existing_entity) = find_entity_by_html_id(html_id_entity_query, node_id) {
                 update_existing_widget_node(commands, existing_entity, new_node, false);
+                update_relocated_node_descendants(
+                    commands,
+                    new_node,
+                    asset_server,
+                    children_query,
+                    html_id_query,
+                    html_id_entity_query,
+                    body_content_root_query,
+                    div_content_root_query,
+                );
                 continue;
             }
 
@@ -280,12 +290,68 @@ fn find_entity_by_html_id(
         .find_map(|(entity, html_id)| (html_id.0 == id).then_some(entity))
 }
 
+fn update_relocated_node_descendants(
+    commands: &mut Commands,
+    node: &HtmlWidgetNode,
+    asset_server: &AssetServer,
+    children_query: &Query<&Children>,
+    html_id_query: &Query<&HtmlID>,
+    html_id_entity_query: &Query<(Entity, &HtmlID)>,
+    body_content_root_query: &Query<&BodyContentRoot>,
+    div_content_root_query: &Query<&DivContentRoot>,
+) {
+    let Some(children) = get_node_children(node) else {
+        return;
+    };
+
+    for child in children {
+        let child_id = get_node_id(child).0;
+        let Some(existing_child) = find_entity_by_html_id(html_id_entity_query, child_id) else {
+            continue;
+        };
+
+        update_existing_widget_node(commands, existing_child, child, false);
+
+        if get_node_children(child).is_some() {
+            let nested_parent = resolve_content_parent(
+                existing_child,
+                body_content_root_query,
+                div_content_root_query,
+            );
+            reconcile_node_children(
+                commands,
+                nested_parent,
+                get_node_children(child).unwrap(),
+                asset_server,
+                children_query,
+                html_id_query,
+                html_id_entity_query,
+                body_content_root_query,
+                div_content_root_query,
+            );
+        }
+    }
+}
+
 fn is_bound_date_picker_node(node: &HtmlWidgetNode) -> bool {
     matches!(
         node,
         HtmlWidgetNode::DatePicker(date_picker, _, _, _, _, _)
             if date_picker.for_id.is_some()
     )
+}
+
+fn is_relocated_widget_node(node: &HtmlWidgetNode) -> bool {
+    if is_bound_date_picker_node(node) {
+        return true;
+    }
+
+    #[cfg(feature = "extended-dialog")]
+    if matches!(node, HtmlWidgetNode::Dialog(_, _, _, _, _, _, _)) {
+        return true;
+    }
+
+    false
 }
 
 fn resolve_content_parent(
@@ -435,7 +501,7 @@ fn update_existing_widget_node(
         }
         #[cfg(feature = "extended-dialog")]
         HtmlWidgetNode::Dialog(dialog, meta, states, _, functions, widget, id) => {
-            update_with_meta(
+            update_dialog_with_meta(
                 commands,
                 entity,
                 dialog.clone(),
@@ -773,6 +839,50 @@ fn update_date_picker_with_meta(
             }
         } else if let Ok(mut entity_mut) = world.get_entity_mut(entity) {
             entity_mut.insert(next);
+        }
+    });
+}
+
+#[cfg(feature = "extended-dialog")]
+fn update_dialog_with_meta(
+    commands: &mut Commands,
+    entity: Entity,
+    component: crate::dialog::DialogWidget,
+    meta: &HtmlMeta,
+    states: &HtmlStates,
+    functions: &HtmlEventBindings,
+    widget: &Widget,
+    id: &HtmlID,
+    _start_hidden: bool,
+) {
+    update_meta_components(commands, entity, meta, states, functions, widget, id, true);
+    crate::dialog::apply_dialog_widget_overlay_components(commands, entity, meta.style.as_ref());
+    commands.entity(entity).insert(NeedHidden);
+
+    commands.queue(move |world: &mut World| {
+        let mut next = component;
+        if let Some(mut existing) = world.get_mut::<crate::dialog::DialogWidget>(entity) {
+            next.open = existing.open;
+            if *existing != next {
+                *existing = next;
+            }
+        } else if let Ok(mut entity_mut) = world.get_entity_mut(entity) {
+            entity_mut.insert(next);
+        }
+
+        let visibility = world
+            .get::<crate::dialog::DialogWidget>(entity)
+            .map(|dialog| {
+                if dialog.renderer == crate::dialog::DialogProvider::BevyApp && dialog.open {
+                    Visibility::Inherited
+                } else {
+                    Visibility::Hidden
+                }
+            })
+            .unwrap_or(Visibility::Hidden);
+
+        if let Ok(mut entity_mut) = world.get_entity_mut(entity) {
+            entity_mut.insert(visibility);
         }
     });
 }
@@ -1122,8 +1232,9 @@ fn spawn_widget_node(
                 functions,
                 widget,
                 id,
-                start_hidden,
+                true,
             );
+            commands.entity(entity).insert(NeedHidden);
             for child in children {
                 spawn_widget_node(commands, child, asset_server, Some(entity), start_hidden);
             }
