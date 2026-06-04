@@ -8,7 +8,7 @@ use crate::html::{
 use crate::styles::{CssClass, CssID, CssSource};
 use crate::widgets::body::BodyContentRoot;
 use crate::widgets::div::DivContentRoot;
-use crate::widgets::{Body, DatePicker, InputField, UIWidgetState, Widget};
+use crate::widgets::{Body, ColorPicker, DatePicker, InputField, UIWidgetState, Widget};
 
 /// Plugin that spawns Bevy UI entities from parsed HTML node structures.
 pub struct HtmlBuilderSystem;
@@ -369,7 +369,7 @@ fn update_existing_widget_node(
             );
         }
         HtmlWidgetNode::ColorPicker(color_picker, meta, states, functions, widget, id) => {
-            update_with_meta(
+            update_color_picker_with_meta(
                 commands,
                 entity,
                 color_picker.clone(),
@@ -767,6 +767,41 @@ fn update_date_picker_with_meta(
     commands.queue(move |world: &mut World| {
         let mut next = component;
         if let Some(mut existing) = world.get_mut::<DatePicker>(entity) {
+            next.entry = existing.entry;
+            if *existing != next {
+                *existing = next;
+            }
+        } else if let Ok(mut entity_mut) = world.get_entity_mut(entity) {
+            entity_mut.insert(next);
+        }
+    });
+}
+
+fn update_color_picker_with_meta(
+    commands: &mut Commands,
+    entity: Entity,
+    component: ColorPicker,
+    meta: &HtmlMeta,
+    states: &HtmlStates,
+    functions: &HtmlEventBindings,
+    widget: &Widget,
+    id: &HtmlID,
+    start_hidden: bool,
+) {
+    update_meta_components(
+        commands,
+        entity,
+        meta,
+        states,
+        functions,
+        widget,
+        id,
+        start_hidden,
+    );
+
+    commands.queue(move |world: &mut World| {
+        let mut next = component;
+        if let Some(mut existing) = world.get_mut::<ColorPicker>(entity) {
             next.entry = existing.entry;
             if *existing != next {
                 *existing = next;

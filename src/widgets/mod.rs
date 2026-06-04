@@ -1675,7 +1675,7 @@ impl Default for Slider {
 // ===============================================
 
 /// Color picker widget with HSV interaction and RGB/RGBA/HEX output values.
-#[derive(Component, Reflect, Debug, Clone)]
+#[derive(Component, Reflect, Debug, Clone, PartialEq)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, Widget)]
 pub struct ColorPicker {

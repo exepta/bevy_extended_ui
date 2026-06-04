@@ -1,12 +1,13 @@
 use crate::CurrentWidgetState;
 use crate::html::*;
+use crate::widgets::controls::color_picker::ColorPickerUserChanged;
 use crate::widgets::controls::input::InputUserChanged;
 use crate::widgets::controls::slider::SliderUserChanged;
 use crate::widgets::{
-    BindToID, Button, ButtonType, CheckBox, ChoiceBox, ColorPicker, DatePicker,
-    FieldSelectionMulti, FieldSelectionSingle, Form, FormValidationMode, InputField, InputValue,
-    ListBox, RadioButton, Scrollbar, SwitchButton, ToggleButton, UIGenID, UIWidgetState,
-    ValidationRules, evaluate_validation_state,
+    BindToID, Button, ButtonType, CheckBox, ChoiceBox, DatePicker, FieldSelectionMulti,
+    FieldSelectionSingle, Form, FormValidationMode, InputField, InputValue, ListBox, RadioButton,
+    Scrollbar, SwitchButton, ToggleButton, UIGenID, UIWidgetState, ValidationRules,
+    evaluate_validation_state,
 };
 use bevy::log::warn;
 use bevy::prelude::*;
@@ -776,10 +777,11 @@ pub(crate) fn emit_slider_change(
 /// Emits change events for color picker widgets.
 pub(crate) fn emit_color_picker_change(
     mut commands: Commands,
-    query: Query<(Entity, &HtmlEventBindings), Changed<ColorPicker>>,
+    query: Query<(Entity, &HtmlEventBindings), With<ColorPickerUserChanged>>,
 ) {
     for (entity, binding) in &query {
         emit_change_if_bound(&mut commands, binding, entity, HtmlChangeAction::State);
+        commands.entity(entity).remove::<ColorPickerUserChanged>();
     }
 }
 

@@ -34,3 +34,35 @@ img {
   border: 1px solid #6f7086;
   border-radius: 8px;
 }
+
+.color-demo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #6f7086;
+  border-radius: 8px;
+}
+
+.color-preview {
+  width: 160px;
+  height: 72px;
+  border: 2px solid #d8dbed;
+  border-radius: 10px;
+}
+
+.data-fieldsets {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #6f7086;
+  border-radius: 8px;
+}
+
+.data-fieldsets > fieldset {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px;
+}

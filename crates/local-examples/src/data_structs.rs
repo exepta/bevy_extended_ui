@@ -12,6 +12,7 @@ use serde::Serialize;
 #[derive(BeuStore, PartialEq, Clone, Debug, Serialize)]
 pub struct DataPack {
     pub version: String,
+    pub available_data: Vec<u8>,
     pub data: Vec<u8>,
     pub used: bool,
     pub state: DataState,
@@ -21,6 +22,7 @@ impl Default for DataPack {
     fn default() -> Self {
         Self {
             version: "1.0.0".to_string(),
+            available_data: vec![0, 1, 2, 4, 8, 16, 18, 22, 29],
             data: vec![0, 2, 1, 4, 18, 22, 29],
             used: false,
             state: DataState::Inactive,

@@ -3,7 +3,10 @@ use bevy::prelude::*;
 use bevy_extended_ui::BeuStore;
 use bevy_extended_ui::framework::UiBindingStore;
 use bevy_extended_ui::html::{HtmlChange, HtmlClick, HtmlInit};
-use bevy_extended_ui::widgets::{InputField, InputValue, Slider};
+use bevy_extended_ui::widgets::{
+    ColorPicker, FieldSelectionMulti, FieldSelectionSingle, InputField, InputValue, RadioButton,
+    Slider, ToggleButton,
+};
 use bevy_extended_ui_macros::*;
 use serde::Serialize;
 
@@ -70,6 +73,7 @@ pub struct Info {
     pub display: String,
     pub see_mee: String,
     pub value: f32,
+    pub color: String,
     pub image_file: String,
     pub date: String,
     pub date_range: String,
@@ -96,6 +100,7 @@ impl Default for Info {
             display: "Hello World!".to_string(),
             see_mee: "See mee!".to_string(),
             value: 10.0,
+            color: "#4285F4".to_string(),
             image_file: String::new(),
             date: "01.01.2022".to_string(),
             date_range: "01.01.2022 - 04.06.2026".to_string(),
@@ -164,6 +169,21 @@ pub fn set_value(
     store.set_store(info);
 }
 
+#[html_fn("set_info_color")]
+pub fn set_info_color(
+    In(event): In<HtmlChange>,
+    mut store: ResMut<UiBindingStore>,
+    color_pickers: Query<&ColorPicker>,
+) {
+    let Ok(color_picker) = color_pickers.get(event.entity) else {
+        return;
+    };
+
+    let mut info = store.get_store::<Info>().cloned().unwrap_or_default();
+    info.color = color_picker.hex();
+    store.set_store(info);
+}
+
 #[html_fn("set_image_file")]
 pub fn set_image_file(
     In(event): In<HtmlChange>,
@@ -208,6 +228,77 @@ pub fn set_info_date_range(
     info.date_range = input.text.clone();
     info.dates_in_range = filter_dates_by_range(&info.dates, &info.date_range);
     store.set_store(info);
+}
+
+#[html_fn("set_data_pack_selection")]
+pub fn set_data_pack_selection(
+    In(event): In<HtmlChange>,
+    mut store: ResMut<UiBindingStore>,
+    mut data_pack_resource: Option<ResMut<DataPack>>,
+    selections: Query<&FieldSelectionMulti>,
+    toggles: Query<&ToggleButton>,
+) {
+    let Ok(selection) = selections.get(event.entity) else {
+        return;
+    };
+
+    let mut selected_data = selection
+        .0
+        .iter()
+        .filter_map(|entity| toggles.get(*entity).ok())
+        .filter_map(|toggle| toggle.value.as_str())
+        .filter_map(|value| value.parse::<u8>().ok())
+        .collect::<Vec<_>>();
+    selected_data.sort_unstable();
+    selected_data.dedup();
+
+    let mut data_pack = store.get_store::<DataPack>().cloned().unwrap_or_default();
+    data_pack.data = selected_data;
+    data_pack.used = !data_pack.data.is_empty();
+
+    if let Some(resource) = data_pack_resource.as_mut() {
+        **resource = data_pack.clone();
+    }
+    store.set_store(data_pack);
+}
+
+#[html_fn("set_data_state")]
+pub fn set_data_state(
+    In(event): In<HtmlChange>,
+    mut store: ResMut<UiBindingStore>,
+    mut data_state_resource: Option<ResMut<DataState>>,
+    mut data_pack_resource: Option<ResMut<DataPack>>,
+    selections: Query<&FieldSelectionSingle>,
+    radios: Query<&RadioButton>,
+) {
+    let Ok(selection) = selections.get(event.entity) else {
+        return;
+    };
+    let Some(radio_entity) = selection.0 else {
+        return;
+    };
+    let Ok(radio) = radios.get(radio_entity) else {
+        return;
+    };
+
+    let next_state = match radio.value_as_str() {
+        Some("Active") => DataState::Active,
+        Some("Inactive") => DataState::Inactive,
+        _ => return,
+    };
+
+    if let Some(resource) = data_state_resource.as_mut() {
+        **resource = next_state.clone();
+    }
+
+    let mut data_pack = store.get_store::<DataPack>().cloned().unwrap_or_default();
+    data_pack.state = next_state.clone();
+    if let Some(resource) = data_pack_resource.as_mut() {
+        resource.state = next_state.clone();
+    }
+
+    store.set_store(next_state);
+    store.set_store(data_pack);
 }
 
 fn filter_dates_by_range(dates: &[String], range: &str) -> Vec<String> {
