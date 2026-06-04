@@ -51,6 +51,15 @@ img {
   border-radius: 10px;
 }
 
+.player-list-demo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #6f7086;
+  border-radius: 8px;
+}
+
 .data-fieldsets {
   display: flex;
   flex-direction: column;

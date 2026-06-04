@@ -5,7 +5,7 @@ use bevy_extended_ui::framework::UiBindingStore;
 use bevy_extended_ui::html::{HtmlChange, HtmlClick, HtmlInit};
 use bevy_extended_ui::widgets::{
     ColorPicker, FieldSelectionMulti, FieldSelectionSingle, InputField, InputValue, RadioButton,
-    Slider, ToggleButton,
+    ListBox, Slider, ToggleButton,
 };
 use bevy_extended_ui_macros::*;
 use serde::Serialize;
@@ -49,6 +49,9 @@ pub struct Player {
     pub state: bool,
     /// The name of the player.
     pub name: String,
+    /// All entries available in the list box.
+    pub available_list: Vec<String>,
+    /// Selected entries from the list box.
     pub list: Vec<String>,
 }
 
@@ -57,7 +60,20 @@ impl Default for Player {
         Self {
             state: false,
             name: "John".to_string(),
-            list: vec!["Alice".to_string(), "Bob".to_string()],
+            available_list: vec![
+                "Alice".to_string(),
+                "Bob".to_string(),
+                "Charlie".to_string(),
+                "Dave".to_string(),
+                "Eve".to_string(),
+                "Mallory".to_string(),
+            ],
+            list: vec![
+                "Alice".to_string(),
+                "Bob".to_string(),
+                "Charlie".to_string(),
+                "Dave".to_string(),
+            ],
         }
     }
 }
@@ -151,6 +167,33 @@ pub fn set_name(
 
     let mut player = store.get_store::<Player>().cloned().unwrap_or_default();
     player.name = input.text.clone();
+    store.set_store(player);
+}
+
+#[html_fn("set_player_list")]
+pub fn set_player_list(
+    In(event): In<HtmlChange>,
+    mut store: ResMut<UiBindingStore>,
+    list_boxes: Query<&ListBox>,
+) {
+    let Ok(list_box) = list_boxes.get(event.entity) else {
+        return;
+    };
+
+    let selected_values = list_box
+        .values
+        .iter()
+        .filter_map(|option| option.value_as_str())
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+
+    let mut player = store.get_store::<Player>().cloned().unwrap_or_default();
+    player.list = player
+        .available_list
+        .iter()
+        .filter(|entry| selected_values.contains(entry))
+        .cloned()
+        .collect();
     store.set_store(player);
 }
 

@@ -13,6 +13,7 @@
 
     <label for="slider-val">Player Name</label>
     <input id="slider-val" type="number" value="{{ info.value }}" onchange="set_value">
+    <progressbar value="{{ info.value }}" min="0" max="100"></progressbar>
 
     <div class="color-demo">
         <h4>Reactive Color Picker</h4>
@@ -27,11 +28,23 @@
     <slider value="{{ info.value }}" onchange="on_slider_change"></slider>
     }
     <h4>{{ info.display }}</h4>
-    <p>Store entries are rendered from UiBindingStore:</p>
 
-    @for (entry, index in player.list) {
-    <p>Entry: {{ entry }}</p>
-    }
+    <div class="player-list-demo">
+        <h4>Player ListBox</h4>
+        <listbox id="player-list-box" multiselect onchange="set_player_list">
+            @for (entry, index in player.available_list) {
+                @if(player.list.contains(entry)) {
+                    <option value="{{ entry }}" selected>{{ entry }}</option>
+                } @else {
+                    <option value="{{ entry }}">{{ entry }}</option>
+                }
+            }
+        </listbox>
+        <p>Selected player entries:</p>
+        @for (entry, index in player.list) {
+            <p>Selected Entry {{ index }}: {{ entry }}</p>
+        }
+    </div>
 
     <div class="data-fieldsets">
         <h4>Data Pack Multi Selection</h4>
