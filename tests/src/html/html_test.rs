@@ -419,6 +419,18 @@ mod tests {
             ),
             "../styles/a.css"
         );
+
+        let absolute_path = std::env::temp_dir().join("bevy_extended_ui_absolute_preview.png");
+        std::fs::write(
+            &absolute_path,
+            b"not an image, only used for path resolution",
+        )
+        .expect("failed to create temporary path resolution file");
+        let absolute_path = absolute_path.to_string_lossy().replace('\\', "/");
+        assert_eq!(
+            converter::resolve_relative_asset_path("examples/test.html", &absolute_path),
+            absolute_path
+        );
     }
 
     #[test]

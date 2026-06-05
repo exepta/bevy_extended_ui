@@ -5,6 +5,8 @@ pub mod reload;
 
 pub use inventory;
 
+#[cfg(feature = "extended-framework")]
+use crate::framework::sync_ui_binding_store_values;
 use crate::html::bindings::HtmlEventBindingsPlugin;
 use crate::html::builder::HtmlBuilderSystem;
 use crate::html::converter::HtmlConverterSystem;
@@ -107,6 +109,10 @@ pub struct HtmlChangeEvent;
 /// does NOT reliably trigger `resource_changed::<HtmlStructureMap>()`.
 #[derive(Resource, Default)]
 pub struct HtmlDirty(pub bool, pub HashSet<String>);
+
+/// Tracks HTML keys that must stay hidden until CSS and styles are ready.
+#[derive(Resource, Default)]
+pub struct HtmlPendingReveal(pub HashSet<String>);
 
 /// Component storing parsed inline CSS (`style="..."`) as your custom Style struct.
 /// Component storing parsed inline CSS (`style="..."`) as a `Style`.
@@ -1014,6 +1020,7 @@ impl Plugin for ExtendedUiHtmlPlugin {
         app.init_resource::<HtmlStructureMap>();
         app.init_resource::<HtmlFunctionRegistry>();
         app.init_resource::<HtmlDirty>();
+        app.init_resource::<HtmlPendingReveal>();
         app.init_resource::<HtmlInitDelay>();
         app.init_resource::<UILang>();
         app.init_resource::<UiLangState>();
@@ -1050,6 +1057,8 @@ impl Plugin for ExtendedUiHtmlPlugin {
 
 fn sync_shared_values_system(world: &mut World) {
     refresh_shared_values(world);
+    #[cfg(feature = "extended-framework")]
+    sync_ui_binding_store_values(world);
 }
 
 /// Registers all HTML event handlers collected via `inventory`.

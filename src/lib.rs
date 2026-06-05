@@ -10,6 +10,7 @@ use crate::io::ExtendedIoPlugin;
 use crate::old::registry::ExtendedRegistryPlugin;
 #[cfg(feature = "providers")]
 use crate::providers::ExtendedUiProviderPlugin;
+use crate::routing::ExtendedRoutingPlugin;
 use crate::services::ExtendedServicePlugin;
 use crate::styles::ExtendedStylingPlugin;
 use crate::widgets::ExtendedWidgetPlugin;
@@ -23,7 +24,6 @@ pub mod component;
 #[cfg(feature = "extended-dialog")]
 pub mod dialog;
 pub mod example_utils;
-#[cfg(feature = "extended-framework")]
 pub mod framework;
 pub mod html;
 pub mod io;
@@ -33,11 +33,13 @@ pub mod old;
 pub mod providers;
 #[deprecated(note = "Legacy module moved to `old::registry`. Use the new component framework.")]
 pub mod registry;
+pub mod routing;
 pub mod services;
 pub mod styles;
 pub mod utils;
 pub mod widgets;
 
+pub use bevy_extended_ui_macros::BeuStore;
 pub use lang::{UILang, UiLangVariables, UiSharedValues};
 
 /// A cache mapping image paths to their loaded handles,
@@ -147,6 +149,7 @@ impl Plugin for ExtendedUiPlugin {
         #[cfg(feature = "extended-framework")]
         app.add_plugins(ExtendedComponentPlugin);
         app.add_plugins((
+            ExtendedRoutingPlugin,
             ExtendedWidgetPlugin,
             ExtendedServicePlugin,
             ExtendedStylingPlugin,

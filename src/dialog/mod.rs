@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::ExtendedUiConfiguration;
 use crate::html::{HtmlStyle, NeedHidden};
-use crate::styles::{BackdropFilter, Background};
+use crate::styles::{BackdropFilter, Background, Style};
 use crate::styles::{CssClass, CssID, TagName};
 use crate::widgets::{Body, UIWidgetState};
 
@@ -16,6 +16,65 @@ static SYSTEM_DIALOG_IN_FLIGHT: Lazy<AtomicBool> = Lazy::new(|| AtomicBool::new(
 
 const DIALOG_WIDGET_Z_INDEX: i32 = 120_000;
 const DIALOG_RUNTIME_BASE_Z_INDEX: i32 = 130_000;
+
+/// Builds the fixed overlay node used by HTML `<dialog>` widgets.
+pub(crate) fn dialog_widget_overlay_node() -> Node {
+    let mut root_node = Node::default();
+    root_node.position_type = PositionType::Absolute;
+    root_node.left = Val::Px(0.0);
+    root_node.right = Val::Px(0.0);
+    root_node.top = Val::Px(0.0);
+    root_node.bottom = Val::Px(0.0);
+    root_node.width = Val::Percent(100.0);
+    root_node.height = Val::Percent(100.0);
+    root_node.justify_content = JustifyContent::Center;
+    root_node.align_items = AlignItems::Center;
+    root_node.padding = UiRect::all(Val::Px(16.0));
+    root_node
+}
+
+/// Builds the fixed overlay style used by HTML `<dialog>` widgets.
+pub(crate) fn dialog_widget_overlay_style(base: Option<&HtmlStyle>) -> HtmlStyle {
+    let mut overlay_style = base.map(|style| style.0.clone()).unwrap_or_default();
+    apply_dialog_widget_overlay_style(&mut overlay_style);
+    HtmlStyle(overlay_style)
+}
+
+/// Inserts overlay components that must survive reactive HTML rebuilds.
+pub(crate) fn apply_dialog_widget_overlay_components(
+    commands: &mut Commands,
+    entity: Entity,
+    base_style: Option<&HtmlStyle>,
+) {
+    commands.entity(entity).insert((
+        dialog_widget_overlay_node(),
+        BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.55)),
+        ZIndex(DIALOG_WIDGET_Z_INDEX),
+        GlobalZIndex(DIALOG_WIDGET_Z_INDEX),
+        dialog_widget_overlay_style(base_style),
+    ));
+}
+
+fn apply_dialog_widget_overlay_style(style: &mut Style) {
+    style.display = Some(Display::Flex);
+    style.position_type = Some(PositionType::Absolute);
+    style.left = Some(Val::Px(0.0));
+    style.right = Some(Val::Px(0.0));
+    style.top = Some(Val::Px(0.0));
+    style.bottom = Some(Val::Px(0.0));
+    style.width = Some(Val::Percent(100.0));
+    style.height = Some(Val::Percent(100.0));
+    style.justify_content = Some(JustifyContent::Center);
+    style.align_items = Some(AlignItems::Center);
+    style.padding = Some(UiRect::all(Val::Px(16.0)));
+    style.z_index = Some(DIALOG_WIDGET_Z_INDEX);
+    style.background = Some(Background {
+        color: Color::srgba(0.0, 0.0, 0.0, 0.55),
+        image: None,
+        gradient: None,
+    });
+    style.backdrop_filter = Some(BackdropFilter::Blur(15.0));
+}
 
 /// Selects how a dialog is presented.
 #[derive(Debug, Clone, Copy, Reflect, Default, Eq, PartialEq)]
@@ -78,7 +137,7 @@ impl DialogWidgetType {
 /// HTML widget backing `<dialog ...>` elements.
 ///
 /// The widget can be styled with CSS like other HTML widgets and opened via a trigger id.
-#[derive(Component, Reflect, Debug, Clone)]
+#[derive(Component, Reflect, Debug, Clone, PartialEq)]
 #[reflect(Component)]
 #[require(
     crate::widgets::UIGenID,
@@ -516,46 +575,8 @@ fn initialize_dialog_widgets(
         );
         push_unique_class(&mut classes, dialog_widget_type_class(dialog.dialog_type));
 
-        let mut root_node = Node::default();
-        root_node.position_type = PositionType::Absolute;
-        root_node.left = Val::Px(0.0);
-        root_node.right = Val::Px(0.0);
-        root_node.top = Val::Px(0.0);
-        root_node.bottom = Val::Px(0.0);
-        root_node.width = Val::Percent(100.0);
-        root_node.height = Val::Percent(100.0);
-        root_node.justify_content = JustifyContent::Center;
-        root_node.align_items = AlignItems::Center;
-        root_node.padding = UiRect::all(Val::Px(16.0));
-
-        let mut overlay_style = html_style_opt
-            .map(|style| style.0.clone())
-            .unwrap_or_default();
-        overlay_style.display = Some(Display::Flex);
-        overlay_style.position_type = Some(PositionType::Absolute);
-        overlay_style.left = Some(Val::Px(0.0));
-        overlay_style.right = Some(Val::Px(0.0));
-        overlay_style.top = Some(Val::Px(0.0));
-        overlay_style.bottom = Some(Val::Px(0.0));
-        overlay_style.width = Some(Val::Percent(100.0));
-        overlay_style.height = Some(Val::Percent(100.0));
-        overlay_style.justify_content = Some(JustifyContent::Center);
-        overlay_style.align_items = Some(AlignItems::Center);
-        overlay_style.padding = Some(UiRect::all(Val::Px(16.0)));
-        overlay_style.z_index = Some(DIALOG_WIDGET_Z_INDEX);
-        overlay_style.background = Some(Background {
-            color: Color::srgba(0.0, 0.0, 0.0, 0.55),
-            image: None,
-            gradient: None,
-        });
-        overlay_style.backdrop_filter = Some(BackdropFilter::Blur(15.0));
-
         commands.entity(entity).insert((
             Name::new(dialog_name),
-            root_node,
-            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.55)),
-            ZIndex(DIALOG_WIDGET_Z_INDEX),
-            GlobalZIndex(DIALOG_WIDGET_Z_INDEX),
             RenderLayers::layer(layer),
             Pickable::default(),
             TagName("dialog".to_string()),
@@ -563,8 +584,8 @@ fn initialize_dialog_widgets(
             DialogWidgetBase,
             NeedHidden,
             Visibility::Hidden,
-            HtmlStyle(overlay_style),
         ));
+        apply_dialog_widget_overlay_components(&mut commands, entity, html_style_opt);
 
         if dialog.renderer == DialogProvider::BevyApp {
             commands

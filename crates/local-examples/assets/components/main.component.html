@@ -1,29 +1,185 @@
 @use "crate::data_structs::*";
 
 <div id="framework-root" oninit="init_main">
+    <button onclick="go_help">Help</button>
+    <button onclick="go_settings">Settings</button>
+    <button onclick="go_info">InfoPage</button>
     <h3>Extended Framework Active</h3>
     <p>This UI was booted from index.html and app-main component.</p>
-    <button>Component Button</button>
-    <switch value="{{ player.state }}" onclick="check_state">{{ player.state }}</switch>
+    <button onclick="check_state">Toggle Store Player</button>
+    <button onclick="increase_value">Increase Value</button>
+    <switch value="{{ player.state }}" onclick="check_state">Store state: {{ player.state }}</switch>
+    <p>Store Player Name: {{ player.name }}</p>
+
+    <label for="player-name">Player Name</label>
+    <input id="player-name" type="text" value="{{ player.name }}" onchange="set_name">
+
+    <div class="dialog-demo">
+        <h4>Player Dialogs</h4>
+        <button id="open-player-bevy-dialog">Open Bevy Dialog</button>
+        <button id="open-player-system-dialog">Open System Dialog</button>
+
+        <dialog trigger="open-player-bevy-dialog" renderer="bevy-app" type="info">
+            <div class="dialog-demo-content">
+                <h4>Player</h4>
+                <p>Player name: {{ player.name }}</p>
+            </div>
+        </dialog>
+
+        <dialog trigger="open-player-system-dialog" renderer="system" type="info">
+            Player name: {{ player.name }}
+        </dialog>
+    </div>
+
+    <label for="slider-val">Player Name</label>
+    <input id="slider-val" type="number" value="{{ info.value }}" onchange="set_value">
+    <progressbar value="{{ info.value }}" min="0" max="100"></progressbar>
+
+    <div class="color-demo">
+        <h4>Reactive Color Picker</h4>
+        <colorpicker id="info-color" value="{{ info.color }}" onchange="set_info_color"></colorpicker>
+        <div class="color-preview" style="background-color: {{ info.color }};"></div>
+        <p>Selected color: {{ info.color }}</p>
+    </div>
+
+    <div class="range-slider-demo">
+        <h4>Reactive Range Slider</h4>
+        <slider
+            id="info-range-slider"
+            type="range"
+            min="0"
+            max="100"
+            step="5"
+            value="{{ info.range_value }}"
+            dots="5"
+            show-labels="true"
+            dot-anchor="bottom"
+            onchange="set_info_range"
+        ></slider>
+        <badge for="#info-range-slider" value="{{ info.range_size }}" max="99" anchor="top right"></badge>
+        <p>Selected range: {{ info.range_value }}</p>
+        <p>Selected span: {{ info.range_size }}</p>
+    </div>
 
     @if(player.state && data_state == DataState::Inactive) {
-        <app-test></app-test>
+    <app-test></app-test>
     } @else {
-        <slider></slider>
+    <slider value="{{ info.value }}" onchange="on_slider_change"></slider>
     }
     <h4>{{ info.display }}</h4>
-    <p>Player Name: {{ player.name }}</p>
 
-    @for (entry, index in player.list) {
-        <p>Entry: {{ entry }}</p>
+    <div class="player-list-demo">
+        <h4>Player ListBox</h4>
+        <listbox id="player-list-box" multiselect onchange="set_player_list">
+            @for (entry, index in player.available_list) {
+                @if(player.list.contains(entry)) {
+                    <option value="{{ entry }}" selected>{{ entry }}</option>
+                } @else {
+                    <option value="{{ entry }}">{{ entry }}</option>
+                }
+            }
+        </listbox>
+        <p>Selected player entries:</p>
+        @for (entry, index in player.list) {
+            <p>Selected Entry {{ index }}: {{ entry }}</p>
+        }
+    </div>
+
+    <div class="data-fieldsets">
+        <h4>Data Pack Multi Selection</h4>
+        <fieldset id="data-pack-selection" mode="multi" onchange="set_data_pack_selection">
+            @for (entry, index in data_pack.available_data) {
+                @if(data_pack.data.contains(entry)) {
+                    <toggle value="{{ entry }}" selected>{{ entry }}</toggle>
+                } @else {
+                    <toggle value="{{ entry }}">{{ entry }}</toggle>
+                }
+            }
+        </fieldset>
+        <p>Selected DataPack bytes:</p>
+        @for (entry, index in data_pack.data) {
+            <p>Selected Byte {{ index }}: {{ entry }}</p>
+        }
+
+        <h4>Data State Radio Selection</h4>
+        <fieldset id="data-state-selection" mode="single" onchange="set_data_state">
+            @if(data_state == DataState::Active) {
+                <radio value="Active" selected>Active</radio>
+                <radio value="Inactive">Inactive</radio>
+            } @else {
+                <radio value="Active">Active</radio>
+                <radio value="Inactive" selected>Inactive</radio>
+            }
+        </fieldset>
+        <p>Selected DataState: {{ data_state }}</p>
+        <p>DataPack embedded state: {{ data_pack.state }}</p>
+    </div>
+
+    <label for="info-image-file">Info Image</label>
+    <input
+        id="info-image-file"
+        type="file"
+        max-size="4MB"
+        extensions="[png, jpeg, jpg]"
+        show-size="true"
+        onchange="set_image_file"
+    >
+
+    @if(info.image_file != "") {
+        <img
+            id="info-image-preview"
+            src="{{ info.image_file }}"
+            preview="info-image-file"
+            alt="Selected info image"
+        >
+    } @else {
+        <p>No image file selected.</p>
     }
 
-    <h4>Data Pack {{ data_pack.version }}</h4>
-    <h5>Data State: {{ data_state }}</h5>
-    <p>Data Pack used: {{ data_pack.used }}</p>
-    @for (entry, index in data_pack.get_data()) {
-        <p>Data Pack Byte {{ index }}: {{ entry }}</p>
-    }
+    <div class="date-demo">
+        <label for="info-date">Info Date</label>
+        <input
+            id="info-date"
+            type="date"
+            value="{{ info.date }}"
+            min="01.01.2022"
+            max="01.12.2026"
+            format="dd.mm.yyyy"
+            onchange="set_info_date"
+        >
+        <date-picker
+            id="info-date-picker"
+            for="#info-date"
+            value="{{ info.date }}"
+            min="01.01.2022"
+            max="01.12.2026"
+            format="dd.mm.yyyy"
+        ></date-picker>
+        <p>Selected date: {{ info.date }}</p>
 
-    <app-help></app-help>
+        <label for="info-date-range">Info Date Range</label>
+        <input
+            id="info-date-range"
+            type="range"
+            value="{{ info.date_range }}"
+            min="01.01.2022"
+            max="01.12.2026"
+            format="dd.mm.yyyy"
+            onchange="set_info_date_range"
+        >
+        <date-picker
+            id="info-date-range-picker"
+            for="#info-date-range"
+            value="{{ info.date_range }}"
+            min="01.01.2022"
+            max="01.12.2026"
+            format="dd.mm.yyyy"
+        ></date-picker>
+        <p>Selected date range: {{ info.date_range }}</p>
+
+        <h4>Date list</h4>
+        @for (date, index in info.dates_in_range) {
+            <p>Date {{ index }}: {{ date }}</p>
+        }
+    </div>
 </div>

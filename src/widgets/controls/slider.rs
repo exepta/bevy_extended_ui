@@ -95,6 +95,10 @@ impl PreviousSliderState {
 #[derive(Component)]
 struct SliderNeedInit;
 
+/// Marker inserted when a slider value changed because of user input.
+#[derive(Component)]
+pub struct SliderUserChanged;
+
 /// Plugin that registers slider widget behavior.
 pub struct SliderWidget;
 
@@ -471,9 +475,10 @@ fn on_internal_cursor_leave(
 /// Handles clicks on the slider track to update value.
 fn on_track_click(
     mut trigger: On<Pointer<Click>>,
+    mut commands: Commands,
     ui_scale: Res<UiScale>,
     window_q: Query<&Window, With<PrimaryWindow>>,
-    mut slider_query: Query<(&mut Slider, &UIGenID), With<Slider>>,
+    mut slider_query: Query<(Entity, &mut Slider, &UIGenID), With<Slider>>,
     slider_state_q: Query<(&UIGenID, &UIWidgetState), With<Slider>>,
     track_q: Query<(&ComputedNode, &BindToID, &RelativeCursorPosition), With<SliderTrackContainer>>,
     thumb_size_q: Query<(&ComputedNode, &BindToID), With<SliderThumb>>,
@@ -500,6 +505,7 @@ fn on_track_click(
     apply_from_track_pointer(
         trigger.entity,
         sf,
+        &mut commands,
         &mut slider_query,
         &slider_state_q,
         &track_q,
@@ -514,9 +520,10 @@ fn on_track_click(
 /// Handles dragging directly on the slider track.
 fn on_track_drag(
     mut trigger: On<Pointer<Drag>>,
+    mut commands: Commands,
     ui_scale: Res<UiScale>,
     window_q: Query<&Window, With<PrimaryWindow>>,
-    mut slider_query: Query<(&mut Slider, &UIGenID), With<Slider>>,
+    mut slider_query: Query<(Entity, &mut Slider, &UIGenID), With<Slider>>,
     slider_state_q: Query<(&UIGenID, &UIWidgetState), With<Slider>>,
     track_q: Query<(&ComputedNode, &BindToID, &RelativeCursorPosition), With<SliderTrackContainer>>,
     thumb_size_q: Query<(&ComputedNode, &BindToID), With<SliderThumb>>,
@@ -543,6 +550,7 @@ fn on_track_drag(
     apply_from_track_pointer(
         trigger.entity,
         sf,
+        &mut commands,
         &mut slider_query,
         &slider_state_q,
         &track_q,
@@ -558,7 +566,8 @@ fn on_track_drag(
 fn apply_from_track_pointer(
     track_entity: Entity,
     sf: f32,
-    slider_query: &mut Query<(&mut Slider, &UIGenID), With<Slider>>,
+    commands: &mut Commands,
+    slider_query: &mut Query<(Entity, &mut Slider, &UIGenID), With<Slider>>,
     slider_state_q: &Query<(&UIGenID, &UIWidgetState), With<Slider>>,
     track_q: &Query<
         (&ComputedNode, &BindToID, &RelativeCursorPosition),
@@ -610,6 +619,7 @@ fn apply_from_track_pointer(
         desired_left,
         track_width,
         thumb_width,
+        commands,
         slider_query,
         fill_q,
         thumb_q,
@@ -622,7 +632,8 @@ fn on_thumb_drag(
     parent_q: Query<&ChildOf>,
     track_q: Query<(&ComputedNode, &BindToID, &RelativeCursorPosition), With<SliderTrackContainer>>,
     thumb_node_q: Query<&ComputedNode, With<SliderThumb>>,
-    mut slider_q: Query<(&mut Slider, &UIGenID), With<Slider>>,
+    mut commands: Commands,
+    mut slider_q: Query<(Entity, &mut Slider, &UIGenID), With<Slider>>,
     slider_state_q: Query<(&UIGenID, &UIWidgetState), With<Slider>>,
     mut fill_q: Query<
         (&mut Node, &BindToID, &mut UiStyle),
@@ -685,6 +696,7 @@ fn on_thumb_drag(
         desired_left,
         track_width,
         thumb_width,
+        &mut commands,
         &mut slider_q,
         &mut fill_q,
         &mut thumb_q,
@@ -722,7 +734,8 @@ fn apply_from_track_left_x(
     desired_left_x: f32,
     track_width: f32,
     thumb_width: f32,
-    slider_q: &mut Query<(&mut Slider, &UIGenID), With<Slider>>,
+    commands: &mut Commands,
+    slider_q: &mut Query<(Entity, &mut Slider, &UIGenID), With<Slider>>,
     fill_q: &mut Query<
         (&mut Node, &BindToID, &mut UiStyle),
         (With<SliderTrackFill>, Without<SliderThumb>),
@@ -738,12 +751,13 @@ fn apply_from_track_left_x(
         (With<SliderThumb>, Without<SliderTrackFill>),
     >,
 ) {
-    for (mut slider, ui_id) in slider_q.iter_mut() {
+    for (entity, mut slider, ui_id) in slider_q.iter_mut() {
         if ui_id.0 != target_ui_id {
             continue;
         }
 
         sanitize_slider(&mut slider);
+        let before = PreviousSliderState::from_slider(&slider);
 
         let next_value = value_from_left(desired_left_x, track_width, thumb_width, &slider);
         match slider.slider_type {
@@ -804,6 +818,10 @@ fn apply_from_track_left_x(
             fill_q,
             thumb_q,
         );
+
+        if PreviousSliderState::from_slider(&slider) != before {
+            commands.entity(entity).insert(SliderUserChanged);
+        }
         break;
     }
 }
@@ -951,9 +969,11 @@ fn apply_slider_visual_state(
 
 /// Detects slider value changes and updates visuals.
 fn detect_change_slider_values(
+    mut commands: Commands,
     keyboard: Res<ButtonInput<KeyCode>>,
     mut slider_q: Query<
         (
+            Entity,
             &mut Slider,
             &UIWidgetState,
             &UIGenID,
@@ -988,8 +1008,9 @@ fn detect_change_slider_values(
 
     let shift = keyboard.pressed(KeyCode::ShiftLeft) || keyboard.pressed(KeyCode::ShiftRight);
 
-    for (mut slider, state, ui_id, mut prev, mut layout_cache) in slider_q.iter_mut() {
+    for (entity, mut slider, state, ui_id, mut prev, mut layout_cache) in slider_q.iter_mut() {
         sanitize_slider(&mut slider);
+        let before_keyboard = PreviousSliderState::from_slider(&slider);
 
         if state.focused && !state.disabled {
             let step = if shift {
@@ -1021,6 +1042,11 @@ fn detect_change_slider_values(
         }
 
         sanitize_slider(&mut slider);
+        let after_keyboard = PreviousSliderState::from_slider(&slider);
+        if after_keyboard != before_keyboard {
+            commands.entity(entity).insert(SliderUserChanged);
+        }
+
         let next_state = PreviousSliderState::from_slider(&slider);
         if next_state == *prev {
             continue;

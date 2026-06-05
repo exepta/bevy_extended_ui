@@ -48,3 +48,4 @@ bevy = { version = "0.18.1", default-features = false, features = [
     "bevy_log",
 ] }
 kuchiki = "0.8.1"
+serde = { version = "1", features = ["derive"] }

@@ -20,9 +20,19 @@ const MODAL_FALLBACK_WIDTH: f32 = 340.0;
 const COLOR_PICKER_MODAL_ROOT_Z: i32 = 40_000;
 const COLOR_PICKER_MODAL_Z: i32 = 40_001;
 
+fn set_if_changed<T: PartialEq>(target: &mut T, value: T) {
+    if *target != value {
+        *target = value;
+    }
+}
+
 /// Marker component for initialized color picker widgets.
 #[derive(Component)]
 struct ColorPickerBase;
+
+/// Marker inserted when a color picker changed because of pointer input.
+#[derive(Component)]
+pub struct ColorPickerUserChanged;
 
 /// Marker component for the picker trigger button.
 #[derive(Component)]
@@ -37,6 +47,32 @@ struct ColorPickerModal;
 struct ColorPickerTextures {
     canvas: Handle<Image>,
     alpha: Handle<Image>,
+}
+
+/// Tracks the last visual state applied to a color picker.
+#[derive(Component, Clone, Copy, Debug, PartialEq)]
+struct ColorPickerVisualSnapshot {
+    red: u8,
+    green: u8,
+    blue: u8,
+    alpha: u8,
+    hue: f32,
+    saturation: f32,
+    value: f32,
+}
+
+impl From<&ColorPicker> for ColorPickerVisualSnapshot {
+    fn from(picker: &ColorPicker) -> Self {
+        Self {
+            red: picker.red,
+            green: picker.green,
+            blue: picker.blue,
+            alpha: picker.alpha,
+            hue: picker.hue,
+            saturation: picker.saturation,
+            value: picker.value,
+        }
+    }
 }
 
 /// Marker component for the saturation/value canvas.
@@ -231,6 +267,7 @@ fn internal_node_creation_system(
                             ))
                             .observe(on_canvas_click)
                             .observe(on_canvas_drag)
+                            .observe(on_canvas_release)
                             .with_children(|canvas_builder| {
                                 canvas_builder.spawn((
                                     Name::new(format!("ColorPicker-Canvas-Thumb-{}", picker.entry)),
@@ -272,6 +309,7 @@ fn internal_node_creation_system(
                             ))
                             .observe(on_hue_click)
                             .observe(on_hue_drag)
+                            .observe(on_hue_release)
                             .with_children(|track| {
                                 track.spawn((
                                     Name::new(format!("ColorPicker-Hue-Thumb-{}", picker.entry)),
@@ -312,6 +350,7 @@ fn internal_node_creation_system(
                             ))
                             .observe(on_alpha_click)
                             .observe(on_alpha_drag)
+                            .observe(on_alpha_release)
                             .with_children(|track| {
                                 track.spawn((
                                     Name::new(format!("ColorPicker-Alpha-Thumb-{}", picker.entry)),
@@ -466,8 +505,8 @@ fn update_modal_position(
         let local_left = Val::Px((trigger_w - modal_w) * 0.5);
         let local_top = Val::Px(trigger_h + gap);
 
-        modal_node.left = local_left;
-        modal_node.top = local_top;
+        set_if_changed(&mut modal_node.left, local_left);
+        set_if_changed(&mut modal_node.top, local_top);
 
         if let Some(mut styles) = maybe_styles {
             for (_, style) in styles.styles.iter_mut() {
@@ -486,12 +525,14 @@ fn logical_size(node: &ComputedNode) -> Vec2 {
 
 /// Syncs generated textures, preview and labels when the color changes.
 fn sync_color_picker_visual_state(
+    mut commands: Commands,
     picker_q: Query<
         (
+            Entity,
             &ColorPicker,
-            Ref<ColorPicker>,
             &UIGenID,
             &ColorPickerTextures,
+            Option<&ColorPickerVisualSnapshot>,
         ),
         With<ColorPickerBase>,
     >,
@@ -508,11 +549,25 @@ fn sync_color_picker_visual_state(
         Query<(&mut Text, &BindToID), With<RgbaText>>,
     )>,
 ) {
-    for (picker, picker_ref, id, textures) in picker_q.iter() {
-        if picker_ref.is_added() || picker_ref.is_changed() {
+    for (entity, picker, id, textures, snapshot) in picker_q.iter() {
+        let next_snapshot = ColorPickerVisualSnapshot::from(picker);
+        if snapshot.is_some_and(|snapshot| *snapshot == next_snapshot) {
+            continue;
+        }
+
+        let hue_changed = snapshot.is_none_or(|snapshot| snapshot.hue != picker.hue);
+        let rgb_changed = snapshot.is_none_or(|snapshot| {
+            snapshot.red != picker.red
+                || snapshot.green != picker.green
+                || snapshot.blue != picker.blue
+        });
+
+        if hue_changed {
             if let Some(canvas_image) = images.get_mut(&textures.canvas) {
                 *canvas_image = generate_sv_canvas_image(picker.hue);
             }
+        }
+        if rgb_changed {
             if let Some(alpha_image) = images.get_mut(&textures.alpha) {
                 *alpha_image = generate_alpha_track_image(picker.red, picker.green, picker.blue);
             }
@@ -524,7 +579,7 @@ fn sync_color_picker_visual_state(
                 if bind.0 == id.0 {
                     let background =
                         Color::srgba_u8(picker.red, picker.green, picker.blue, picker.alpha);
-                    *color = BackgroundColor(background);
+                    set_if_changed(&mut *color, BackgroundColor(background));
 
                     if let Some(mut styles) = maybe_styles {
                         for (_, style) in styles.styles.iter_mut() {
@@ -542,8 +597,14 @@ fn sync_color_picker_visual_state(
             let mut canvas_thumb_q = params.p1();
             for (mut node, bind) in canvas_thumb_q.iter_mut() {
                 if bind.0 == id.0 {
-                    node.left = Val::Percent((picker.saturation * 100.0).clamp(0.0, 100.0));
-                    node.top = Val::Percent(((1.0 - picker.value) * 100.0).clamp(0.0, 100.0));
+                    set_if_changed(
+                        &mut node.left,
+                        Val::Percent((picker.saturation * 100.0).clamp(0.0, 100.0)),
+                    );
+                    set_if_changed(
+                        &mut node.top,
+                        Val::Percent(((1.0 - picker.value) * 100.0).clamp(0.0, 100.0)),
+                    );
                 }
             }
         }
@@ -565,8 +626,8 @@ fn sync_color_picker_visual_state(
                     let left = (picker.hue / 360.0).clamp(0.0, 1.0) * max_left;
                     let top = ((track_size.y - thumb_size.y) * 0.5).max(0.0);
 
-                    node.left = Val::Px(left);
-                    node.top = Val::Px(top);
+                    set_if_changed(&mut node.left, Val::Px(left));
+                    set_if_changed(&mut node.top, Val::Px(top));
                 }
             }
         }
@@ -588,8 +649,8 @@ fn sync_color_picker_visual_state(
                     let left = (picker.alpha as f32 / 255.0).clamp(0.0, 1.0) * max_left;
                     let top = ((track_size.y - thumb_size.y) * 0.5).max(0.0);
 
-                    node.left = Val::Px(left);
-                    node.top = Val::Px(top);
+                    set_if_changed(&mut node.left, Val::Px(left));
+                    set_if_changed(&mut node.top, Val::Px(top));
                 }
             }
         }
@@ -598,9 +659,11 @@ fn sync_color_picker_visual_state(
             let mut hex_q = params.p4();
             for (mut text, mut text_color, bind, maybe_styles) in hex_q.iter_mut() {
                 if bind.0 == id.0 {
-                    text.0 = format!("{}", picker.hex());
-                    text_color.0 =
-                        trigger_text_color(picker.red, picker.green, picker.blue, picker.alpha);
+                    set_if_changed(&mut text.0, picker.hex());
+                    set_if_changed(
+                        &mut text_color.0,
+                        trigger_text_color(picker.red, picker.green, picker.blue, picker.alpha),
+                    );
 
                     if let Some(mut styles) = maybe_styles {
                         for (_, style) in styles.styles.iter_mut() {
@@ -614,7 +677,7 @@ fn sync_color_picker_visual_state(
             let mut rgb_q = params.p5();
             for (mut text, bind) in rgb_q.iter_mut() {
                 if bind.0 == id.0 {
-                    text.0 = format!("RGB  {}", picker.rgb_string());
+                    set_if_changed(&mut text.0, format!("RGB  {}", picker.rgb_string()));
                 }
             }
         }
@@ -622,10 +685,12 @@ fn sync_color_picker_visual_state(
             let mut rgba_q = params.p6();
             for (mut text, bind) in rgba_q.iter_mut() {
                 if bind.0 == id.0 {
-                    text.0 = format!("RGBA {}", picker.rgba_string());
+                    set_if_changed(&mut text.0, format!("RGBA {}", picker.rgba_string()));
                 }
             }
         }
+
+        commands.entity(entity).insert(next_snapshot);
     }
 }
 
@@ -709,15 +774,21 @@ fn on_internal_cursor_leave(
 /// Handles clicks on the SV canvas.
 fn on_canvas_click(
     mut trigger: On<Pointer<Click>>,
+    mut commands: Commands,
     canvas_q: Query<(&BindToID, &RelativeCursorPosition), With<ColorCanvas>>,
-    mut picker_q: Query<(&mut ColorPicker, &mut UIWidgetState, &UIGenID), With<ColorPicker>>,
+    mut picker_q: Query<
+        (Entity, &mut ColorPicker, &mut UIWidgetState, &UIGenID),
+        With<ColorPicker>,
+    >,
     mut current_widget_state: ResMut<CurrentWidgetState>,
 ) {
     apply_canvas_pointer(
         trigger.entity,
+        &mut commands,
         &canvas_q,
         &mut picker_q,
         &mut current_widget_state,
+        true,
     );
     trigger.propagate(false);
 }
@@ -725,24 +796,46 @@ fn on_canvas_click(
 /// Handles drag interaction on the SV canvas.
 fn on_canvas_drag(
     trigger: On<Pointer<Drag>>,
+    mut commands: Commands,
     canvas_q: Query<(&BindToID, &RelativeCursorPosition), With<ColorCanvas>>,
-    mut picker_q: Query<(&mut ColorPicker, &mut UIWidgetState, &UIGenID), With<ColorPicker>>,
+    mut picker_q: Query<
+        (Entity, &mut ColorPicker, &mut UIWidgetState, &UIGenID),
+        With<ColorPicker>,
+    >,
     mut current_widget_state: ResMut<CurrentWidgetState>,
 ) {
     apply_canvas_pointer(
         trigger.entity,
+        &mut commands,
         &canvas_q,
         &mut picker_q,
         &mut current_widget_state,
+        false,
     );
+}
+
+/// Emits a color change after canvas dragging has finished.
+fn on_canvas_release(
+    mut trigger: On<Pointer<Release>>,
+    mut commands: Commands,
+    canvas_q: Query<&BindToID, With<ColorCanvas>>,
+    picker_q: Query<(Entity, &UIGenID), With<ColorPicker>>,
+) {
+    mark_bound_picker_user_changed(trigger.entity, &mut commands, &canvas_q, &picker_q);
+    trigger.propagate(false);
 }
 
 /// Handles `apply_canvas_pointer` in the extended UI workflow.
 fn apply_canvas_pointer(
     entity: Entity,
+    commands: &mut Commands,
     canvas_q: &Query<(&BindToID, &RelativeCursorPosition), With<ColorCanvas>>,
-    picker_q: &mut Query<(&mut ColorPicker, &mut UIWidgetState, &UIGenID), With<ColorPicker>>,
+    picker_q: &mut Query<
+        (Entity, &mut ColorPicker, &mut UIWidgetState, &UIGenID),
+        With<ColorPicker>,
+    >,
     current_widget_state: &mut ResMut<CurrentWidgetState>,
+    emit_change: bool,
 ) {
     let Ok((bind, rel)) = canvas_q.get(entity) else {
         return;
@@ -754,7 +847,7 @@ fn apply_canvas_pointer(
     let saturation = (normalized.x + 0.5).clamp(0.0, 1.0);
     let value = 1.0 - (normalized.y + 0.5).clamp(0.0, 1.0);
 
-    for (mut picker, mut state, id) in picker_q.iter_mut() {
+    for (picker_entity, mut picker, mut state, id) in picker_q.iter_mut() {
         if id.0 != bind.0 {
             continue;
         }
@@ -764,7 +857,23 @@ fn apply_canvas_pointer(
         state.focused = true;
         current_widget_state.widget_id = id.0;
         let hue = picker.hue;
+        let old_saturation = picker.saturation;
+        let old_value = picker.value;
+        let old_red = picker.red;
+        let old_green = picker.green;
+        let old_blue = picker.blue;
         picker.set_hsv(hue, saturation, value);
+        if emit_change
+            && (old_saturation != picker.saturation
+                || old_value != picker.value
+                || old_red != picker.red
+                || old_green != picker.green
+                || old_blue != picker.blue)
+        {
+            commands
+                .entity(picker_entity)
+                .insert(ColorPickerUserChanged);
+        }
         break;
     }
 }
@@ -772,15 +881,21 @@ fn apply_canvas_pointer(
 /// Handles clicks on the hue track.
 fn on_hue_click(
     mut trigger: On<Pointer<Click>>,
+    mut commands: Commands,
     hue_q: Query<(&BindToID, &RelativeCursorPosition), With<HueTrack>>,
-    mut picker_q: Query<(&mut ColorPicker, &mut UIWidgetState, &UIGenID), With<ColorPicker>>,
+    mut picker_q: Query<
+        (Entity, &mut ColorPicker, &mut UIWidgetState, &UIGenID),
+        With<ColorPicker>,
+    >,
     mut current_widget_state: ResMut<CurrentWidgetState>,
 ) {
     apply_hue_pointer(
         trigger.entity,
+        &mut commands,
         &hue_q,
         &mut picker_q,
         &mut current_widget_state,
+        true,
     );
     trigger.propagate(false);
 }
@@ -788,24 +903,46 @@ fn on_hue_click(
 /// Handles drag interaction on the hue track.
 fn on_hue_drag(
     trigger: On<Pointer<Drag>>,
+    mut commands: Commands,
     hue_q: Query<(&BindToID, &RelativeCursorPosition), With<HueTrack>>,
-    mut picker_q: Query<(&mut ColorPicker, &mut UIWidgetState, &UIGenID), With<ColorPicker>>,
+    mut picker_q: Query<
+        (Entity, &mut ColorPicker, &mut UIWidgetState, &UIGenID),
+        With<ColorPicker>,
+    >,
     mut current_widget_state: ResMut<CurrentWidgetState>,
 ) {
     apply_hue_pointer(
         trigger.entity,
+        &mut commands,
         &hue_q,
         &mut picker_q,
         &mut current_widget_state,
+        false,
     );
+}
+
+/// Emits a color change after hue dragging has finished.
+fn on_hue_release(
+    mut trigger: On<Pointer<Release>>,
+    mut commands: Commands,
+    hue_q: Query<&BindToID, With<HueTrack>>,
+    picker_q: Query<(Entity, &UIGenID), With<ColorPicker>>,
+) {
+    mark_bound_picker_user_changed(trigger.entity, &mut commands, &hue_q, &picker_q);
+    trigger.propagate(false);
 }
 
 /// Handles `apply_hue_pointer` in the extended UI workflow.
 fn apply_hue_pointer(
     entity: Entity,
+    commands: &mut Commands,
     hue_q: &Query<(&BindToID, &RelativeCursorPosition), With<HueTrack>>,
-    picker_q: &mut Query<(&mut ColorPicker, &mut UIWidgetState, &UIGenID), With<ColorPicker>>,
+    picker_q: &mut Query<
+        (Entity, &mut ColorPicker, &mut UIWidgetState, &UIGenID),
+        With<ColorPicker>,
+    >,
     current_widget_state: &mut ResMut<CurrentWidgetState>,
+    emit_change: bool,
 ) {
     let Ok((bind, rel)) = hue_q.get(entity) else {
         return;
@@ -816,7 +953,7 @@ fn apply_hue_pointer(
 
     let hue = (normalized.x + 0.5).clamp(0.0, 1.0) * 360.0;
 
-    for (mut picker, mut state, id) in picker_q.iter_mut() {
+    for (picker_entity, mut picker, mut state, id) in picker_q.iter_mut() {
         if id.0 != bind.0 {
             continue;
         }
@@ -827,7 +964,21 @@ fn apply_hue_pointer(
         current_widget_state.widget_id = id.0;
         let saturation = picker.saturation;
         let value = picker.value;
+        let old_hue = picker.hue;
+        let old_red = picker.red;
+        let old_green = picker.green;
+        let old_blue = picker.blue;
         picker.set_hsv(hue, saturation, value);
+        if emit_change
+            && (old_hue != picker.hue
+                || old_red != picker.red
+                || old_green != picker.green
+                || old_blue != picker.blue)
+        {
+            commands
+                .entity(picker_entity)
+                .insert(ColorPickerUserChanged);
+        }
         break;
     }
 }
@@ -835,15 +986,21 @@ fn apply_hue_pointer(
 /// Handles clicks on the alpha track.
 fn on_alpha_click(
     mut trigger: On<Pointer<Click>>,
+    mut commands: Commands,
     alpha_q: Query<(&BindToID, &RelativeCursorPosition), With<AlphaTrack>>,
-    mut picker_q: Query<(&mut ColorPicker, &mut UIWidgetState, &UIGenID), With<ColorPicker>>,
+    mut picker_q: Query<
+        (Entity, &mut ColorPicker, &mut UIWidgetState, &UIGenID),
+        With<ColorPicker>,
+    >,
     mut current_widget_state: ResMut<CurrentWidgetState>,
 ) {
     apply_alpha_pointer(
         trigger.entity,
+        &mut commands,
         &alpha_q,
         &mut picker_q,
         &mut current_widget_state,
+        true,
     );
     trigger.propagate(false);
 }
@@ -851,24 +1008,66 @@ fn on_alpha_click(
 /// Handles drag interaction on the alpha track.
 fn on_alpha_drag(
     trigger: On<Pointer<Drag>>,
+    mut commands: Commands,
     alpha_q: Query<(&BindToID, &RelativeCursorPosition), With<AlphaTrack>>,
-    mut picker_q: Query<(&mut ColorPicker, &mut UIWidgetState, &UIGenID), With<ColorPicker>>,
+    mut picker_q: Query<
+        (Entity, &mut ColorPicker, &mut UIWidgetState, &UIGenID),
+        With<ColorPicker>,
+    >,
     mut current_widget_state: ResMut<CurrentWidgetState>,
 ) {
     apply_alpha_pointer(
         trigger.entity,
+        &mut commands,
         &alpha_q,
         &mut picker_q,
         &mut current_widget_state,
+        false,
     );
+}
+
+/// Emits a color change after alpha dragging has finished.
+fn on_alpha_release(
+    mut trigger: On<Pointer<Release>>,
+    mut commands: Commands,
+    alpha_q: Query<&BindToID, With<AlphaTrack>>,
+    picker_q: Query<(Entity, &UIGenID), With<ColorPicker>>,
+) {
+    mark_bound_picker_user_changed(trigger.entity, &mut commands, &alpha_q, &picker_q);
+    trigger.propagate(false);
+}
+
+fn mark_bound_picker_user_changed<T: Component>(
+    source_entity: Entity,
+    commands: &mut Commands,
+    source_q: &Query<&BindToID, With<T>>,
+    picker_q: &Query<(Entity, &UIGenID), With<ColorPicker>>,
+) {
+    let Ok(bind) = source_q.get(source_entity) else {
+        return;
+    };
+
+    for (picker_entity, id) in picker_q.iter() {
+        if id.0 == bind.0 {
+            commands
+                .entity(picker_entity)
+                .insert(ColorPickerUserChanged);
+            break;
+        }
+    }
 }
 
 /// Handles `apply_alpha_pointer` in the extended UI workflow.
 fn apply_alpha_pointer(
     entity: Entity,
+    commands: &mut Commands,
     alpha_q: &Query<(&BindToID, &RelativeCursorPosition), With<AlphaTrack>>,
-    picker_q: &mut Query<(&mut ColorPicker, &mut UIWidgetState, &UIGenID), With<ColorPicker>>,
+    picker_q: &mut Query<
+        (Entity, &mut ColorPicker, &mut UIWidgetState, &UIGenID),
+        With<ColorPicker>,
+    >,
     current_widget_state: &mut ResMut<CurrentWidgetState>,
+    emit_change: bool,
 ) {
     let Ok((bind, rel)) = alpha_q.get(entity) else {
         return;
@@ -879,7 +1078,7 @@ fn apply_alpha_pointer(
 
     let alpha = ((normalized.x + 0.5).clamp(0.0, 1.0) * 255.0).round() as u8;
 
-    for (mut picker, mut state, id) in picker_q.iter_mut() {
+    for (picker_entity, mut picker, mut state, id) in picker_q.iter_mut() {
         if id.0 != bind.0 {
             continue;
         }
@@ -888,7 +1087,14 @@ fn apply_alpha_pointer(
         }
         state.focused = true;
         current_widget_state.widget_id = id.0;
-        picker.alpha = alpha;
+        if picker.alpha != alpha {
+            picker.alpha = alpha;
+            if emit_change {
+                commands
+                    .entity(picker_entity)
+                    .insert(ColorPickerUserChanged);
+            }
+        }
         break;
     }
 }

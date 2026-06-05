@@ -19,10 +19,10 @@ use crate::ExtendedUiConfiguration;
 #[cfg(feature = "extended-dialog")]
 use crate::dialog::{DialogProvider, DialogWidget, DialogWidgetType};
 #[cfg(feature = "extended-framework")]
-use crate::framework::{ExtendedFrameworkConfiguration, compile_framework_template};
+use crate::framework::{ExtendedFrameworkConfiguration, compile_framework_template_with_router};
 use crate::html::{
-    HtmlDirty, HtmlEventBindings, HtmlID, HtmlInnerContent, HtmlMeta, HtmlSource, HtmlStates,
-    HtmlStructureMap, HtmlStyle, HtmlSystemSet, HtmlWidgetNode,
+    HtmlDirty, HtmlEventBindings, HtmlID, HtmlInnerContent, HtmlMeta, HtmlPendingReveal,
+    HtmlSource, HtmlStates, HtmlStructureMap, HtmlStyle, HtmlSystemSet, HtmlWidgetNode,
 };
 use crate::io::{CssAsset, DefaultCssHandle, HtmlAsset};
 use crate::lang::{
@@ -33,6 +33,8 @@ use crate::lang::{
 use crate::providers::{
     ProviderChildPolicy, ProviderResolveContext, ThemeProviderState, UiProvider, UiProviderRegistry,
 };
+#[cfg(feature = "extended-framework")]
+use crate::routing::Router;
 use crate::styles::IconPlace;
 use crate::styles::parser::convert_to_color;
 use crate::widgets::Button;
@@ -83,15 +85,32 @@ struct TemplateInputs<'w> {
     shared_values: Res<'w, UiSharedValues>,
 }
 
+/// Bundled mutable HTML runtime state for converter systems.
+#[derive(SystemParam)]
+struct HtmlRuntimeState<'w> {
+    structure_map: ResMut<'w, HtmlStructureMap>,
+    html_dirty: ResMut<'w, HtmlDirty>,
+    #[allow(dead_code)]
+    pending_reveal: Option<ResMut<'w, HtmlPendingReveal>>,
+    ui_lang: ResMut<'w, UILang>,
+    lang_state: ResMut<'w, UiLangState>,
+}
+
+/// Bundled framework inputs for route-aware template compilation.
+#[cfg(feature = "extended-framework")]
+#[derive(SystemParam)]
+struct FrameworkInputs<'w, 's> {
+    framework_config: Option<Res<'w, ExtendedFrameworkConfiguration>>,
+    router: Option<Res<'w, Router>>,
+    last_router_revision: Local<'s, u64>,
+}
+
 /// Converts HtmlAsset content into HtmlStructureMap entries.
 /// Also resolves <link rel="stylesheet" href="..."> into Handle<CssAsset>.
 /// Updates parsed HTML structures from assets and language state.
 fn update_html_ui(
     mut commands: Commands,
-    mut structure_map: ResMut<HtmlStructureMap>,
-    mut html_dirty: ResMut<HtmlDirty>,
-    mut ui_lang: ResMut<UILang>,
-    mut lang_state: ResMut<UiLangState>,
+    mut state: HtmlRuntimeState,
 
     template_inputs: TemplateInputs,
     config: Res<ExtendedUiConfiguration>,
@@ -99,9 +118,7 @@ fn update_html_ui(
     html_assets: Res<Assets<HtmlAsset>>,
     mut html_asset_events: MessageReader<AssetEvent<HtmlAsset>>,
     default_css: Res<DefaultCssHandle>,
-    #[cfg(feature = "extended-framework")] framework_config: Option<
-        Res<ExtendedFrameworkConfiguration>,
-    >,
+    #[cfg(feature = "extended-framework")] mut framework_inputs: FrameworkInputs,
     #[cfg(feature = "providers")] provider_registry: Option<Res<UiProviderRegistry>>,
     #[cfg(feature = "providers")] mut theme_provider_state: Option<ResMut<ThemeProviderState>>,
 
@@ -111,7 +128,11 @@ fn update_html_ui(
 ) {
     let type_registry = type_registry.read();
     #[cfg(feature = "extended-framework")]
-    let mut framework_config = framework_config.as_deref().cloned().unwrap_or_default();
+    let mut framework_config = framework_inputs
+        .framework_config
+        .as_deref()
+        .cloned()
+        .unwrap_or_default();
     #[cfg(feature = "extended-framework")]
     {
         framework_config.assets_component_root = config.framework_components_path.clone();
@@ -126,30 +147,40 @@ fn update_html_ui(
                     .to_string();
         }
     }
-    let resolved = ui_lang.resolved().map(|lang| lang.to_string());
+    #[cfg(feature = "extended-framework")]
+    let router_dirty = framework_inputs.router.as_ref().is_some_and(|router| {
+        if router.revision() == *framework_inputs.last_router_revision {
+            return false;
+        }
+
+        *framework_inputs.last_router_revision = router.revision();
+        true
+    });
+    let resolved = state.ui_lang.resolved().map(|lang| lang.to_string());
     let mut lang_dirty = false;
     let vars_hash = vars_fingerprint(&template_inputs.lang_vars);
 
-    if lang_state.last_resolved != resolved {
-        lang_state.last_resolved = resolved;
+    if state.lang_state.last_resolved != resolved {
+        state.lang_state.last_resolved = resolved;
         lang_dirty = true;
     }
 
-    if lang_state.last_language_path.as_deref() != Some(config.language_path.as_str()) {
-        lang_state
+    if state.lang_state.last_language_path.as_deref() != Some(config.language_path.as_str()) {
+        state
+            .lang_state
             .last_language_path
             .replace(config.language_path.clone());
         lang_dirty = true;
     }
 
-    if lang_state.last_vars_fingerprint != Some(vars_hash) {
-        lang_state.last_vars_fingerprint = Some(vars_hash);
+    if state.lang_state.last_vars_fingerprint != Some(vars_hash) {
+        state.lang_state.last_vars_fingerprint = Some(vars_hash);
         lang_dirty = true;
     }
 
     let shared_hash = shared_values_fingerprint(&template_inputs.shared_values);
-    if lang_state.last_shared_fingerprint != Some(shared_hash) {
-        lang_state.last_shared_fingerprint = Some(shared_hash);
+    if state.lang_state.last_shared_fingerprint != Some(shared_hash) {
+        state.lang_state.last_shared_fingerprint = Some(shared_hash);
         lang_dirty = true;
     }
 
@@ -182,6 +213,13 @@ fn update_html_ui(
         dirty_entities.dedup();
     }
 
+    #[cfg(feature = "extended-framework")]
+    if router_dirty {
+        dirty_entities.extend(queries.all.iter().map(|(e, _)| e));
+        dirty_entities.sort();
+        dirty_entities.dedup();
+    }
+
     if dirty_entities.is_empty() {
         return;
     }
@@ -203,8 +241,12 @@ fn update_html_ui(
         let source_path = html.get_source_path();
         let raw_content = html_asset.html.clone();
         #[cfg(feature = "extended-framework")]
-        let framework_compiled =
-            compile_framework_template(&raw_content, &source_path, &framework_config);
+        let framework_compiled = compile_framework_template_with_router(
+            &raw_content,
+            &source_path,
+            &framework_config,
+            framework_inputs.router.as_deref(),
+        );
         #[cfg(feature = "extended-framework")]
         let content = framework_compiled.html.clone();
         #[cfg(not(feature = "extended-framework"))]
@@ -216,12 +258,12 @@ fn update_html_ui(
             .ok()
             .and_then(|node| node.attributes.borrow().get("lang").map(|s| s.to_string()));
 
-        ui_lang.apply_html_lang(html_lang.as_deref());
-        lang_state.last_resolved = ui_lang.resolved().map(|lang| lang.to_string());
+        state.ui_lang.apply_html_lang(html_lang.as_deref());
+        state.lang_state.last_resolved = state.ui_lang.resolved().map(|lang| lang.to_string());
 
         let localized = localize_html(
             &content,
-            ui_lang.resolved(),
+            state.ui_lang.resolved(),
             &config.language_path,
             &template_inputs.lang_vars,
         );
@@ -366,20 +408,27 @@ fn update_html_ui(
             &type_registry,
             "0",
         ) {
-            structure_map
+            state
+                .structure_map
                 .html_map
                 .insert(ui_key.clone(), vec![body_widget]);
             #[cfg(feature = "extended-framework")]
             {
-                let active = structure_map.active.get_or_insert_with(Vec::new);
+                let active = state.structure_map.active.get_or_insert_with(Vec::new);
                 if !active.iter().any(|existing| existing == &ui_key) {
                     active.push(ui_key.clone());
                 }
             }
 
             // IMPORTANT: Explicitly mark the affected UI key as dirty so the builder rebuilds.
-            html_dirty.0 = true;
-            html_dirty.1.insert(ui_key);
+            state.html_dirty.0 = true;
+            #[cfg(feature = "extended-framework")]
+            if router_dirty {
+                if let Some(pending_reveal) = state.pending_reveal.as_mut() {
+                    pending_reveal.0.insert(ui_key.clone());
+                }
+            }
+            state.html_dirty.1.insert(ui_key);
         } else {
             error!("Failed to parse <body> node.");
         }
@@ -1770,6 +1819,11 @@ pub fn resolve_relative_asset_path(html_path: &str, href: &str) -> String {
         href = rest.to_string();
     }
 
+    let path = std::path::Path::new(&href);
+    if path.is_absolute() && (path.exists() || path.parent().is_some_and(std::path::Path::exists)) {
+        return href;
+    }
+
     if let Some(rest) = href.strip_prefix('/') {
         return rest.to_string();
     }
@@ -3105,6 +3159,7 @@ enum ExprToken {
     LBracket,
     RBracket,
     EqEq,
+    BangEq,
     AndAnd,
     OrOr,
     Bang,
@@ -3149,6 +3204,11 @@ fn tokenize_expression(expression: &str) -> Option<Vec<ExprToken>> {
 
         if ch == '!' {
             chars.next();
+            if chars.peek() == Some(&'=') {
+                chars.next();
+                tokens.push(ExprToken::BangEq);
+                continue;
+            }
             tokens.push(ExprToken::Bang);
             continue;
         }
@@ -3344,9 +3404,20 @@ impl<'a> ExpressionParser<'a> {
 
     fn parse_equality(&mut self) -> Option<JsonValue> {
         let mut left = self.parse_unary()?;
-        while self.consume(ExprToken::EqEq) {
-            let right = self.parse_unary()?;
-            left = JsonValue::Bool(json_values_equal(&left, &right));
+        loop {
+            if self.consume(ExprToken::EqEq) {
+                let right = self.parse_unary()?;
+                left = JsonValue::Bool(json_values_equal(&left, &right));
+                continue;
+            }
+
+            if self.consume(ExprToken::BangEq) {
+                let right = self.parse_unary()?;
+                left = JsonValue::Bool(!json_values_equal(&left, &right));
+                continue;
+            }
+
+            break;
         }
         Some(left)
     }

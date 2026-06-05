@@ -1,10 +1,13 @@
 use crate::CurrentWidgetState;
 use crate::html::*;
+use crate::widgets::controls::color_picker::ColorPickerUserChanged;
+use crate::widgets::controls::input::InputUserChanged;
+use crate::widgets::controls::slider::SliderUserChanged;
 use crate::widgets::{
-    BindToID, Button, ButtonType, CheckBox, ChoiceBox, ColorPicker, DatePicker,
-    FieldSelectionMulti, FieldSelectionSingle, Form, FormValidationMode, InputField, InputValue,
-    ListBox, RadioButton, Scrollbar, Slider, SwitchButton, ToggleButton, UIGenID, UIWidgetState,
-    ValidationRules, evaluate_validation_state,
+    BindToID, Button, ButtonType, CheckBox, ChoiceBox, DatePicker, FieldSelectionMulti,
+    FieldSelectionSingle, Form, FormValidationMode, InputField, InputValue, ListBox, RadioButton,
+    Scrollbar, SwitchButton, ToggleButton, UIGenID, UIWidgetState, ValidationRules,
+    evaluate_validation_state,
 };
 use bevy::log::warn;
 use bevy::prelude::*;
@@ -762,10 +765,11 @@ pub(crate) fn emit_field_set_change(
 /// Emits change events for slider widgets.
 pub(crate) fn emit_slider_change(
     mut commands: Commands,
-    query: Query<(Entity, &HtmlEventBindings), Changed<Slider>>,
+    query: Query<(Entity, &HtmlEventBindings), With<SliderUserChanged>>,
 ) {
     for (entity, binding) in &query {
         emit_change_if_bound(&mut commands, binding, entity, HtmlChangeAction::State);
+        commands.entity(entity).remove::<SliderUserChanged>();
     }
 }
 
@@ -773,20 +777,35 @@ pub(crate) fn emit_slider_change(
 /// Emits change events for color picker widgets.
 pub(crate) fn emit_color_picker_change(
     mut commands: Commands,
-    query: Query<(Entity, &HtmlEventBindings), Changed<ColorPicker>>,
+    query: Query<(Entity, &HtmlEventBindings), With<ColorPickerUserChanged>>,
 ) {
     for (entity, binding) in &query {
         emit_change_if_bound(&mut commands, binding, entity, HtmlChangeAction::State);
+        commands.entity(entity).remove::<ColorPickerUserChanged>();
     }
 }
 
 /// Emits change events for input widgets.
 pub(crate) fn emit_input_change(
     mut commands: Commands,
-    query: Query<(Entity, &HtmlEventBindings), Changed<InputValue>>,
+    query: Query<
+        (
+            Entity,
+            &HtmlEventBindings,
+            Option<&UIWidgetState>,
+            Option<&InputUserChanged>,
+        ),
+        Or<(Changed<InputValue>, With<InputUserChanged>)>,
+    >,
 ) {
-    for (entity, binding) in &query {
-        emit_change_if_bound(&mut commands, binding, entity, HtmlChangeAction::State);
+    for (entity, binding, state, user_changed) in &query {
+        let is_focused_user_edit = state.is_some_and(|state| state.focused);
+        if user_changed.is_some() || is_focused_user_edit {
+            emit_change_if_bound(&mut commands, binding, entity, HtmlChangeAction::State);
+        }
+        if user_changed.is_some() {
+            commands.entity(entity).remove::<InputUserChanged>();
+        }
     }
 }
 

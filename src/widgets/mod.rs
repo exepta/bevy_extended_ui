@@ -882,7 +882,7 @@ impl DateFormat {
 }
 
 /// Date picker widget with an anchored calendar popover.
-#[derive(Component, Reflect, Debug, Clone)]
+#[derive(Component, Reflect, Debug, Clone, PartialEq)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, Widget, InputValue)]
 pub struct DatePicker {
@@ -928,7 +928,7 @@ impl Default for DatePicker {
 // ===============================================
 
 /// Input field widget with text and validation settings.
-#[derive(Component, Reflect, Debug, Clone)]
+#[derive(Component, Reflect, Debug, Clone, PartialEq)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, Widget, InputValue)]
 pub struct InputField {
@@ -1004,7 +1004,7 @@ impl InputType {
     pub fn is_valid_char(&self, c: char) -> bool {
         match self {
             InputType::Text | InputType::Password => true,
-            InputType::Number => c.is_ascii_digit() || "+-*/() ".contains(c),
+            InputType::Number => c.is_ascii_digit() || "+-*/()., ".contains(c),
             InputType::Email => c.is_ascii_alphanumeric() || c == '@' || c == '.' || c == '-',
             InputType::Date => c.is_ascii_digit() || c == '/' || c == '-' || c == '.',
             InputType::Range => c.is_ascii_digit() || c == '/' || c == '-' || c == '.' || c == ' ',
@@ -1675,7 +1675,7 @@ impl Default for Slider {
 // ===============================================
 
 /// Color picker widget with HSV interaction and RGB/RGBA/HEX output values.
-#[derive(Component, Reflect, Debug, Clone)]
+#[derive(Component, Reflect, Debug, Clone, PartialEq)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, Widget)]
 pub struct ColorPicker {

@@ -40,10 +40,16 @@ mod tests {
         vars.set("data", r#"{"username":"NetRunner","state":true}"#);
         vars.set("client", r#"{"id":42}"#);
         vars.set("state", "true");
+        vars.set("file", r#""avatar.png""#);
 
         let template = r#"
             @if(data.username.startsWidth("Net") && client.id == 42) {
               <div><p>Hello World</p></div>
+            }
+            @if(file != "") {
+              <img src="{{ file }}">
+            } @else {
+              <p>No File</p>
             }
             @if(!state) {
               <p>Should Not Exist</p>
@@ -53,6 +59,8 @@ mod tests {
         let rendered = preprocess_template_directives(template, &vars);
 
         assert!(rendered.contains("<div><p>Hello World</p></div>"));
+        assert!(rendered.contains(r#"<img src="avatar.png">"#));
+        assert!(!rendered.contains("No File"));
         assert!(!rendered.contains("Should Not Exist"));
     }
 
