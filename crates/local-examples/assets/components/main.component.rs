@@ -3,6 +3,7 @@ use bevy::prelude::*;
 use bevy_extended_ui::BeuStore;
 use bevy_extended_ui::framework::UiBindingStore;
 use bevy_extended_ui::html::{HtmlChange, HtmlClick, HtmlInit};
+use bevy_extended_ui::routing::Router;
 use bevy_extended_ui::widgets::{
     ColorPicker, FieldSelectionMulti, FieldSelectionSingle, InputField, InputValue, RadioButton,
     ListBox, Slider, ToggleButton,
@@ -135,6 +136,21 @@ pub fn check_state(In(_): In<HtmlClick>, mut store: ResMut<UiBindingStore>) {
     let mut player = store.get_store::<Player>().cloned().unwrap_or_default();
     player.state = !player.state;
     store.set_store(player);
+}
+
+#[html_fn("go_help")]
+pub fn go_help(In(_): In<HtmlClick>, mut router: ResMut<Router>) {
+    router.navigate("/help");
+}
+
+#[html_fn("go_settings")]
+pub fn go_settings(In(_): In<HtmlClick>, mut router: ResMut<Router>) {
+    router.navigate("/settings");
+}
+
+#[html_fn("go_info")]
+pub fn go_info(In(_): In<HtmlClick>, mut router: ResMut<Router>) {
+    router.navigate("/info");
 }
 
 #[html_fn("increase_value")]

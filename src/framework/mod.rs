@@ -13,6 +13,8 @@ use crate::component::{
     load_component_definitions, load_component_template_html, validate_component_assets,
 };
 use crate::lang::UiSharedValues;
+#[cfg(feature = "extended-framework")]
+use crate::routing::Router;
 
 pub use inventory;
 
@@ -449,13 +451,27 @@ pub fn compile_framework_template(
     source_path: &str,
     config: &ExtendedFrameworkConfiguration,
 ) -> FrameworkCompileResult {
+    compile_framework_template_with_router(template_html, source_path, config, None)
+}
+
+/// Compiles an HTML template and resolves `<router-outlet>` against the active route.
+#[cfg(feature = "extended-framework")]
+pub fn compile_framework_template_with_router(
+    template_html: &str,
+    source_path: &str,
+    config: &ExtendedFrameworkConfiguration,
+    router: Option<&Router>,
+) -> FrameworkCompileResult {
     let source = normalize_source_path(source_path);
     let mut html = template_html.to_string();
     let mut component_controllers = Vec::new();
     if source == normalize_source_path(&config.index_html_file) {
-        component_controllers = compile_index_template(&mut html, config).unwrap_or_else(|err| {
-            panic!("extended-framework compile failed for index.html: {err}")
-        });
+        let route_components = router.map(registered_route_components).unwrap_or_default();
+        component_controllers =
+            compile_index_template(&mut html, config, router, route_components.as_slice())
+                .unwrap_or_else(|err| {
+                    panic!("extended-framework compile failed for index.html: {err}")
+                });
     }
 
     FrameworkCompileResult {
@@ -534,11 +550,22 @@ fn normalize_root(path: &str) -> String {
 fn compile_index_template(
     index_html: &mut String,
     config: &ExtendedFrameworkConfiguration,
+    router: Option<&Router>,
+    route_components: &[String],
 ) -> Result<Vec<String>, String> {
     let defs = load_component_definitions(config)?;
     validate_component_assets(&defs, config)?;
+    let has_router_outlet = has_router_outlet(index_html)?;
 
-    let mut used_style_hrefs: BTreeSet<String> = BTreeSet::new();
+    if let Some(router) = router {
+        replace_router_outlets(index_html, router, &defs)?;
+    }
+
+    let mut used_style_hrefs = if has_router_outlet {
+        collect_route_component_style_hrefs(route_components, &defs, config)
+    } else {
+        BTreeSet::new()
+    };
     let mut used_component_controllers: BTreeSet<String> = BTreeSet::new();
 
     for _ in 0..16 {
@@ -588,6 +615,165 @@ fn compile_index_template(
 
     inject_component_styles(index_html, used_style_hrefs);
     Ok(used_component_controllers.into_iter().collect())
+}
+
+/// Handles `registered_route_components` in the extended UI workflow.
+#[cfg(feature = "extended-framework")]
+fn registered_route_components(router: &Router) -> Vec<String> {
+    let mut components = router
+        .routes()
+        .routes()
+        .iter()
+        .map(|route| route.component.clone())
+        .collect::<BTreeSet<_>>();
+
+    if let Some(fallback) = router.routes().fallback_component() {
+        components.insert(fallback.to_string());
+    }
+
+    components.into_iter().collect()
+}
+
+/// Handles `has_router_outlet` in the extended UI workflow.
+#[cfg(feature = "extended-framework")]
+fn has_router_outlet(html: &str) -> Result<bool, String> {
+    let full_outlet_re = Regex::new(r"(?is)<\s*router-outlet\b[^>]*>.*?</\s*router-outlet\s*>")
+        .map_err(|err| format!("invalid router-outlet regex: {err}"))?;
+    let self_closing_outlet_re = Regex::new(r"(?is)<\s*router-outlet\b[^>]*/\s*>")
+        .map_err(|err| format!("invalid router-outlet regex: {err}"))?;
+
+    Ok(full_outlet_re.is_match(html) || self_closing_outlet_re.is_match(html))
+}
+
+/// Handles `collect_route_component_style_hrefs` in the extended UI workflow.
+#[cfg(feature = "extended-framework")]
+fn collect_route_component_style_hrefs(
+    route_components: &[String],
+    defs: &[crate::component::ComponentDefinition],
+    config: &ExtendedFrameworkConfiguration,
+) -> BTreeSet<String> {
+    let route_components = route_components
+        .iter()
+        .map(String::as_str)
+        .collect::<BTreeSet<_>>();
+    let mut hrefs = BTreeSet::new();
+
+    for def in defs {
+        if !route_components.contains(def.template_name.as_str()) {
+            continue;
+        }
+
+        for style in &def.styles {
+            hrefs.insert(build_component_style_href(
+                &config.assets_component_root,
+                &def.source_dir_rel,
+                style,
+            ));
+        }
+    }
+
+    hrefs
+}
+
+/// Handles `replace_router_outlets` in the extended UI workflow.
+#[cfg(feature = "extended-framework")]
+fn replace_router_outlets(
+    html: &mut String,
+    router: &Router,
+    defs: &[crate::component::ComponentDefinition],
+) -> Result<(), String> {
+    let full_outlet_re = Regex::new(r"(?is)<\s*router-outlet\b[^>]*>.*?</\s*router-outlet\s*>")
+        .map_err(|err| format!("invalid router-outlet regex: {err}"))?;
+    let self_closing_outlet_re = Regex::new(r"(?is)<\s*router-outlet\b[^>]*/\s*>")
+        .map_err(|err| format!("invalid router-outlet regex: {err}"))?;
+
+    if !full_outlet_re.is_match(html) && !self_closing_outlet_re.is_match(html) {
+        return Ok(());
+    }
+
+    let Some(active_route_component) = router.active_component() else {
+        return Ok(());
+    };
+
+    if !component_is_registered(active_route_component, defs) {
+        return Err(format!(
+            "Route component `{active_route_component}` is not registered as a component template_name."
+        ));
+    }
+
+    let keep_alive_routes = router
+        .routes()
+        .routes()
+        .iter()
+        .filter(|route| route.keep_alive)
+        .collect::<Vec<_>>();
+
+    let routed_component = if keep_alive_routes.is_empty() {
+        format!("<{active_route_component}></{active_route_component}>")
+    } else {
+        build_keep_alive_router_outlet(active_route_component, keep_alive_routes.as_slice(), defs)?
+    };
+    *html = full_outlet_re
+        .replace_all(html, routed_component.as_str())
+        .to_string();
+    *html = self_closing_outlet_re
+        .replace_all(html, routed_component.as_str())
+        .to_string();
+    Ok(())
+}
+
+#[cfg(feature = "extended-framework")]
+fn component_is_registered(
+    component: &str,
+    defs: &[crate::component::ComponentDefinition],
+) -> bool {
+    defs.iter()
+        .any(|definition| definition.template_name == component)
+}
+
+#[cfg(feature = "extended-framework")]
+fn build_keep_alive_router_outlet(
+    active_route_component: &str,
+    keep_alive_routes: &[&crate::routing::Route],
+    defs: &[crate::component::ComponentDefinition],
+) -> Result<String, String> {
+    let mut html = String::new();
+    let mut active_is_keep_alive = false;
+
+    for route in keep_alive_routes {
+        if !component_is_registered(&route.component, defs) {
+            return Err(format!(
+                "Keep-alive route component `{}` is not registered as a component template_name.",
+                route.component
+            ));
+        }
+
+        let active = route.component == active_route_component;
+        active_is_keep_alive |= active;
+        html.push_str(&route_component_wrapper(&route.component, active));
+    }
+
+    if !active_is_keep_alive {
+        html.push_str(&route_component_wrapper(active_route_component, true));
+    }
+
+    Ok(html)
+}
+
+#[cfg(feature = "extended-framework")]
+fn route_component_wrapper(component: &str, active: bool) -> String {
+    let style = if active {
+        "display: flex; width: 100%; height: 100%; flex-direction: column;"
+    } else {
+        "display: none;"
+    };
+    let class = if active {
+        "beu-route beu-route-active"
+    } else {
+        "beu-route beu-route-cached"
+    };
+
+    format!(r#"<div class="{class}" style="{style}"><{component}></{component}></div>"#,)
 }
 
 /// Handles `inject_component_styles` in the extended UI workflow.

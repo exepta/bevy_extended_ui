@@ -1,0 +1,45 @@
+#settings-page {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  background: #1a2027;
+  color: #effaf5;
+}
+
+.settings-shell {
+  width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 28px;
+  border: 1px solid #719587;
+  border-radius: 18px;
+  background: #20302d;
+  color: #effaf5;
+}
+
+.eyebrow {
+  color: #98d8bf;
+  font-size: 13px;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+}
+
+.settings-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  border-radius: 14px;
+  background: #111a20;
+}
+
+.settings-actions {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+}
