@@ -9,6 +9,7 @@ pub mod framework;
 pub mod html;
 pub mod io;
 pub mod lang;
+pub mod routing;
 pub mod services;
 pub mod styles;
 pub mod widgets;

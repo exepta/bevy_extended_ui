@@ -42,6 +42,25 @@ impl Routes {
         self
     }
 
+    /// Merges another route table into this one.
+    ///
+    /// The input can be a [`Routes`] value or a function that returns [`Routes`].
+    /// This supports Angular-like route file composition:
+    ///
+    /// ```rust
+    /// # use bevy_extended_ui::routing::Routes;
+    /// fn secondary_routes() -> Routes {
+    ///     Routes::new().route("/settings", "app-settings")
+    /// }
+    ///
+    /// let routes = Routes::new()
+    ///     .route("/", "app-main")
+    ///     .merge(secondary_routes);
+    /// ```
+    pub fn merge(self, routes: impl IntoRoutes) -> Self {
+        merge_routes(self, routes.into_routes())
+    }
+
     /// Registers a redirect from one path to another.
     pub fn redirect(mut self, from: impl Into<String>, to: impl Into<String>) -> Self {
         self.redirects.push(RouteRedirect {
@@ -148,6 +167,27 @@ impl From<&str> for RouteTarget {
 impl From<String> for RouteTarget {
     fn from(value: String) -> Self {
         Self::new(value)
+    }
+}
+
+/// Converts a route source into a concrete route table.
+pub trait IntoRoutes {
+    /// Returns a concrete route table.
+    fn into_routes(self) -> Routes;
+}
+
+impl IntoRoutes for Routes {
+    fn into_routes(self) -> Routes {
+        self
+    }
+}
+
+impl<F> IntoRoutes for F
+where
+    F: FnOnce() -> Routes,
+{
+    fn into_routes(self) -> Routes {
+        self()
     }
 }
 
@@ -291,42 +331,4 @@ fn normalize_route_path(path: impl AsRef<str>) -> String {
     }
 
     normalized
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn routes_resolve_registered_path() {
-        let routes = Routes::new().route("/help", "app-help");
-        assert_eq!(routes.resolve_component("/help"), Some("app-help"));
-    }
-
-    #[test]
-    fn load_macro_marks_route_keep_alive() {
-        let routes = Routes::new().route("/", load!("app-home"));
-        assert_eq!(routes.resolve_component("/"), Some("app-home"));
-        assert!(routes.routes()[0].keep_alive);
-    }
-
-    #[test]
-    fn routes_apply_redirects() {
-        let routes = Routes::new().route("/", "app-home").redirect("", "/");
-        assert_eq!(routes.resolve_component(""), Some("app-home"));
-    }
-
-    #[test]
-    fn routes_use_fallback_for_unknown_path() {
-        let routes = Routes::new().route("/", "app-home").fallback("app-home");
-        assert_eq!(routes.resolve_component("/missing"), Some("app-home"));
-    }
-
-    #[test]
-    fn router_revision_changes_on_navigation() {
-        let mut router = Router::default();
-        let first = router.revision();
-        router.navigate("/help");
-        assert!(router.revision() > first);
-    }
 }

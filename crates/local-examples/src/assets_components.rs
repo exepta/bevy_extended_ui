@@ -12,11 +12,6 @@ mod beu_routes;
 
 #[cfg(feature = "extended-framework")]
 #[allow(dead_code)]
-#[path = "../assets/components/secondary.routes.rs"]
-mod secondary_routes;
-
-#[cfg(feature = "extended-framework")]
-#[allow(dead_code)]
 #[path = "../assets/components/main.component.rs"]
 mod main_component_mod;
 

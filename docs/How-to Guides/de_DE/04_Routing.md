@@ -230,7 +230,7 @@ Halte die Liste klein. Jede Keep-alive Route behält ihren Widget-Baum, zustands
 
 #### Keep-alive mit mehreren Route-Dateien
 
-`load!()` funktioniert in jeder Route-Datei, die über `#[beu_routes]` gesammelt wird.
+`load!()` funktioniert in Route-Helper-Dateien, die in deine zentrale `beu.routes.rs` gemerged werden.
 
 Datei: `assets/components/beu.routes.rs`
 
@@ -238,11 +238,15 @@ Datei: `assets/components/beu.routes.rs`
 use bevy_extended_ui::routing::{Routes, load};
 use bevy_extended_ui_macros::beu_routes;
 
+#[path = "secondary.routes.rs"]
+mod secondary_routes;
+
 #[beu_routes]
 pub fn routes() -> Routes {
     Routes::new()
         .route("/", load!("app-main"))
         .route("/help", "app-help")
+        .merge(secondary_routes::secondary_routes)
         .redirect("", "/")
         .fallback("app-main")
 }
@@ -252,9 +256,7 @@ Datei: `assets/components/secondary.routes.rs`
 
 ```rust
 use bevy_extended_ui::routing::{Routes, load};
-use bevy_extended_ui_macros::beu_routes;
 
-#[beu_routes]
 pub fn secondary_routes() -> Routes {
     Routes::new()
         .route("/settings", "app-settings")
@@ -262,7 +264,7 @@ pub fn secondary_routes() -> Routes {
 }
 ```
 
-Beide Route-Tabellen werden über Inventory gesammelt und vom Routing-Plugin zusammengeführt.
+Bei diesem Composition-Style braucht nur die zentrale `routes()` Funktion `#[beu_routes]`. Die zweite Datei ist ein normaler Rust-Helper, der `Routes` zurückgibt.
 
 #### Wie das Outlet intern aussieht
 
@@ -661,15 +663,15 @@ Sehr große Route-CSS-Dateien solltest du trotzdem vermeiden, wenn Navigation so
 
 ## 13) Mehrere Route-Dateien
 
-Du kannst Routes nach Features in mehrere `#[beu_routes]` Dateien aufteilen. Das Routing-Plugin sammelt alle über Inventory.
+Du kannst Routes nach Features in Helper-Dateien aufteilen und in der zentralen `beu.routes.rs` mergen.
+
+Das ist die empfohlene Struktur, wenn eine Route-Tabelle der explizite Einstiegspunkt sein soll.
 
 Datei: `assets/components/admin.routes.rs`
 
 ```rust
 use bevy_extended_ui::routing::Routes;
-use bevy_extended_ui_macros::beu_routes;
 
-#[beu_routes]
 pub fn admin_routes() -> Routes {
     Routes::new()
         .route("/admin", "app-admin")
@@ -683,18 +685,24 @@ Datei: `assets/components/beu.routes.rs`
 use bevy_extended_ui::routing::{Routes, load};
 use bevy_extended_ui_macros::beu_routes;
 
+#[path = "admin.routes.rs"]
+mod admin_routes;
+
 #[beu_routes]
 pub fn routes() -> Routes {
     Routes::new()
         .route("/", load!("app-main"))
         .route("/help", "app-help")
+        .merge(admin_routes::admin_routes)
         .fallback("app-main")
 }
 ```
 
-Jede Route-Datei muss über `#[path]` aus deiner `assets_components.rs` in die Rust-App kompiliert werden.
+Nur `beu.routes.rs` muss aus deiner `assets_components.rs` eingebunden werden. Die Helper-Route-Datei wird von `beu.routes.rs` eingebunden.
 
-`load!()` kann in jeder dieser Route-Dateien verwendet werden. Das Keep-alive Flag wird auf der Route gespeichert und bleibt beim Zusammenführen der Route-Tabellen erhalten.
+`load!()` kann auch in Helper-Route-Dateien verwendet werden. Das Keep-alive Flag wird auf der Route gespeichert und bleibt bei `.merge(...)` erhalten.
+
+Setze kein `#[beu_routes]` auf Helper-Funktionen, die manuell gemerged werden. Sonst wird dieselbe Route-Tabelle sowohl manuell gemerged als auch über Inventory gesammelt.
 
 ## 14) Mehrere `#[beu_routes]` Registrierungen
 
