@@ -1,0 +1,11 @@
+<svg width="128" height="128" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+<rect width="512" height="512" rx="120" fill="#0f0f14"/>
+<polygon points="256,80 400,160 400,320 256,400 112,320 112,160"
+fill="none" stroke="#6642f5" stroke-width="18"/>
+<rect x="170" y="180" width="172" height="40" rx="8" fill="#6642f5"/>
+<rect x="170" y="240" width="120" height="36" rx="6" fill="#8a6bff"/>
+<rect x="300" y="240" width="42" height="36" rx="6" fill="#8a6bff"/>
+<line x1="256" y1="160" x2="256" y2="180" stroke="#6642f5" stroke-width="6"/>
+<line x1="170" y1="220" x2="170" y2="240" stroke="#6642f5" stroke-width="6"/>
+<line x1="342" y1="220" x2="342" y2="240" stroke="#6642f5" stroke-width="6"/>
+</svg>

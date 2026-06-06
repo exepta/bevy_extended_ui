@@ -1,10 +1,14 @@
 use crate::CurrentWidgetState;
+use crate::html::inline_functions::queue_html_inline_action;
 use crate::html::*;
+use crate::widgets::controls::color_picker::ColorPickerUserChanged;
+use crate::widgets::controls::input::InputUserChanged;
+use crate::widgets::controls::slider::SliderUserChanged;
 use crate::widgets::{
-    BindToID, Button, ButtonType, CheckBox, ChoiceBox, ColorPicker, DatePicker,
-    FieldSelectionMulti, FieldSelectionSingle, Form, FormValidationMode, InputField, InputValue,
-    RadioButton, Scrollbar, Slider, SwitchButton, ToggleButton, UIGenID, UIWidgetState,
-    ValidationRules, evaluate_validation_state,
+    BindToID, Button, ButtonType, CheckBox, ChoiceBox, DatePicker, FieldSelectionMulti,
+    FieldSelectionSingle, Form, FormValidationMode, InputField, InputValue, ListBox, RadioButton,
+    Scrollbar, SwitchButton, ToggleButton, UIGenID, UIWidgetState, ValidationRules,
+    evaluate_validation_state,
 };
 use bevy::log::warn;
 use bevy::prelude::*;
@@ -68,6 +72,7 @@ impl Plugin for HtmlEventBindingsPlugin {
             Update,
             emit_choice_box_change.in_set(HtmlSystemSet::Bindings),
         );
+        app.add_systems(Update, emit_list_box_change.in_set(HtmlSystemSet::Bindings));
         app.add_systems(
             Update,
             emit_field_set_change.in_set(HtmlSystemSet::Bindings),
@@ -130,6 +135,7 @@ impl Plugin for HtmlEventBindingsPlugin {
     }
 }
 
+/// Handles `pointer_inner_position` in the extended UI workflow.
 fn pointer_inner_position(
     rel_pos: Option<&RelativeCursorPosition>,
     node: Option<&ComputedNode>,
@@ -195,6 +201,10 @@ pub(crate) fn on_html_click(
     let Ok(bindings) = q_bindings.get(entity) else {
         return;
     };
+    if let Some(action) = bindings.inline.onclick.clone() {
+        queue_html_inline_action(&mut commands, entity, action);
+        return;
+    }
     let Some(name) = bindings.onclick.as_deref() else {
         return;
     };
@@ -254,6 +264,10 @@ pub(crate) fn on_html_mouse_down(
     let Ok(bindings) = q_bindings.get(entity) else {
         return;
     };
+    if let Some(action) = bindings.inline.onmousedown.clone() {
+        queue_html_inline_action(&mut commands, entity, action);
+        return;
+    }
     let Some(name) = bindings.onmousedown.as_deref() else {
         return;
     };
@@ -313,6 +327,10 @@ pub(crate) fn on_html_mouse_up(
     let Ok(bindings) = q_bindings.get(entity) else {
         return;
     };
+    if let Some(action) = bindings.inline.onmouseup.clone() {
+        queue_html_inline_action(&mut commands, entity, action);
+        return;
+    }
     let Some(name) = bindings.onmouseup.as_deref() else {
         return;
     };
@@ -581,6 +599,10 @@ pub(crate) fn on_html_mouse_over(
     let Ok(bindings) = q_bindings.get(entity) else {
         return;
     };
+    if let Some(action) = bindings.inline.onmouseover.clone() {
+        queue_html_inline_action(&mut commands, entity, action);
+        return;
+    }
     let Some(name) = bindings.onmouseover.as_deref() else {
         return;
     };
@@ -626,6 +648,10 @@ pub(crate) fn on_html_mouse_out(
     let Ok(bindings) = q_bindings.get(entity) else {
         return;
     };
+    if let Some(action) = bindings.inline.onmouseout.clone() {
+        queue_html_inline_action(&mut commands, entity, action);
+        return;
+    }
     let Some(name) = bindings.onmouseout.as_deref() else {
         return;
     };
@@ -692,6 +718,10 @@ pub(crate) fn on_html_init(
         return;
     };
 
+    if let Some(action) = bindings.inline.oninit.clone() {
+        queue_html_inline_action(&mut commands, entity, action);
+        return;
+    }
     let Some(name) = bindings.oninit.as_deref() else {
         return;
     };
@@ -731,6 +761,17 @@ pub(crate) fn emit_choice_box_change(
     }
 }
 
+/// ListBox
+/// Emits change events for list box widgets.
+pub(crate) fn emit_list_box_change(
+    mut commands: Commands,
+    query: Query<(Entity, &HtmlEventBindings), Changed<ListBox>>,
+) {
+    for (entity, binding) in &query {
+        emit_change_if_bound(&mut commands, binding, entity, HtmlChangeAction::State);
+    }
+}
+
 /// FieldSet
 /// Emits change events for field set widgets.
 pub(crate) fn emit_field_set_change(
@@ -749,10 +790,11 @@ pub(crate) fn emit_field_set_change(
 /// Emits change events for slider widgets.
 pub(crate) fn emit_slider_change(
     mut commands: Commands,
-    query: Query<(Entity, &HtmlEventBindings), Changed<Slider>>,
+    query: Query<(Entity, &HtmlEventBindings), With<SliderUserChanged>>,
 ) {
     for (entity, binding) in &query {
         emit_change_if_bound(&mut commands, binding, entity, HtmlChangeAction::State);
+        commands.entity(entity).remove::<SliderUserChanged>();
     }
 }
 
@@ -760,20 +802,35 @@ pub(crate) fn emit_slider_change(
 /// Emits change events for color picker widgets.
 pub(crate) fn emit_color_picker_change(
     mut commands: Commands,
-    query: Query<(Entity, &HtmlEventBindings), Changed<ColorPicker>>,
+    query: Query<(Entity, &HtmlEventBindings), With<ColorPickerUserChanged>>,
 ) {
     for (entity, binding) in &query {
         emit_change_if_bound(&mut commands, binding, entity, HtmlChangeAction::State);
+        commands.entity(entity).remove::<ColorPickerUserChanged>();
     }
 }
 
 /// Emits change events for input widgets.
 pub(crate) fn emit_input_change(
     mut commands: Commands,
-    query: Query<(Entity, &HtmlEventBindings), Changed<InputValue>>,
+    query: Query<
+        (
+            Entity,
+            &HtmlEventBindings,
+            Option<&UIWidgetState>,
+            Option<&InputUserChanged>,
+        ),
+        Or<(Changed<InputValue>, With<InputUserChanged>)>,
+    >,
 ) {
-    for (entity, binding) in &query {
-        emit_change_if_bound(&mut commands, binding, entity, HtmlChangeAction::State);
+    for (entity, binding, state, user_changed) in &query {
+        let is_focused_user_edit = state.is_some_and(|state| state.focused);
+        if user_changed.is_some() || is_focused_user_edit {
+            emit_change_if_bound(&mut commands, binding, entity, HtmlChangeAction::State);
+        }
+        if user_changed.is_some() {
+            commands.entity(entity).remove::<InputUserChanged>();
+        }
     }
 }
 
@@ -802,6 +859,10 @@ pub(crate) fn on_html_change(
         return;
     };
 
+    if let Some(action) = bindings.inline.onchange.clone() {
+        queue_html_inline_action(&mut commands, entity, action);
+        return;
+    }
     let Some(name) = bindings.onchange.as_deref() else {
         return;
     };
@@ -877,6 +938,10 @@ pub(crate) fn on_html_focus(
     let Ok(bindings) = q_bindings.get(entity) else {
         return;
     };
+    if let Some(action) = bindings.inline.onfoucs.clone() {
+        queue_html_inline_action(&mut commands, entity, action);
+        return;
+    }
     let Some(name) = bindings.onfoucs.as_deref() else {
         return;
     };
@@ -990,6 +1055,10 @@ pub(crate) fn on_html_scroll(
     let Ok(bindings) = q_bindings.get(entity) else {
         return;
     };
+    if let Some(action) = bindings.inline.onscroll.clone() {
+        queue_html_inline_action(&mut commands, entity, action);
+        return;
+    }
     let Some(name) = bindings.onscroll.as_deref() else {
         return;
     };
@@ -1046,6 +1115,10 @@ pub(crate) fn on_html_wheel(
     let Ok(bindings) = q_bindings.get(entity) else {
         return;
     };
+    if let Some(action) = bindings.inline.onwheel.clone() {
+        queue_html_inline_action(&mut commands, entity, action);
+        return;
+    }
     let Some(name) = bindings.onwheel.as_deref() else {
         return;
     };
@@ -1063,6 +1136,7 @@ pub(crate) fn on_html_wheel(
 //                       Keyboard
 // =================================================
 
+/// Handles `find_keyboard_target_entity` in the extended UI workflow.
 fn find_keyboard_target_entity(
     current_widget_state: &CurrentWidgetState,
     q_bindings: &Query<(Entity, &UIGenID, &HtmlEventBindings, &UIWidgetState)>,
@@ -1150,6 +1224,10 @@ pub(crate) fn on_html_key_down(
     let Ok(bindings) = q_bindings.get(entity) else {
         return;
     };
+    if let Some(action) = bindings.inline.onkeydown.clone() {
+        queue_html_inline_action(&mut commands, entity, action);
+        return;
+    }
     let Some(name) = bindings.onkeydown.as_deref() else {
         return;
     };
@@ -1175,6 +1253,10 @@ pub(crate) fn on_html_key_up(
     let Ok(bindings) = q_bindings.get(entity) else {
         return;
     };
+    if let Some(action) = bindings.inline.onkeyup.clone() {
+        queue_html_inline_action(&mut commands, entity, action);
+        return;
+    }
     let Some(name) = bindings.onkeyup.as_deref() else {
         return;
     };
@@ -1238,6 +1320,10 @@ pub(crate) fn on_html_touch_start(
     let Ok(bindings) = q_bindings.get(entity) else {
         return;
     };
+    if let Some(action) = bindings.inline.ontouchstart.clone() {
+        queue_html_inline_action(&mut commands, entity, action);
+        return;
+    }
     let Some(name) = bindings.ontouchstart.as_deref() else {
         return;
     };
@@ -1298,6 +1384,10 @@ pub(crate) fn on_html_touch_move(
     let Ok(bindings) = q_bindings.get(entity) else {
         return;
     };
+    if let Some(action) = bindings.inline.ontouchmove.clone() {
+        queue_html_inline_action(&mut commands, entity, action);
+        return;
+    }
     let Some(name) = bindings.ontouchmove.as_deref() else {
         return;
     };
@@ -1357,6 +1447,10 @@ pub(crate) fn on_html_touch_end(
     let Ok(bindings) = q_bindings.get(entity) else {
         return;
     };
+    if let Some(action) = bindings.inline.ontouchend.clone() {
+        queue_html_inline_action(&mut commands, entity, action);
+        return;
+    }
     let Some(name) = bindings.ontouchend.as_deref() else {
         return;
     };
@@ -1410,6 +1504,10 @@ pub(crate) fn on_html_drag_start(
     let Ok(bindings) = q_bindings.get(entity) else {
         return;
     };
+    if let Some(action) = bindings.inline.ondragstart.clone() {
+        queue_html_inline_action(&mut commands, entity, action);
+        return;
+    }
     let Some(name) = bindings.ondragstart.as_deref() else {
         return;
     };
@@ -1459,6 +1557,10 @@ pub(crate) fn on_html_drag(
     let Ok(bindings) = q_bindings.get(entity) else {
         return;
     };
+    if let Some(action) = bindings.inline.ondrag.clone() {
+        queue_html_inline_action(&mut commands, entity, action);
+        return;
+    }
     let Some(name) = bindings.ondrag.as_deref() else {
         return;
     };
@@ -1508,6 +1610,10 @@ pub(crate) fn on_html_drag_stop(
     let Ok(bindings) = q_bindings.get(entity) else {
         return;
     };
+    if let Some(action) = bindings.inline.ondragstop.clone() {
+        queue_html_inline_action(&mut commands, entity, action);
+        return;
+    }
     let Some(name) = bindings.ondragstop.as_deref() else {
         return;
     };

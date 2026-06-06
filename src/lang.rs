@@ -1,7 +1,8 @@
 use bevy::prelude::*;
-use std::collections::HashMap;
-#[cfg(any(feature = "fluent", feature = "properties-lang"))]
-use std::collections::HashSet;
+use serde::Serialize;
+use serde::de::DeserializeOwned;
+use serde_json::Value as JsonValue;
+use std::collections::{HashMap, HashSet};
 use std::env;
 
 #[cfg(any(feature = "fluent", feature = "properties-lang"))]
@@ -65,6 +66,7 @@ impl Default for UiLangState {
             last_resolved: None,
             last_language_path: None,
             last_vars_fingerprint: None,
+            last_shared_fingerprint: None,
         }
     }
 }
@@ -110,6 +112,7 @@ pub struct UiLangState {
     pub last_resolved: Option<String>,
     pub last_language_path: Option<String>,
     pub last_vars_fingerprint: Option<u64>,
+    pub last_shared_fingerprint: Option<u64>,
 }
 
 /// Runtime variables used for placeholder substitution during localization.
@@ -118,10 +121,91 @@ pub struct UiLangVariables {
     pub vars: HashMap<String, String>,
 }
 
+/// Shared typed values exposed to HTML templates.
+#[derive(Resource, Debug, Default, Clone)]
+pub struct UiSharedValues {
+    /// Shared type name -> JSON value
+    pub values: HashMap<String, JsonValue>,
+    /// Auto alias (`#[html_use]`) -> shared type name
+    pub auto_use_aliases: HashMap<String, String>,
+    /// Registered shared type names (available via macros), even if no resource exists yet.
+    pub known_types: HashSet<String>,
+}
+
+/// Registration entry produced by `#[html_shared]` / `#[html_use]`.
+pub enum HtmlSharedRegistration {
+    Shared {
+        name: &'static str,
+        path: &'static str,
+        alias: &'static str,
+        auto_use: bool,
+        capture: fn(&World) -> Option<JsonValue>,
+    },
+}
+
+inventory::collect!(HtmlSharedRegistration);
+pub use inventory;
+pub use serde_json;
+
 impl UiLangVariables {
     /// Inserts or replaces a localization variable.
     pub fn set(&mut self, key: impl Into<String>, value: impl Into<String>) {
         self.vars.insert(key.into(), value.into());
+    }
+
+    /// Returns a variable value as `&str`.
+    pub fn get(&self, key: &str) -> Option<&str> {
+        self.vars.get(key).map(String::as_str)
+    }
+
+    /// Returns whether a key exists.
+    pub fn contains_key(&self, key: &str) -> bool {
+        self.vars.contains_key(key)
+    }
+
+    /// Sets a boolean variable as normalized `"true"` / `"false"`.
+    pub fn set_bool(&mut self, key: impl Into<String>, value: bool) {
+        self.set(key, if value { "true" } else { "false" });
+    }
+
+    /// Reads a boolean variable from common textual forms.
+    pub fn get_bool(&self, key: &str) -> Option<bool> {
+        let raw = self.get(key)?;
+        parse_bool_var(raw)
+    }
+
+    /// Toggles a boolean variable and returns the new value.
+    pub fn toggle_bool(&mut self, key: impl Into<String>, default: bool) -> bool {
+        let key = key.into();
+        let current = self.get_bool(&key).unwrap_or(default);
+        let next = !current;
+        self.set_bool(key, next);
+        next
+    }
+
+    /// Stores any serializable value as JSON text.
+    pub fn set_json<T: Serialize>(
+        &mut self,
+        key: impl Into<String>,
+        value: &T,
+    ) -> Result<(), serde_json::Error> {
+        let encoded = serde_json::to_string(value)?;
+        self.vars.insert(key.into(), encoded);
+        Ok(())
+    }
+
+    /// Reads a JSON value into a typed model.
+    pub fn get_json<T: DeserializeOwned>(&self, key: &str) -> Option<T> {
+        let raw = self.get(key)?;
+        serde_json::from_str(raw).ok()
+    }
+}
+
+fn parse_bool_var(raw: &str) -> Option<bool> {
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "true" | "1" | "yes" | "on" => Some(true),
+        "false" | "0" | "no" | "off" => Some(false),
+        _ => None,
     }
 }
 
@@ -448,9 +532,90 @@ pub fn vars_fingerprint(vars: &UiLangVariables) -> u64 {
     hasher.finish()
 }
 
+/// Computes a stable fingerprint for shared typed values.
+pub fn shared_values_fingerprint(shared: &UiSharedValues) -> u64 {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+
+    let mut shared_entries: Vec<_> = shared.values.iter().collect();
+    shared_entries.sort_by(|(a, _), (b, _)| a.cmp(b));
+
+    let mut alias_entries: Vec<_> = shared.auto_use_aliases.iter().collect();
+    alias_entries.sort_by(|(a, _), (b, _)| a.cmp(b));
+    let mut known_types: Vec<_> = shared.known_types.iter().collect();
+    known_types.sort();
+
+    let mut hasher = DefaultHasher::new();
+    for (key, value) in shared_entries {
+        key.hash(&mut hasher);
+        value.to_string().hash(&mut hasher);
+    }
+    for (alias, target) in alias_entries {
+        alias.hash(&mut hasher);
+        target.hash(&mut hasher);
+    }
+    for type_name in known_types {
+        type_name.hash(&mut hasher);
+    }
+
+    hasher.finish()
+}
+
+/// Refreshes all shared typed values from macro-generated registrations.
+pub fn refresh_shared_values(world: &mut World) {
+    let mut values: HashMap<String, JsonValue> = HashMap::new();
+    let mut aliases: HashMap<String, String> = HashMap::new();
+    let mut known_types: HashSet<String> = HashSet::new();
+
+    for registration in inventory::iter::<HtmlSharedRegistration> {
+        let HtmlSharedRegistration::Shared {
+            name,
+            path,
+            alias,
+            auto_use,
+            capture,
+        } = registration;
+
+        known_types.insert((*name).to_string());
+        known_types.insert((*path).to_string());
+        if *auto_use {
+            if let Some(previous) = aliases.get(*alias) {
+                if previous != name {
+                    warn!(
+                        "Duplicate #[html_use] alias '{}' for '{}' ignored (already used by '{}')",
+                        alias, name, previous
+                    );
+                    continue;
+                }
+            }
+            aliases.insert((*alias).to_string(), (*name).to_string());
+        }
+
+        if let Some(value) = (*capture)(&*world) {
+            values.insert((*path).to_string(), value.clone());
+            values.insert((*name).to_string(), value);
+        }
+    }
+
+    let mut shared = world.resource_mut::<UiSharedValues>();
+    if shared.values != values {
+        shared.values = values;
+    }
+    if shared.auto_use_aliases != aliases {
+        shared.auto_use_aliases = aliases;
+    }
+    if shared.known_types != known_types {
+        shared.known_types = known_types;
+    }
+}
+
 /// Resolves a placeholder token, returning `None` if unchanged.
 #[cfg(any(feature = "fluent", feature = "properties-lang"))]
-fn resolve_placeholder<F>(inner: &str, mut translate: F, vars: &UiLangVariables) -> Option<String>
+pub fn resolve_placeholder<F>(
+    inner: &str,
+    mut translate: F,
+    vars: &UiLangVariables,
+) -> Option<String>
 where
     F: FnMut(&str) -> Option<String>,
 {
@@ -553,37 +718,3 @@ pub use i18n_fluent;
 
 #[cfg(feature = "properties-lang")]
 pub use i18n_properties;
-
-#[cfg(all(test, any(feature = "fluent", feature = "properties-lang")))]
-mod tests {
-    #[cfg(feature = "properties-lang")]
-    use super::localize_html;
-    use super::{UiLangVariables, resolve_placeholder};
-
-    #[test]
-    fn unresolved_reactive_placeholder_stays_unchanged() {
-        let vars = UiLangVariables::default();
-        let resolved = resolve_placeholder("user.name", |_| None, &vars);
-        assert_eq!(resolved, None);
-    }
-
-    #[test]
-    fn dotted_language_keys_can_still_be_localized() {
-        let vars = UiLangVariables::default();
-        let resolved = resolve_placeholder("app.title", |key| Some(format!("tr:{key}")), &vars);
-        assert_eq!(resolved, Some("tr:app.title".to_string()));
-    }
-
-    #[cfg(feature = "properties-lang")]
-    #[test]
-    fn properties_localization_replaces_placeholders_from_assets() {
-        let html = "<h2>{{ LANGUAGE_TITLE }}</h2><p>{{ WELCOME_START_TEXT %player_name% WELCOME_END_TEXT }}</p>";
-        let mut vars = UiLangVariables::default();
-        vars.set("player_name", "Tester");
-
-        let out = localize_html(html, Some("de"), "assets/lang", &vars);
-
-        assert!(out.contains("Sprachbeispiel"), "output: {out}");
-        assert!(out.contains("Willkommen Tester !"), "output: {out}");
-    }
-}

@@ -46,6 +46,23 @@
       ]
     },
     {
+      "name": "listbox",
+      "examples": [
+        {
+          "id": "listbox",
+          "iframe_src": "{base.url}/examples/base",
+          "html": "<listbox id=\"difficulty\"><option value=\"easy\">Easy</option><option selected value=\"normal\">Normal</option><option value=\"hard\">Hard</option></listbox>",
+          "css": "body {\n  width: 100%;\n  height: 100%;\n  display: flex;\n  justify-content: center;\n  align-items: center;\n  padding: 24px;\n  background: #0f172a;\n}\n\nlistbox {\n  width: 280px;\n  min-height: 160px;\n  padding: 10px;\n  border-radius: 14px;\n  background: #f8fafc;\n  color: #111827;\n  border: 1px #94a3b8;\n}\n\nlistbox > .listbox-option {\n  min-height: 32px;\n  padding: 6px 8px;\n  border-radius: 8px;\n}"
+        },
+        {
+          "id": "listbox-multi",
+          "iframe_src": "{base.url}/examples/base",
+          "html": "<listbox id=\"music-tags\" multiselect><option value=\"rock\" selected>Rock</option><option value=\"jazz\" selected>Jazz</option><option value=\"pop\">Pop</option><option value=\"electro\">Electro</option><option value=\"blues\">Blues</option></listbox>",
+          "css": "body {\n  width: 100%;\n  height: 100%;\n  display: flex;\n  justify-content: center;\n  align-items: center;\n  padding: 24px;\n  background: #0f172a;\n}\n\nlistbox {\n  width: 280px;\n  min-height: 160px;\n  padding: 10px;\n  border-radius: 14px;\n  background: #f8fafc;\n  color: #111827;\n  border: 1px #94a3b8;\n}\n\nlistbox > .listbox-option {\n  min-height: 32px;\n  padding: 6px 8px;\n  border-radius: 8px;\n}"
+        }
+      ]
+    },
+    {
       "name": "colorpicker",
       "examples": [
         {

@@ -23,6 +23,13 @@ use regex::Regex;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 
+/// Handles `load_css` in the extended UI workflow.
+///
+/// # Examples
+///
+/// ```rust
+/// // Call `load_css` with values from your app state and world context.
+/// ```
 pub fn load_css(css: &str) -> ParsedCss {
     parse_css(css, HashMap::new(), true)
 }
@@ -69,15 +76,18 @@ pub fn collect_root_css_vars(css: &str) -> HashMap<String, String> {
     css_vars
 }
 
+/// Handles `parse_css` in the extended UI workflow.
 fn parse_css(
     css: &str,
     mut css_vars: HashMap<String, String>,
     allow_root_var_collection: bool,
 ) -> ParsedCss {
+    let normalized_css = normalize_media_range_prefix_syntax(css);
+
     let mut options = ParserOptions::default();
     options.flags.insert(ParserFlags::NESTING);
 
-    let stylesheet = match StyleSheet::parse(css, options) {
+    let stylesheet = match StyleSheet::parse(&normalized_css, options) {
         Ok(stylesheet) => stylesheet,
         Err(err) => {
             error!("Css Parsing failed: {:?}", err);
@@ -112,6 +122,25 @@ fn parse_css(
     }
 }
 
+/// Rewrites non-standard breakpoint expressions like `(min-width > 900px)` to `(width > 900px)`.
+fn normalize_media_range_prefix_syntax(css: &str) -> String {
+    let pattern = match Regex::new(r"\(\s*(min|max)-(width|height)\s*(<=|>=|<|>)\s*([^\)]+?)\s*\)")
+    {
+        Ok(regex) => regex,
+        Err(_) => return css.to_string(),
+    };
+
+    pattern
+        .replace_all(css, |caps: &regex::Captures<'_>| {
+            let axis = caps.get(2).map(|m| m.as_str()).unwrap_or_default();
+            let op = caps.get(3).map(|m| m.as_str()).unwrap_or_default();
+            let value = caps.get(4).map(|m| m.as_str()).unwrap_or_default();
+            format!("({axis} {op} {value})")
+        })
+        .into_owned()
+}
+
+/// Handles `collect_css_rules` in the extended UI workflow.
 fn collect_css_rules(
     rules: &lightningcss::rules::CssRuleList<'_>,
     parent_selectors: Option<&[String]>,
@@ -184,6 +213,7 @@ fn collect_css_rules(
     }
 }
 
+/// Handles `collect_style_rule` in the extended UI workflow.
 fn collect_style_rule(
     style_rule: &lightningcss::rules::style::StyleRule<'_>,
     parent_selectors: Option<&[String]>,
@@ -236,6 +266,7 @@ fn collect_style_rule(
     );
 }
 
+/// Handles `combine_media_conditions` in the extended UI workflow.
 fn combine_media_conditions(
     left: Option<MediaQueryCondition>,
     right: Option<MediaQueryCondition>,
@@ -252,6 +283,7 @@ fn combine_media_conditions(
     }
 }
 
+/// Handles `media_list_to_condition` in the extended UI workflow.
 fn media_list_to_condition(media_list: &MediaList<'_>) -> MediaQueryCondition {
     if media_list.media_queries.is_empty() {
         return MediaQueryCondition::Always;
@@ -269,6 +301,7 @@ fn media_list_to_condition(media_list: &MediaList<'_>) -> MediaQueryCondition {
     }
 }
 
+/// Handles `media_query_to_condition` in the extended UI workflow.
 fn media_query_to_condition(query: &MediaQuery<'_>) -> MediaQueryCondition {
     let media_type_condition = match query.media_type {
         MediaType::All | MediaType::Screen => MediaQueryCondition::Always,
@@ -294,6 +327,7 @@ fn media_query_to_condition(query: &MediaQuery<'_>) -> MediaQueryCondition {
     combined
 }
 
+/// Handles `media_condition_to_condition` in the extended UI workflow.
 fn media_condition_to_condition(condition: &MediaCondition<'_>) -> MediaQueryCondition {
     match condition {
         MediaCondition::Feature(feature) => media_feature_to_condition(feature),
@@ -318,6 +352,7 @@ fn media_condition_to_condition(condition: &MediaCondition<'_>) -> MediaQueryCon
     }
 }
 
+/// Handles `media_feature_to_condition` in the extended UI workflow.
 fn media_feature_to_condition(feature: &MediaFeature<'_>) -> MediaQueryCondition {
     match feature {
         MediaFeature::Plain { name, value } => match_media_feature(name, value, None),
@@ -342,6 +377,7 @@ fn media_feature_to_condition(feature: &MediaFeature<'_>) -> MediaQueryCondition
     }
 }
 
+/// Handles `opposite_comparison` in the extended UI workflow.
 fn opposite_comparison(comparison: MediaFeatureComparison) -> MediaFeatureComparison {
     match comparison {
         MediaFeatureComparison::Equal => MediaFeatureComparison::Equal,
@@ -352,25 +388,62 @@ fn opposite_comparison(comparison: MediaFeatureComparison) -> MediaFeatureCompar
     }
 }
 
+/// Handles `match_media_feature` in the extended UI workflow.
 fn match_media_feature(
     name: &MediaFeatureName<'_, MediaFeatureId>,
     value: &MediaFeatureValue<'_>,
     comparison: Option<MediaFeatureComparison>,
 ) -> MediaQueryCondition {
-    match name {
-        MediaFeatureName::Standard(MediaFeatureId::Width)
-        | MediaFeatureName::Standard(MediaFeatureId::DeviceWidth) => {
-            map_length_feature(value, comparison, true)
-        }
-        MediaFeatureName::Standard(MediaFeatureId::Height)
-        | MediaFeatureName::Standard(MediaFeatureId::DeviceHeight) => {
-            map_length_feature(value, comparison, false)
-        }
-        MediaFeatureName::Standard(MediaFeatureId::Orientation) => map_orientation_feature(value),
+    let feature_name = name
+        .to_css_string(PrinterOptions::default())
+        .ok()
+        .map(|text| text.to_ascii_lowercase());
+
+    match feature_name.as_deref() {
+        Some("width") | Some("device-width") => map_length_feature(value, comparison, true),
+        Some("height") | Some("device-height") => map_length_feature(value, comparison, false),
+        Some("min-width") => map_prefixed_length_feature(value, comparison, true, true),
+        Some("max-width") => map_prefixed_length_feature(value, comparison, true, false),
+        Some("min-height") => map_prefixed_length_feature(value, comparison, false, true),
+        Some("max-height") => map_prefixed_length_feature(value, comparison, false, false),
+        Some("orientation") => map_orientation_feature(value),
         _ => MediaQueryCondition::Never,
     }
 }
 
+/// Maps prefixed width/height features (`min-*` / `max-*`) including range operators.
+fn map_prefixed_length_feature(
+    value: &MediaFeatureValue<'_>,
+    comparison: Option<MediaFeatureComparison>,
+    is_width: bool,
+    is_min: bool,
+) -> MediaQueryCondition {
+    if let Some(op) = comparison {
+        return map_length_feature(value, Some(op), is_width);
+    }
+
+    let MediaFeatureValue::Length(length) = value else {
+        return MediaQueryCondition::Never;
+    };
+
+    let Some(px) = length.to_px() else {
+        return MediaQueryCondition::Never;
+    };
+
+    if is_width {
+        if is_min {
+            MediaQueryCondition::MinWidth(px)
+        } else {
+            MediaQueryCondition::MaxWidth(px)
+        }
+    } else if is_min {
+        MediaQueryCondition::MinHeight(px)
+    } else {
+        MediaQueryCondition::MaxHeight(px)
+    }
+}
+
+/// Handles `map_length_feature` in the extended UI workflow.
 fn map_length_feature(
     value: &MediaFeatureValue<'_>,
     comparison: Option<MediaFeatureComparison>,
@@ -412,6 +485,7 @@ fn map_length_feature(
     }
 }
 
+/// Handles `map_orientation_feature` in the extended UI workflow.
 fn map_orientation_feature(value: &MediaFeatureValue<'_>) -> MediaQueryCondition {
     let MediaFeatureValue::Ident(ident) = value else {
         return MediaQueryCondition::Never;
@@ -424,6 +498,7 @@ fn map_orientation_feature(value: &MediaFeatureValue<'_>) -> MediaQueryCondition
     }
 }
 
+/// Handles `collect_keyframes_rule` in the extended UI workflow.
 fn collect_keyframes_rule(
     keyframes_rule: &lightningcss::rules::keyframes::KeyframesRule<'_>,
     css_vars: &HashMap<String, String>,
@@ -454,6 +529,7 @@ fn collect_keyframes_rule(
     }
 }
 
+/// Handles `selector_list_to_strings` in the extended UI workflow.
 fn selector_list_to_strings(selectors: &lightningcss::selector::SelectorList<'_>) -> Vec<String> {
     let mut out = Vec::new();
     for selector in selectors.0.iter() {
@@ -464,6 +540,7 @@ fn selector_list_to_strings(selectors: &lightningcss::selector::SelectorList<'_>
     out
 }
 
+/// Handles `expand_selectors` in the extended UI workflow.
 fn expand_selectors(parent_selectors: Option<&[String]>, selectors: Vec<String>) -> Vec<String> {
     let Some(parents) = parent_selectors else {
         return selectors
@@ -482,6 +559,7 @@ fn expand_selectors(parent_selectors: Option<&[String]>, selectors: Vec<String>)
     expanded
 }
 
+/// Handles `combine_selector` in the extended UI workflow.
 fn combine_selector(parent: &str, nested: &str) -> String {
     let trimmed = nested.trim();
     if trimmed.contains('&') {
@@ -493,6 +571,7 @@ fn combine_selector(parent: &str, nested: &str) -> String {
     format!("{parent} {trimmed}")
 }
 
+/// Handles `normalize_selector` in the extended UI workflow.
 fn normalize_selector(selector: &str) -> String {
     selector
         .replace('>', " > ")
@@ -501,6 +580,7 @@ fn normalize_selector(selector: &str) -> String {
         .join(" ")
 }
 
+/// Handles `collect_css_vars` in the extended UI workflow.
 fn collect_css_vars(
     decls: &lightningcss::declaration::DeclarationBlock<'_>,
     css_vars: &mut HashMap<String, String>,
@@ -520,6 +600,7 @@ fn collect_css_vars(
     }
 }
 
+/// Handles `apply_declaration_list` in the extended UI workflow.
 fn apply_declaration_list(
     style: &mut Style,
     declarations: &[lightningcss::properties::Property<'_>],
@@ -539,6 +620,7 @@ fn apply_declaration_list(
     }
 }
 
+/// Handles `merge_style_map` in the extended UI workflow.
 fn merge_style_map(style_map: &mut HashMap<String, StylePair>, selector: &str, style: &StylePair) {
     let key = selector_map_key(selector, style.media.as_ref());
 
@@ -555,6 +637,7 @@ fn merge_style_map(style_map: &mut HashMap<String, StylePair>, selector: &str, s
         });
 }
 
+/// Handles `selector_map_key` in the extended UI workflow.
 fn selector_map_key(selector: &str, media: Option<&MediaQueryCondition>) -> String {
     match media {
         Some(media) => format!("{selector}@@media({})", media.cache_key()),
@@ -567,6 +650,7 @@ fn resolve_var(value: &str, css_vars: &HashMap<String, String>) -> String {
     resolve_var_inner(value, css_vars, 0)
 }
 
+/// Handles `resolve_var_inner` in the extended UI workflow.
 fn resolve_var_inner(value: &str, css_vars: &HashMap<String, String>, depth: u8) -> String {
     if depth >= 8 {
         return value.to_string();
@@ -592,6 +676,7 @@ fn resolve_var_inner(value: &str, css_vars: &HashMap<String, String>, depth: u8)
     resolved
 }
 
+/// Handles `find_var_call_bounds` in the extended UI workflow.
 fn find_var_call_bounds(value: &str) -> Option<(usize, usize)> {
     let lower = value.to_ascii_lowercase();
     let start = lower.find("var(")?;
@@ -615,6 +700,7 @@ fn find_var_call_bounds(value: &str) -> Option<(usize, usize)> {
     end.map(|end_idx| (start, end_idx))
 }
 
+/// Handles `resolve_single_var_call` in the extended UI workflow.
 fn resolve_single_var_call(
     var_call: &str,
     css_vars: &HashMap<String, String>,
@@ -644,6 +730,7 @@ fn resolve_single_var_call(
     var_call.to_string()
 }
 
+/// Handles `split_var_args` in the extended UI workflow.
 fn split_var_args(input: &str) -> (&str, Option<&str>) {
     let mut depth = 0u8;
     for (idx, ch) in input.char_indices() {
@@ -877,24 +964,34 @@ pub fn apply_property_to_style(style: &mut Style, name: &str, value: &str) {
     }
 }
 
+/// Defines the available `RectSide` variants for this part of the UI runtime.
 #[derive(Clone, Copy)]
 enum RectSide {
+    /// Variant `Left`.
     Left,
+    /// Variant `Right`.
     Right,
+    /// Variant `Top`.
     Top,
+    /// Variant `Bottom`.
     Bottom,
 }
 
+/// Defines the available `OverflowAxisSelector` variants for this part of the UI runtime.
 #[derive(Clone, Copy)]
 enum OverflowAxisSelector {
+    /// Variant `X`.
     X,
+    /// Variant `Y`.
     Y,
 }
 
+/// Handles `apply_rect_side` in the extended UI workflow.
 fn apply_rect_side(value: &str, side: RectSide, target: &mut Option<UiRect>) {
     *target = rect_from_side(value, side);
 }
 
+/// Handles `apply_border_side` in the extended UI workflow.
 fn apply_border_side(
     value: &str,
     side: RectSide,
@@ -920,6 +1017,7 @@ fn apply_border_side(
     }
 }
 
+/// Handles `apply_overflow_axis` in the extended UI workflow.
 fn apply_overflow_axis(style: &mut Style, value: &str, axis: OverflowAxisSelector) {
     let val = match axis {
         OverflowAxisSelector::X => convert_overflow(value.to_string(), "x"),
@@ -933,6 +1031,7 @@ fn apply_overflow_axis(style: &mut Style, value: &str, axis: OverflowAxisSelecto
     style.overflow = Some(overflow);
 }
 
+/// Handles `rect_from_side` in the extended UI workflow.
 fn rect_from_side(value: &str, side: RectSide) -> Option<UiRect> {
     let val = parse_single_rect_value(value)?;
     let zero = Val::Px(0.0);
@@ -946,6 +1045,7 @@ fn rect_from_side(value: &str, side: RectSide) -> Option<UiRect> {
     Some(rect)
 }
 
+/// Handles `parse_single_rect_value` in the extended UI workflow.
 fn parse_single_rect_value(value: &str) -> Option<Val> {
     let vals = parse_radius_values(value)?;
     if vals.len() == 1 {
@@ -955,6 +1055,7 @@ fn parse_single_rect_value(value: &str) -> Option<Val> {
     }
 }
 
+/// Handles `set_rect_side` in the extended UI workflow.
 fn set_rect_side(rect: &mut UiRect, side: RectSide, value: Val) {
     match side {
         RectSide::Left => rect.left = value,
@@ -1103,12 +1204,16 @@ fn ensure_animation_spec(style: &mut Style) -> &mut AnimationSpec {
     style.animation.get_or_insert_with(AnimationSpec::default)
 }
 
+/// Defines the available `AnimationTimeField` variants for this part of the UI runtime.
 #[derive(Clone, Copy)]
 enum AnimationTimeField {
+    /// Variant `Duration`.
     Duration,
+    /// Variant `Delay`.
     Delay,
 }
 
+/// Handles `apply_animation_time` in the extended UI workflow.
 fn apply_animation_time(style: &mut Style, value: &str, field: AnimationTimeField) {
     if let Some(time) = parse_time_seconds(value) {
         let spec = ensure_animation_spec(style);
@@ -1188,16 +1293,19 @@ fn convert_to_font_weight(value: String) -> Option<FontWeight> {
     FontWeight::from_name(in_value)
 }
 
+/// Represents the `MathParser` data structure used by the extended UI system.
 struct MathParser<'a> {
     input: &'a str,
     pos: usize,
 }
 
 impl<'a> MathParser<'a> {
+    /// Handles `new` in the extended UI workflow.
     fn new(input: &'a str) -> Self {
         Self { input, pos: 0 }
     }
 
+    /// Handles `parse_expression` in the extended UI workflow.
     fn parse_expression(&mut self) -> Option<CalcValue> {
         let mut left = self.parse_term()?;
         loop {
@@ -1215,6 +1323,7 @@ impl<'a> MathParser<'a> {
         Some(left)
     }
 
+    /// Handles `parse_term` in the extended UI workflow.
     fn parse_term(&mut self) -> Option<CalcValue> {
         let mut left = self.parse_factor()?;
         loop {
@@ -1232,6 +1341,7 @@ impl<'a> MathParser<'a> {
         Some(left)
     }
 
+    /// Handles `parse_factor` in the extended UI workflow.
     fn parse_factor(&mut self) -> Option<CalcValue> {
         self.skip_ws();
         if self.consume('+') {
@@ -1258,6 +1368,7 @@ impl<'a> MathParser<'a> {
         self.parse_number()
     }
 
+    /// Handles `parse_function` in the extended UI workflow.
     fn parse_function(&mut self, name: &str) -> Option<CalcValue> {
         match name {
             "calc" => {
@@ -1298,6 +1409,7 @@ impl<'a> MathParser<'a> {
         }
     }
 
+    /// Handles `parse_number` in the extended UI workflow.
     fn parse_number(&mut self) -> Option<CalcValue> {
         self.skip_ws();
         let start = self.pos;
@@ -1346,6 +1458,7 @@ impl<'a> MathParser<'a> {
         Some(CalcValue::new(value, unit))
     }
 
+    /// Handles `parse_identifier` in the extended UI workflow.
     fn parse_identifier(&mut self) -> Option<String> {
         self.skip_ws();
         let start = self.pos;
@@ -1364,6 +1477,7 @@ impl<'a> MathParser<'a> {
         Some(self.input[start..self.pos].to_ascii_lowercase())
     }
 
+    /// Handles `parse_unit` in the extended UI workflow.
     fn parse_unit(&mut self) -> Option<String> {
         let start = self.pos;
         let mut found = false;
@@ -1381,6 +1495,7 @@ impl<'a> MathParser<'a> {
         Some(self.input[start..self.pos].to_ascii_lowercase())
     }
 
+    /// Handles `skip_ws` in the extended UI workflow.
     fn skip_ws(&mut self) {
         while let Some(ch) = self.peek_char() {
             if ch.is_whitespace() {
@@ -1391,6 +1506,7 @@ impl<'a> MathParser<'a> {
         }
     }
 
+    /// Handles `consume` in the extended UI workflow.
     fn consume(&mut self, expected: char) -> bool {
         if self.peek_char() == Some(expected) {
             self.pos += expected.len_utf8();
@@ -1400,6 +1516,7 @@ impl<'a> MathParser<'a> {
         }
     }
 
+    /// Handles `expect` in the extended UI workflow.
     fn expect(&mut self, expected: char) -> Option<()> {
         self.skip_ws();
         if self.consume(expected) {
@@ -1409,15 +1526,18 @@ impl<'a> MathParser<'a> {
         }
     }
 
+    /// Handles `peek_char` in the extended UI workflow.
     fn peek_char(&self) -> Option<char> {
         self.input[self.pos..].chars().next()
     }
 
+    /// Handles `is_eof` in the extended UI workflow.
     fn is_eof(&self) -> bool {
         self.pos >= self.input.len()
     }
 }
 
+/// Handles `parse_math_value` in the extended UI workflow.
 fn parse_math_value(input: &str) -> Option<CalcValue> {
     let mut parser = MathParser::new(input);
     let value = parser.parse_expression()?;
@@ -1425,6 +1545,7 @@ fn parse_math_value(input: &str) -> Option<CalcValue> {
     if parser.is_eof() { Some(value) } else { None }
 }
 
+/// Handles `add_values` in the extended UI workflow.
 fn add_values(a: CalcValue, b: CalcValue) -> Option<CalcValue> {
     if a.unit == b.unit {
         Some(CalcValue::new(a.value + b.value, a.unit))
@@ -1433,6 +1554,7 @@ fn add_values(a: CalcValue, b: CalcValue) -> Option<CalcValue> {
     }
 }
 
+/// Handles `sub_values` in the extended UI workflow.
 fn sub_values(a: CalcValue, b: CalcValue) -> Option<CalcValue> {
     if a.unit == b.unit {
         Some(CalcValue::new(a.value - b.value, a.unit))
@@ -1441,6 +1563,7 @@ fn sub_values(a: CalcValue, b: CalcValue) -> Option<CalcValue> {
     }
 }
 
+/// Handles `mul_values` in the extended UI workflow.
 fn mul_values(a: CalcValue, b: CalcValue) -> Option<CalcValue> {
     match (a.unit, b.unit) {
         (CalcUnit::None, unit) => Some(CalcValue::new(a.value * b.value, unit)),
@@ -1449,6 +1572,7 @@ fn mul_values(a: CalcValue, b: CalcValue) -> Option<CalcValue> {
     }
 }
 
+/// Handles `div_values` in the extended UI workflow.
 fn div_values(a: CalcValue, b: CalcValue) -> Option<CalcValue> {
     if b.value == 0.0 {
         return None;
@@ -1459,6 +1583,7 @@ fn div_values(a: CalcValue, b: CalcValue) -> Option<CalcValue> {
     }
 }
 
+/// Handles `reduce_min_max` in the extended UI workflow.
 fn reduce_min_max(is_min: bool, values: &[CalcValue]) -> Option<CalcValue> {
     let first = values.first().copied()?;
     let mut best = first;
@@ -1477,6 +1602,7 @@ fn reduce_min_max(is_min: bool, values: &[CalcValue]) -> Option<CalcValue> {
     Some(best)
 }
 
+/// Handles `to_radians` in the extended UI workflow.
 fn to_radians(value: CalcValue) -> Option<f32> {
     match value.unit {
         CalcUnit::None => Some(value.value),
@@ -1487,16 +1613,19 @@ fn to_radians(value: CalcValue) -> Option<f32> {
     }
 }
 
+/// Represents the `CalcParser` data structure used by the extended UI system.
 struct CalcParser<'a> {
     input: &'a str,
     pos: usize,
 }
 
 impl<'a> CalcParser<'a> {
+    /// Handles `new` in the extended UI workflow.
     fn new(input: &'a str) -> Self {
         Self { input, pos: 0 }
     }
 
+    /// Handles `parse_expression` in the extended UI workflow.
     fn parse_expression(&mut self) -> Option<CalcExpr> {
         let mut left = self.parse_term()?;
         loop {
@@ -1514,6 +1643,7 @@ impl<'a> CalcParser<'a> {
         Some(left)
     }
 
+    /// Handles `parse_term` in the extended UI workflow.
     fn parse_term(&mut self) -> Option<CalcExpr> {
         let mut left = self.parse_factor()?;
         loop {
@@ -1531,6 +1661,7 @@ impl<'a> CalcParser<'a> {
         Some(left)
     }
 
+    /// Handles `parse_factor` in the extended UI workflow.
     fn parse_factor(&mut self) -> Option<CalcExpr> {
         self.skip_ws();
         if self.consume('+') {
@@ -1560,6 +1691,7 @@ impl<'a> CalcParser<'a> {
         self.parse_number()
     }
 
+    /// Handles `parse_function` in the extended UI workflow.
     fn parse_function(&mut self, name: &str) -> Option<CalcExpr> {
         match name {
             "calc" => {
@@ -1603,6 +1735,7 @@ impl<'a> CalcParser<'a> {
         }
     }
 
+    /// Handles `parse_number` in the extended UI workflow.
     fn parse_number(&mut self) -> Option<CalcExpr> {
         self.skip_ws();
         let start = self.pos;
@@ -1651,6 +1784,7 @@ impl<'a> CalcParser<'a> {
         Some(CalcExpr::Value(CalcValue::new(value, unit)))
     }
 
+    /// Handles `parse_identifier` in the extended UI workflow.
     fn parse_identifier(&mut self) -> Option<String> {
         self.skip_ws();
         let start = self.pos;
@@ -1669,6 +1803,7 @@ impl<'a> CalcParser<'a> {
         Some(self.input[start..self.pos].to_ascii_lowercase())
     }
 
+    /// Handles `parse_unit` in the extended UI workflow.
     fn parse_unit(&mut self) -> Option<String> {
         let start = self.pos;
         let mut found = false;
@@ -1686,6 +1821,7 @@ impl<'a> CalcParser<'a> {
         Some(self.input[start..self.pos].to_ascii_lowercase())
     }
 
+    /// Handles `skip_ws` in the extended UI workflow.
     fn skip_ws(&mut self) {
         while let Some(ch) = self.peek_char() {
             if ch.is_whitespace() {
@@ -1696,6 +1832,7 @@ impl<'a> CalcParser<'a> {
         }
     }
 
+    /// Handles `consume` in the extended UI workflow.
     fn consume(&mut self, expected: char) -> bool {
         if self.peek_char() == Some(expected) {
             self.pos += expected.len_utf8();
@@ -1705,6 +1842,7 @@ impl<'a> CalcParser<'a> {
         }
     }
 
+    /// Handles `expect` in the extended UI workflow.
     fn expect(&mut self, expected: char) -> Option<()> {
         self.skip_ws();
         if self.consume(expected) {
@@ -1714,15 +1852,18 @@ impl<'a> CalcParser<'a> {
         }
     }
 
+    /// Handles `peek_char` in the extended UI workflow.
     fn peek_char(&self) -> Option<char> {
         self.input[self.pos..].chars().next()
     }
 
+    /// Handles `is_eof` in the extended UI workflow.
     fn is_eof(&self) -> bool {
         self.pos >= self.input.len()
     }
 }
 
+/// Handles `parse_calc_expr` in the extended UI workflow.
 fn parse_calc_expr(input: &str) -> Option<CalcExpr> {
     let mut parser = CalcParser::new(input);
     let expr = parser.parse_expression()?;
@@ -1730,6 +1871,7 @@ fn parse_calc_expr(input: &str) -> Option<CalcExpr> {
     if parser.is_eof() { Some(expr) } else { None }
 }
 
+/// Handles `apply_length_property` in the extended UI workflow.
 fn apply_length_property(value: &str, dest: &mut Option<Val>, dest_calc: &mut Option<CalcExpr>) {
     if let Some(val) = convert_to_val(value.to_string()) {
         *dest = Some(val);
@@ -1967,7 +2109,7 @@ pub fn convert_to_color(value: String) -> Option<Color> {
         if trimmed.eq("#00000000") {
             color = Some(Color::NONE);
         } else {
-            color = Some(Colored::hex_to_color(trimmed));
+            color = Colored::try_hex_to_color(trimmed);
         }
     } else if let Some(parts) = parse_color_components(trimmed, "rgb", 3) {
         color = Some(Color::srgb_u8(parts[0], parts[1], parts[2]));
@@ -1985,6 +2127,7 @@ pub fn convert_to_color(value: String) -> Option<Color> {
     color
 }
 
+/// Handles `parse_color_components` in the extended UI workflow.
 fn parse_color_components(value: &str, name: &str, expected: usize) -> Option<Vec<u8>> {
     let inner = parse_color_function_inner(value, name)?;
     let parts: Vec<_> = inner.split(',').map(str::trim).collect();
@@ -1999,6 +2142,7 @@ fn parse_color_components(value: &str, name: &str, expected: usize) -> Option<Ve
     Some(values)
 }
 
+/// Handles `parse_rgba_components` in the extended UI workflow.
 fn parse_rgba_components(value: &str) -> Option<(u8, u8, u8, f32)> {
     let inner = parse_color_function_inner(value, "rgba")?;
     let parts: Vec<_> = inner.split(',').map(str::trim).collect();
@@ -2019,6 +2163,7 @@ fn parse_rgba_components(value: &str) -> Option<(u8, u8, u8, f32)> {
     Some((r, g, b, alpha))
 }
 
+/// Handles `parse_color_function_inner` in the extended UI workflow.
 fn parse_color_function_inner<'a>(value: &'a str, name: &str) -> Option<&'a str> {
     let prefix = format!("{name}(");
     value.strip_prefix(&prefix)?.strip_suffix(')')
@@ -2059,6 +2204,7 @@ pub fn convert_to_background(value: String, all_types: bool) -> Option<Backgroun
     if has_any { Some(background) } else { None }
 }
 
+/// Handles `apply_background_color` in the extended UI workflow.
 fn apply_background_color(style: &mut Style, value: &str) {
     let Some(color) = convert_to_color(value.to_string()) else {
         return;
@@ -2069,6 +2215,7 @@ fn apply_background_color(style: &mut Style, value: &str) {
     style.background = Some(background);
 }
 
+/// Handles `apply_background_image` in the extended UI workflow.
 fn apply_background_image(style: &mut Style, value: &str) {
     if value.trim().eq_ignore_ascii_case("none") {
         if let Some(mut background) = style.background.clone() {
@@ -2093,6 +2240,7 @@ fn apply_background_image(style: &mut Style, value: &str) {
     style.background = Some(background);
 }
 
+/// Handles `parse_background_image_layer` in the extended UI workflow.
 fn parse_background_image_layer(value: &str) -> Option<Background> {
     if let Some(gradient_fn) = extract_css_function(value, "linear-gradient") {
         if let Some(gradient) = parse_linear_gradient(gradient_fn.as_str()) {
@@ -2121,6 +2269,7 @@ fn parse_background_image_layer(value: &str) -> Option<Background> {
     None
 }
 
+/// Handles `parse_background_color_layer` in the extended UI workflow.
 fn parse_background_color_layer(value: &str) -> Option<Color> {
     if let Some(color) = convert_to_color(value.to_string()) {
         return Some(color);
@@ -2141,6 +2290,7 @@ fn parse_background_color_layer(value: &str) -> Option<Color> {
     None
 }
 
+/// Handles `strip_known_background_functions` in the extended UI workflow.
 fn strip_known_background_functions(value: &str) -> String {
     let mut output = value.to_string();
     loop {
@@ -2160,6 +2310,7 @@ fn strip_known_background_functions(value: &str) -> String {
     output
 }
 
+/// Handles `extract_css_function` in the extended UI workflow.
 fn extract_css_function(input: &str, function_name: &str) -> Option<String> {
     let lower = input.to_ascii_lowercase();
     let needle = format!("{function_name}(");
@@ -2184,6 +2335,7 @@ fn extract_css_function(input: &str, function_name: &str) -> Option<String> {
     end.map(|end_idx| input[start..end_idx].to_string())
 }
 
+/// Handles `parse_background_position` in the extended UI workflow.
 fn parse_background_position(value: &str) -> Option<BackgroundPosition> {
     let segment = value.split(',').next().unwrap_or(value);
     let tokens: Vec<&str> = segment.split_whitespace().collect();
@@ -2226,6 +2378,7 @@ fn parse_background_position(value: &str) -> Option<BackgroundPosition> {
     Some(BackgroundPosition { x, y })
 }
 
+/// Handles `parse_position_value` in the extended UI workflow.
 fn parse_position_value(value: &str) -> Option<BackgroundPositionValue> {
     let val = convert_to_val(value.to_string())?;
     match val {
@@ -2235,6 +2388,7 @@ fn parse_position_value(value: &str) -> Option<BackgroundPositionValue> {
     }
 }
 
+/// Handles `parse_background_size` in the extended UI workflow.
 fn parse_background_size(value: &str) -> Option<BackgroundSize> {
     let segment = value.split(',').next().unwrap_or(value);
     let tokens: Vec<&str> = segment.split_whitespace().collect();
@@ -2264,6 +2418,7 @@ fn parse_background_size(value: &str) -> Option<BackgroundSize> {
     None
 }
 
+/// Handles `parse_size_value` in the extended UI workflow.
 fn parse_size_value(value: &str) -> Option<BackgroundSizeValue> {
     let lower = value.trim().to_ascii_lowercase();
     if lower == "auto" {
@@ -2278,6 +2433,7 @@ fn parse_size_value(value: &str) -> Option<BackgroundSizeValue> {
     }
 }
 
+/// Handles `parse_background_attachment` in the extended UI workflow.
 fn parse_background_attachment(value: &str) -> Option<BackgroundAttachment> {
     let trimmed = value.trim().to_ascii_lowercase();
     match trimmed.as_str() {
@@ -2288,6 +2444,7 @@ fn parse_background_attachment(value: &str) -> Option<BackgroundAttachment> {
     }
 }
 
+/// Handles `parse_backdrop_filter` in the extended UI workflow.
 fn parse_backdrop_filter(value: &str) -> Option<BackdropFilter> {
     let trimmed = value.trim();
     if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("none") {
@@ -2316,6 +2473,7 @@ fn parse_backdrop_filter(value: &str) -> Option<BackdropFilter> {
     Some(BackdropFilter::Blur(radius.max(0.0)))
 }
 
+/// Handles `parse_linear_gradient` in the extended UI workflow.
 fn parse_linear_gradient(value: &str) -> Option<LinearGradient> {
     let trimmed = value.trim();
     let lower = trimmed.to_ascii_lowercase();
@@ -2353,6 +2511,7 @@ fn parse_linear_gradient(value: &str) -> Option<LinearGradient> {
     Some(LinearGradient { angle, stops })
 }
 
+/// Handles `split_top_level_commas` in the extended UI workflow.
 fn split_top_level_commas(input: &str) -> Vec<String> {
     let mut parts = Vec::new();
     let mut depth = 0i32;
@@ -2381,6 +2540,7 @@ fn split_top_level_commas(input: &str) -> Vec<String> {
     parts
 }
 
+/// Handles `parse_gradient_direction` in the extended UI workflow.
 fn parse_gradient_direction(value: &str) -> Option<f32> {
     let trimmed = value.trim();
     let lower = trimmed.to_ascii_lowercase();
@@ -2411,6 +2571,7 @@ fn parse_gradient_direction(value: &str) -> Option<f32> {
     Some(normalize_angle(angle))
 }
 
+/// Handles `parse_angle_degrees` in the extended UI workflow.
 fn parse_angle_degrees(value: &str) -> Option<f32> {
     let trimmed = value.trim();
     if let Some(num) = trimmed.strip_suffix("deg") {
@@ -2427,10 +2588,12 @@ fn parse_angle_degrees(value: &str) -> Option<f32> {
     None
 }
 
+/// Handles `normalize_angle` in the extended UI workflow.
 fn normalize_angle(angle: f32) -> f32 {
     angle.rem_euclid(360.0)
 }
 
+/// Handles `parse_gradient_stop` in the extended UI workflow.
 fn parse_gradient_stop(value: &str) -> Option<Vec<GradientStop>> {
     let (color_text, rest) = split_color_and_positions(value)?;
     let color = convert_to_color(color_text)?;
@@ -2461,6 +2624,7 @@ fn parse_gradient_stop(value: &str) -> Option<Vec<GradientStop>> {
     Some(stops)
 }
 
+/// Handles `split_color_and_positions` in the extended UI workflow.
 fn split_color_and_positions(value: &str) -> Option<(String, &str)> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
@@ -2483,6 +2647,7 @@ fn split_color_and_positions(value: &str) -> Option<(String, &str)> {
     Some((color, rest))
 }
 
+/// Handles `parse_stop_positions` in the extended UI workflow.
 fn parse_stop_positions(value: &str) -> Vec<GradientStopPosition> {
     value
         .split_whitespace()
@@ -2490,6 +2655,7 @@ fn parse_stop_positions(value: &str) -> Vec<GradientStopPosition> {
         .collect()
 }
 
+/// Handles `parse_stop_position` in the extended UI workflow.
 fn parse_stop_position(value: &str) -> Option<GradientStopPosition> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
@@ -2679,6 +2845,7 @@ pub fn convert_to_ui_rect(value: String) -> Option<UiRect> {
     })
 }
 
+/// Handles `split_css_whitespace_tokens` in the extended UI workflow.
 fn split_css_whitespace_tokens(input: &str) -> Vec<&str> {
     let mut tokens = Vec::new();
     let mut start: Option<usize> = None;
@@ -2722,6 +2889,7 @@ fn split_css_whitespace_tokens(input: &str) -> Vec<&str> {
     tokens
 }
 
+/// Handles `split_css_top_level_commas` in the extended UI workflow.
 fn split_css_top_level_commas(input: &str) -> Vec<&str> {
     let mut out = Vec::new();
     let mut depth = 0u32;
@@ -2750,6 +2918,7 @@ fn split_css_top_level_commas(input: &str) -> Vec<&str> {
     out
 }
 
+/// Handles `parse_text_shadow_length_px` in the extended UI workflow.
 fn parse_text_shadow_length_px(input: &str) -> Option<f32> {
     let parsed = parse_math_value(input.trim())?;
     match parsed.unit {
@@ -3579,342 +3748,4 @@ fn parse_radius_values(value: &str) -> Option<Vec<Val>> {
         vals.push(val);
     }
     Some(vals)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn keeps_base_and_media_variants_for_same_selector() {
-        let parsed = load_css(
-            r#"
-            .panel { width: 200px; }
-            @media (max-width: 900px) {
-                .panel { display: none; }
-            }
-        "#,
-        );
-
-        let mut base_count = 0usize;
-        let mut media_count = 0usize;
-
-        for pair in parsed.styles.values() {
-            if pair.selector != ".panel" {
-                continue;
-            }
-
-            if pair.media.is_some() {
-                media_count += 1;
-            } else {
-                base_count += 1;
-            }
-        }
-
-        assert_eq!(base_count, 1);
-        assert_eq!(media_count, 1);
-    }
-
-    #[test]
-    fn evaluates_max_width_breakpoint() {
-        let parsed = load_css(
-            r#"
-            @media (max-width: 800px) {
-                .hide-me { display: none; }
-            }
-        "#,
-        );
-
-        let pair = parsed
-            .styles
-            .values()
-            .find(|pair| pair.selector == ".hide-me")
-            .expect("missing parsed .hide-me style");
-
-        let media = pair.media.as_ref().expect("missing media condition");
-        assert!(media.matches_viewport(Vec2::new(640.0, 360.0)));
-        assert!(!media.matches_viewport(Vec2::new(920.0, 360.0)));
-    }
-
-    #[test]
-    fn background_image_gradient_preserves_existing_color() {
-        let mut style = Style::default();
-        apply_property_to_style(&mut style, "background-color", "rgba(16, 24, 40, 45)");
-        apply_property_to_style(
-            &mut style,
-            "background-image",
-            "linear-gradient(to right, #ffffff, #000000)",
-        );
-
-        let background = style.background.expect("missing background");
-        assert!(background.gradient.is_some());
-        assert_eq!(background.image, None);
-        assert_ne!(background.color, Color::NONE);
-    }
-
-    #[test]
-    fn background_shorthand_parses_gradient_with_extra_tokens() {
-        let mut style = Style::default();
-        apply_property_to_style(
-            &mut style,
-            "background",
-            "linear-gradient(to bottom left, #ff6336, #4f00b1) no-repeat center",
-        );
-
-        let background = style.background.expect("missing background");
-        assert!(background.gradient.is_some());
-    }
-
-    #[test]
-    fn background_color_after_gradient_keeps_gradient() {
-        let mut style = Style::default();
-        apply_property_to_style(
-            &mut style,
-            "background",
-            "linear-gradient(to right, #ff0000, #00ff00)",
-        );
-        apply_property_to_style(&mut style, "background-color", "#112233");
-
-        let background = style.background.expect("missing background");
-        assert!(background.gradient.is_some());
-        assert_ne!(background.color, Color::NONE);
-    }
-
-    #[test]
-    fn background_gradient_resolves_nested_css_var_tokens() {
-        let parsed = load_css(
-            r#"
-            :root { --btn-bg: #ffd700; }
-            .btn-login {
-                background: linear-gradient(180deg, var(--btn-bg) 0%, #f0b90b 100%) center;
-            }
-        "#,
-        );
-
-        let pair = parsed
-            .styles
-            .values()
-            .find(|pair| pair.selector == ".btn-login")
-            .expect("missing parsed .btn-login style");
-
-        let background = pair.normal.background.as_ref().expect("missing background");
-        assert!(background.gradient.is_some());
-    }
-
-    #[test]
-    fn collects_root_css_vars_from_stylesheet() {
-        let vars = collect_root_css_vars(
-            r#"
-            :root {
-                --brand: #102030;
-                --accent: #445566;
-            }
-            .panel { color: var(--brand); }
-        "#,
-        );
-
-        assert_eq!(vars.get("--brand"), Some(&"#102030".to_string()));
-        assert_eq!(vars.get("--accent"), Some(&"#456".to_string()));
-    }
-
-    #[test]
-    fn resolves_vars_from_external_root_scope() {
-        let mut root_vars = HashMap::new();
-        root_vars.insert("--brand".to_string(), "#112233".to_string());
-
-        let parsed = load_css_with_root_vars(
-            r#"
-            :root { --brand: #ffeeaa; }
-            .panel { background: var(--brand); }
-        "#,
-            &root_vars,
-        );
-
-        let pair = parsed
-            .styles
-            .values()
-            .find(|pair| pair.selector == ".panel")
-            .expect("missing parsed .panel style");
-
-        let background = pair.normal.background.as_ref().expect("missing background");
-        assert_eq!(background.color, Color::srgb_u8(0x11, 0x22, 0x33));
-    }
-
-    #[test]
-    fn parses_body_flex_layout_properties() {
-        let parsed = load_css(
-            r#"
-            body {
-                width: 100vw;
-                height: 100vh;
-                display: flex;
-                flex-direction: column;
-                justify-content: flex-start;
-                align-items: flex-start;
-                flex-wrap: wrap;
-                background: linear-gradient(to bottom right, #6a00ff, #ff006a);
-            }
-        "#,
-        );
-
-        let pair = parsed
-            .styles
-            .values()
-            .find(|pair| pair.selector == "body")
-            .expect("missing parsed body style");
-
-        assert_eq!(pair.normal.display, Some(Display::Flex));
-        assert_eq!(pair.normal.flex_direction, Some(FlexDirection::Column));
-        assert_eq!(pair.normal.justify_content, Some(JustifyContent::FlexStart));
-        assert_eq!(pair.normal.align_items, Some(AlignItems::FlexStart));
-        assert_eq!(pair.normal.flex_wrap, Some(FlexWrap::Wrap));
-    }
-
-    #[test]
-    fn parses_border_shorthand_rgba_with_spaces() {
-        let parsed =
-            convert_css_border("2px rgba(192, 198, 210, 0.95)".to_string()).expect("border");
-
-        assert_eq!(parsed.0, UiRect::all(Val::Px(2.0)));
-        assert_eq!(
-            parsed.1,
-            convert_to_color("rgba(192, 198, 210, 0.95)".to_string()).expect("color")
-        );
-    }
-
-    #[test]
-    fn parses_border_shorthand_with_style_token() {
-        let parsed =
-            convert_css_border("2px solid rgba(192, 198, 210, 0.95)".to_string()).expect("border");
-
-        assert_eq!(parsed.0, UiRect::all(Val::Px(2.0)));
-        assert_eq!(
-            parsed.1,
-            convert_to_color("rgba(192, 198, 210, 0.95)".to_string()).expect("color")
-        );
-    }
-
-    #[test]
-    fn parses_outline_shorthand_with_style_token() {
-        let (width, color) = convert_css_outline("3px solid rgba(192, 198, 210, 0.95)".to_string())
-            .expect("outline");
-
-        assert_eq!(width, Val::Px(3.0));
-        assert_eq!(
-            color,
-            convert_to_color("rgba(192, 198, 210, 0.95)".to_string()).expect("color")
-        );
-    }
-
-    #[test]
-    fn outline_and_outline_offset_properties_map_to_style_fields() {
-        let mut style = Style::default();
-
-        apply_property_to_style(&mut style, "outline", "2px #7ea2ff");
-        apply_property_to_style(&mut style, "outline-offset", "5px");
-
-        assert_eq!(style.outline_width, Some(Val::Px(2.0)));
-        assert_eq!(style.outline_color, convert_to_color("#7ea2ff".to_string()));
-        assert_eq!(style.outline_offset, Some(Val::Px(5.0)));
-    }
-
-    #[test]
-    fn outline_none_hides_outline() {
-        let mut style = Style::default();
-
-        apply_property_to_style(&mut style, "outline", "none");
-
-        assert_eq!(style.outline_width, Some(Val::Px(0.0)));
-        assert_eq!(style.outline_color, Some(Color::NONE));
-    }
-
-    #[test]
-    fn outline_width_and_color_longhands_are_supported() {
-        let mut style = Style::default();
-
-        apply_property_to_style(&mut style, "outline-width", "4px");
-        apply_property_to_style(&mut style, "outline-color", "#4f83ff");
-
-        assert_eq!(style.outline_width, Some(Val::Px(4.0)));
-        assert_eq!(style.outline_color, convert_to_color("#4f83ff".to_string()));
-    }
-
-    #[test]
-    fn text_align_property_maps_to_text_layout_justify() {
-        let mut style = Style::default();
-        apply_property_to_style(&mut style, "text-align", "center");
-        assert_eq!(style.text_align, Some(Justify::Center));
-
-        apply_property_to_style(&mut style, "text-align", "right");
-        assert_eq!(style.text_align, Some(Justify::Right));
-
-        apply_property_to_style(&mut style, "text-align", "justify");
-        assert_eq!(style.text_align, Some(Justify::Justified));
-    }
-
-    #[test]
-    fn text_shadow_property_maps_to_bevy_text_shadow() {
-        let mut style = Style::default();
-        apply_property_to_style(
-            &mut style,
-            "text-shadow",
-            "3px 2px 8px rgba(10, 20, 30, 0.5)",
-        );
-
-        let shadow = style.text_shadow.expect("missing text shadow");
-        assert_eq!(shadow.offset, Vec2::new(3.0, 2.0));
-        assert_eq!(
-            shadow.color,
-            convert_to_color("rgba(10, 20, 30, 0.5)".to_string()).expect("color")
-        );
-    }
-
-    #[test]
-    fn text_transform_property_supports_upper_lower_capitalize_and_none() {
-        let mut style = Style::default();
-
-        apply_property_to_style(&mut style, "text-transform", "uppercase");
-        assert_eq!(style.text_transform, Some(TextTransform::Uppercase));
-
-        apply_property_to_style(&mut style, "text-transform", "lowercase");
-        assert_eq!(style.text_transform, Some(TextTransform::Lowercase));
-
-        apply_property_to_style(&mut style, "text-transform", "capitalize");
-        assert_eq!(style.text_transform, Some(TextTransform::Capitalize));
-
-        apply_property_to_style(&mut style, "text-transform", "none");
-        assert_eq!(style.text_transform, Some(TextTransform::None));
-    }
-
-    #[test]
-    fn text_transfrom_alias_is_supported() {
-        let mut style = Style::default();
-        apply_property_to_style(&mut style, "text-transfrom", "lowercase");
-        assert_eq!(style.text_transform, Some(TextTransform::Lowercase));
-    }
-
-    #[test]
-    fn line_height_property_maps_to_bevy_line_height() {
-        let mut style = Style::default();
-        apply_property_to_style(&mut style, "line-height", "150%");
-        assert_eq!(style.line_height, Some(LineHeight::RelativeToFont(1.5)));
-
-        apply_property_to_style(&mut style, "line-height", "20px");
-        assert_eq!(style.line_height, Some(LineHeight::Px(20.0)));
-    }
-
-    #[test]
-    fn box_shadow_parses_rgba_with_spaces() {
-        let shadow = convert_to_bevy_box_shadow("2px 4px 6px rgba(192, 198, 210, 0.95)".into())
-            .expect("shadow");
-        let layer = shadow.0.first().expect("shadow layer");
-
-        assert_eq!(layer.x_offset, Val::Px(2.0));
-        assert_eq!(layer.y_offset, Val::Px(4.0));
-        assert_eq!(layer.blur_radius, Val::Px(6.0));
-        assert_eq!(
-            layer.color,
-            convert_to_color("rgba(192, 198, 210, 0.95)".to_string()).expect("color")
-        );
-    }
 }

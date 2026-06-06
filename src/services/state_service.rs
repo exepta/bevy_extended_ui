@@ -1,6 +1,14 @@
 use crate::CurrentWidgetState;
 use crate::widgets::{BindToID, IgnoreParentState, UIGenID, UIWidgetState};
 use bevy::prelude::*;
+use std::collections::HashMap;
+
+/// Represents the `BoundStateIndex` data structure used by the extended UI system.
+#[derive(Resource, Default)]
+pub struct BoundStateIndex {
+    by_widget: HashMap<usize, Vec<Entity>>,
+    by_entity: HashMap<Entity, usize>,
+}
 
 /// Plugin that manages widget focus and state propagation.
 pub struct StateService;
@@ -8,8 +16,12 @@ pub struct StateService;
 impl Plugin for StateService {
     /// Registers widget state systems.
     fn build(&self, app: &mut App) {
+        app.init_resource::<BoundStateIndex>();
         app.register_type::<Pickable>();
-        app.add_systems(PostUpdate, update_widget_states);
+        app.add_systems(
+            PostUpdate,
+            (refresh_bound_state_index, update_widget_states).chain(),
+        );
         app.add_systems(
             Update,
             (
@@ -18,6 +30,48 @@ impl Plugin for StateService {
                 unfocus_disabled,
             ),
         );
+    }
+}
+
+/// Handles `remove_from_bound_state_index` in the extended UI workflow.
+fn remove_from_bound_state_index(index: &mut BoundStateIndex, entity: Entity, widget_id: usize) {
+    let should_remove = if let Some(entries) = index.by_widget.get_mut(&widget_id) {
+        entries.retain(|current| *current != entity);
+        entries.is_empty()
+    } else {
+        false
+    };
+
+    if should_remove {
+        index.by_widget.remove(&widget_id);
+    }
+}
+
+/// Handles `refresh_bound_state_index` in the extended UI workflow.
+fn refresh_bound_state_index(
+    mut index: ResMut<BoundStateIndex>,
+    query: Query<(Entity, &BindToID), Or<(Added<BindToID>, Changed<BindToID>)>>,
+    mut removed: RemovedComponents<BindToID>,
+) {
+    for entity in removed.read() {
+        if let Some(previous_id) = index.by_entity.remove(&entity) {
+            remove_from_bound_state_index(&mut index, entity, previous_id);
+        }
+    }
+
+    for (entity, bind_to) in query.iter() {
+        let widget_id = bind_to.0;
+
+        if let Some(previous_id) = index.by_entity.insert(entity, widget_id) {
+            if previous_id != widget_id {
+                remove_from_bound_state_index(&mut index, entity, previous_id);
+            }
+        }
+
+        let entries = index.by_widget.entry(widget_id).or_default();
+        if !entries.contains(&entity) {
+            entries.push(entity);
+        }
     }
 }
 
@@ -39,24 +93,40 @@ impl Plugin for StateService {
 /// will also be marked as focused.
 pub fn update_widget_states(
     main_query: Query<(&UIGenID, &UIWidgetState), (Changed<UIWidgetState>, With<UIGenID>)>,
+    index: Option<Res<BoundStateIndex>>,
     mut inner_query: Query<
-        (&BindToID, &mut UIWidgetState),
+        (Entity, &BindToID, &mut UIWidgetState),
         (Without<UIGenID>, Without<IgnoreParentState>),
     >,
 ) {
-    for (id, state) in main_query.iter() {
-        for (bind_to, mut inner_state) in inner_query.iter_mut() {
-            if bind_to.0 != id.get() {
+    for (widget_id, widget_state) in main_query.iter() {
+        if let Some(bound_index) = index.as_ref() {
+            if let Some(bound_entities) = bound_index.by_widget.get(&widget_id.get()) {
+                for bound_entity in bound_entities {
+                    let Ok((_, _, mut bound_state)) = inner_query.get_mut(*bound_entity) else {
+                        continue;
+                    };
+                    copy_widget_state(&mut bound_state, widget_state);
+                }
                 continue;
             }
+        }
 
-            inner_state.hovered = state.hovered;
-            inner_state.focused = state.focused;
-            inner_state.readonly = state.readonly;
-            inner_state.disabled = state.disabled;
-            inner_state.checked = state.checked;
+        for (_, bind_to, mut bound_state) in inner_query.iter_mut() {
+            if bind_to.0 != widget_id.get() {
+                continue;
+            }
+            copy_widget_state(&mut bound_state, widget_state);
         }
     }
+}
+
+fn copy_widget_state(target: &mut UIWidgetState, source: &UIWidgetState) {
+    target.hovered = source.hovered;
+    target.focused = source.focused;
+    target.readonly = source.readonly;
+    target.disabled = source.disabled;
+    target.checked = source.checked;
 }
 
 /// Clears the `focused` state from all widgets except the currently focused one.
@@ -105,7 +175,7 @@ fn internal_state_check(
 /// # Example
 /// When the user presses Tab while focused on widget `#2`, focus will move to widget `#3`.
 fn handle_tab_focus(
-    mut query: Query<(Entity, &mut UIWidgetState, &UIGenID)>,
+    mut widget_query: Query<(Entity, &mut UIWidgetState, &UIGenID)>,
     keyboard: Res<ButtonInput<KeyCode>>,
     mut current_state: ResMut<CurrentWidgetState>,
 ) {
@@ -114,50 +184,50 @@ fn handle_tab_focus(
     }
     let reverse = keyboard.pressed(KeyCode::ShiftLeft) || keyboard.pressed(KeyCode::ShiftRight);
 
-    let mut elems: Vec<_> = query
+    let mut focusable_widgets: Vec<_> = widget_query
         .iter_mut()
         .filter(|(_, state, _)| !state.disabled)
         .collect();
 
-    elems.sort_by_key(|(_, _, id)| id.get());
+    focusable_widgets.sort_by_key(|(_, _, id)| id.get());
 
-    let len = elems.len();
-    if len == 0 {
+    let focusable_count = focusable_widgets.len();
+    if focusable_count == 0 {
         return;
     }
 
-    let mut focused_idx = None;
-    for (i, (_, state, _)) in elems.iter().enumerate() {
+    let mut focused_index = None;
+    for (index, (_, state, _)) in focusable_widgets.iter().enumerate() {
         if state.focused {
-            focused_idx = Some(i);
+            focused_index = Some(index);
             break;
         }
     }
 
-    match focused_idx {
-        Some(i) => {
-            elems[i].1.focused = false;
-            let next = if reverse {
-                (i + len - 1) % len
+    match focused_index {
+        Some(current_index) => {
+            focusable_widgets[current_index].1.focused = false;
+            let next_index = if reverse {
+                (current_index + focusable_count - 1) % focusable_count
             } else {
-                (i + 1) % len
+                (current_index + 1) % focusable_count
             };
-            elems[next].1.focused = true;
-            current_state.widget_id = elems[next].2.get();
+            focusable_widgets[next_index].1.focused = true;
+            current_state.widget_id = focusable_widgets[next_index].2.get();
         }
         None => {
-            let next = if reverse { len - 1 } else { 0 };
-            elems[next].1.focused = true;
-            current_state.widget_id = elems[next].2.get();
+            let next_index = if reverse { focusable_count - 1 } else { 0 };
+            focusable_widgets[next_index].1.focused = true;
+            current_state.widget_id = focusable_widgets[next_index].2.get();
         }
     }
 }
 
 /// Clears focus from widgets that became disabled.
-fn unfocus_disabled(mut q: Query<&mut UIWidgetState, Changed<UIWidgetState>>) {
-    for mut s in &mut q {
-        if s.disabled && s.focused {
-            s.focused = false;
+fn unfocus_disabled(mut state_query: Query<&mut UIWidgetState, Changed<UIWidgetState>>) {
+    for mut widget_state in &mut state_query {
+        if widget_state.disabled && widget_state.focused {
+            widget_state.focused = false;
         }
     }
 }

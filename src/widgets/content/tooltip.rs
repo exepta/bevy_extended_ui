@@ -1,5 +1,8 @@
 use crate::ExtendedUiConfiguration;
 use crate::styles::{CssClass, CssID, CssSource, TagName};
+use crate::widgets::widget_util::{
+    resolve_owner_widget, resolve_owner_widget_from_parent, set_css_classes,
+};
 use crate::widgets::{
     BindToID, Body, ToolTip, ToolTipAlignment, ToolTipPriority, ToolTipTrigger, ToolTipVariant,
     UIGenID, UIWidgetState, WidgetId, WidgetKind,
@@ -46,11 +49,16 @@ struct ToolTipTriggerState {
     dragging: HashSet<Entity>,
 }
 
+/// Defines the available `ToolTipSide` variants for this part of the UI runtime.
 #[derive(Clone, Copy, Eq, PartialEq)]
 enum ToolTipSide {
+    /// Variant `Top`.
     Top,
+    /// Variant `Bottom`.
     Bottom,
+    /// Variant `Left`.
     Left,
+    /// Variant `Right`.
     Right,
 }
 
@@ -183,13 +191,14 @@ fn internal_node_creation_system(
 
 /// Tracks click state used for trigger="click".
 fn track_click_trigger(
-    ev: On<Pointer<Click>>,
+    click_event: On<Pointer<Click>>,
     mut trigger_state: ResMut<ToolTipTriggerState>,
     parents_q: Query<&ChildOf>,
     widget_q: Query<(), With<WidgetId>>,
     body_q: Query<(), With<Body>>,
 ) {
-    let Some(owner) = resolve_owner_widget(ev.event_target(), &parents_q, &widget_q, &body_q)
+    let Some(owner) =
+        resolve_owner_widget(click_event.event_target(), &parents_q, &widget_q, &body_q)
     else {
         trigger_state.clicked.clear();
         return;
@@ -205,51 +214,37 @@ fn track_click_trigger(
 
 /// Tracks drag start state used for trigger="drag".
 fn track_drag_start_trigger(
-    ev: On<Pointer<DragStart>>,
+    drag_start_event: On<Pointer<DragStart>>,
     mut trigger_state: ResMut<ToolTipTriggerState>,
     parents_q: Query<&ChildOf>,
     widget_q: Query<(), With<WidgetId>>,
     body_q: Query<(), With<Body>>,
 ) {
-    if let Some(owner) = resolve_owner_widget(ev.event_target(), &parents_q, &widget_q, &body_q) {
+    if let Some(owner) = resolve_owner_widget(
+        drag_start_event.event_target(),
+        &parents_q,
+        &widget_q,
+        &body_q,
+    ) {
         trigger_state.dragging.insert(owner);
     }
 }
 
 /// Tracks drag end state used for trigger="drag".
 fn track_drag_end_trigger(
-    ev: On<Pointer<DragEnd>>,
+    drag_end_event: On<Pointer<DragEnd>>,
     mut trigger_state: ResMut<ToolTipTriggerState>,
     parents_q: Query<&ChildOf>,
     widget_q: Query<(), With<WidgetId>>,
     body_q: Query<(), With<Body>>,
 ) {
-    if let Some(owner) = resolve_owner_widget(ev.event_target(), &parents_q, &widget_q, &body_q) {
+    if let Some(owner) = resolve_owner_widget(
+        drag_end_event.event_target(),
+        &parents_q,
+        &widget_q,
+        &body_q,
+    ) {
         trigger_state.dragging.remove(&owner);
-    }
-}
-
-/// Resolves the nearest widget ancestor for an entity, excluding body.
-fn resolve_owner_widget(
-    mut current: Entity,
-    parents_q: &Query<&ChildOf>,
-    widget_q: &Query<(), With<WidgetId>>,
-    body_q: &Query<(), With<Body>>,
-) -> Option<Entity> {
-    loop {
-        if body_q.get(current).is_ok() {
-            return None;
-        }
-
-        if widget_q.get(current).is_ok() {
-            return Some(current);
-        }
-
-        if let Ok(parent) = parents_q.get(current) {
-            current = parent.parent();
-        } else {
-            return None;
-        }
     }
 }
 
@@ -275,30 +270,8 @@ fn resolve_tooltip_targets(
         let target = if let Some(for_id) = tooltip.for_id.as_deref() {
             let normalized = for_id.trim().trim_start_matches('#');
             by_id.get(normalized).copied()
-        } else if let Some(parent) = parent_opt {
-            let mut current = parent.parent();
-            let mut resolved = None;
-
-            loop {
-                if body_q.get(current).is_ok() {
-                    break;
-                }
-
-                if widget_q.get(current).is_ok() {
-                    resolved = Some(current);
-                    break;
-                }
-
-                if let Ok(next) = parents_q.get(current) {
-                    current = next.parent();
-                } else {
-                    break;
-                }
-            }
-
-            resolved
         } else {
-            None
+            resolve_owner_widget_from_parent(parent_opt, &parents_q, &widget_q, &body_q)
         };
 
         runtime.target = target;
@@ -462,6 +435,7 @@ fn place_nose(node: &mut Node, side: ToolTipSide, tip_w: f32, tip_h: f32) {
     }
 }
 
+/// Handles `side_to_tooltip_class` in the extended UI workflow.
 fn side_to_tooltip_class(side: ToolTipSide) -> &'static str {
     match side {
         ToolTipSide::Top => "tooltip-side-top",
@@ -471,24 +445,13 @@ fn side_to_tooltip_class(side: ToolTipSide) -> &'static str {
     }
 }
 
+/// Handles `side_to_nose_class` in the extended UI workflow.
 fn side_to_nose_class(side: ToolTipSide) -> &'static str {
     match side {
         ToolTipSide::Top => "tooltip-nose-side-top",
         ToolTipSide::Bottom => "tooltip-nose-side-bottom",
         ToolTipSide::Left => "tooltip-nose-side-left",
         ToolTipSide::Right => "tooltip-nose-side-right",
-    }
-}
-
-fn set_css_classes(classes: &mut CssClass, base: &[String], dynamic: &[&str]) {
-    let mut next = base.to_vec();
-    for class in dynamic {
-        if !next.iter().any(|c| c == class) {
-            next.push((*class).to_string());
-        }
-    }
-    if classes.0 != next {
-        classes.0 = next;
     }
 }
 

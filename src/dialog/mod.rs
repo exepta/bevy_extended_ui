@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::ExtendedUiConfiguration;
 use crate::html::{HtmlStyle, NeedHidden};
-use crate::styles::{BackdropFilter, Background};
+use crate::styles::{BackdropFilter, Background, Style};
 use crate::styles::{CssClass, CssID, TagName};
 use crate::widgets::{Body, UIWidgetState};
 
@@ -16,6 +16,65 @@ static SYSTEM_DIALOG_IN_FLIGHT: Lazy<AtomicBool> = Lazy::new(|| AtomicBool::new(
 
 const DIALOG_WIDGET_Z_INDEX: i32 = 120_000;
 const DIALOG_RUNTIME_BASE_Z_INDEX: i32 = 130_000;
+
+/// Builds the fixed overlay node used by HTML `<dialog>` widgets.
+pub(crate) fn dialog_widget_overlay_node() -> Node {
+    let mut root_node = Node::default();
+    root_node.position_type = PositionType::Absolute;
+    root_node.left = Val::Px(0.0);
+    root_node.right = Val::Px(0.0);
+    root_node.top = Val::Px(0.0);
+    root_node.bottom = Val::Px(0.0);
+    root_node.width = Val::Percent(100.0);
+    root_node.height = Val::Percent(100.0);
+    root_node.justify_content = JustifyContent::Center;
+    root_node.align_items = AlignItems::Center;
+    root_node.padding = UiRect::all(Val::Px(16.0));
+    root_node
+}
+
+/// Builds the fixed overlay style used by HTML `<dialog>` widgets.
+pub(crate) fn dialog_widget_overlay_style(base: Option<&HtmlStyle>) -> HtmlStyle {
+    let mut overlay_style = base.map(|style| style.0.clone()).unwrap_or_default();
+    apply_dialog_widget_overlay_style(&mut overlay_style);
+    HtmlStyle(overlay_style)
+}
+
+/// Inserts overlay components that must survive reactive HTML rebuilds.
+pub(crate) fn apply_dialog_widget_overlay_components(
+    commands: &mut Commands,
+    entity: Entity,
+    base_style: Option<&HtmlStyle>,
+) {
+    commands.entity(entity).insert((
+        dialog_widget_overlay_node(),
+        BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.55)),
+        ZIndex(DIALOG_WIDGET_Z_INDEX),
+        GlobalZIndex(DIALOG_WIDGET_Z_INDEX),
+        dialog_widget_overlay_style(base_style),
+    ));
+}
+
+fn apply_dialog_widget_overlay_style(style: &mut Style) {
+    style.display = Some(Display::Flex);
+    style.position_type = Some(PositionType::Absolute);
+    style.left = Some(Val::Px(0.0));
+    style.right = Some(Val::Px(0.0));
+    style.top = Some(Val::Px(0.0));
+    style.bottom = Some(Val::Px(0.0));
+    style.width = Some(Val::Percent(100.0));
+    style.height = Some(Val::Percent(100.0));
+    style.justify_content = Some(JustifyContent::Center);
+    style.align_items = Some(AlignItems::Center);
+    style.padding = Some(UiRect::all(Val::Px(16.0)));
+    style.z_index = Some(DIALOG_WIDGET_Z_INDEX);
+    style.background = Some(Background {
+        color: Color::srgba(0.0, 0.0, 0.0, 0.55),
+        image: None,
+        gradient: None,
+    });
+    style.backdrop_filter = Some(BackdropFilter::Blur(15.0));
+}
 
 /// Selects how a dialog is presented.
 #[derive(Debug, Clone, Copy, Reflect, Default, Eq, PartialEq)]
@@ -51,10 +110,14 @@ pub enum DialogLayout {
 /// Dialog category for HTML-defined dialogs (`<dialog type="...">`).
 #[derive(Debug, Clone, Copy, Reflect, Default, Eq, PartialEq)]
 pub enum DialogWidgetType {
+    /// Variant `Warn`.
     Warn,
+    /// Variant `Error`.
     Error,
+    /// Variant `Info`.
     #[default]
     Info,
+    /// Variant `Blank`.
     Blank,
 }
 
@@ -74,7 +137,7 @@ impl DialogWidgetType {
 /// HTML widget backing `<dialog ...>` elements.
 ///
 /// The widget can be styled with CSS like other HTML widgets and opened via a trigger id.
-#[derive(Component, Reflect, Debug, Clone)]
+#[derive(Component, Reflect, Debug, Clone, PartialEq)]
 #[reflect(Component)]
 #[require(
     crate::widgets::UIGenID,
@@ -83,6 +146,7 @@ impl DialogWidgetType {
     GlobalTransform,
     InheritedVisibility
 )]
+/// Represents the `DialogWidget` data structure used by the extended UI system.
 pub struct DialogWidget {
     /// Trigger element id (`trigger` or `triggger` attribute).
     pub trigger: Option<String>,
@@ -97,6 +161,7 @@ pub struct DialogWidget {
 }
 
 impl Default for DialogWidget {
+    /// Handles `default` in the extended UI workflow.
     fn default() -> Self {
         Self {
             trigger: None,
@@ -111,10 +176,14 @@ impl Default for DialogWidget {
 /// Canonical modal kind.
 #[derive(Debug, Clone, Copy, Reflect, Default, Eq, PartialEq)]
 pub enum DialogModalKind {
+    /// Variant `Default`.
     #[default]
     Default,
+    /// Variant `Failure`.
     Failure,
+    /// Variant `Question`.
     Question,
+    /// Variant `Blank`.
     Blank,
 }
 
@@ -138,6 +207,7 @@ pub enum DialogModalType {
 }
 
 impl Default for DialogModalType {
+    /// Handles `default` in the extended UI workflow.
     fn default() -> Self {
         Self::Default
     }
@@ -168,6 +238,7 @@ pub struct DialogConfig {
 }
 
 impl Default for DialogConfig {
+    /// Handles `default` in the extended UI workflow.
     fn default() -> Self {
         Self {
             provider: DialogProvider::default(),
@@ -241,6 +312,13 @@ pub struct ShowDialog {
 }
 
 impl ShowDialog {
+    /// Handles `new` in the extended UI workflow.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// // Call `new` with values from your app state and world context.
+    /// ```
     pub fn new(config: DialogConfig) -> Self {
         Self {
             request_id: None,
@@ -285,6 +363,7 @@ pub struct DialogSpawned {
     pub panel: Entity,
 }
 
+/// Represents the `DialogRuntimeState` data structure used by the extended UI system.
 #[derive(Resource, Debug)]
 struct DialogRuntimeState {
     next_request_id: u64,
@@ -292,6 +371,7 @@ struct DialogRuntimeState {
 }
 
 impl Default for DialogRuntimeState {
+    /// Handles `default` in the extended UI workflow.
     fn default() -> Self {
         Self {
             next_request_id: 0,
@@ -300,6 +380,7 @@ impl Default for DialogRuntimeState {
     }
 }
 
+/// Represents the `DialogAction` data structure used by the extended UI system.
 #[derive(Component, Debug, Clone, Copy)]
 struct DialogAction {
     request_id: u64,
@@ -309,6 +390,7 @@ struct DialogAction {
     result: DialogResult,
 }
 
+/// Represents the `DialogBackdropAction` data structure used by the extended UI system.
 #[derive(Component, Debug, Clone, Copy)]
 struct DialogBackdropAction {
     request_id: u64,
@@ -317,21 +399,27 @@ struct DialogBackdropAction {
     modal: DialogModalKind,
 }
 
+/// Represents the `DialogWidgetBase` data structure used by the extended UI system.
 #[derive(Component, Debug, Clone, Copy)]
 struct DialogWidgetBase;
 
+/// Represents the `DialogWidgetPanel` data structure used by the extended UI system.
 #[derive(Component, Debug, Clone, Copy)]
 struct DialogWidgetPanel;
 
+/// Represents the `DialogTriggerTargets` data structure used by the extended UI system.
 #[derive(Component, Debug, Clone)]
 struct DialogTriggerTargets(Vec<Entity>);
 
+/// Represents the `DialogTriggerObserver` data structure used by the extended UI system.
 #[derive(Component, Debug, Clone, Copy)]
 struct DialogTriggerObserver;
 
+/// Represents the `DialogTriggerBound` data structure used by the extended UI system.
 #[derive(Component, Debug, Clone, Copy)]
 struct DialogTriggerBound;
 
+/// Represents the `DialogWidgetButtonAction` data structure used by the extended UI system.
 #[derive(Component, Debug, Clone, Copy)]
 struct DialogWidgetButtonAction {
     dialog: Entity,
@@ -358,6 +446,7 @@ pub struct DialogPanelWidget {
 pub struct ExtendedDialogPlugin;
 
 impl Plugin for ExtendedDialogPlugin {
+    /// Handles `build` in the extended UI workflow.
     fn build(&self, app: &mut App) {
         app.init_resource::<DialogRuntimeState>();
         app.register_type::<DialogProvider>();
@@ -385,6 +474,7 @@ impl Plugin for ExtendedDialogPlugin {
     }
 }
 
+/// Handles `process_dialog_requests` in the extended UI workflow.
 fn process_dialog_requests(
     mut commands: Commands,
     config: Res<ExtendedUiConfiguration>,
@@ -429,6 +519,7 @@ fn process_dialog_requests(
     }
 }
 
+/// Handles `resolve_request_id` in the extended UI workflow.
 fn resolve_request_id(runtime: &mut DialogRuntimeState, requested: Option<u64>) -> u64 {
     if let Some(id) = requested {
         runtime.next_request_id = runtime.next_request_id.max(id);
@@ -439,6 +530,7 @@ fn resolve_request_id(runtime: &mut DialogRuntimeState, requested: Option<u64>) 
     runtime.next_request_id
 }
 
+/// Handles `initialize_dialog_widgets` in the extended UI workflow.
 fn initialize_dialog_widgets(
     mut commands: Commands,
     config: Res<ExtendedUiConfiguration>,
@@ -483,46 +575,8 @@ fn initialize_dialog_widgets(
         );
         push_unique_class(&mut classes, dialog_widget_type_class(dialog.dialog_type));
 
-        let mut root_node = Node::default();
-        root_node.position_type = PositionType::Absolute;
-        root_node.left = Val::Px(0.0);
-        root_node.right = Val::Px(0.0);
-        root_node.top = Val::Px(0.0);
-        root_node.bottom = Val::Px(0.0);
-        root_node.width = Val::Percent(100.0);
-        root_node.height = Val::Percent(100.0);
-        root_node.justify_content = JustifyContent::Center;
-        root_node.align_items = AlignItems::Center;
-        root_node.padding = UiRect::all(Val::Px(16.0));
-
-        let mut overlay_style = html_style_opt
-            .map(|style| style.0.clone())
-            .unwrap_or_default();
-        overlay_style.display = Some(Display::Flex);
-        overlay_style.position_type = Some(PositionType::Absolute);
-        overlay_style.left = Some(Val::Px(0.0));
-        overlay_style.right = Some(Val::Px(0.0));
-        overlay_style.top = Some(Val::Px(0.0));
-        overlay_style.bottom = Some(Val::Px(0.0));
-        overlay_style.width = Some(Val::Percent(100.0));
-        overlay_style.height = Some(Val::Percent(100.0));
-        overlay_style.justify_content = Some(JustifyContent::Center);
-        overlay_style.align_items = Some(AlignItems::Center);
-        overlay_style.padding = Some(UiRect::all(Val::Px(16.0)));
-        overlay_style.z_index = Some(DIALOG_WIDGET_Z_INDEX);
-        overlay_style.background = Some(Background {
-            color: Color::srgba(0.0, 0.0, 0.0, 0.55),
-            image: None,
-            gradient: None,
-        });
-        overlay_style.backdrop_filter = Some(BackdropFilter::Blur(15.0));
-
         commands.entity(entity).insert((
             Name::new(dialog_name),
-            root_node,
-            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.55)),
-            ZIndex(DIALOG_WIDGET_Z_INDEX),
-            GlobalZIndex(DIALOG_WIDGET_Z_INDEX),
             RenderLayers::layer(layer),
             Pickable::default(),
             TagName("dialog".to_string()),
@@ -530,8 +584,8 @@ fn initialize_dialog_widgets(
             DialogWidgetBase,
             NeedHidden,
             Visibility::Hidden,
-            HtmlStyle(overlay_style),
         ));
+        apply_dialog_widget_overlay_components(&mut commands, entity, html_style_opt);
 
         if dialog.renderer == DialogProvider::BevyApp {
             commands
@@ -635,6 +689,7 @@ fn initialize_dialog_widgets(
     }
 }
 
+/// Handles `find_body_ancestor` in the extended UI workflow.
 fn find_body_ancestor(
     start: Entity,
     parents: &Query<&ChildOf>,
@@ -651,12 +706,14 @@ fn find_body_ancestor(
     None
 }
 
+/// Handles `class_has` in the extended UI workflow.
 fn class_has(class_opt: Option<&CssClass>, expected: &str) -> bool {
     class_opt
         .map(|classes| classes.0.iter().any(|class_name| class_name == expected))
         .unwrap_or(false)
 }
 
+/// Handles `spawn_default_dialog_header` in the extended UI workflow.
 fn spawn_default_dialog_header(commands: &mut Commands, panel: Entity, layer: usize) -> Entity {
     let mut node = Node::default();
     node.width = Val::Percent(100.0);
@@ -695,6 +752,7 @@ fn spawn_default_dialog_header(commands: &mut Commands, panel: Entity, layer: us
     header
 }
 
+/// Handles `spawn_default_dialog_body` in the extended UI workflow.
 fn spawn_default_dialog_body(commands: &mut Commands, panel: Entity, layer: usize) -> Entity {
     let mut node = Node::default();
     node.width = Val::Percent(100.0);
@@ -719,6 +777,7 @@ fn spawn_default_dialog_body(commands: &mut Commands, panel: Entity, layer: usiz
     body
 }
 
+/// Handles `spawn_default_dialog_footer` in the extended UI workflow.
 fn spawn_default_dialog_footer(
     commands: &mut Commands,
     panel: Entity,
@@ -790,6 +849,7 @@ fn spawn_default_dialog_footer(
     footer
 }
 
+/// Handles `spawn_default_dialog_footer_button` in the extended UI workflow.
 fn spawn_default_dialog_footer_button(
     commands: &mut Commands,
     footer: Entity,
@@ -850,6 +910,7 @@ fn spawn_default_dialog_footer_button(
     button
 }
 
+/// Handles `on_dialog_widget_button_click` in the extended UI workflow.
 fn on_dialog_widget_button_click(
     mut trigger: On<Pointer<Click>>,
     mut dialogs: Query<&mut DialogWidget>,
@@ -864,6 +925,7 @@ fn on_dialog_widget_button_click(
     trigger.propagate(false);
 }
 
+/// Handles `bind_dialog_triggers` in the extended UI workflow.
 fn bind_dialog_triggers(
     mut commands: Commands,
     dialogs: Query<(Entity, &DialogWidget, Option<&DialogTriggerBound>), With<DialogWidget>>,
@@ -911,6 +973,7 @@ fn bind_dialog_triggers(
     }
 }
 
+/// Handles `sync_dialog_widget_visibility` in the extended UI workflow.
 fn sync_dialog_widget_visibility(
     mut dialogs: Query<
         (&DialogWidget, &mut Visibility),
@@ -927,6 +990,7 @@ fn sync_dialog_widget_visibility(
     }
 }
 
+/// Handles `on_dialog_trigger_click` in the extended UI workflow.
 fn on_dialog_trigger_click(
     trigger: On<Pointer<Click>>,
     targets: Query<&DialogTriggerTargets>,
@@ -952,6 +1016,7 @@ fn on_dialog_trigger_click(
     }
 }
 
+/// Handles `on_dialog_widget_overlay_click` in the extended UI workflow.
 fn on_dialog_widget_overlay_click(
     mut trigger: On<Pointer<Click>>,
     mut dialogs: Query<&mut DialogWidget>,
@@ -965,16 +1030,19 @@ fn on_dialog_widget_overlay_click(
     trigger.propagate(false);
 }
 
+/// Handles `normalize_trigger_id` in the extended UI workflow.
 fn normalize_trigger_id(input: &str) -> String {
     input.trim().trim_start_matches('#').to_string()
 }
 
+/// Handles `push_unique_class` in the extended UI workflow.
 fn push_unique_class(classes: &mut Vec<String>, class_name: &str) {
     if !classes.iter().any(|existing| existing == class_name) {
         classes.push(class_name.to_string());
     }
 }
 
+/// Handles `dialog_widget_type_class` in the extended UI workflow.
 fn dialog_widget_type_class(kind: DialogWidgetType) -> &'static str {
     match kind {
         DialogWidgetType::Warn => "dialog-type-warn",
@@ -984,6 +1052,7 @@ fn dialog_widget_type_class(kind: DialogWidgetType) -> &'static str {
     }
 }
 
+/// Handles `spawn_bevy_dialog` in the extended UI workflow.
 fn spawn_bevy_dialog(
     commands: &mut Commands,
     dialog: &DialogConfig,
@@ -1087,6 +1156,7 @@ fn spawn_bevy_dialog(
     (root, panel)
 }
 
+/// Handles `populate_dialog_panel` in the extended UI workflow.
 fn populate_dialog_panel(
     commands: &mut Commands,
     panel: Entity,
@@ -1168,6 +1238,7 @@ fn populate_dialog_panel(
     }
 }
 
+/// Handles `spawn_header` in the extended UI workflow.
 fn spawn_header(
     commands: &mut Commands,
     panel: Entity,
@@ -1228,6 +1299,7 @@ fn spawn_header(
     commands.entity(panel).add_child(header);
 }
 
+/// Handles `spawn_body` in the extended UI workflow.
 fn spawn_body(
     commands: &mut Commands,
     panel: Entity,
@@ -1272,6 +1344,7 @@ fn spawn_body(
     commands.entity(panel).add_child(body);
 }
 
+/// Handles `spawn_footer` in the extended UI workflow.
 fn spawn_footer(
     commands: &mut Commands,
     panel: Entity,
@@ -1315,6 +1388,7 @@ fn spawn_footer(
     commands.entity(panel).add_child(footer);
 }
 
+/// Handles `spawn_action_button` in the extended UI workflow.
 fn spawn_action_button(
     commands: &mut Commands,
     request_id: u64,
@@ -1380,6 +1454,7 @@ fn spawn_action_button(
     button
 }
 
+/// Handles `modal_class_suffix` in the extended UI workflow.
 fn modal_class_suffix(kind: DialogModalKind) -> &'static str {
     match kind {
         DialogModalKind::Default => "default",
@@ -1389,10 +1464,12 @@ fn modal_class_suffix(kind: DialogModalKind) -> &'static str {
     }
 }
 
+/// Handles `stop_dialog_click_propagation` in the extended UI workflow.
 fn stop_dialog_click_propagation(mut trigger: On<Pointer<Click>>) {
     trigger.propagate(false);
 }
 
+/// Handles `on_dialog_backdrop_click` in the extended UI workflow.
 fn on_dialog_backdrop_click(
     mut trigger: On<Pointer<Click>>,
     mut commands: Commands,
@@ -1415,6 +1492,7 @@ fn on_dialog_backdrop_click(
     trigger.propagate(false);
 }
 
+/// Handles `on_dialog_action_click` in the extended UI workflow.
 fn on_dialog_action_click(
     mut trigger: On<Pointer<Click>>,
     mut commands: Commands,
@@ -1437,6 +1515,7 @@ fn on_dialog_action_click(
     trigger.propagate(false);
 }
 
+/// Handles `spawn_linux_system_dialog_task` in the extended UI workflow.
 #[cfg(all(target_os = "linux", not(target_arch = "wasm32")))]
 fn spawn_linux_system_dialog_task(task: impl FnOnce() + Send + 'static) -> bool {
     if SYSTEM_DIALOG_IN_FLIGHT
@@ -1457,6 +1536,7 @@ fn spawn_linux_system_dialog_task(task: impl FnOnce() + Send + 'static) -> bool 
     true
 }
 
+/// Handles `show_system_message_blocking` in the extended UI workflow.
 #[cfg(not(target_arch = "wasm32"))]
 fn show_system_message_blocking(kind: DialogWidgetType, content: &str) -> DialogResult {
     use rfd::{MessageButtons, MessageDialog, MessageDialogResult, MessageLevel};
@@ -1492,6 +1572,7 @@ fn show_system_message_blocking(kind: DialogWidgetType, content: &str) -> Dialog
     }
 }
 
+/// Handles `show_wasm_alert_dialog` in the extended UI workflow.
 #[cfg(all(target_arch = "wasm32", feature = "clipboard-wasm"))]
 fn show_wasm_alert_dialog(title: &str, content: &str) -> DialogResult {
     let message = if title.trim().is_empty() {
@@ -1510,6 +1591,7 @@ fn show_wasm_alert_dialog(title: &str, content: &str) -> DialogResult {
     }
 }
 
+/// Handles `show_wasm_confirm_dialog` in the extended UI workflow.
 #[cfg(all(target_arch = "wasm32", feature = "clipboard-wasm"))]
 fn show_wasm_confirm_dialog(title: &str, content: &str) -> DialogResult {
     let message = if title.trim().is_empty() {
@@ -1529,6 +1611,7 @@ fn show_wasm_confirm_dialog(title: &str, content: &str) -> DialogResult {
     }
 }
 
+/// Handles `show_system_message` in the extended UI workflow.
 fn show_system_message(kind: DialogWidgetType, content: &str) -> DialogResult {
     #[cfg(all(target_os = "linux", not(target_arch = "wasm32")))]
     {
@@ -1575,6 +1658,7 @@ fn show_system_message(kind: DialogWidgetType, content: &str) -> DialogResult {
     }
 }
 
+/// Handles `show_system_dialog_blocking` in the extended UI workflow.
 #[cfg(not(target_arch = "wasm32"))]
 fn show_system_dialog_blocking(dialog: &DialogConfig) -> DialogResult {
     use rfd::{MessageButtons, MessageDialog, MessageDialogResult, MessageLevel};
@@ -1627,6 +1711,7 @@ fn show_system_dialog_blocking(dialog: &DialogConfig) -> DialogResult {
     }
 }
 
+/// Handles `show_system_dialog` in the extended UI workflow.
 fn show_system_dialog(dialog: &DialogConfig) -> DialogResult {
     #[cfg(all(target_os = "linux", not(target_arch = "wasm32")))]
     {
@@ -1684,51 +1769,5 @@ fn show_system_dialog(dialog: &DialogConfig) -> DialogResult {
             let _ = (title, description);
             return DialogResult::Unavailable;
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn modal_kind_mapping_matches_modal_variants() {
-        assert_eq!(DialogModalType::Default.kind(), DialogModalKind::Default);
-        assert_eq!(
-            DialogModalType::Failure {
-                error_code: "E-1".to_string(),
-                confirm_label: "Confirm".to_string()
-            }
-            .kind(),
-            DialogModalKind::Failure
-        );
-        assert_eq!(
-            DialogModalType::Question {
-                confirm_label: "Yes".to_string(),
-                cancel_label: "No".to_string()
-            }
-            .kind(),
-            DialogModalKind::Question
-        );
-        assert_eq!(DialogModalType::Blank.kind(), DialogModalKind::Blank);
-    }
-
-    #[test]
-    fn dialog_constructors_set_expected_defaults() {
-        let default = DialogConfig::default_modal("Title", "Body");
-        assert_eq!(default.modal.kind(), DialogModalKind::Default);
-        assert_eq!(default.provider, DialogProvider::BevyApp);
-
-        let failure = DialogConfig::failure("Error", "Something failed", "E-500");
-        assert_eq!(failure.modal.kind(), DialogModalKind::Failure);
-        assert!(!failure.close_on_backdrop);
-
-        let question = DialogConfig::question("Question", "Proceed?");
-        assert_eq!(question.modal.kind(), DialogModalKind::Question);
-        assert!(question.close_on_backdrop);
-
-        let blank = DialogConfig::blank(DialogLayout::BottomSheet);
-        assert_eq!(blank.modal.kind(), DialogModalKind::Blank);
-        assert_eq!(blank.layout, DialogLayout::BottomSheet);
     }
 }

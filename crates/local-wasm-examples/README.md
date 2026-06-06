@@ -29,3 +29,4 @@ cargo run --manifest-path crates/local-wasm-examples/Cargo.toml
 
 - `theming_provider_example` (default feature: `theme-provider`)
 - `widget_overview_example` (feature: `widget-overview`)
+- `typed_values_example` (feature: `typed-values`) — ChoiceBox/RadioButton typed values (i32, bool, enum, object)

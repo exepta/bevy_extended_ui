@@ -1,6 +1,8 @@
 #[cfg(test)]
 mod tests {
-    use super::super::css_service::{CssService, CssUsers};
+    use super::super::css_service::{
+        CssService, CssUsers, collect_assets_with_changed_media_matches, matches_css_selector_token,
+    };
     use super::super::image_service::{get_or_load_image, pre_load_assets};
     use super::super::state_service::{StateService, update_widget_states};
     use super::super::style_service::{
@@ -9,14 +11,17 @@ mod tests {
     };
     use crate::io::CssAsset;
     use crate::styles::components::UiStyle;
-    use crate::styles::{CssSource, FontVal, Style, StylePair, TextTransform, TransitionSpec};
+    use crate::styles::{
+        CssClass, CssID, CssSource, FontVal, Style, StylePair, TagName, TextTransform,
+        TransitionSpec,
+    };
     use crate::widgets::{BindToID, UIGenID, UIWidgetState};
     use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
     use bevy::asset::AssetPlugin;
     use bevy::input::ButtonInput;
     use bevy::prelude::*;
     use bevy::text::LineHeight;
-    use std::collections::HashMap;
+    use std::collections::{HashMap, HashSet};
     use std::fs;
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -41,6 +46,22 @@ mod tests {
             std::process::id(),
             nanos
         ))
+    }
+
+    fn load_image_for_test(app: &mut App, path: &str, asset_server: &AssetServer) -> Handle<Image> {
+        app.world_mut()
+            .resource_scope(|world, mut cache: Mut<ImageCache>| {
+                let mut images = world.resource_mut::<Assets<Image>>();
+                get_or_load_image(path, &mut cache, &mut images, asset_server)
+            })
+    }
+
+    fn set_entity_ui_styles(app: &mut App, entity: Entity, styles: HashMap<String, StylePair>) {
+        if let Some(mut ui_style) = app.world_mut().entity_mut(entity).get_mut::<UiStyle>() {
+            ui_style.styles = styles;
+        } else {
+            panic!("missing UiStyle");
+        }
     }
 
     #[test]
@@ -239,19 +260,8 @@ mod tests {
         let path = "service/unit/icon.png";
         let asset_server = app.world().resource::<AssetServer>().clone();
 
-        let first = app
-            .world_mut()
-            .resource_scope(|world, mut cache: Mut<ImageCache>| {
-                let mut images = world.resource_mut::<Assets<Image>>();
-                get_or_load_image(path, &mut cache, &mut images, &asset_server)
-            });
-
-        let second = app
-            .world_mut()
-            .resource_scope(|world, mut cache: Mut<ImageCache>| {
-                let mut images = world.resource_mut::<Assets<Image>>();
-                get_or_load_image(path, &mut cache, &mut images, &asset_server)
-            });
+        let first = load_image_for_test(&mut app, path, &asset_server);
+        let second = load_image_for_test(&mut app, path, &asset_server);
 
         assert_eq!(first.id(), second.id());
         let cache = app.world().resource::<ImageCache>();
@@ -383,6 +393,44 @@ mod tests {
     }
 
     #[test]
+    fn css_service_collects_only_assets_with_changed_media_matches() {
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, AssetPlugin::default()));
+        app.init_asset::<CssAsset>();
+
+        let responsive_entity = app.world_mut().spawn_empty().id();
+        let static_entity = app.world_mut().spawn_empty().id();
+
+        let (responsive_css, static_css) = {
+            let mut assets = app.world_mut().resource_mut::<Assets<CssAsset>>();
+            (
+                assets.add(CssAsset {
+                    text: "@media (max-width: 500px) { .card { color: red; } }".to_string(),
+                }),
+                assets.add(CssAsset {
+                    text: ".card { color: blue; }".to_string(),
+                }),
+            )
+        };
+
+        let mut css_users = CssUsers::default();
+        css_users.users = HashMap::from([
+            (responsive_css.id(), HashSet::from([responsive_entity])),
+            (static_css.id(), HashSet::from([static_entity])),
+        ]);
+
+        let affected = collect_assets_with_changed_media_matches(
+            &css_users,
+            app.world().resource::<Assets<CssAsset>>(),
+            Vec2::new(800.0, 600.0),
+            Vec2::new(400.0, 600.0),
+        );
+
+        assert!(affected.contains(&responsive_css.id()));
+        assert!(!affected.contains(&static_css.id()));
+    }
+
+    #[test]
     fn css_service_updates_css_users_index_for_added_and_changed_sources() {
         let mut app = App::new();
         app.add_plugins((MinimalPlugins, AssetPlugin::default(), CssService));
@@ -426,6 +474,142 @@ mod tests {
         if let Some(set_old) = users.users.get(&h1.id()) {
             assert!(!set_old.contains(&entity));
         }
+    }
+
+    #[test]
+    fn css_service_matches_compound_selectors_and_suffixes() {
+        let id = CssID("main-card".to_string());
+        let classes = CssClass(vec![
+            "card".to_string(),
+            "active".to_string(),
+            "btn".to_string(),
+            "primary".to_string(),
+        ]);
+        let tag = TagName("div".to_string());
+
+        assert!(matches_css_selector_token(
+            ".card.active",
+            Some(&id),
+            Some(&classes),
+            Some(&tag)
+        ));
+        assert!(matches_css_selector_token(
+            "div.card#main-card",
+            Some(&id),
+            Some(&classes),
+            Some(&tag)
+        ));
+        assert!(matches_css_selector_token(
+            "#main-card.active:hover",
+            Some(&id),
+            Some(&classes),
+            Some(&tag)
+        ));
+        assert!(matches_css_selector_token(
+            ".btn.primary[data-kind='main']",
+            Some(&id),
+            Some(&classes),
+            Some(&tag)
+        ));
+    }
+
+    #[test]
+    fn css_service_rejects_selectors_with_missing_parts() {
+        let id = CssID("main-card".to_string());
+        let classes = CssClass(vec!["card".to_string()]);
+        let tag = TagName("div".to_string());
+
+        assert!(matches_css_selector_token(
+            ".card",
+            Some(&id),
+            Some(&classes),
+            Some(&tag)
+        ));
+        assert!(!matches_css_selector_token(
+            ".card.active",
+            Some(&id),
+            Some(&classes),
+            Some(&tag)
+        ));
+        assert!(!matches_css_selector_token(
+            "span.card#main-card",
+            Some(&id),
+            Some(&classes),
+            Some(&tag)
+        ));
+        assert!(!matches_css_selector_token(
+            "#other.card",
+            Some(&id),
+            Some(&classes),
+            Some(&tag)
+        ));
+    }
+
+    #[test]
+    fn css_service_rejects_invalid_selector_tokens() {
+        let id = CssID("main".to_string());
+        let classes = CssClass(vec!["card".to_string()]);
+        let tag = TagName("div".to_string());
+
+        assert!(matches_css_selector_token(
+            "div.card",
+            Some(&id),
+            Some(&classes),
+            Some(&tag)
+        ));
+        assert!(!matches_css_selector_token(
+            "..card",
+            Some(&id),
+            Some(&classes),
+            Some(&tag)
+        ));
+        assert!(!matches_css_selector_token(
+            "div#",
+            Some(&id),
+            Some(&classes),
+            Some(&tag)
+        ));
+        assert!(!matches_css_selector_token(
+            ".",
+            Some(&id),
+            Some(&classes),
+            Some(&tag)
+        ));
+    }
+
+    #[test]
+    fn css_service_matches_selector_case_insensitive_tag_names() {
+        let tag = TagName("Div".to_string());
+        let classes = CssClass(vec!["card".to_string()]);
+
+        assert!(matches_css_selector_token("div", None, None, Some(&tag)));
+        assert!(matches_css_selector_token("DIV", None, None, Some(&tag)));
+        assert!(matches_css_selector_token(
+            "dIv.card",
+            None,
+            Some(&classes),
+            Some(&tag)
+        ));
+    }
+
+    #[test]
+    fn css_service_ignores_pseudo_and_attribute_suffixes() {
+        let id = CssID("cta".to_string());
+        let classes = CssClass(vec!["btn".to_string(), "primary".to_string()]);
+        let tag = TagName("button".to_string());
+
+        assert!(matches_css_selector_token(
+            "button.btn.primary:hover",
+            Some(&id),
+            Some(&classes),
+            Some(&tag)
+        ));
+        assert!(matches_css_selector_token(
+            ".btn.primary[data-kind='main']",
+            Some(&id),
+            Some(&classes),
+            Some(&tag)
+        ));
     }
 
     #[test]
@@ -668,6 +852,65 @@ mod tests {
     }
 
     #[test]
+    fn update_widget_styles_system_prefers_hover_pseudo_styles_when_state_matches() {
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, AssetPlugin::default()));
+        app.init_asset::<Image>();
+        app.insert_resource(ImageCache::default());
+        app.add_systems(Update, update_widget_styles_system);
+
+        let mut base_style = Style::default();
+        base_style.color = Some(Color::srgb(0.2, 0.2, 1.0));
+
+        let mut hover_style = Style::default();
+        hover_style.color = Some(Color::srgb(1.0, 0.5, 0.0));
+
+        let mut styles = HashMap::new();
+        styles.insert(
+            "button".to_string(),
+            StylePair {
+                normal: base_style,
+                selector: "button".to_string(),
+                ..default()
+            },
+        );
+        styles.insert(
+            "button:hover".to_string(),
+            StylePair {
+                normal: hover_style,
+                selector: "button:hover".to_string(),
+                ..default()
+            },
+        );
+
+        let entity = app
+            .world_mut()
+            .spawn((
+                UiStyle {
+                    css: Handle::default(),
+                    styles,
+                    keyframes: HashMap::new(),
+                    active_style: None,
+                },
+                UIWidgetState {
+                    hovered: true,
+                    ..default()
+                },
+                Node::default(),
+                TextColor(Color::NONE),
+            ))
+            .id();
+
+        app.update();
+
+        let text_color = app
+            .world()
+            .get::<TextColor>(entity)
+            .expect("missing TextColor");
+        assert_eq!(text_color.0, Color::srgb(1.0, 0.5, 0.0));
+    }
+
+    #[test]
     fn update_widget_styles_system_applies_line_height_from_css() {
         let mut app = App::new();
         app.add_plugins((MinimalPlugins, AssetPlugin::default()));
@@ -764,11 +1007,7 @@ mod tests {
                 ..default()
             },
         );
-        if let Some(mut ui_style) = app.world_mut().entity_mut(entity).get_mut::<UiStyle>() {
-            ui_style.styles = reset_styles;
-        } else {
-            panic!("missing UiStyle");
-        }
+        set_entity_ui_styles(&mut app, entity, reset_styles);
 
         app.update();
 
@@ -846,11 +1085,7 @@ mod tests {
             },
         );
 
-        if let Some(mut ui_style) = app.world_mut().entity_mut(entity).get_mut::<UiStyle>() {
-            ui_style.styles = reset_styles;
-        } else {
-            panic!("missing UiStyle");
-        }
+        set_entity_ui_styles(&mut app, entity, reset_styles);
 
         app.update();
 

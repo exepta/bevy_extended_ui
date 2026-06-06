@@ -1,0 +1,9 @@
+.test-container {
+    padding: 24px;
+    gap: 12px;
+    background: #327bc3;
+}
+
+h2 {
+    color: white;
+}

@@ -1,13 +1,17 @@
 use std::collections::HashMap;
 
 use crate::html::HtmlStyle;
-use crate::registry::UiRegistry;
+use crate::old::registry::UiRegistry;
 use crate::styles::{CssClass, CssSource, Style, TagName};
 use crate::widgets::controls::choice_box::ChoiceLayoutBoxBase;
 use crate::widgets::div::DivContentRoot;
-use crate::widgets::widget_util::wheel_delta_y;
+use crate::widgets::widget_util::{
+    apply_wheel_scroll_events_for_root, can_scroll_axis, find_owner_with_scroll_and_bar,
+    max_scroll_for_extents, set_scrollbar_display_and_visibility,
+};
 use crate::widgets::{
-    BindToID, Body, Div, Scrollbar, UIGenID, UIWidgetState, WidgetId, WidgetKind,
+    ActiveScrollTarget, BindToID, Body, Div, Scrollbar, UIGenID, UIWidgetState, WidgetId,
+    WidgetKind,
 };
 use crate::{CurrentWidgetState, ExtendedUiConfiguration};
 use bevy::camera::visibility::RenderLayers;
@@ -17,23 +21,23 @@ use bevy::ui::ScrollPosition;
 
 /// Marker component for the internal body node.
 #[derive(Component)]
-struct BodyBase;
+pub struct BodyBase;
 
 /// Marker for the scroll content node inside a body.
 #[derive(Component)]
-struct BodyScrollContent;
+pub struct BodyScrollContent;
 
 /// Component storing the root content entity for a body.
 #[derive(Component, Deref)]
-struct BodyContentRoot(Entity);
+pub struct BodyContentRoot(pub Entity);
 
 /// Component storing the vertical scrollbar entity for a body.
 #[derive(Component, Deref)]
-struct BodyScrollbar(Entity);
+pub struct BodyScrollbar(pub Entity);
 
 /// Component storing the horizontal scrollbar entity for a body.
 #[derive(Component, Deref)]
-struct BodyScrollbarH(Entity);
+pub struct BodyScrollbarH(pub Entity);
 
 /// Marks which body owns a scroll-content subtree.
 #[derive(Component, Deref)]
@@ -45,9 +49,9 @@ struct BodyScrollbarOwner(Entity);
 
 /// Tracks hover counts for body widgets.
 #[derive(Resource, Default)]
-struct HoveredBodyTracker {
-    body_ref: HashMap<Entity, u32>,
-    last_body: Option<Entity>,
+pub struct HoveredBodyTracker {
+    pub body_ref: HashMap<Entity, u32>,
+    pub last_body: Option<Entity>,
 }
 
 /// Returns true for dialog overlays/panels that must not be nested into scroll-content.
@@ -77,6 +81,7 @@ impl Plugin for BodyWidget {
     /// Registers systems for body widget setup.
     fn build(&self, app: &mut App) {
         app.init_resource::<HoveredBodyTracker>();
+        app.init_resource::<ActiveScrollTarget>();
         app.add_systems(
             Update,
             (
@@ -101,11 +106,11 @@ fn internal_node_creation_system(
     >,
     existing_bodies: Query<&ZIndex, With<BodyBase>>,
     config: Res<ExtendedUiConfiguration>,
-    ui_registry: Res<UiRegistry>,
+    ui_registry: Option<Res<UiRegistry>>,
 ) {
     let layer = config.render_layers.first().unwrap_or(&1);
 
-    let ui_order = ui_registry.current.as_ref();
+    let ui_order = ui_registry.as_ref().and_then(|reg| reg.current.as_ref());
     let max_z_index = existing_bodies
         .iter()
         .map(|z_index| z_index.0)
@@ -167,7 +172,7 @@ fn internal_node_creation_system(
 }
 
 /// Ensures the body has scroll content and scrollbar nodes when needed.
-fn ensure_body_scroll_structure(
+pub fn ensure_body_scroll_structure(
     mut commands: Commands,
     mut body_q: Query<
         (
@@ -564,40 +569,8 @@ fn route_hover_from_pointer_messages(
     mut body_state_q: Query<&mut UIWidgetState, With<Body>>,
     mut hovered: ResMut<HoveredBodyTracker>,
 ) {
-    /// Walks up the hierarchy to find the owning body entity.
-    fn find_owner_body(
-        mut e: Entity,
-        parents: &Query<&ChildOf>,
-        is_body_q: &Query<(), With<Body>>,
-        is_scroll_content_q: &Query<(), With<BodyScrollContent>>,
-        scroll_owner_q: &Query<&BodyContentOwner, With<BodyScrollContent>>,
-        sb_owner_q: &Query<&BodyScrollbarOwner>,
-    ) -> Option<Entity> {
-        loop {
-            if let Ok(owner) = sb_owner_q.get(e) {
-                return Some(**owner);
-            }
-
-            if is_body_q.get(e).is_ok() {
-                return Some(e);
-            }
-
-            if is_scroll_content_q.get(e).is_ok() {
-                if let Ok(owner) = scroll_owner_q.get(e) {
-                    return Some(**owner);
-                }
-            }
-
-            if let Ok(p) = parents.get(e) {
-                e = p.parent();
-            } else {
-                return None;
-            }
-        }
-    }
-
     for msg in over.read() {
-        let Some(body) = find_owner_body(
+        let Some(body) = find_owner_with_scroll_and_bar(
             msg.entity,
             &parents,
             &is_body_q,
@@ -618,7 +591,7 @@ fn route_hover_from_pointer_messages(
     }
 
     for msg in out.read() {
-        let Some(body) = find_owner_body(
+        let Some(body) = find_owner_with_scroll_and_bar(
             msg.entity,
             &parents,
             &is_body_q,
@@ -646,9 +619,11 @@ fn route_hover_from_pointer_messages(
     }
 }
 
-/// Wheel scroll uses the "last hovered body" and scrolls its BodyScrollContent (Y only).
-fn handle_body_scroll_wheel(
+/// Wheel scroll uses the "last hovered body" and scrolls its BodyScrollContent on both axes.
+pub fn handle_body_scroll_wheel(
     mut wheel_events: MessageReader<MouseWheel>,
+    keyboard: Option<Res<ButtonInput<KeyCode>>>,
+    active_scroll_target: Option<Res<ActiveScrollTarget>>,
     hovered: Res<HoveredBodyTracker>,
     body_q: Query<(Entity, &BodyContentRoot), With<Body>>,
     mut content_q: Query<(&Node, &ComputedNode, &mut ScrollPosition), With<BodyScrollContent>>,
@@ -663,6 +638,14 @@ fn handle_body_scroll_wheel(
     >,
     dialog_overlay_q: Query<(Option<&TagName>, Option<&CssClass>, &Visibility)>,
 ) {
+    if active_scroll_target
+        .as_ref()
+        .is_some_and(|target| target.entity.is_some())
+    {
+        wheel_events.clear();
+        return;
+    }
+
     // Scrollable div under the pointer has priority over body scrolling.
     let has_hovered_scrollable_div = div_q.iter().any(|(state, root)| {
         if !state.hovered {
@@ -673,16 +656,21 @@ fn handle_body_scroll_wheel(
             return false;
         };
 
-        if node.overflow.y != OverflowAxis::Scroll {
-            return false;
-        }
-
         let inv_sf = computed.inverse_scale_factor.max(f32::EPSILON);
-        let viewport_h = (computed.size().y * inv_sf).max(1.0);
-        let content_h = (computed.content_size.y * inv_sf).max(viewport_h);
-        let max_scroll = (content_h - viewport_h).max(0.0);
+        let can_scroll_y = can_scroll_axis(
+            node.overflow.y,
+            computed.size().y,
+            computed.content_size.y,
+            inv_sf,
+        );
+        let can_scroll_x = can_scroll_axis(
+            node.overflow.x,
+            computed.size().x,
+            computed.content_size.x,
+            inv_sf,
+        );
 
-        max_scroll > 0.5
+        can_scroll_x || can_scroll_y
     });
     if has_hovered_scrollable_div {
         return;
@@ -699,16 +687,21 @@ fn handle_body_scroll_wheel(
                 if !matches!(*visibility, Visibility::Visible | Visibility::Inherited) {
                     return false;
                 }
-                if node.overflow.y != OverflowAxis::Scroll {
-                    return false;
-                }
-
                 let inv_sf = computed.inverse_scale_factor.max(f32::EPSILON);
-                let viewport_h = (computed.size().y * inv_sf).max(1.0);
-                let content_h = (computed.content_size.y * inv_sf).max(viewport_h);
-                let max_scroll = (content_h - viewport_h).max(0.0);
+                let can_scroll_y = can_scroll_axis(
+                    node.overflow.y,
+                    computed.size().y,
+                    computed.content_size.y,
+                    inv_sf,
+                );
+                let can_scroll_x = can_scroll_axis(
+                    node.overflow.x,
+                    computed.size().x,
+                    computed.content_size.x,
+                    inv_sf,
+                );
 
-                max_scroll > 0.5
+                can_scroll_x || can_scroll_y
             });
     if has_hovered_scrollable_choice_overlay {
         return;
@@ -738,24 +731,12 @@ fn handle_body_scroll_wheel(
         return;
     };
 
-    for event in wheel_events.read() {
-        let Ok((node, computed, mut scroll)) = content_q.get_mut(**root) else {
-            continue;
-        };
-
-        if node.overflow.y != OverflowAxis::Scroll {
-            continue;
-        }
-
-        let inv_sf = computed.inverse_scale_factor.max(f32::EPSILON);
-        let delta = -wheel_delta_y(event, inv_sf);
-
-        let viewport_h = (computed.size().y * inv_sf).max(1.0);
-        let content_h = (computed.content_size.y * inv_sf).max(viewport_h);
-        let max_scroll = (content_h - viewport_h).max(0.0);
-
-        scroll.y = (scroll.y + delta).clamp(0.0, max_scroll);
-    }
+    apply_wheel_scroll_events_for_root(
+        **root,
+        &mut wheel_events,
+        keyboard.as_deref(),
+        &mut content_q,
+    );
 }
 
 /// Synchronizes body content scroll positions from scrollbar widget values.
@@ -791,7 +772,7 @@ fn sync_body_content_from_scrollbar(
             if let Ok(scrollbar) = scroll_q.get(**sb) {
                 let viewport_h = viewport.y.max(1.0);
                 let content_h = content.y.max(viewport_h);
-                let max_scroll = (content_h - viewport_h).max(0.0);
+                let max_scroll = max_scroll_for_extents(viewport_h, content_h);
                 pos.y = scrollbar.value.clamp(0.0, max_scroll);
             }
         }
@@ -800,7 +781,7 @@ fn sync_body_content_from_scrollbar(
             if let Ok(scrollbar) = scroll_q.get(**sb) {
                 let viewport_w = viewport.x.max(1.0);
                 let content_w = content.x.max(viewport_w);
-                let max_scroll = (content_w - viewport_w).max(0.0);
+                let max_scroll = max_scroll_for_extents(viewport_w, content_w);
                 pos.x = scrollbar.value.clamp(0.0, max_scroll);
             }
         }
@@ -843,9 +824,9 @@ fn sync_body_scrollbar_from_content(
         if let Some(sb) = sb_y_opt {
             let viewport_h = viewport.y.max(1.0);
             let content_h = content.y.max(viewport_h);
-            let max_scroll = (content_h - viewport_h).max(0.0);
+            let max_scroll = max_scroll_for_extents(viewport_h, content_h);
 
-            check_scroll_bar_state(&mut sb_node_q, &mut sb_vis_q, sb, max_scroll);
+            set_scrollbar_display_and_visibility(&mut sb_node_q, &mut sb_vis_q, sb, max_scroll);
 
             if let Ok(mut scrollbar) = scroll_q.get_mut(**sb) {
                 scrollbar.entity = Some(**root);
@@ -861,9 +842,9 @@ fn sync_body_scrollbar_from_content(
         if let Some(sb) = sb_x_opt {
             let viewport_w = viewport.x.max(1.0);
             let content_w = content.x.max(viewport_w);
-            let max_scroll = (content_w - viewport_w).max(0.0);
+            let max_scroll = max_scroll_for_extents(viewport_w, content_w);
 
-            check_scroll_bar_state(&mut sb_node_q, &mut sb_vis_q, sb, max_scroll);
+            set_scrollbar_display_and_visibility(&mut sb_node_q, &mut sb_vis_q, sb, max_scroll);
 
             if let Ok(mut scrollbar) = scroll_q.get_mut(**sb) {
                 scrollbar.entity = Some(**root);
@@ -873,34 +854,6 @@ fn sync_body_scrollbar_from_content(
                 scrollbar.content_extent = content_w;
                 scrollbar.value = scroll_pos.x.clamp(0.0, max_scroll);
             }
-        }
-    }
-}
-
-/// Updates scrollbar visibility if content dimensions have changed.
-fn check_scroll_bar_state<T>(
-    sb_node_q: &mut Query<&mut Node, With<Scrollbar>>,
-    sb_vis_q: &mut Query<&mut Visibility, With<Scrollbar>>,
-    sb: &T,
-    max_scroll: f32,
-) where
-    T: std::ops::Deref<Target = Entity>,
-{
-    if let Ok(mut sb_node) = sb_node_q.get_mut(**sb) {
-        if sb_node.display != Display::Flex {
-            sb_node.display = Display::Flex;
-        }
-    }
-
-    if let Ok(mut vis) = sb_vis_q.get_mut(**sb) {
-        let want_visible = max_scroll > 0.5;
-        let new_vis = if want_visible {
-            Visibility::Visible
-        } else {
-            Visibility::Hidden
-        };
-        if *vis != new_vis {
-            *vis = new_vis;
         }
     }
 }
@@ -941,338 +894,4 @@ fn on_internal_cursor_leave(
     }
 
     trigger.propagate(false);
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use bevy::ecs::message::Messages;
-    use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
-
-    fn computed_node(viewport: Vec2, content: Vec2) -> ComputedNode {
-        let mut computed = ComputedNode::default();
-        computed.inverse_scale_factor = 1.0;
-        computed.size = viewport;
-        computed.content_size = content;
-        computed
-    }
-
-    fn line_wheel(y: f32) -> MouseWheel {
-        MouseWheel {
-            unit: MouseScrollUnit::Line,
-            x: 0.0,
-            y,
-            window: Entity::PLACEHOLDER,
-        }
-    }
-
-    fn spawn_body_scroll_content(world: &mut World, viewport_h: f32, content_h: f32) -> Entity {
-        let mut node = Node::default();
-        node.overflow = Overflow {
-            x: OverflowAxis::Hidden,
-            y: OverflowAxis::Scroll,
-        };
-
-        world
-            .spawn((
-                BodyScrollContent,
-                node,
-                computed_node(Vec2::new(200.0, viewport_h), Vec2::new(200.0, content_h)),
-                ScrollPosition::default(),
-            ))
-            .id()
-    }
-
-    fn spawn_div_scroll_content(world: &mut World, viewport_h: f32, content_h: f32) -> Entity {
-        let mut node = Node::default();
-        node.overflow = Overflow {
-            x: OverflowAxis::Hidden,
-            y: OverflowAxis::Scroll,
-        };
-
-        world
-            .spawn((
-                node,
-                computed_node(Vec2::new(180.0, viewport_h), Vec2::new(180.0, content_h)),
-                ScrollPosition::default(),
-            ))
-            .id()
-    }
-
-    fn spawn_choice_overlay(
-        world: &mut World,
-        viewport_h: f32,
-        content_h: f32,
-        hovered: bool,
-    ) -> Entity {
-        let mut node = Node::default();
-        node.overflow = Overflow {
-            x: OverflowAxis::Hidden,
-            y: OverflowAxis::Scroll,
-        };
-
-        world
-            .spawn((
-                ChoiceLayoutBoxBase,
-                UIWidgetState {
-                    hovered,
-                    ..default()
-                },
-                node,
-                computed_node(Vec2::new(220.0, viewport_h), Vec2::new(220.0, content_h)),
-                ScrollPosition::default(),
-                Visibility::Inherited,
-            ))
-            .id()
-    }
-
-    fn spawn_dialog_overlay_marker(world: &mut World, visible: bool) -> Entity {
-        world
-            .spawn((
-                TagName("dialog-overlay".to_string()),
-                CssClass(vec!["dialog-overlay".to_string()]),
-                if visible {
-                    Visibility::Inherited
-                } else {
-                    Visibility::Hidden
-                },
-            ))
-            .id()
-    }
-
-    #[test]
-    fn body_wheel_scroll_moves_body_content_when_no_div_is_hovered() {
-        let mut app = App::new();
-        app.add_plugins(MinimalPlugins);
-        app.init_resource::<Messages<MouseWheel>>();
-        app.insert_resource(HoveredBodyTracker::default());
-        app.add_systems(Update, handle_body_scroll_wheel);
-
-        let content_entity = spawn_body_scroll_content(app.world_mut(), 100.0, 300.0);
-        let body_entity = app
-            .world_mut()
-            .spawn((Body::default(), BodyContentRoot(content_entity)))
-            .id();
-        app.world_mut()
-            .resource_mut::<HoveredBodyTracker>()
-            .last_body = Some(body_entity);
-
-        app.world_mut()
-            .resource_mut::<Messages<MouseWheel>>()
-            .write(line_wheel(-1.0));
-        app.update();
-
-        let pos = app
-            .world()
-            .get::<ScrollPosition>(content_entity)
-            .expect("body scroll content is missing ScrollPosition");
-        assert_eq!(pos.y, 25.0);
-    }
-
-    #[test]
-    fn body_wheel_scroll_is_blocked_by_hovered_scrollable_div() {
-        let mut app = App::new();
-        app.add_plugins(MinimalPlugins);
-        app.init_resource::<Messages<MouseWheel>>();
-        app.insert_resource(HoveredBodyTracker::default());
-        app.add_systems(Update, handle_body_scroll_wheel);
-
-        let body_content_entity = spawn_body_scroll_content(app.world_mut(), 100.0, 300.0);
-        let body_entity = app
-            .world_mut()
-            .spawn((Body::default(), BodyContentRoot(body_content_entity)))
-            .id();
-        app.world_mut()
-            .resource_mut::<HoveredBodyTracker>()
-            .last_body = Some(body_entity);
-
-        let div_content_entity = spawn_div_scroll_content(app.world_mut(), 120.0, 260.0);
-        app.world_mut().spawn((
-            Div::default(),
-            UIWidgetState {
-                hovered: true,
-                ..default()
-            },
-            DivContentRoot(div_content_entity),
-        ));
-
-        app.world_mut()
-            .resource_mut::<Messages<MouseWheel>>()
-            .write(line_wheel(-2.0));
-        app.update();
-
-        let pos = app
-            .world()
-            .get::<ScrollPosition>(body_content_entity)
-            .expect("body scroll content is missing ScrollPosition");
-        assert_eq!(pos.y, 0.0);
-    }
-
-    #[test]
-    fn body_wheel_scroll_ignores_hovered_div_without_scroll_range() {
-        let mut app = App::new();
-        app.add_plugins(MinimalPlugins);
-        app.init_resource::<Messages<MouseWheel>>();
-        app.insert_resource(HoveredBodyTracker::default());
-        app.add_systems(Update, handle_body_scroll_wheel);
-
-        let body_content_entity = spawn_body_scroll_content(app.world_mut(), 100.0, 300.0);
-        let body_entity = app
-            .world_mut()
-            .spawn((Body::default(), BodyContentRoot(body_content_entity)))
-            .id();
-        app.world_mut()
-            .resource_mut::<HoveredBodyTracker>()
-            .last_body = Some(body_entity);
-
-        // Content equals viewport -> max scroll is zero, so this div should not block body scrolling.
-        let div_content_entity = spawn_div_scroll_content(app.world_mut(), 160.0, 160.0);
-        app.world_mut().spawn((
-            Div::default(),
-            UIWidgetState {
-                hovered: true,
-                ..default()
-            },
-            DivContentRoot(div_content_entity),
-        ));
-
-        app.world_mut()
-            .resource_mut::<Messages<MouseWheel>>()
-            .write(line_wheel(-1.0));
-        app.update();
-
-        let pos = app
-            .world()
-            .get::<ScrollPosition>(body_content_entity)
-            .expect("body scroll content is missing ScrollPosition");
-        assert_eq!(pos.y, 25.0);
-    }
-
-    #[test]
-    fn ensure_body_scroll_structure_creates_content_and_vertical_scrollbar() {
-        let mut app = App::new();
-        app.add_plugins(MinimalPlugins);
-        app.add_systems(Update, ensure_body_scroll_structure);
-
-        let mut body_node = Node::default();
-        body_node.width = Val::Px(640.0);
-        body_node.height = Val::Px(360.0);
-        body_node.overflow = Overflow {
-            x: OverflowAxis::Hidden,
-            y: OverflowAxis::Scroll,
-        };
-
-        let body_entity = app
-            .world_mut()
-            .spawn((Body::default(), BodyBase, UIGenID::default(), body_node))
-            .id();
-
-        app.update();
-
-        let body_root = app
-            .world()
-            .get::<BodyContentRoot>(body_entity)
-            .expect("body should have a content root after setup");
-        let content_entity = **body_root;
-
-        let body_node_after = app
-            .world()
-            .get::<Node>(body_entity)
-            .expect("body should still have a node");
-        assert_eq!(body_node_after.overflow.y, OverflowAxis::Clip);
-        assert_eq!(body_node_after.overflow.x, OverflowAxis::Clip);
-
-        assert!(
-            app.world()
-                .get::<BodyScrollContent>(content_entity)
-                .is_some(),
-            "content root should be marked as BodyScrollContent"
-        );
-        assert!(
-            app.world().get::<ScrollPosition>(content_entity).is_some(),
-            "content root should be scrollable"
-        );
-
-        let content_node = app
-            .world()
-            .get::<Node>(content_entity)
-            .expect("content root should have a node");
-        assert_eq!(content_node.overflow.y, OverflowAxis::Scroll);
-        assert_eq!(content_node.overflow.x, OverflowAxis::Hidden);
-        assert_eq!(content_node.width, Val::Percent(100.0));
-        assert_eq!(content_node.height, Val::Percent(100.0));
-
-        let scrollbar_ref = app
-            .world()
-            .get::<BodyScrollbar>(body_entity)
-            .expect("vertical scrollbar should exist");
-        let scrollbar = app
-            .world()
-            .get::<Scrollbar>(**scrollbar_ref)
-            .expect("scrollbar entity should have Scrollbar component");
-        assert!(scrollbar.vertical);
-        assert_eq!(scrollbar.entity, Some(content_entity));
-    }
-
-    #[test]
-    fn body_wheel_scroll_is_blocked_by_hovered_scrollable_choice_overlay() {
-        let mut app = App::new();
-        app.add_plugins(MinimalPlugins);
-        app.init_resource::<Messages<MouseWheel>>();
-        app.insert_resource(HoveredBodyTracker::default());
-        app.add_systems(Update, handle_body_scroll_wheel);
-
-        let body_content_entity = spawn_body_scroll_content(app.world_mut(), 100.0, 300.0);
-        let body_entity = app
-            .world_mut()
-            .spawn((Body::default(), BodyContentRoot(body_content_entity)))
-            .id();
-        app.world_mut()
-            .resource_mut::<HoveredBodyTracker>()
-            .last_body = Some(body_entity);
-
-        let _overlay = spawn_choice_overlay(app.world_mut(), 90.0, 240.0, true);
-
-        app.world_mut()
-            .resource_mut::<Messages<MouseWheel>>()
-            .write(line_wheel(-2.0));
-        app.update();
-
-        let pos = app
-            .world()
-            .get::<ScrollPosition>(body_content_entity)
-            .expect("body scroll content is missing ScrollPosition");
-        assert_eq!(pos.y, 0.0);
-    }
-
-    #[test]
-    fn body_wheel_scroll_is_blocked_by_visible_dialog_overlay() {
-        let mut app = App::new();
-        app.add_plugins(MinimalPlugins);
-        app.init_resource::<Messages<MouseWheel>>();
-        app.insert_resource(HoveredBodyTracker::default());
-        app.add_systems(Update, handle_body_scroll_wheel);
-
-        let body_content_entity = spawn_body_scroll_content(app.world_mut(), 100.0, 300.0);
-        let body_entity = app
-            .world_mut()
-            .spawn((Body::default(), BodyContentRoot(body_content_entity)))
-            .id();
-        app.world_mut()
-            .resource_mut::<HoveredBodyTracker>()
-            .last_body = Some(body_entity);
-
-        let _overlay = spawn_dialog_overlay_marker(app.world_mut(), true);
-
-        app.world_mut()
-            .resource_mut::<Messages<MouseWheel>>()
-            .write(line_wheel(-2.0));
-        app.update();
-
-        let pos = app
-            .world()
-            .get::<ScrollPosition>(body_content_entity)
-            .expect("body scroll content is missing ScrollPosition");
-        assert_eq!(pos.y, 0.0);
-    }
 }

@@ -31,7 +31,9 @@ struct SliderDotNode;
 /// Thumb role for single/range slider handling.
 #[derive(Component, Reflect, Debug, Clone, Copy, Eq, PartialEq)]
 enum SliderThumbRole {
+    /// Variant `Start`.
     Start,
+    /// Variant `End`.
     End,
 }
 
@@ -75,6 +77,7 @@ struct SliderLayoutCache {
 }
 
 impl PreviousSliderState {
+    /// Handles `from_slider` in the extended UI workflow.
     fn from_slider(slider: &Slider) -> Self {
         Self {
             slider_type: slider.slider_type,
@@ -91,6 +94,10 @@ impl PreviousSliderState {
 /// Marker component indicating slider needs initial layout.
 #[derive(Component)]
 struct SliderNeedInit;
+
+/// Marker inserted when a slider value changed because of user input.
+#[derive(Component)]
+pub struct SliderUserChanged;
 
 /// Plugin that registers slider widget behavior.
 pub struct SliderWidget;
@@ -174,7 +181,10 @@ fn internal_node_creation_system(
                         css_source.clone(),
                         CssClass(vec!["slider-track".to_string()]),
                         RenderLayers::layer(layer),
-                        Pickable::default(),
+                        Pickable {
+                            should_block_lower: false,
+                            is_hoverable: true,
+                        },
                         SliderTrackContainer,
                         BindToID(id.0),
                     ))
@@ -319,6 +329,7 @@ fn internal_node_creation_system(
     }
 }
 
+/// Handles `spawn_thumb` in the extended UI workflow.
 fn spawn_thumb(
     builder: &mut ChildSpawnerCommands,
     slider: &Slider,
@@ -362,6 +373,7 @@ fn spawn_thumb(
             ),
         ))
         .observe(on_thumb_drag)
+        .observe(on_thumb_click)
         .observe(on_thumb_over)
         .observe(on_thumb_out)
         .with_children(|builder| {
@@ -463,9 +475,10 @@ fn on_internal_cursor_leave(
 /// Handles clicks on the slider track to update value.
 fn on_track_click(
     mut trigger: On<Pointer<Click>>,
+    mut commands: Commands,
     ui_scale: Res<UiScale>,
     window_q: Query<&Window, With<PrimaryWindow>>,
-    mut slider_query: Query<(&mut Slider, &UIGenID), With<Slider>>,
+    mut slider_query: Query<(Entity, &mut Slider, &UIGenID), With<Slider>>,
     slider_state_q: Query<(&UIGenID, &UIWidgetState), With<Slider>>,
     track_q: Query<(&ComputedNode, &BindToID, &RelativeCursorPosition), With<SliderTrackContainer>>,
     thumb_size_q: Query<(&ComputedNode, &BindToID), With<SliderThumb>>,
@@ -492,6 +505,7 @@ fn on_track_click(
     apply_from_track_pointer(
         trigger.entity,
         sf,
+        &mut commands,
         &mut slider_query,
         &slider_state_q,
         &track_q,
@@ -506,9 +520,10 @@ fn on_track_click(
 /// Handles dragging directly on the slider track.
 fn on_track_drag(
     mut trigger: On<Pointer<Drag>>,
+    mut commands: Commands,
     ui_scale: Res<UiScale>,
     window_q: Query<&Window, With<PrimaryWindow>>,
-    mut slider_query: Query<(&mut Slider, &UIGenID), With<Slider>>,
+    mut slider_query: Query<(Entity, &mut Slider, &UIGenID), With<Slider>>,
     slider_state_q: Query<(&UIGenID, &UIWidgetState), With<Slider>>,
     track_q: Query<(&ComputedNode, &BindToID, &RelativeCursorPosition), With<SliderTrackContainer>>,
     thumb_size_q: Query<(&ComputedNode, &BindToID), With<SliderThumb>>,
@@ -535,6 +550,7 @@ fn on_track_drag(
     apply_from_track_pointer(
         trigger.entity,
         sf,
+        &mut commands,
         &mut slider_query,
         &slider_state_q,
         &track_q,
@@ -546,10 +562,12 @@ fn on_track_drag(
     trigger.propagate(false);
 }
 
+/// Handles `apply_from_track_pointer` in the extended UI workflow.
 fn apply_from_track_pointer(
     track_entity: Entity,
     sf: f32,
-    slider_query: &mut Query<(&mut Slider, &UIGenID), With<Slider>>,
+    commands: &mut Commands,
+    slider_query: &mut Query<(Entity, &mut Slider, &UIGenID), With<Slider>>,
     slider_state_q: &Query<(&UIGenID, &UIWidgetState), With<Slider>>,
     track_q: &Query<
         (&ComputedNode, &BindToID, &RelativeCursorPosition),
@@ -601,6 +619,7 @@ fn apply_from_track_pointer(
         desired_left,
         track_width,
         thumb_width,
+        commands,
         slider_query,
         fill_q,
         thumb_q,
@@ -609,11 +628,12 @@ fn apply_from_track_pointer(
 
 /// Handles dragging the slider thumb to update value.
 fn on_thumb_drag(
-    event: On<Pointer<Drag>>,
+    mut event: On<Pointer<Drag>>,
     parent_q: Query<&ChildOf>,
-    track_q: Query<(&ComputedNode, &BindToID), With<SliderTrackContainer>>,
+    track_q: Query<(&ComputedNode, &BindToID, &RelativeCursorPosition), With<SliderTrackContainer>>,
     thumb_node_q: Query<&ComputedNode, With<SliderThumb>>,
-    mut slider_q: Query<(&mut Slider, &UIGenID), With<Slider>>,
+    mut commands: Commands,
+    mut slider_q: Query<(Entity, &mut Slider, &UIGenID), With<Slider>>,
     slider_state_q: Query<(&UIGenID, &UIWidgetState), With<Slider>>,
     mut fill_q: Query<
         (&mut Node, &BindToID, &mut UiStyle),
@@ -640,7 +660,7 @@ fn on_thumb_drag(
     let Ok(parent) = parent_q.get(event.entity) else {
         return;
     };
-    let Ok((track_node, bind)) = track_q.get(parent.parent()) else {
+    let Ok((track_node, bind, rel)) = track_q.get(parent.parent()) else {
         return;
     };
 
@@ -656,23 +676,39 @@ fn on_thumb_drag(
     let thumb_width = (thumb_node.size().x / sf).max(1.0);
     let half = thumb_width * 0.5;
 
-    let dx = event.event.delta.x / sf;
-
     let Ok((_, thumb, _, _, _)) = thumb_q.get(event.entity) else {
         return;
     };
-    let current_left = thumb.current_center_x - half;
+    let desired_left = if let Some(n) = rel.normalized {
+        let t = (n.x + 0.5).clamp(0.0, 1.0);
+        let click_x = t * track_width;
+        click_x - half
+    } else {
+        // Fallback for edge-cases where relative cursor data is temporarily unavailable.
+        let dx = event.event.delta.x / sf;
+        let current_left = thumb.current_center_x - half;
+        current_left + dx
+    };
 
     apply_from_track_left_x(
         bind.0,
         Some(thumb.role),
-        current_left + dx,
+        desired_left,
         track_width,
         thumb_width,
+        &mut commands,
         &mut slider_q,
         &mut fill_q,
         &mut thumb_q,
     );
+
+    // Prevent thumb drags from bubbling to the track drag observer.
+    event.propagate(false);
+}
+
+/// Stops thumb click events from reaching the track.
+fn on_thumb_click(mut event: On<Pointer<Click>>) {
+    event.propagate(false);
 }
 
 /// Tracks thumb hover state.
@@ -698,7 +734,8 @@ fn apply_from_track_left_x(
     desired_left_x: f32,
     track_width: f32,
     thumb_width: f32,
-    slider_q: &mut Query<(&mut Slider, &UIGenID), With<Slider>>,
+    commands: &mut Commands,
+    slider_q: &mut Query<(Entity, &mut Slider, &UIGenID), With<Slider>>,
     fill_q: &mut Query<
         (&mut Node, &BindToID, &mut UiStyle),
         (With<SliderTrackFill>, Without<SliderThumb>),
@@ -714,36 +751,63 @@ fn apply_from_track_left_x(
         (With<SliderThumb>, Without<SliderTrackFill>),
     >,
 ) {
-    for (mut slider, ui_id) in slider_q.iter_mut() {
+    for (entity, mut slider, ui_id) in slider_q.iter_mut() {
         if ui_id.0 != target_ui_id {
             continue;
         }
 
         sanitize_slider(&mut slider);
-
-        let role = resolve_target_role(
-            &slider,
-            preferred_role,
-            desired_left_x,
-            track_width,
-            thumb_width,
-            ui_id.0,
-            thumb_q,
-        );
+        let before = PreviousSliderState::from_slider(&slider);
 
         let next_value = value_from_left(desired_left_x, track_width, thumb_width, &slider);
         match slider.slider_type {
             SliderType::Default => {
                 slider.value = next_value;
             }
-            SliderType::Range => match role {
-                SliderThumbRole::Start => {
-                    slider.range_start = next_value.min(slider.range_end);
+            SliderType::Range => {
+                if preferred_role.is_none() {
+                    // Track interactions move the full selected span.
+                    let current_center = (slider.range_start + slider.range_end) * 0.5;
+                    let delta = next_value - current_center;
+                    let span = slider.range_end - slider.range_start;
+                    let max_start = (slider.max - span).max(slider.min);
+
+                    let mut next_start = slider.range_start + delta;
+                    let mut next_end = slider.range_end + delta;
+
+                    if next_start < slider.min {
+                        let shift = slider.min - next_start;
+                        next_start += shift;
+                        next_end += shift;
+                    }
+                    if next_end > slider.max {
+                        let shift = next_end - slider.max;
+                        next_start -= shift;
+                    }
+
+                    slider.range_start = next_start.clamp(slider.min, max_start);
+                    slider.range_end = slider.range_start + span;
+                } else {
+                    let role = resolve_target_role(
+                        &slider,
+                        preferred_role,
+                        desired_left_x,
+                        track_width,
+                        thumb_width,
+                        ui_id.0,
+                        thumb_q,
+                    );
+
+                    match role {
+                        SliderThumbRole::Start => {
+                            slider.range_start = next_value.min(slider.range_end - slider.step);
+                        }
+                        SliderThumbRole::End => {
+                            slider.range_end = next_value.max(slider.range_start + slider.step);
+                        }
+                    }
                 }
-                SliderThumbRole::End => {
-                    slider.range_end = next_value.max(slider.range_start);
-                }
-            },
+            }
         }
 
         apply_slider_visual_state(
@@ -754,10 +818,15 @@ fn apply_from_track_left_x(
             fill_q,
             thumb_q,
         );
+
+        if PreviousSliderState::from_slider(&slider) != before {
+            commands.entity(entity).insert(SliderUserChanged);
+        }
         break;
     }
 }
 
+/// Handles `resolve_target_role` in the extended UI workflow.
 fn resolve_target_role(
     slider: &Slider,
     preferred_role: Option<SliderThumbRole>,
@@ -900,9 +969,11 @@ fn apply_slider_visual_state(
 
 /// Detects slider value changes and updates visuals.
 fn detect_change_slider_values(
+    mut commands: Commands,
     keyboard: Res<ButtonInput<KeyCode>>,
     mut slider_q: Query<
         (
+            Entity,
             &mut Slider,
             &UIWidgetState,
             &UIGenID,
@@ -937,8 +1008,9 @@ fn detect_change_slider_values(
 
     let shift = keyboard.pressed(KeyCode::ShiftLeft) || keyboard.pressed(KeyCode::ShiftRight);
 
-    for (mut slider, state, ui_id, mut prev, mut layout_cache) in slider_q.iter_mut() {
+    for (entity, mut slider, state, ui_id, mut prev, mut layout_cache) in slider_q.iter_mut() {
         sanitize_slider(&mut slider);
+        let before_keyboard = PreviousSliderState::from_slider(&slider);
 
         if state.focused && !state.disabled {
             let step = if shift {
@@ -970,6 +1042,11 @@ fn detect_change_slider_values(
         }
 
         sanitize_slider(&mut slider);
+        let after_keyboard = PreviousSliderState::from_slider(&slider);
+        if after_keyboard != before_keyboard {
+            commands.entity(entity).insert(SliderUserChanged);
+        }
+
         let next_state = PreviousSliderState::from_slider(&slider);
         if next_state == *prev {
             continue;
@@ -1187,6 +1264,7 @@ fn update_thumb_tooltips(
     }
 }
 
+/// Handles `value_from_left` in the extended UI workflow.
 fn value_from_left(desired_left: f32, track_width: f32, thumb_width: f32, slider: &Slider) -> f32 {
     let track_width = track_width.max(1.0);
     let thumb_width = thumb_width.max(1.0).min(track_width);
@@ -1199,6 +1277,7 @@ fn value_from_left(desired_left: f32, track_width: f32, thumb_width: f32, slider
     snap_to_step(raw, slider)
 }
 
+/// Handles `normalize_value` in the extended UI workflow.
 fn normalize_value(value: f32, min: f32, max: f32) -> f32 {
     let span = (max - min).abs();
     if span <= f32::EPSILON {
@@ -1208,12 +1287,14 @@ fn normalize_value(value: f32, min: f32, max: f32) -> f32 {
     }
 }
 
+/// Handles `snap_to_step` in the extended UI workflow.
 fn snap_to_step(raw: f32, slider: &Slider) -> f32 {
     let step = slider.step.abs().max(f32::EPSILON);
     let snapped = slider.min + ((raw - slider.min) / step).round() * step;
     snapped.clamp(slider.min, slider.max)
 }
 
+/// Handles `sanitize_slider` in the extended UI workflow.
 fn sanitize_slider(slider: &mut Slider) {
     if slider.max < slider.min {
         std::mem::swap(&mut slider.min, &mut slider.max);
@@ -1229,6 +1310,7 @@ fn sanitize_slider(slider: &mut Slider) {
     }
 }
 
+/// Handles `format_slider_value` in the extended UI workflow.
 fn format_slider_value(value: f32) -> String {
     let rounded = (value * 100.0).round() / 100.0;
     if rounded.fract().abs() < 0.0001 {
@@ -1245,6 +1327,7 @@ fn format_slider_value(value: f32) -> String {
     txt
 }
 
+/// Handles `effective_dot_segments` in the extended UI workflow.
 fn effective_dot_segments(slider: &Slider, requested: u32) -> usize {
     let requested = requested.max(1) as usize;
     let span = (slider.max - slider.min).abs();

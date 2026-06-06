@@ -11,7 +11,7 @@ use crate::styles::{
     Style, TextTransform, TransformStyle, TransitionProperty, TransitionSpec,
 };
 use crate::widgets::UIWidgetState;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use bevy::asset::RenderAssetUsages;
 use bevy::asset::{load_internal_asset, uuid_handle};
@@ -47,10 +47,31 @@ use bevy::ui_render::{DrawUiMaterial, TransparentUi, UiCameraView};
 use bevy::window::{
     CursorIcon, CustomCursor, CustomCursorImage, PrimaryWindow, SystemCursorIcon, WindowResized,
 };
+use once_cell::sync::Lazy;
+use std::sync::RwLock;
 
 const BACKDROP_BLUR_SHADER_HANDLE: Handle<Shader> =
     uuid_handle!("9d04a8bb-b6cf-4758-bca8-30706480973f");
 const MAX_BACKDROP_BLUR_PX: f32 = 80.0;
+
+const SELECTOR_READ_ONLY: u8 = 1 << 0;
+const SELECTOR_DISABLED: u8 = 1 << 1;
+const SELECTOR_CHECKED: u8 = 1 << 2;
+const SELECTOR_FOCUS: u8 = 1 << 3;
+const SELECTOR_HOVER: u8 = 1 << 4;
+const SELECTOR_INVALID: u8 = 1 << 5;
+
+static SELECTOR_METADATA_CACHE: Lazy<RwLock<HashMap<String, SelectorMetadata>>> =
+    Lazy::new(|| RwLock::new(HashMap::new()));
+
+/// Represents the `SelectorMetadata` data structure used by the extended UI system.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct SelectorMetadata {
+    specificity: u32,
+    pseudo_flags: u8,
+    has_pseudo: bool,
+    skip: bool,
+}
 
 /// Plugin that applies CSS styles, transitions, and animations to UI nodes.
 pub struct StyleService;
@@ -163,10 +184,11 @@ struct CssCursorState {
 
 /// Marker to force a style application pass when a UI node was just created.
 #[derive(Component)]
-pub(crate) struct StyleRefreshOnNodeAdded;
+pub struct StyleRefreshOnNodeAdded;
 
+/// Represents the `TextTransformState` data structure used by the extended UI system.
 #[derive(Component, Debug, Clone, Default)]
-pub(crate) struct TextTransformState {
+pub struct TextTransformState {
     source: String,
     last_rendered: String,
 }
@@ -179,6 +201,7 @@ struct BackgroundGradientApplied;
 #[derive(Component)]
 struct BackgroundImageApplied;
 
+/// Represents the `BackdropBlurUniform` data structure used by the extended UI system.
 #[derive(ShaderType, Clone, Copy, Debug)]
 struct BackdropBlurUniform {
     blur_radius_px: f32,
@@ -188,6 +211,7 @@ struct BackdropBlurUniform {
     tint: Vec4,
 }
 
+/// Represents the `BackdropBlurMaterial` data structure used by the extended UI system.
 #[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
 struct BackdropBlurMaterial {
     #[uniform(0)]
@@ -201,11 +225,13 @@ struct BackdropBlurMaterial {
 }
 
 impl UiMaterial for BackdropBlurMaterial {
+    /// Handles `fragment_shader` in the extended UI workflow.
     fn fragment_shader() -> ShaderRef {
         BACKDROP_BLUR_SHADER_HANDLE.into()
     }
 }
 
+/// Represents the `BackdropCaptureState` data structure used by the extended UI system.
 #[derive(Resource, Default, Clone, ExtractResource)]
 struct BackdropCaptureState {
     screen_texture: Option<Handle<Image>>,
@@ -214,18 +240,23 @@ struct BackdropCaptureState {
     warmup_frames: u8,
 }
 
+/// Represents the `BackdropCaptureCopyPass` data structure used by the extended UI system.
 #[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
 struct BackdropCaptureCopyPass;
 
+/// Represents the `BackdropDeferredDrawPass` data structure used by the extended UI system.
 #[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
 struct BackdropDeferredDrawPass;
 
+/// Represents the `BackdropCaptureCopyNode` data structure used by the extended UI system.
 #[derive(Default)]
 struct BackdropCaptureCopyNode;
 
+/// Represents the `BackdropDeferredDrawNode` data structure used by the extended UI system.
 #[derive(Default)]
 struct BackdropDeferredDrawNode;
 
+/// Represents the `DeferredBackdropUiPhases` data structure used by the extended UI system.
 #[derive(Resource, Default)]
 struct DeferredBackdropUiPhases(HashMap<RetainedViewEntity, SortedRenderPhase<TransparentUi>>);
 
@@ -328,6 +359,7 @@ fn update_css_cursor_icons(
     }
 }
 
+/// Handles `mark_new_nodes_for_style_refresh` in the extended UI workflow.
 #[cfg(not(all(feature = "wasm-default", target_arch = "wasm32")))]
 fn mark_new_nodes_for_style_refresh(
     mut commands: Commands,
@@ -379,15 +411,15 @@ pub fn update_widget_styles_system(
                 style_pair.selector.as_str()
             };
 
-            if selector.contains("::") {
+            let metadata = selector_metadata(selector);
+            if metadata.skip {
                 continue;
             }
-            if selector_matches_state(selector, &state) {
-                let specificity = selector_specificity(selector);
-                if selector.contains(':') {
-                    pseudo_styles.push((key, specificity, style_pair.origin));
+            if selector_matches_state(metadata, &state) {
+                if metadata.has_pseudo {
+                    pseudo_styles.push((key, metadata.specificity, style_pair.origin));
                 } else {
-                    base_styles.push((key, specificity, style_pair.origin));
+                    base_styles.push((key, metadata.specificity, style_pair.origin));
                 }
             }
         }
@@ -682,7 +714,8 @@ pub fn update_style_animations(
     }
 }
 
-fn apply_calc_styles_system(
+/// Applies deferred CSS `calc(...)` values to Bevy UI nodes after styles were resolved.
+pub fn apply_calc_styles_system(
     mut query: Query<(
         Entity,
         &UiStyle,
@@ -838,6 +871,7 @@ fn apply_calc_styles_system(
     }
 }
 
+/// Handles `resolve_layout_viewport` in the extended UI workflow.
 #[cfg(all(feature = "wasm-default", target_arch = "wasm32"))]
 fn resolve_layout_viewport(window_q: &Query<&Window, With<PrimaryWindow>>) -> Option<Vec2> {
     let window = window_q.single().ok()?;
@@ -849,6 +883,7 @@ fn resolve_layout_viewport(window_q: &Query<&Window, With<PrimaryWindow>>) -> Op
     not(feature = "wasm-default"),
     target_arch = "wasm32"
 ))]
+/// Handles `resolve_layout_viewport` in the extended UI workflow.
 fn resolve_layout_viewport(_window_q: &Query<&Window, With<PrimaryWindow>>) -> Option<Vec2> {
     let window = web_sys::window()?;
     let width = window.inner_width().ok()?.as_f64()? as f32;
@@ -856,23 +891,27 @@ fn resolve_layout_viewport(_window_q: &Query<&Window, With<PrimaryWindow>>) -> O
     Some(Vec2::new(width, height))
 }
 
+/// Handles `resolve_layout_viewport` in the extended UI workflow.
 #[cfg(all(feature = "wasm-breakpoints", not(target_arch = "wasm32")))]
 fn resolve_layout_viewport(window_q: &Query<&Window, With<PrimaryWindow>>) -> Option<Vec2> {
     let window = window_q.single().ok()?;
     Some(window.resolution.size())
 }
 
+/// Handles `resolve_layout_viewport` in the extended UI workflow.
 #[cfg(all(not(feature = "wasm-breakpoints"), feature = "css-breakpoints"))]
 fn resolve_layout_viewport(window_q: &Query<&Window, With<PrimaryWindow>>) -> Option<Vec2> {
     let window = window_q.single().ok()?;
     Some(window.resolution.size())
 }
 
+/// Handles `resolve_layout_viewport` in the extended UI workflow.
 #[cfg(all(not(feature = "wasm-breakpoints"), not(feature = "css-breakpoints")))]
 fn resolve_layout_viewport(_window_q: &Query<&Window, With<PrimaryWindow>>) -> Option<Vec2> {
     None
 }
 
+/// Handles `clear_image_node_texture` in the extended UI workflow.
 #[inline]
 fn clear_image_node_texture(img_node: &mut ImageNode) {
     if img_node.image.id() != TRANSPARENT_IMAGE_HANDLE.id() {
@@ -880,6 +919,7 @@ fn clear_image_node_texture(img_node: &mut ImageNode) {
     }
 }
 
+/// Handles `apply_background_gradients_system` in the extended UI workflow.
 fn apply_background_gradients_system(
     mut commands: Commands,
     mut query: Query<(
@@ -1000,6 +1040,7 @@ fn apply_background_gradients_system(
     }
 }
 
+/// Handles `apply_background_images_system` in the extended UI workflow.
 fn apply_background_images_system(
     mut commands: Commands,
     mut query: Query<(
@@ -1185,6 +1226,7 @@ fn apply_background_images_system(
     }
 }
 
+/// Handles `resolved_active_style` in the extended UI workflow.
 fn resolved_active_style<'a>(
     ui_style: &'a UiStyle,
     transition_opt: Option<&'a StyleTransition>,
@@ -1199,6 +1241,7 @@ fn resolved_active_style<'a>(
     ui_style.active_style.as_ref()
 }
 
+/// Handles `sync_backdrop_blur_materials_system` in the extended UI workflow.
 fn sync_backdrop_blur_materials_system(
     mut commands: Commands,
     window_q: Query<&Window, With<PrimaryWindow>>,
@@ -1319,6 +1362,7 @@ fn sync_backdrop_blur_materials_system(
     }
 }
 
+/// Handles `ensure_backdrop_capture_texture_system` in the extended UI workflow.
 fn ensure_backdrop_capture_texture_system(
     window_q: Query<&Window, With<PrimaryWindow>>,
     blur_query: Query<(&UiStyle, Option<&StyleTransition>, Option<&StyleAnimation>)>,
@@ -1399,6 +1443,7 @@ fn ensure_backdrop_capture_texture_system(
 }
 
 impl ViewNode for BackdropCaptureCopyNode {
+    /// Type alias used for `ViewQuery` values in the extended UI API.
     type ViewQuery = (
         Entity,
         &'static ExtractedCamera,
@@ -1406,6 +1451,7 @@ impl ViewNode for BackdropCaptureCopyNode {
         Option<&'static UiCameraView>,
     );
 
+    /// Handles `run` in the extended UI workflow.
     fn run(
         &self,
         _graph: &mut RenderGraphContext,
@@ -1477,6 +1523,7 @@ impl ViewNode for BackdropCaptureCopyNode {
     }
 }
 
+/// Handles `split_backdrop_ui_phase_items_system` in the extended UI workflow.
 fn split_backdrop_ui_phase_items_system(
     mut phases: ResMut<ViewSortedRenderPhases<TransparentUi>>,
     draw_functions: Res<DrawFunctions<TransparentUi>>,
@@ -1513,6 +1560,7 @@ fn split_backdrop_ui_phase_items_system(
 }
 
 impl ViewNode for BackdropDeferredDrawNode {
+    /// Type alias used for `ViewQuery` values in the extended UI API.
     type ViewQuery = (
         Entity,
         &'static ViewTarget,
@@ -1520,6 +1568,7 @@ impl ViewNode for BackdropDeferredDrawNode {
         Option<&'static UiCameraView>,
     );
 
+    /// Handles `run` in the extended UI workflow.
     fn run(
         &self,
         _graph: &mut RenderGraphContext,
@@ -1558,8 +1607,10 @@ impl ViewNode for BackdropDeferredDrawNode {
     }
 }
 
+/// Type alias used for `StyleCandidate` values in the extended UI API.
 type StyleCandidate<'a> = (&'a String, u32, usize);
 
+/// Handles `sort_style_candidates` in the extended UI workflow.
 fn sort_style_candidates(candidates: &mut [StyleCandidate<'_>]) {
     candidates.sort_by(|a, b| match a.2.cmp(&b.2) {
         std::cmp::Ordering::Equal => a.1.cmp(&b.1),
@@ -1567,6 +1618,7 @@ fn sort_style_candidates(candidates: &mut [StyleCandidate<'_>]) {
     });
 }
 
+/// Handles `merge_style_candidates` in the extended UI workflow.
 fn merge_style_candidates(
     final_style: &mut Style,
     ui_style: &UiStyle,
@@ -1584,6 +1636,7 @@ fn merge_style_candidates(
     }
 }
 
+/// Handles `apply_transform_style_if_blocked` in the extended UI workflow.
 fn apply_transform_style_if_blocked(
     qs: &mut ParamSet<(Query<UiStyleComponents>,)>,
     entity: Entity,
@@ -1601,10 +1654,12 @@ fn apply_transform_style_if_blocked(
     }
 }
 
+/// Handles `shrink_axis` in the extended UI workflow.
 fn shrink_axis(size: f32, min_inset: f32, max_inset: f32) -> f32 {
     (size - min_inset - max_inset).max(0.0)
 }
 
+/// Handles `gradient_cache_key` in the extended UI workflow.
 fn gradient_cache_key(gradient: &LinearGradient, size: UVec2) -> String {
     let mut key = format!("__linear-gradient__:{:.4}", gradient.angle);
     for stop in &gradient.stops {
@@ -1628,6 +1683,7 @@ fn gradient_cache_key(gradient: &LinearGradient, size: UVec2) -> String {
     key
 }
 
+/// Handles `background_image_cache_key` in the extended UI workflow.
 fn background_image_cache_key(
     source: &Handle<Image>,
     container_size: UVec2,
@@ -1644,6 +1700,7 @@ fn background_image_cache_key(
     )
 }
 
+/// Handles `resolve_background_draw_size` in the extended UI workflow.
 fn resolve_background_draw_size(
     size: &BackgroundSize,
     source: UVec2,
@@ -1688,6 +1745,7 @@ fn resolve_background_draw_size(
     )
 }
 
+/// Handles `resolve_background_size_value` in the extended UI workflow.
 fn resolve_background_size_value(
     value: &BackgroundSizeValue,
     area: f32,
@@ -1700,6 +1758,7 @@ fn resolve_background_size_value(
     }
 }
 
+/// Handles `resolve_background_position` in the extended UI workflow.
 fn resolve_background_position(
     position: &BackgroundPosition,
     area: UVec2,
@@ -1716,6 +1775,7 @@ fn resolve_background_position(
     Vec2::new(x, y)
 }
 
+/// Handles `resolve_background_position_axis` in the extended UI workflow.
 fn resolve_background_position_axis(
     value: &BackgroundPositionValue,
     area: f32,
@@ -1728,6 +1788,7 @@ fn resolve_background_position_axis(
     }
 }
 
+/// Handles `render_background_image` in the extended UI workflow.
 fn render_background_image(
     source: &Image,
     container_size: UVec2,
@@ -1833,6 +1894,7 @@ fn render_background_image(
     Some(image)
 }
 
+/// Handles `render_linear_gradient_image` in the extended UI workflow.
 fn render_linear_gradient_image(
     gradient: &LinearGradient,
     size: UVec2,
@@ -1881,12 +1943,14 @@ fn render_linear_gradient_image(
     image
 }
 
+/// Represents the `ResolvedGradientStop` data structure used by the extended UI system.
 #[derive(Clone, Copy)]
 struct ResolvedGradientStop {
     color: Srgba,
     position: f32,
 }
 
+/// Handles `resolve_gradient_stops` in the extended UI workflow.
 fn resolve_gradient_stops(
     gradient: &LinearGradient,
     line_length: f32,
@@ -1982,6 +2046,7 @@ fn resolve_gradient_stops(
     resolved
 }
 
+/// Handles `sample_gradient_color` in the extended UI workflow.
 fn sample_gradient_color(stops: &[ResolvedGradientStop], t: f32) -> Srgba {
     if stops.is_empty() {
         return Srgba::new(0.0, 0.0, 0.0, 0.0);
@@ -2003,6 +2068,7 @@ fn sample_gradient_color(stops: &[ResolvedGradientStop], t: f32) -> Srgba {
     stops.last().map(|stop| stop.color).unwrap_or_default()
 }
 
+/// Handles `lerp_srgba` in the extended UI workflow.
 fn lerp_srgba(a: Srgba, b: Srgba, t: f32) -> Srgba {
     Srgba {
         red: lerp(a.red, b.red, t),
@@ -2012,6 +2078,7 @@ fn lerp_srgba(a: Srgba, b: Srgba, t: f32) -> Srgba {
     }
 }
 
+/// Handles `apply_calc_length` in the extended UI workflow.
 fn apply_calc_length(expr: Option<&CalcExpr>, ctx: CalcContext, target: &mut Val) {
     if let Some(expr) = expr {
         if let Some(px) = expr.eval_length(ctx) {
@@ -2227,10 +2294,12 @@ fn blend_animation_style(from: &Style, to: &Style, t: f32) -> Style {
     blended
 }
 
+/// Handles `style_requests_outline` in the extended UI workflow.
 fn style_requests_outline(style: &Style) -> bool {
     style.outline_width.is_some() || style.outline_offset.is_some() || style.outline_color.is_some()
 }
 
+/// Handles `build_outline_from_style` in the extended UI workflow.
 fn build_outline_from_style(style: &Style) -> Outline {
     let default_outline = Outline::default();
 
@@ -2581,51 +2650,101 @@ fn lerp(from: f32, to: f32, t: f32) -> f32 {
     from + (to - from) * t
 }
 
-/// Returns true if the selector's pseudo state matches the widget state.
-fn selector_matches_state(selector: &str, state: &UIWidgetState) -> bool {
-    for part in selector.replace('>', " > ").split_whitespace() {
-        if part == ">" {
-            continue;
-        }
-        let segments: Vec<&str> = part.split(':').collect();
-        for pseudo in &segments[1..] {
-            match *pseudo {
-                "read-only" if !state.readonly => return false,
-                "disabled" if !state.disabled => return false,
-                "checked" if state.disabled || !state.checked => return false,
-                "focus" if state.disabled || !state.focused => return false,
-                "hover" if state.disabled || !state.hovered => return false,
-                "invalid" if !state.invalid => return false,
-                _ => {}
-            }
-        }
+/// Handles `selector_metadata` in the extended UI workflow.
+fn selector_metadata(selector: &str) -> SelectorMetadata {
+    if let Some(cached) = SELECTOR_METADATA_CACHE
+        .read()
+        .ok()
+        .and_then(|cache| cache.get(selector).copied())
+    {
+        return cached;
     }
-    true
+
+    let metadata = compute_selector_metadata(selector);
+    if let Ok(mut cache) = SELECTOR_METADATA_CACHE.write() {
+        cache.insert(selector.to_string(), metadata);
+    }
+    metadata
 }
 
-/// Computes a simple specificity score for a selector.
-fn selector_specificity(selector: &str) -> u32 {
-    let mut spec = 0;
+/// Handles `compute_selector_metadata` in the extended UI workflow.
+fn compute_selector_metadata(selector: &str) -> SelectorMetadata {
+    if selector.contains("::") {
+        return SelectorMetadata {
+            skip: true,
+            ..Default::default()
+        };
+    }
+
+    let mut specificity = 0;
+    let mut pseudo_flags = 0;
+    let mut has_pseudo = false;
+
     for part in selector.replace('>', " > ").split_whitespace() {
         if part == ">" {
             continue;
         }
+
         let segments: Vec<&str> = part.split(':').collect();
         let base = segments[0];
 
-        spec += if base.starts_with('#') {
+        specificity += if base.starts_with('#') {
             100
         } else if base.starts_with('.') {
             10
-        } else if base == "*" {
+        } else if base == "*" || base.is_empty() {
             0
         } else {
             1
         };
 
-        spec += segments.len().saturating_sub(1) as u32;
+        if segments.len() > 1 {
+            has_pseudo = true;
+            specificity += segments.len().saturating_sub(1) as u32;
+        }
+
+        for pseudo in &segments[1..] {
+            match *pseudo {
+                "read-only" => pseudo_flags |= SELECTOR_READ_ONLY,
+                "disabled" => pseudo_flags |= SELECTOR_DISABLED,
+                "checked" => pseudo_flags |= SELECTOR_CHECKED,
+                "focus" => pseudo_flags |= SELECTOR_FOCUS,
+                "hover" => pseudo_flags |= SELECTOR_HOVER,
+                "invalid" => pseudo_flags |= SELECTOR_INVALID,
+                _ => {}
+            }
+        }
     }
-    spec
+
+    SelectorMetadata {
+        specificity,
+        pseudo_flags,
+        has_pseudo,
+        skip: false,
+    }
+}
+
+/// Returns true if the selector's cached pseudo state matches the widget state.
+fn selector_matches_state(metadata: SelectorMetadata, state: &UIWidgetState) -> bool {
+    if metadata.pseudo_flags & SELECTOR_READ_ONLY != 0 && !state.readonly {
+        return false;
+    }
+    if metadata.pseudo_flags & SELECTOR_DISABLED != 0 && !state.disabled {
+        return false;
+    }
+    if metadata.pseudo_flags & SELECTOR_CHECKED != 0 && (state.disabled || !state.checked) {
+        return false;
+    }
+    if metadata.pseudo_flags & SELECTOR_FOCUS != 0 && (state.disabled || !state.focused) {
+        return false;
+    }
+    if metadata.pseudo_flags & SELECTOR_HOVER != 0 && (state.disabled || !state.hovered) {
+        return false;
+    }
+    if metadata.pseudo_flags & SELECTOR_INVALID != 0 && !state.invalid {
+        return false;
+    }
+    true
 }
 
 /// Applies layout-related style fields to a Bevy `Node`.
@@ -2736,28 +2855,81 @@ fn folder_basename(folder: &str) -> &str {
         .unwrap_or(folder)
 }
 
-/// Propagates inheritable style fields down the widget tree.
+/// Propagates inheritable style fields only through subtrees that actually changed.
 pub fn propagate_style_inheritance(
     mut commands: Commands,
-    root_query: Query<Entity, (With<UiStyle>, Without<ChildOf>)>,
+    mut qs: ParamSet<(
+        Query<
+            Entity,
+            Or<(
+                Added<UiStyle>,
+                Changed<UiStyle>,
+                Added<StyleTransition>,
+                Changed<StyleTransition>,
+                Added<StyleAnimation>,
+                Changed<StyleAnimation>,
+                Added<ChildOf>,
+                Changed<ChildOf>,
+                Added<Text>,
+                Changed<Text>,
+                Added<TextColor>,
+                Added<TextFont>,
+                Added<LineHeight>,
+                Added<ImageNode>,
+                Added<TextShadow>,
+            )>,
+        >,
+        Query<(
+            Option<&mut TextColor>,
+            Option<&mut TextFont>,
+            Option<&mut LineHeight>,
+            Option<&mut ImageNode>,
+            Option<&mut TextShadow>,
+            Option<&mut Text>,
+            Option<&mut TextTransformState>,
+        )>,
+    )>,
+    parent_query: Query<&ChildOf>,
     children_query: Query<&Children>,
     style_query: Query<&UiStyle>,
     style_state_query: Query<(Option<&StyleTransition>, Option<&StyleAnimation>)>,
-    mut target_query: Query<(
-        Option<&mut TextColor>,
-        Option<&mut TextFont>,
-        Option<&mut LineHeight>,
-        Option<&mut ImageNode>,
-        Option<&mut TextShadow>,
-        Option<&mut Text>,
-        Option<&mut TextTransformState>,
-    )>,
     asset_server: Res<AssetServer>,
 ) {
-    for root_entity in root_query.iter() {
+    let dirty_entities: Vec<Entity> = qs.p0().iter().collect();
+    if dirty_entities.is_empty() {
+        return;
+    }
+
+    let dirty_set: HashSet<Entity> = dirty_entities.iter().copied().collect();
+    let mut target_query = qs.p1();
+
+    for entity in dirty_entities {
+        let mut current = entity;
+        let mut has_dirty_ancestor = false;
+
+        while let Ok(parent) = parent_query.get(current) {
+            let parent_entity = parent.parent();
+            if dirty_set.contains(&parent_entity) {
+                has_dirty_ancestor = true;
+                break;
+            }
+            current = parent_entity;
+        }
+
+        if has_dirty_ancestor {
+            continue;
+        }
+
+        let inherited_style = resolve_inherited_style_for_entity(
+            entity,
+            &parent_query,
+            &style_query,
+            &style_state_query,
+        );
+
         propagate_recursive(
-            root_entity,
-            None,
+            entity,
+            inherited_style.as_ref(),
             &mut commands,
             &children_query,
             &style_query,
@@ -2765,6 +2937,70 @@ pub fn propagate_style_inheritance(
             &mut target_query,
             &asset_server,
         );
+    }
+}
+
+/// Handles `resolve_inherited_style_for_entity` in the extended UI workflow.
+fn resolve_inherited_style_for_entity(
+    entity: Entity,
+    parent_query: &Query<&ChildOf>,
+    style_query: &Query<&UiStyle>,
+    style_state_query: &Query<(Option<&StyleTransition>, Option<&StyleAnimation>)>,
+) -> Option<Style> {
+    let mut lineage = Vec::new();
+    let mut current = entity;
+
+    while let Ok(parent) = parent_query.get(current) {
+        let parent_entity = parent.parent();
+        lineage.push(parent_entity);
+        current = parent_entity;
+    }
+
+    if lineage.is_empty() {
+        return None;
+    }
+
+    let mut inherited_style = Style::default();
+    let mut has_inherited = false;
+
+    for ancestor in lineage.into_iter().rev() {
+        merge_entity_style_for_propagation(
+            ancestor,
+            &mut inherited_style,
+            style_query,
+            style_state_query,
+        );
+        has_inherited = true;
+    }
+
+    has_inherited.then_some(inherited_style)
+}
+
+/// Handles `merge_entity_style_for_propagation` in the extended UI workflow.
+fn merge_entity_style_for_propagation(
+    entity: Entity,
+    style_to_propagate: &mut Style,
+    style_query: &Query<&UiStyle>,
+    style_state_query: &Query<(Option<&StyleTransition>, Option<&StyleAnimation>)>,
+) {
+    if let Ok(ui_style) = style_query.get(entity) {
+        if let Some(active_style) = ui_style.active_style.as_ref() {
+            style_to_propagate.merge(active_style);
+        }
+    }
+
+    if let Ok((transition_opt, animation_opt)) = style_state_query.get(entity) {
+        if let Some(transition) = transition_opt {
+            if let Some(current) = &transition.current_style {
+                style_to_propagate.merge(current);
+            }
+        }
+
+        if let Some(animation) = animation_opt {
+            if let Some(current) = &animation.current_style {
+                style_to_propagate.merge(current);
+            }
+        }
     }
 }
 
@@ -2790,28 +3026,13 @@ fn propagate_recursive(
     let my_style_comp = style_query.get(entity).ok();
     let my_active_style = my_style_comp.and_then(|s| s.active_style.as_ref());
 
-    let mut style_to_propagate = if let Some(inherited) = inherited_style {
-        inherited.clone()
-    } else {
-        Style::default()
-    };
-
-    if let Some(mine) = my_active_style {
-        style_to_propagate.merge(mine);
-    }
-
-    if let Ok((transition_opt, animation_opt)) = style_state_query.get(entity) {
-        if let Some(transition) = transition_opt {
-            if let Some(current) = &transition.current_style {
-                style_to_propagate.merge(current);
-            }
-        }
-        if let Some(animation) = animation_opt {
-            if let Some(current) = &animation.current_style {
-                style_to_propagate.merge(current);
-            }
-        }
-    }
+    let mut style_to_propagate = inherited_style.cloned().unwrap_or_default();
+    merge_entity_style_for_propagation(
+        entity,
+        &mut style_to_propagate,
+        style_query,
+        style_state_query,
+    );
 
     if let Ok((
         mut text_color_opt,
@@ -2929,6 +3150,7 @@ fn propagate_recursive(
     }
 }
 
+/// Handles `sync_text_transform_entity` in the extended UI workflow.
 fn sync_text_transform_entity(
     entity: Entity,
     transform: Option<TextTransform>,
@@ -2985,6 +3207,7 @@ fn sync_text_transform_entity(
     }
 }
 
+/// Handles `apply_text_transform` in the extended UI workflow.
 fn apply_text_transform(transform: TextTransform, input: &str) -> String {
     match transform {
         TextTransform::None => input.to_string(),
@@ -2994,6 +3217,7 @@ fn apply_text_transform(transform: TextTransform, input: &str) -> String {
     }
 }
 
+/// Handles `capitalize_words` in the extended UI workflow.
 fn capitalize_words(input: &str) -> String {
     let mut out = String::with_capacity(input.len());
     let mut start_word = true;

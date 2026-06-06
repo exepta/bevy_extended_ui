@@ -1,5 +1,8 @@
 use crate::ExtendedUiConfiguration;
 use crate::styles::{CssClass, CssID, CssSource, TagName};
+use crate::widgets::widget_util::{
+    resolve_owner_widget_from_parent, resolve_parent_top_left, set_css_classes,
+};
 use crate::widgets::{
     Badge, BadgeAnchor, BindToID, Body, UIGenID, UIWidgetState, WidgetId, WidgetKind,
 };
@@ -148,42 +151,13 @@ fn resolve_badge_targets(
         let target = if let Some(for_id) = badge.for_id.as_deref() {
             let normalized = for_id.trim().trim_start_matches('#');
             by_id.get(normalized).copied().or_else(|| {
-                resolve_parent_widget_target(parent_opt, &parents_q, &widget_q, &body_q)
+                resolve_owner_widget_from_parent(parent_opt, &parents_q, &widget_q, &body_q)
             })
         } else {
-            resolve_parent_widget_target(parent_opt, &parents_q, &widget_q, &body_q)
+            resolve_owner_widget_from_parent(parent_opt, &parents_q, &widget_q, &body_q)
         };
 
         runtime.target = target;
-    }
-}
-
-fn resolve_parent_widget_target(
-    parent_opt: Option<&ChildOf>,
-    parents_q: &Query<&ChildOf>,
-    widget_q: &Query<(), With<WidgetId>>,
-    body_q: &Query<(), With<Body>>,
-) -> Option<Entity> {
-    let Some(parent) = parent_opt else {
-        return None;
-    };
-
-    let mut current = parent.parent();
-
-    loop {
-        if body_q.get(current).is_ok() {
-            return None;
-        }
-
-        if widget_q.get(current).is_ok() {
-            return Some(current);
-        }
-
-        if let Ok(next) = parents_q.get(current) {
-            current = next.parent();
-        } else {
-            return None;
-        }
     }
 }
 
@@ -204,6 +178,7 @@ fn update_badge_text(
     }
 }
 
+/// Handles `format_badge_label` in the extended UI workflow.
 fn format_badge_label(value: u32, max: u32) -> String {
     if value > max {
         format!("+{}", max)
@@ -212,6 +187,7 @@ fn format_badge_label(value: u32, max: u32) -> String {
     }
 }
 
+/// Handles `anchor_to_class` in the extended UI workflow.
 fn anchor_to_class(anchor: BadgeAnchor) -> &'static str {
     match anchor {
         BadgeAnchor::TopLeft => "badge-anchor-top-left",
@@ -221,19 +197,7 @@ fn anchor_to_class(anchor: BadgeAnchor) -> &'static str {
     }
 }
 
-fn set_css_classes(classes: &mut CssClass, base: &[String], dynamic: &[&str]) {
-    let mut next = base.to_vec();
-    for class in dynamic {
-        if !next.iter().any(|existing| existing == class) {
-            next.push((*class).to_string());
-        }
-    }
-
-    if classes.0 != next {
-        classes.0 = next;
-    }
-}
-
+/// Handles `snap_to_pixel` in the extended UI workflow.
 fn snap_to_pixel(value: f32, scale: f32) -> f32 {
     (value * scale).round() / scale
 }
@@ -293,13 +257,7 @@ fn update_badge_visuals(
 
         *visibility = Visibility::Inherited;
 
-        let mut parent_top_left = Vec2::ZERO;
-        if let Some(parent) = parent_opt {
-            if let Ok((parent_node, parent_transform)) = parent_q.get(parent.parent()) {
-                let half = parent_node.size() * 0.5;
-                parent_top_left = parent_transform.affine().transform_point2(-half) / sf;
-            }
-        }
+        let parent_top_left = resolve_parent_top_left(parent_opt, &parent_q, sf);
 
         let target_size = target_node.size() / sf;
         let target_top_left = target_transform

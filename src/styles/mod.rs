@@ -1,7 +1,6 @@
 pub mod components;
 pub mod paint;
 pub mod parser;
-mod unit_tests;
 
 use crate::io::CssAsset;
 use crate::styles::components::UiStyle;
@@ -112,6 +111,7 @@ pub struct BackgroundPosition {
 }
 
 impl Default for BackgroundPosition {
+    /// Handles `default` in the extended UI workflow.
     fn default() -> Self {
         Self {
             x: BackgroundPositionValue::Percent(0.0),
@@ -123,20 +123,27 @@ impl Default for BackgroundPosition {
 /// Represents a single background position axis value.
 #[derive(Reflect, Debug, Clone, PartialEq)]
 pub enum BackgroundPositionValue {
+    /// Variant `Percent`.
     Percent(f32),
+    /// Variant `Px`.
     Px(f32),
 }
 
 /// Defines how a background image is sized.
 #[derive(Reflect, Debug, Clone, PartialEq)]
 pub enum BackgroundSize {
+    /// Variant `Auto`.
     Auto,
+    /// Variant `Cover`.
     Cover,
+    /// Variant `Contain`.
     Contain,
+    /// Variant `Explicit`.
     Explicit(BackgroundSizeValue, BackgroundSizeValue),
 }
 
 impl Default for BackgroundSize {
+    /// Handles `default` in the extended UI workflow.
     fn default() -> Self {
         Self::Auto
     }
@@ -145,20 +152,27 @@ impl Default for BackgroundSize {
 /// Represents a single background size axis value.
 #[derive(Reflect, Debug, Clone, PartialEq)]
 pub enum BackgroundSizeValue {
+    /// Variant `Auto`.
     Auto,
+    /// Variant `Percent`.
     Percent(f32),
+    /// Variant `Px`.
     Px(f32),
 }
 
 /// Defines how the background image is attached.
 #[derive(Reflect, Debug, Clone, PartialEq)]
 pub enum BackgroundAttachment {
+    /// Variant `Scroll`.
     Scroll,
+    /// Variant `Fixed`.
     Fixed,
+    /// Variant `Local`.
     Local,
 }
 
 impl Default for BackgroundAttachment {
+    /// Handles `default` in the extended UI workflow.
     fn default() -> Self {
         Self::Scroll
     }
@@ -167,6 +181,7 @@ impl Default for BackgroundAttachment {
 /// Defines supported backdrop-filter effects.
 #[derive(Reflect, Debug, Clone, PartialEq)]
 pub enum BackdropFilter {
+    /// Variant `Blur`.
     Blur(f32),
 }
 
@@ -187,21 +202,32 @@ pub struct GradientStop {
 /// Represents a gradient stop position.
 #[derive(Reflect, Debug, Clone, PartialEq)]
 pub enum GradientStopPosition {
+    /// Variant `Percent`.
     Percent(f32),
+    /// Variant `Px`.
     Px(f32),
 }
 
 /// Constants for common font weight values.
 #[derive(Reflect, Debug, Clone, PartialEq, Copy)]
 pub enum FontWeight {
+    /// Variant `Thin`.
     Thin = 100,
+    /// Variant `ExtraLight`.
     ExtraLight = 200,
+    /// Variant `Light`.
     Light = 300,
+    /// Variant `Normal`.
     Normal = 400,
+    /// Variant `Medium`.
     Medium = 500,
+    /// Variant `SemiBold`.
     SemiBold = 600,
+    /// Variant `Bold`.
     Bold = 700,
+    /// Variant `ExtraBold`.
     ExtraBold = 800,
+    /// Variant `Black`.
     Black = 900,
 }
 
@@ -259,7 +285,9 @@ impl FontWeight {
 /// Placement of an icon relative to text.
 #[derive(Reflect, Debug, Clone, Copy, PartialEq)]
 pub enum IconPlace {
+    /// Variant `Left`.
     Left,
+    /// Variant `Right`.
     Right,
 }
 
@@ -273,7 +301,9 @@ impl Default for IconPlace {
 /// Represents a font size value, either in pixels or rem units.
 #[derive(Reflect, Debug, Clone, PartialEq)]
 pub enum FontVal {
+    /// Variant `Px`.
     Px(f32),
+    /// Variant `Rem`.
     Rem(f32),
 }
 
@@ -294,22 +324,36 @@ impl FontVal {
     }
 }
 
+/// Defines the available `CalcUnit` variants for this part of the UI runtime.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CalcUnit {
+    /// Variant `None`.
     None,
+    /// Variant `Px`.
     Px,
+    /// Variant `Percent`.
     Percent,
+    /// Variant `Rem`.
     Rem,
+    /// Variant `Vw`.
     Vw,
+    /// Variant `Vh`.
     Vh,
+    /// Variant `VMin`.
     VMin,
+    /// Variant `VMax`.
     VMax,
+    /// Variant `Deg`.
     Deg,
+    /// Variant `Rad`.
     Rad,
+    /// Variant `Turn`.
     Turn,
+    /// Variant `Fr`.
     Fr,
 }
 
+/// Represents the `CalcValue` data structure used by the extended UI system.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CalcValue {
     pub value: f32,
@@ -317,10 +361,18 @@ pub struct CalcValue {
 }
 
 impl CalcValue {
+    /// Handles `new` in the extended UI workflow.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// // Call `new` with values from your app state and world context.
+    /// ```
     pub fn new(value: f32, unit: CalcUnit) -> Self {
         Self { value, unit }
     }
 
+    /// Handles `to_length_px` in the extended UI workflow.
     fn to_length_px(self, ctx: CalcContext) -> Option<f32> {
         match self.unit {
             CalcUnit::Px => Some(self.value),
@@ -334,6 +386,7 @@ impl CalcValue {
         }
     }
 
+    /// Handles `to_angle_radians` in the extended UI workflow.
     fn to_angle_radians(self) -> Option<f32> {
         match self.unit {
             CalcUnit::None => Some(self.value),
@@ -345,18 +398,28 @@ impl CalcValue {
     }
 }
 
+/// Defines the available `CalcExpr` variants for this part of the UI runtime.
 #[derive(Debug, Clone, PartialEq)]
 pub enum CalcExpr {
+    /// Variant `Value`.
     Value(CalcValue),
+    /// Variant `Add`.
     Add(Box<CalcExpr>, Box<CalcExpr>),
+    /// Variant `Sub`.
     Sub(Box<CalcExpr>, Box<CalcExpr>),
+    /// Variant `Mul`.
     Mul(Box<CalcExpr>, Box<CalcExpr>),
+    /// Variant `Div`.
     Div(Box<CalcExpr>, Box<CalcExpr>),
+    /// Variant `Min`.
     Min(Vec<CalcExpr>),
+    /// Variant `Max`.
     Max(Vec<CalcExpr>),
+    /// Variant `Sin`.
     Sin(Box<CalcExpr>),
 }
 
+/// Represents the `CalcContext` data structure used by the extended UI system.
 #[derive(Debug, Clone, Copy)]
 pub struct CalcContext {
     pub base: f32,
@@ -364,6 +427,13 @@ pub struct CalcContext {
 }
 
 impl CalcExpr {
+    /// Handles `eval_length` in the extended UI workflow.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// // Call `eval_length` with values from your app state and world context.
+    /// ```
     pub fn eval_length(&self, ctx: CalcContext) -> Option<f32> {
         match self {
             CalcExpr::Value(value) => value.to_length_px(ctx),
@@ -419,6 +489,13 @@ impl CalcExpr {
         }
     }
 
+    /// Handles `eval_unitless` in the extended UI workflow.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// // Call `eval_unitless` with values from your app state and world context.
+    /// ```
     pub fn eval_unitless(&self) -> Option<f32> {
         match self {
             CalcExpr::Value(value) if value.unit == CalcUnit::None => Some(value.value),
@@ -462,6 +539,7 @@ impl CalcExpr {
         }
     }
 
+    /// Handles `eval_angle_radians` in the extended UI workflow.
     fn eval_angle_radians(&self) -> Option<f32> {
         match self {
             CalcExpr::Value(value) => value.to_angle_radians(),
@@ -525,10 +603,15 @@ pub struct FontFamily(pub String);
 /// Timing functions for transitions and animations.
 #[derive(Reflect, Debug, Clone, PartialEq, Eq, Copy)]
 pub enum TransitionTiming {
+    /// Variant `Linear`.
     Linear,
+    /// Variant `Ease`.
     Ease,
+    /// Variant `EaseIn`.
     EaseIn,
+    /// Variant `EaseOut`.
     EaseOut,
+    /// Variant `EaseInOut`.
     EaseInOut,
 }
 
@@ -573,9 +656,13 @@ impl Default for TransitionTiming {
 /// Direction modes for CSS animations.
 #[derive(Reflect, Debug, Clone, PartialEq, Eq, Copy)]
 pub enum AnimationDirection {
+    /// Variant `Normal`.
     Normal,
+    /// Variant `Reverse`.
     Reverse,
+    /// Variant `Alternate`.
     Alternate,
+    /// Variant `AlternateReverse`.
     AlternateReverse,
 }
 
@@ -602,9 +689,13 @@ impl Default for AnimationDirection {
 /// Properties that can be targeted by transitions.
 #[derive(Reflect, Debug, Clone, PartialEq, Eq, Copy)]
 pub enum TransitionProperty {
+    /// Variant `All`.
     All,
+    /// Variant `Color`.
     Color,
+    /// Variant `Background`.
     Background,
+    /// Variant `Transform`.
     Transform,
 }
 
@@ -678,22 +769,36 @@ pub struct ParsedCss {
 /// Breakpoint/media condition expression used for CSS `@media` rules.
 #[derive(Debug, Clone, PartialEq)]
 pub enum MediaQueryCondition {
+    /// Variant `Always`.
     Always,
+    /// Variant `Never`.
     Never,
+    /// Variant `MinWidth`.
     MinWidth(f32),
+    /// Variant `MaxWidth`.
     MaxWidth(f32),
+    /// Variant `Width`.
     Width(f32),
+    /// Variant `MinHeight`.
     MinHeight(f32),
+    /// Variant `MaxHeight`.
     MaxHeight(f32),
+    /// Variant `Height`.
     Height(f32),
+    /// Variant `OrientationLandscape`.
     OrientationLandscape,
+    /// Variant `OrientationPortrait`.
     OrientationPortrait,
+    /// Variant `Not`.
     Not(Box<MediaQueryCondition>),
+    /// Variant `And`.
     And(Vec<MediaQueryCondition>),
+    /// Variant `Or`.
     Or(Vec<MediaQueryCondition>),
 }
 
 impl MediaQueryCondition {
+    /// Handles `compound_cache_key` in the extended UI workflow.
     fn compound_cache_key(prefix: &str, parts: &[MediaQueryCondition]) -> String {
         let mut key = String::from(prefix);
         key.push('(');
@@ -791,16 +896,22 @@ impl TransformStyle {
 /// Cursor styling, either a system cursor or a custom asset path.
 #[derive(Reflect, Debug, Clone, PartialEq)]
 pub enum CursorStyle {
+    /// Variant `System`.
     System(SystemCursorIcon),
+    /// Variant `Custom`.
     Custom(String),
 }
 
 /// Text casing transformation parsed from `text-transform`.
 #[derive(Reflect, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TextTransform {
+    /// Variant `None`.
     None,
+    /// Variant `Uppercase`.
     Uppercase,
+    /// Variant `Lowercase`.
     Lowercase,
+    /// Variant `Capitalize`.
     Capitalize,
 }
 
@@ -1093,6 +1204,7 @@ fn merge_opt<T: Clone>(dst: &mut Option<T>, src: &Option<T>) {
     }
 }
 
+/// Handles `merge_val_with_calc` in the extended UI workflow.
 #[inline]
 fn merge_val_with_calc<T: Clone>(
     dst_val: &mut Option<T>,

@@ -8,6 +8,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use crate::html::HtmlSystemSet;
 use crate::services::image_service::get_or_load_image;
 use crate::styles::components::UiStyle;
 use crate::styles::paint::Colored;
@@ -46,6 +47,10 @@ struct InputFieldIcon;
 /// Marker component for the input icon image.
 #[derive(Component)]
 struct InputFieldIconImage;
+
+/// Marker inserted when an input value changed because of user input.
+#[derive(Component)]
+pub struct InputUserChanged;
 
 /// Marker component for the blinking cursor node.
 #[derive(Component)]
@@ -96,6 +101,7 @@ struct KeyRepeatTimers {
     timers: HashMap<KeyCode, Timer>,
 }
 
+/// Represents the `PendingFileSelection` data structure used by the extended UI system.
 #[derive(Clone, Debug)]
 struct PendingFileSelection {
     target: usize,
@@ -128,6 +134,7 @@ struct InputClipboard {
     pending: Arc<Mutex<PendingPaste>>,
 }
 
+/// Represents the `PendingPaste` data structure used by the extended UI system.
 #[cfg(all(target_arch = "wasm32", feature = "clipboard-wasm"))]
 struct PendingPaste {
     target: Option<usize>,
@@ -135,6 +142,7 @@ struct PendingPaste {
 }
 
 impl Default for InputClipboard {
+    /// Handles `default` in the extended UI workflow.
     fn default() -> Self {
         #[cfg(not(target_arch = "wasm32"))]
         {
@@ -165,6 +173,7 @@ impl Default for InputClipboard {
 }
 
 impl InputClipboard {
+    /// Handles `set_text` in the extended UI workflow.
     fn set_text(&mut self, text: &str) {
         #[cfg(not(target_arch = "wasm32"))]
         if let Some(clipboard) = self.clipboard.as_mut() {
@@ -188,6 +197,7 @@ impl InputClipboard {
         self.fallback = text.to_string();
     }
 
+    /// Handles `get_text` in the extended UI workflow.
     fn get_text(&mut self) -> Option<String> {
         #[cfg(all(target_arch = "wasm32", feature = "clipboard-wasm"))]
         {
@@ -208,6 +218,7 @@ impl InputClipboard {
         }
     }
 
+    /// Handles `request_paste` in the extended UI workflow.
     #[cfg(all(target_arch = "wasm32", feature = "clipboard-wasm"))]
     fn request_paste(&mut self, target: usize) {
         if let Ok(mut pending) = self.pending.lock() {
@@ -234,6 +245,7 @@ impl InputClipboard {
         }
     }
 
+    /// Handles `take_pending` in the extended UI workflow.
     #[cfg(all(target_arch = "wasm32", feature = "clipboard-wasm"))]
     fn take_pending(&mut self) -> Option<(usize, String)> {
         let mut pending = self.pending.lock().ok()?;
@@ -274,25 +286,46 @@ impl Plugin for InputWidget {
         app.insert_resource(InputClipboard::default());
         app.insert_resource(InputFileDialogBridge::default());
         #[cfg(all(target_arch = "wasm32", feature = "clipboard-wasm"))]
-        let typing_chain = (handle_typing, sync_input_text_spans, apply_pending_paste).chain();
-
-        #[cfg(not(all(target_arch = "wasm32", feature = "clipboard-wasm")))]
-        let typing_chain = (handle_typing, sync_input_text_spans).chain();
-
         app.add_systems(
             Update,
             (
                 internal_node_creation_system,
                 apply_pending_file_selection,
-                sync_input_field_updates.after(apply_pending_file_selection),
-                sync_file_input_feedback.after(apply_pending_file_selection),
+                sync_input_field_updates,
+                sync_file_input_feedback,
+                handle_typing,
+                apply_pending_paste,
+                sync_input_text_spans,
                 update_cursor_visibility,
                 update_cursor_position,
-                typing_chain,
                 handle_input_horizontal_scroll,
                 calculate_correct_text_container_width,
                 handle_overlay_label,
-            ),
+            )
+                .chain()
+                .after(HtmlSystemSet::Build)
+                .before(HtmlSystemSet::Bindings),
+        );
+
+        #[cfg(not(all(target_arch = "wasm32", feature = "clipboard-wasm")))]
+        app.add_systems(
+            Update,
+            (
+                internal_node_creation_system,
+                apply_pending_file_selection,
+                sync_input_field_updates,
+                sync_file_input_feedback,
+                handle_typing,
+                sync_input_text_spans,
+                update_cursor_visibility,
+                update_cursor_position,
+                handle_input_horizontal_scroll,
+                calculate_correct_text_container_width,
+                handle_overlay_label,
+            )
+                .chain()
+                .after(HtmlSystemSet::Build)
+                .before(HtmlSystemSet::Bindings),
         );
     }
 }
@@ -562,6 +595,7 @@ fn sync_input_field_updates(
             &mut InputSelection,
             &InputFileState,
             &UIGenID,
+            &UIWidgetState,
             Option<&CssSource>,
         ),
         (With<InputFieldBase>, Changed<InputField>),
@@ -594,16 +628,26 @@ fn sync_input_field_updates(
         icon_entities.insert(bind.0, entity);
     }
 
-    for (entity, mut field, mut input_value, mut selection, file_state, ui_id, source_opt) in
+    for (entity, mut field, mut input_value, mut selection, file_state, ui_id, state, source_opt) in
         query.iter_mut()
     {
         let css_source = source_opt.cloned().unwrap_or_default();
 
-        field.cursor_position = field.cursor_position.min(field.text.len());
-        selection.anchor = selection.anchor.min(field.text.len());
-        selection.focus = selection.focus.min(field.text.len());
-        if field.input_type != InputType::File && input_value.0 != field.text {
-            input_value.0 = field.text.clone();
+        if state.focused && field.input_type != InputType::File {
+            // Template updates create a fresh InputField from the rendered `value` attribute.
+            // Keep the user's draft text while focused so reactive number formatting does not
+            // rewrite intermediate input like `10`, `10.`, or an empty field.
+            field.text = input_value.0.clone();
+            selection.anchor = selection.anchor.min(field.text.len());
+            selection.focus = selection.focus.min(field.text.len());
+            field.cursor_position = selection.focus;
+        } else {
+            selection.anchor = selection.anchor.min(field.text.len());
+            selection.focus = selection.focus.min(field.text.len());
+            field.cursor_position = field.cursor_position.min(field.text.len());
+            if field.input_type != InputType::File && input_value.0 != field.text {
+                input_value.0 = field.text.clone();
+            }
         }
 
         for (mut label_text, bind_id) in label_query.iter_mut() {
@@ -692,10 +736,13 @@ fn sync_input_field_updates(
     }
 }
 
+/// Handles `apply_pending_file_selection` in the extended UI workflow.
 fn apply_pending_file_selection(
+    mut commands: Commands,
     bridge: Res<InputFileDialogBridge>,
     mut query: Query<
         (
+            Entity,
             &UIGenID,
             &mut InputField,
             &mut InputValue,
@@ -719,6 +766,7 @@ fn apply_pending_file_selection(
 
     for selection in pending {
         if let Some((
+            entity,
             _,
             mut field,
             mut input_value,
@@ -727,7 +775,7 @@ fn apply_pending_file_selection(
             mut state,
         )) = query
             .iter_mut()
-            .find(|(ui_id, _, _, _, _, _)| ui_id.0 == selection.target)
+            .find(|(_, ui_id, _, _, _, _, _)| ui_id.0 == selection.target)
         {
             if let Some(error_message) = selection.error_message {
                 file_state.error_message = Some(error_message);
@@ -744,6 +792,7 @@ fn apply_pending_file_selection(
 
             if input_value.0 != selection.value {
                 input_value.0 = selection.value;
+                commands.entity(entity).insert(InputUserChanged);
             }
 
             state.invalid = false;
@@ -1559,6 +1608,7 @@ fn sync_input_text_spans(
     }
 }
 
+/// Handles `apply_pending_paste` in the extended UI workflow.
 #[cfg(all(target_arch = "wasm32", feature = "clipboard-wasm"))]
 fn apply_pending_paste(
     mut clipboard: ResMut<InputClipboard>,
@@ -1629,6 +1679,11 @@ fn calculate_text_width(text: &str, style: &TextFont) -> f32 {
     text.len() as f32 * style.font_size * 0.6
 }
 
+#[cfg(any(
+    all(not(target_arch = "wasm32"), feature = "extended-dialog"),
+    all(target_arch = "wasm32", feature = "clipboard-wasm")
+))]
+/// Handles `normalized_extensions` in the extended UI workflow.
 fn normalized_extensions(values: &[String]) -> Vec<String> {
     values
         .iter()
@@ -1640,6 +1695,7 @@ fn normalized_extensions(values: &[String]) -> Vec<String> {
         .collect()
 }
 
+/// Handles `format_file_size` in the extended UI workflow.
 fn format_file_size(bytes: u64) -> String {
     const UNITS: [&str; 5] = ["B", "KB", "MB", "GB", "TB"];
 
@@ -1653,6 +1709,11 @@ fn format_file_size(bytes: u64) -> String {
     format!("{:.0} {}", value.round(), UNITS[unit_idx])
 }
 
+#[cfg(any(
+    all(not(target_arch = "wasm32"), feature = "extended-dialog"),
+    all(target_arch = "wasm32", feature = "clipboard-wasm")
+))]
+/// Handles `push_pending_file_selection` in the extended UI workflow.
 fn push_pending_file_selection(
     bridge: &InputFileDialogBridge,
     target: usize,
@@ -1672,6 +1733,11 @@ fn push_pending_file_selection(
     });
 }
 
+#[cfg(any(
+    all(not(target_arch = "wasm32"), feature = "extended-dialog"),
+    all(target_arch = "wasm32", feature = "clipboard-wasm")
+))]
+/// Handles `push_pending_file_selection_error` in the extended UI workflow.
 fn push_pending_file_selection_error(
     bridge: &InputFileDialogBridge,
     target: usize,
@@ -1694,6 +1760,7 @@ fn push_pending_file_selection_error(
     not(target_arch = "wasm32"),
     feature = "extended-dialog"
 ))]
+/// Handles `spawn_linux_file_dialog_task` in the extended UI workflow.
 fn spawn_linux_file_dialog_task(task: impl FnOnce() + Send + 'static) -> bool {
     if FILE_DIALOG_IN_FLIGHT
         .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
@@ -1711,6 +1778,7 @@ fn spawn_linux_file_dialog_task(task: impl FnOnce() + Send + 'static) -> bool {
     true
 }
 
+/// Handles `run_native_file_picker` in the extended UI workflow.
 #[cfg(all(not(target_arch = "wasm32"), feature = "extended-dialog"))]
 fn run_native_file_picker(
     target: usize,
@@ -1769,24 +1837,25 @@ fn run_native_file_picker(
     }
 }
 
-fn open_file_picker(target: usize, field: &InputField, bridge: &InputFileDialogBridge) {
+/// Handles `open_file_picker` in the extended UI workflow.
+fn open_file_picker(_target: usize, _field: &InputField, _bridge: &InputFileDialogBridge) {
     #[cfg(all(not(target_arch = "wasm32"), feature = "extended-dialog"))]
     {
-        let folder_mode = field.folder;
-        let extensions = normalized_extensions(&field.extensions);
-        let include_size = field.show_size && !folder_mode;
+        let folder_mode = _field.folder;
+        let extensions = normalized_extensions(&_field.extensions);
+        let include_size = _field.show_size && !folder_mode;
         let max_size_bytes = if folder_mode {
             None
         } else {
-            field.max_size_bytes
+            _field.max_size_bytes
         };
 
         #[cfg(target_os = "linux")]
         {
-            let bridge = bridge.clone();
+            let bridge = _bridge.clone();
             let _ = spawn_linux_file_dialog_task(move || {
                 run_native_file_picker(
-                    target,
+                    _target,
                     folder_mode,
                     extensions,
                     include_size,
@@ -1800,12 +1869,12 @@ fn open_file_picker(target: usize, field: &InputField, bridge: &InputFileDialogB
         #[cfg(not(target_os = "linux"))]
         {
             run_native_file_picker(
-                target,
+                _target,
                 folder_mode,
                 extensions,
                 include_size,
                 max_size_bytes,
-                bridge.clone(),
+                _bridge.clone(),
             );
             return;
         }
@@ -1829,12 +1898,12 @@ fn open_file_picker(target: usize, field: &InputField, bridge: &InputFileDialogB
         input.set_type("file");
         let _ = input.set_attribute("style", "display: none;");
 
-        let folder_mode = field.folder;
+        let folder_mode = _field.folder;
         if folder_mode {
             let _ = input.set_attribute("webkitdirectory", "");
             let _ = input.set_attribute("directory", "");
         } else {
-            let extensions = normalized_extensions(&field.extensions);
+            let extensions = normalized_extensions(&_field.extensions);
             if !extensions.is_empty() {
                 let accept = extensions
                     .iter()
@@ -1845,13 +1914,13 @@ fn open_file_picker(target: usize, field: &InputField, bridge: &InputFileDialogB
             }
         }
 
-        let bridge = bridge.clone();
+        let bridge = _bridge.clone();
         let input_clone = input.clone();
-        let include_size = field.show_size && !folder_mode;
+        let include_size = _field.show_size && !folder_mode;
         let max_size_bytes = if folder_mode {
             None
         } else {
-            field.max_size_bytes
+            _field.max_size_bytes
         };
 
         let onchange = Closure::wrap(Box::new(move |_event: web_sys::Event| {
@@ -1887,7 +1956,7 @@ fn open_file_picker(target: usize, field: &InputField, bridge: &InputFileDialogB
                 {
                     push_pending_file_selection_error(
                         &bridge,
-                        target,
+                        _target,
                         format!("File is too large (max: {})", format_file_size(limit)),
                     );
                     warn!(
@@ -1911,7 +1980,7 @@ fn open_file_picker(target: usize, field: &InputField, bridge: &InputFileDialogB
                 let Ok(reader) = web_sys::FileReader::new() else {
                     push_pending_file_selection(
                         &bridge,
-                        target,
+                        _target,
                         display_name.clone(),
                         display_name,
                         size,
@@ -1928,7 +1997,7 @@ fn open_file_picker(target: usize, field: &InputField, bridge: &InputFileDialogB
 
                     push_pending_file_selection(
                         &bridge_load,
-                        target,
+                        _target,
                         display_name_load.clone(),
                         value,
                         size,
@@ -1942,7 +2011,7 @@ fn open_file_picker(target: usize, field: &InputField, bridge: &InputFileDialogB
 
             push_pending_file_selection(
                 &bridge,
-                target,
+                _target,
                 display_name.clone(),
                 display_name,
                 size_bytes,
@@ -1978,12 +2047,14 @@ fn selection_range(selection: &InputSelection) -> Option<(usize, usize)> {
     Some((start, end))
 }
 
+/// Handles `clear_selection` in the extended UI workflow.
 fn clear_selection(selection: &mut InputSelection, cursor: usize) {
     selection.anchor = cursor;
     selection.focus = cursor;
     selection.dragging = false;
 }
 
+/// Handles `delete_selection` in the extended UI workflow.
 fn delete_selection(in_field: &mut InputField, selection: &mut InputSelection) -> bool {
     let Some((start, end)) = selection_range(selection) else {
         return false;
@@ -2000,6 +2071,7 @@ fn delete_selection(in_field: &mut InputField, selection: &mut InputSelection) -
     true
 }
 
+/// Handles `insert_text_filtered` in the extended UI workflow.
 fn insert_text_filtered(
     in_field: &mut InputField,
     style: &UiStyle,
@@ -2049,10 +2121,12 @@ fn insert_text_filtered(
     inserted
 }
 
+/// Handles `default_selection_background` in the extended UI workflow.
 fn default_selection_background() -> Color {
     Color::srgba(0.2, 0.45, 1.0, 0.35)
 }
 
+/// Handles `resolve_selection_colors` in the extended UI workflow.
 fn resolve_selection_colors(
     ui_style: &UiStyle,
     state: &UIWidgetState,
@@ -2108,6 +2182,7 @@ fn resolve_selection_colors(
     (text_color, background)
 }
 
+/// Handles `selector_matches_state_for_selection` in the extended UI workflow.
 fn selector_matches_state_for_selection(selector: &str, state: &UIWidgetState) -> bool {
     for part in selector.replace('>', " > ").split_whitespace() {
         if part == ">" {
@@ -2133,6 +2208,7 @@ fn selector_matches_state_for_selection(selector: &str, state: &UIWidgetState) -
     true
 }
 
+/// Handles `selector_specificity_for_selection` in the extended UI workflow.
 fn selector_specificity_for_selection(selector: &str) -> u32 {
     let mut spec = 0;
     for part in selector.replace('>', " > ").split_whitespace() {
@@ -2167,6 +2243,7 @@ fn selector_specificity_for_selection(selector: &str) -> u32 {
     spec
 }
 
+/// Handles `cursor_position_from_pointer` in the extended UI workflow.
 fn cursor_position_from_pointer(
     ui_id: usize,
     text_len: usize,
@@ -2473,6 +2550,28 @@ fn on_internal_release(
 
 /// Handles click events on input fields.
 /// Focuses the input field on click and updates the current widget state.
+fn handle_input_click_target(
+    state: &mut UIWidgetState,
+    gen_id: &UIGenID,
+    field: &InputField,
+    current_widget_state: &mut CurrentWidgetState,
+    file_dialog_bridge: &InputFileDialogBridge,
+) {
+    if state.disabled {
+        return;
+    }
+
+    current_widget_state.widget_id = gen_id.0;
+    if field.input_type == InputType::File {
+        state.focused = false;
+        open_file_picker(gen_id.0, field, file_dialog_bridge);
+    } else {
+        state.focused = true;
+    }
+}
+
+/// Handles click events on input fields.
+/// Focuses the input field on click and updates the current widget state.
 fn on_internal_click(
     mut trigger: On<Pointer<Click>>,
     mut query: Query<(&mut UIWidgetState, &UIGenID, &InputField), With<InputField>>,
@@ -2482,27 +2581,23 @@ fn on_internal_click(
 ) {
     let target = trigger.event_target();
     if let Ok((mut state, gen_id, field)) = query.get_mut(target) {
-        if !state.disabled {
-            current_widget_state.widget_id = gen_id.0;
-            if field.input_type == InputType::File {
-                state.focused = false;
-                open_file_picker(gen_id.0, field, &file_dialog_bridge);
-            } else {
-                state.focused = true;
-            }
-        }
+        handle_input_click_target(
+            &mut state,
+            gen_id,
+            field,
+            &mut current_widget_state,
+            &file_dialog_bridge,
+        );
     } else if let Ok(bind) = bind_query.get(target) {
         if let Some((mut state, gen_id, field)) = query.iter_mut().find(|(_, id, _)| id.0 == bind.0)
         {
-            if !state.disabled {
-                current_widget_state.widget_id = gen_id.0;
-                if field.input_type == InputType::File {
-                    state.focused = false;
-                    open_file_picker(gen_id.0, field, &file_dialog_bridge);
-                } else {
-                    state.focused = true;
-                }
-            }
+            handle_input_click_target(
+                &mut state,
+                gen_id,
+                field,
+                &mut current_widget_state,
+                &file_dialog_bridge,
+            );
         }
     }
 
