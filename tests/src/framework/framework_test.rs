@@ -700,4 +700,94 @@ mod unit_tests {
             Some(7)
         );
     }
+
+    #[test]
+    fn ui_binding_store_register_type_and_entry_getters_work() {
+        #[derive(Clone, PartialEq)]
+        struct RawOnly(u32);
+
+        let mut store = UiBindingStore::default();
+        assert!(store.register_type::<Player>("player", "crate::Player"));
+        let first_revision = store.revision();
+        assert!(!store.register_type::<Player>("player", "crate::Player"));
+        assert_eq!(store.revision(), first_revision);
+
+        assert!(store.register_type::<Player>("player", "crate::models::Player"));
+        assert!(store.revision() > first_revision);
+        assert!(
+            store
+                .known_types()
+                .any(|known| known == "crate::models::Player")
+        );
+
+        assert!(store.set_raw("raw", RawOnly(7)));
+        let entry = store.data.get("raw").expect("raw entry");
+        assert_eq!(entry.type_name(), "RawOnly");
+        assert!(entry.type_path().ends_with("RawOnly"));
+        assert!(entry.has_value());
+        assert!(entry.revision() > 0);
+        assert_eq!(entry.get::<RawOnly>().map(|value| value.0), Some(7));
+        assert!(entry.json().is_none());
+
+        let value = store
+            .data
+            .get("raw")
+            .and_then(|entry| entry.get::<RawOnly>());
+        assert_eq!(value.map(|value| value.0), Some(7));
+    }
+
+    #[test]
+    fn ui_binding_store_direct_json_conversion_edges_work() {
+        let mut store = UiBindingStore::default();
+        store.set("flag", false);
+        store.set("small", 1_u8);
+        store.set("signed", 1_i8);
+        store.set("float32", 1.0_f32);
+        store.set("float64", 1.0_f64);
+        store.set("text", String::from("old"));
+        store.set("json", json!({"old": true}));
+
+        assert!(store.set_path_json("flag", json!("yes")));
+        assert_eq!(store.get::<bool>("flag"), Some(&true));
+        assert!(!store.set_path_json("flag", json!("maybe")));
+
+        assert!(!store.set_path_json("small", json!(999)));
+        assert_eq!(store.get::<u8>("small"), Some(&1_u8));
+        assert!(store.set_path_json("signed", json!("-5")));
+        assert_eq!(store.get::<i8>("signed"), Some(&-5_i8));
+
+        assert!(store.set_path_json("float32", json!("2.25")));
+        assert_eq!(store.get::<f32>("float32"), Some(&2.25_f32));
+        assert!(store.set_path_json("float64", json!(false)));
+        assert_eq!(store.get::<f64>("float64"), Some(&0.0_f64));
+
+        assert!(store.set_path_json("text", json!([1, 2])));
+        assert_eq!(store.get::<String>("text"), Some(&"[1,2]".to_string()));
+
+        assert!(store.set_path_json("json", json!(["new"])));
+        assert_eq!(
+            store.get::<bevy_extended_ui::lang::serde_json::Value>("json"),
+            Some(&json!(["new"]))
+        );
+    }
+
+    #[test]
+    fn ui_binding_store_path_edge_cases_work() {
+        let mut store = UiBindingStore::default();
+
+        assert!(!store.set_path_json("", json!(1)));
+        assert!(!store.set_path_json("info.", json!(1)));
+        assert_eq!(store.json_path(""), None);
+        assert_eq!(store.json_path(".value"), None);
+
+        assert!(store.set_path_json("info.value", json!(1)));
+        assert!(!store.set_path_json("info.value", json!(1)));
+        assert_eq!(store.json_path("info.value"), Some(json!(1)));
+
+        assert!(store.set_path_json("info.items", json!(["zero", "one"])));
+        assert_eq!(store.json_path("info.items.1"), Some(json!("one")));
+        assert_eq!(store.json_path("info.items.x"), None);
+        assert_eq!(store.json_path("info.items.3"), None);
+        assert_eq!(store.json_path("info.value.missing"), None);
+    }
 }

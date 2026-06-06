@@ -640,67 +640,6 @@ fn json_to_f64(value: &JsonValue) -> Option<f64> {
     }
 }
 
-#[cfg(all(test, feature = "extended-framework"))]
-mod inline_binding_store_tests {
-    use super::*;
-    use serde_json::json;
-
-    #[test]
-    fn set_path_json_preserves_direct_primitive_types() {
-        let mut store = UiBindingStore::default();
-        store.set("flag", false);
-        store.set("small", 1u8);
-        store.set("wide", 1u128);
-        store.set("signed", -1isize);
-        store.set("float", 1.0f64);
-        store.set("text", String::from("old"));
-
-        assert!(store.set_path_json("flag", json!(true)));
-        assert!(store.set_path_json("small", json!(7)));
-        assert!(store.set_path_json("wide", json!("340282366920938463463374607431768211455")));
-        assert!(store.set_path_json("signed", json!("-12")));
-        assert!(store.set_path_json("float", json!("2.5")));
-        assert!(store.set_path_json("text", json!(42)));
-
-        assert_eq!(store.get::<bool>("flag"), Some(&true));
-        assert_eq!(store.get::<u8>("small"), Some(&7u8));
-        assert_eq!(store.get::<u128>("wide"), Some(&u128::MAX));
-        assert_eq!(store.get::<isize>("signed"), Some(&-12isize));
-        assert_eq!(store.get::<f64>("float"), Some(&2.5f64));
-        assert_eq!(store.get::<String>("text"), Some(&String::from("42")));
-    }
-
-    #[test]
-    fn set_path_json_updates_nested_template_projection() {
-        let mut store = UiBindingStore::default();
-
-        assert!(store.set_path_json("info.value", json!("changed")));
-        assert_eq!(store.json_path("info.value"), Some(json!("changed")));
-
-        assert!(store.set_path_json("info.count", json!(3)));
-        assert_eq!(store.json_path("info.count"), Some(json!(3)));
-        assert_eq!(
-            store.json_path("info"),
-            Some(json!({"value": "changed", "count": 3}))
-        );
-    }
-
-    #[test]
-    fn set_path_json_resolves_template_alias_to_store_key() {
-        #[derive(Clone, Default, PartialEq, Serialize)]
-        struct PlayerProfile {
-            name: String,
-        }
-
-        let mut store = UiBindingStore::default();
-        store.set("PlayerProfile", PlayerProfile::default());
-
-        assert!(store.set_path_json("player_profile.name", json!("Ada")));
-        assert_eq!(store.json_path("player_profile.name"), Some(json!("Ada")));
-        assert_eq!(store.json_path("PlayerProfile.name"), Some(json!("Ada")));
-    }
-}
-
 /// Registers all `#[derive(BeuStore)]` types collected by `inventory`.
 pub fn register_beu_stores(world: &mut World) {
     let mut store = world.resource_mut::<UiBindingStore>();

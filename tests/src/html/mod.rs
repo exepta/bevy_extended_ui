@@ -7,3 +7,4 @@ pub use bevy_extended_ui::html::reload;
 
 mod converter_test;
 mod html_test;
+mod inline_functions_test;

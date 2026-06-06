@@ -589,24 +589,3 @@ fn json_to_f64(value: &JsonValue) -> Option<f64> {
 fn number_json(value: f64) -> Option<JsonValue> {
     JsonNumber::from_f64(value).map(JsonValue::Number)
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn parses_set_event_value() {
-        let action = parse_html_inline_action("$set(info.value, $event.value)").unwrap();
-        assert_eq!(action.calls().len(), 1);
-        assert_eq!(action.calls()[0].function, HtmlInlineFunction::Set);
-        assert_eq!(action.calls()[0].target.as_dotted(), "info.value");
-    }
-
-    #[test]
-    fn parses_multiple_calls_and_literals() {
-        let action = parse_html_inline_action("$add(counter, 1); $min(total, '2')").unwrap();
-        assert_eq!(action.calls().len(), 2);
-        assert_eq!(action.calls()[0].function, HtmlInlineFunction::Add);
-        assert_eq!(action.calls()[1].function, HtmlInlineFunction::Min);
-    }
-}
