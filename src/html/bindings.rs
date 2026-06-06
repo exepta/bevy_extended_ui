@@ -1,4 +1,5 @@
 use crate::CurrentWidgetState;
+use crate::html::inline_functions::queue_html_inline_action;
 use crate::html::*;
 use crate::widgets::controls::color_picker::ColorPickerUserChanged;
 use crate::widgets::controls::input::InputUserChanged;
@@ -200,6 +201,10 @@ pub(crate) fn on_html_click(
     let Ok(bindings) = q_bindings.get(entity) else {
         return;
     };
+    if let Some(action) = bindings.inline.onclick.clone() {
+        queue_html_inline_action(&mut commands, entity, action);
+        return;
+    }
     let Some(name) = bindings.onclick.as_deref() else {
         return;
     };
@@ -259,6 +264,10 @@ pub(crate) fn on_html_mouse_down(
     let Ok(bindings) = q_bindings.get(entity) else {
         return;
     };
+    if let Some(action) = bindings.inline.onmousedown.clone() {
+        queue_html_inline_action(&mut commands, entity, action);
+        return;
+    }
     let Some(name) = bindings.onmousedown.as_deref() else {
         return;
     };
@@ -318,6 +327,10 @@ pub(crate) fn on_html_mouse_up(
     let Ok(bindings) = q_bindings.get(entity) else {
         return;
     };
+    if let Some(action) = bindings.inline.onmouseup.clone() {
+        queue_html_inline_action(&mut commands, entity, action);
+        return;
+    }
     let Some(name) = bindings.onmouseup.as_deref() else {
         return;
     };
@@ -586,6 +599,10 @@ pub(crate) fn on_html_mouse_over(
     let Ok(bindings) = q_bindings.get(entity) else {
         return;
     };
+    if let Some(action) = bindings.inline.onmouseover.clone() {
+        queue_html_inline_action(&mut commands, entity, action);
+        return;
+    }
     let Some(name) = bindings.onmouseover.as_deref() else {
         return;
     };
@@ -631,6 +648,10 @@ pub(crate) fn on_html_mouse_out(
     let Ok(bindings) = q_bindings.get(entity) else {
         return;
     };
+    if let Some(action) = bindings.inline.onmouseout.clone() {
+        queue_html_inline_action(&mut commands, entity, action);
+        return;
+    }
     let Some(name) = bindings.onmouseout.as_deref() else {
         return;
     };
@@ -697,6 +718,10 @@ pub(crate) fn on_html_init(
         return;
     };
 
+    if let Some(action) = bindings.inline.oninit.clone() {
+        queue_html_inline_action(&mut commands, entity, action);
+        return;
+    }
     let Some(name) = bindings.oninit.as_deref() else {
         return;
     };
@@ -834,6 +859,10 @@ pub(crate) fn on_html_change(
         return;
     };
 
+    if let Some(action) = bindings.inline.onchange.clone() {
+        queue_html_inline_action(&mut commands, entity, action);
+        return;
+    }
     let Some(name) = bindings.onchange.as_deref() else {
         return;
     };
@@ -909,6 +938,10 @@ pub(crate) fn on_html_focus(
     let Ok(bindings) = q_bindings.get(entity) else {
         return;
     };
+    if let Some(action) = bindings.inline.onfoucs.clone() {
+        queue_html_inline_action(&mut commands, entity, action);
+        return;
+    }
     let Some(name) = bindings.onfoucs.as_deref() else {
         return;
     };
@@ -1022,6 +1055,10 @@ pub(crate) fn on_html_scroll(
     let Ok(bindings) = q_bindings.get(entity) else {
         return;
     };
+    if let Some(action) = bindings.inline.onscroll.clone() {
+        queue_html_inline_action(&mut commands, entity, action);
+        return;
+    }
     let Some(name) = bindings.onscroll.as_deref() else {
         return;
     };
@@ -1078,6 +1115,10 @@ pub(crate) fn on_html_wheel(
     let Ok(bindings) = q_bindings.get(entity) else {
         return;
     };
+    if let Some(action) = bindings.inline.onwheel.clone() {
+        queue_html_inline_action(&mut commands, entity, action);
+        return;
+    }
     let Some(name) = bindings.onwheel.as_deref() else {
         return;
     };
@@ -1183,6 +1224,10 @@ pub(crate) fn on_html_key_down(
     let Ok(bindings) = q_bindings.get(entity) else {
         return;
     };
+    if let Some(action) = bindings.inline.onkeydown.clone() {
+        queue_html_inline_action(&mut commands, entity, action);
+        return;
+    }
     let Some(name) = bindings.onkeydown.as_deref() else {
         return;
     };
@@ -1208,6 +1253,10 @@ pub(crate) fn on_html_key_up(
     let Ok(bindings) = q_bindings.get(entity) else {
         return;
     };
+    if let Some(action) = bindings.inline.onkeyup.clone() {
+        queue_html_inline_action(&mut commands, entity, action);
+        return;
+    }
     let Some(name) = bindings.onkeyup.as_deref() else {
         return;
     };
@@ -1271,6 +1320,10 @@ pub(crate) fn on_html_touch_start(
     let Ok(bindings) = q_bindings.get(entity) else {
         return;
     };
+    if let Some(action) = bindings.inline.ontouchstart.clone() {
+        queue_html_inline_action(&mut commands, entity, action);
+        return;
+    }
     let Some(name) = bindings.ontouchstart.as_deref() else {
         return;
     };
@@ -1331,6 +1384,10 @@ pub(crate) fn on_html_touch_move(
     let Ok(bindings) = q_bindings.get(entity) else {
         return;
     };
+    if let Some(action) = bindings.inline.ontouchmove.clone() {
+        queue_html_inline_action(&mut commands, entity, action);
+        return;
+    }
     let Some(name) = bindings.ontouchmove.as_deref() else {
         return;
     };
@@ -1390,6 +1447,10 @@ pub(crate) fn on_html_touch_end(
     let Ok(bindings) = q_bindings.get(entity) else {
         return;
     };
+    if let Some(action) = bindings.inline.ontouchend.clone() {
+        queue_html_inline_action(&mut commands, entity, action);
+        return;
+    }
     let Some(name) = bindings.ontouchend.as_deref() else {
         return;
     };
@@ -1443,6 +1504,10 @@ pub(crate) fn on_html_drag_start(
     let Ok(bindings) = q_bindings.get(entity) else {
         return;
     };
+    if let Some(action) = bindings.inline.ondragstart.clone() {
+        queue_html_inline_action(&mut commands, entity, action);
+        return;
+    }
     let Some(name) = bindings.ondragstart.as_deref() else {
         return;
     };
@@ -1492,6 +1557,10 @@ pub(crate) fn on_html_drag(
     let Ok(bindings) = q_bindings.get(entity) else {
         return;
     };
+    if let Some(action) = bindings.inline.ondrag.clone() {
+        queue_html_inline_action(&mut commands, entity, action);
+        return;
+    }
     let Some(name) = bindings.ondrag.as_deref() else {
         return;
     };
@@ -1541,6 +1610,10 @@ pub(crate) fn on_html_drag_stop(
     let Ok(bindings) = q_bindings.get(entity) else {
         return;
     };
+    if let Some(action) = bindings.inline.ondragstop.clone() {
+        queue_html_inline_action(&mut commands, entity, action);
+        return;
+    }
     let Some(name) = bindings.ondragstop.as_deref() else {
         return;
     };

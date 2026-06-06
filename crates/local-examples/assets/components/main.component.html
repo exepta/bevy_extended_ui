@@ -7,12 +7,13 @@
     <h3>Extended Framework Active</h3>
     <p>This UI was booted from index.html and app-main component.</p>
     <button onclick="check_state">Toggle Store Player</button>
-    <button onclick="increase_value">Increase Value</button>
+    <button onclick="$min(info.value, 1)">Decrease Value</button>
+    <button onclick="$add(info.value, 1)">Increase Value</button>
     <switch value="{{ player.state }}" onclick="check_state">Store state: {{ player.state }}</switch>
     <p>Store Player Name: {{ player.name }}</p>
 
     <label for="player-name">Player Name</label>
-    <input id="player-name" type="text" value="{{ player.name }}" onchange="set_name">
+    <input id="player-name" type="text" value="{{ player.name }}" onchange="$set(player.name, $event.value)">
 
     <div class="dialog-demo">
         <h4>Player Dialogs</h4>
@@ -32,12 +33,12 @@
     </div>
 
     <label for="slider-val">Player Name</label>
-    <input id="slider-val" type="number" value="{{ info.value }}" onchange="set_value">
+    <input id="slider-val" type="number" value="{{ info.value }}" onchange="$set(info.value, $event.value)">
     <progressbar value="{{ info.value }}" min="0" max="100"></progressbar>
 
     <div class="color-demo">
         <h4>Reactive Color Picker</h4>
-        <colorpicker id="info-color" value="{{ info.color }}" onchange="set_info_color"></colorpicker>
+        <colorpicker id="info-color" value="{{ info.color }}" onchange="$set(info.color, $event.hex)"></colorpicker>
         <div class="color-preview" style="background-color: {{ info.color }};"></div>
         <p>Selected color: {{ info.color }}</p>
     </div>
@@ -64,7 +65,7 @@
     @if(player.state && data_state == DataState::Inactive) {
     <app-test></app-test>
     } @else {
-    <slider value="{{ info.value }}" onchange="on_slider_change"></slider>
+    <slider value="{{ info.value }}" onchange="$set(info.value, $event.value)"></slider>
     }
     <h4>{{ info.display }}</h4>
 
@@ -122,7 +123,7 @@
         max-size="4MB"
         extensions="[png, jpeg, jpg]"
         show-size="true"
-        onchange="set_image_file"
+        onchange="$set(info.image_file, $event.value)"
     >
 
     @if(info.image_file != "") {
@@ -145,7 +146,7 @@
             min="01.01.2022"
             max="01.12.2026"
             format="dd.mm.yyyy"
-            onchange="set_info_date"
+            onchange="$set(info.date, $event.value)"
         >
         <date-picker
             id="info-date-picker"

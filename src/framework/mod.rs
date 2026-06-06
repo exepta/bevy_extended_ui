@@ -290,6 +290,45 @@ impl UiBindingStore {
         self.get::<T>(T::STORE_KEY)
     }
 
+    /// Returns a template-visible JSON value from a dot-separated binding path.
+    pub fn json_path(&self, path: &str) -> Option<JsonValue> {
+        let (root, tail) = split_binding_path(path)?;
+        let root = self.resolve_binding_root(root);
+        let entry = self.data.get(root.as_str())?;
+        let value = entry.json()?.clone();
+        resolve_json_tail(value, &tail)
+    }
+
+    /// Sets a template-visible value through a dot-separated binding path.
+    ///
+    /// Direct primitive keys keep their registered Rust type (`bool`, strings,
+    /// all common integer widths, `usize`/`isize`, `f32`, `f64`). Nested paths
+    /// update the stored JSON projection so templates can react immediately.
+    pub fn set_path_json(&mut self, path: &str, value: JsonValue) -> bool {
+        let Some((root, tail)) = split_binding_path(path) else {
+            return false;
+        };
+        let root = self.resolve_binding_root(root);
+        let root = root.as_str();
+
+        if tail.is_empty() {
+            return self.set_direct_json(root, value);
+        }
+
+        let mut root_json = self
+            .data
+            .get(root)
+            .and_then(UiBindingEntry::json)
+            .cloned()
+            .unwrap_or_else(|| JsonValue::Object(Default::default()));
+
+        if !set_json_tail(&mut root_json, &tail, value) {
+            return false;
+        }
+
+        self.set_json_projection(root, root_json)
+    }
+
     /// Returns whether a key is registered in the store.
     pub fn contains_key(&self, key: &str) -> bool {
         self.data.contains_key(key)
@@ -371,8 +410,294 @@ impl UiBindingStore {
         true
     }
 
+    fn set_direct_json(&mut self, key: &str, value: JsonValue) -> bool {
+        if let Some(changed) = self.set_known_primitive_json(key, &value) {
+            return changed;
+        }
+
+        self.set_json_projection(key, value)
+    }
+
+    fn set_known_primitive_json(&mut self, key: &str, value: &JsonValue) -> Option<bool> {
+        let entry = self.data.get(key)?;
+        let type_id = entry.type_id();
+
+        macro_rules! set_unsigned {
+            ($ty:ty) => {
+                if type_id == TypeId::of::<$ty>() {
+                    return Some(json_to_u128(value).map_or(false, |value| {
+                        <$ty>::try_from(value)
+                            .ok()
+                            .is_some_and(|value| self.set::<$ty>(key, value))
+                    }));
+                }
+            };
+        }
+
+        macro_rules! set_signed {
+            ($ty:ty) => {
+                if type_id == TypeId::of::<$ty>() {
+                    return Some(json_to_i128(value).map_or(false, |value| {
+                        <$ty>::try_from(value)
+                            .ok()
+                            .is_some_and(|value| self.set::<$ty>(key, value))
+                    }));
+                }
+            };
+        }
+
+        set_unsigned!(u8);
+        set_unsigned!(u16);
+        set_unsigned!(u32);
+        set_unsigned!(u64);
+        set_unsigned!(u128);
+        set_unsigned!(usize);
+        set_signed!(i8);
+        set_signed!(i16);
+        set_signed!(i32);
+        set_signed!(i64);
+        set_signed!(i128);
+        set_signed!(isize);
+
+        if type_id == TypeId::of::<bool>() {
+            return Some(json_to_bool(value).is_some_and(|value| self.set::<bool>(key, value)));
+        }
+        if type_id == TypeId::of::<String>() {
+            return Some(self.set::<String>(key, json_to_string(value)));
+        }
+        if type_id == TypeId::of::<f32>() {
+            return Some(
+                json_to_f64(value).is_some_and(|value| self.set::<f32>(key, value as f32)),
+            );
+        }
+        if type_id == TypeId::of::<f64>() {
+            return Some(json_to_f64(value).is_some_and(|value| self.set::<f64>(key, value)));
+        }
+        if type_id == TypeId::of::<JsonValue>() {
+            return Some(self.set::<JsonValue>(key, value.clone()));
+        }
+
+        None
+    }
+
+    fn resolve_binding_root(&self, root: &str) -> String {
+        if self.data.contains_key(root) {
+            return root.to_string();
+        }
+
+        let mut matches = self
+            .data
+            .iter()
+            .filter(|(key, entry)| binding_root_matches(root, key, entry))
+            .map(|(key, _entry)| key.as_str())
+            .collect::<Vec<_>>();
+        matches.sort_unstable();
+
+        matches.first().copied().unwrap_or(root).to_string()
+    }
+
+    fn set_json_projection(&mut self, key: &str, value: JsonValue) -> bool {
+        if let Some(entry) = self.data.get_mut(key) {
+            let Some(stored) = entry.value.as_mut() else {
+                return self.set::<JsonValue>(key, value);
+            };
+
+            if stored.json.as_ref() == Some(&value) {
+                return false;
+            }
+
+            stored.json = Some(value);
+            let next_revision = self.revision + 1;
+            entry.revision = next_revision;
+            self.revision = next_revision;
+            self.known_types.insert(key.to_string());
+            return true;
+        }
+
+        self.set::<JsonValue>(key, value)
+    }
+
     fn bump_revision(&mut self) {
         self.revision += 1;
+    }
+}
+
+fn split_binding_path(path: &str) -> Option<(&str, Vec<String>)> {
+    let mut parts = path.split('.');
+    let root = parts.next()?.trim();
+    if root.is_empty() {
+        return None;
+    }
+
+    let mut tail = Vec::new();
+    for part in parts {
+        let part = part.trim();
+        if part.is_empty() {
+            return None;
+        }
+        tail.push(part.to_string());
+    }
+
+    Some((root, tail))
+}
+
+fn binding_root_matches(root: &str, key: &str, entry: &UiBindingEntry) -> bool {
+    to_template_alias(key) == root
+        || to_template_alias(entry.type_name()) == root
+        || to_template_alias(simple_type_name(entry.type_path())) == root
+}
+
+fn resolve_json_tail(mut value: JsonValue, tail: &[String]) -> Option<JsonValue> {
+    for segment in tail {
+        match value {
+            JsonValue::Object(map) => {
+                value = map.get(segment)?.clone();
+            }
+            JsonValue::Array(items) => {
+                let index = segment.parse::<usize>().ok()?;
+                value = items.get(index)?.clone();
+            }
+            _ => return None,
+        }
+    }
+    Some(value)
+}
+
+fn set_json_tail(value: &mut JsonValue, tail: &[String], next: JsonValue) -> bool {
+    if tail.is_empty() {
+        let changed = *value != next;
+        *value = next;
+        return changed;
+    }
+
+    if !value.is_object() {
+        *value = JsonValue::Object(Default::default());
+    }
+
+    let JsonValue::Object(map) = value else {
+        return false;
+    };
+
+    let entry = map
+        .entry(tail[0].clone())
+        .or_insert_with(|| JsonValue::Object(Default::default()));
+    set_json_tail(entry, &tail[1..], next)
+}
+
+fn json_to_string(value: &JsonValue) -> String {
+    match value {
+        JsonValue::String(value) => value.clone(),
+        JsonValue::Bool(value) => value.to_string(),
+        JsonValue::Number(value) => value.to_string(),
+        JsonValue::Null => String::new(),
+        JsonValue::Array(_) | JsonValue::Object(_) => value.to_string(),
+    }
+}
+
+fn json_to_bool(value: &JsonValue) -> Option<bool> {
+    match value {
+        JsonValue::Bool(value) => Some(*value),
+        JsonValue::Number(value) => Some(value.as_f64()? != 0.0),
+        JsonValue::String(value) => match value.trim().to_ascii_lowercase().as_str() {
+            "true" | "1" | "yes" | "on" => Some(true),
+            "false" | "0" | "no" | "off" => Some(false),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+fn json_to_u128(value: &JsonValue) -> Option<u128> {
+    match value {
+        JsonValue::Number(value) => value
+            .as_u64()
+            .map(u128::from)
+            .or_else(|| value.as_i64().and_then(|value| u128::try_from(value).ok())),
+        JsonValue::String(value) => value.trim().parse::<u128>().ok(),
+        JsonValue::Bool(value) => Some(if *value { 1 } else { 0 }),
+        _ => None,
+    }
+}
+
+fn json_to_i128(value: &JsonValue) -> Option<i128> {
+    match value {
+        JsonValue::Number(value) => value
+            .as_i64()
+            .map(i128::from)
+            .or_else(|| value.as_u64().and_then(|value| i128::try_from(value).ok())),
+        JsonValue::String(value) => value.trim().parse::<i128>().ok(),
+        JsonValue::Bool(value) => Some(if *value { 1 } else { 0 }),
+        _ => None,
+    }
+}
+
+fn json_to_f64(value: &JsonValue) -> Option<f64> {
+    match value {
+        JsonValue::Number(value) => value.as_f64(),
+        JsonValue::String(value) => value.trim().parse::<f64>().ok(),
+        JsonValue::Bool(value) => Some(if *value { 1.0 } else { 0.0 }),
+        _ => None,
+    }
+}
+
+#[cfg(all(test, feature = "extended-framework"))]
+mod inline_binding_store_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn set_path_json_preserves_direct_primitive_types() {
+        let mut store = UiBindingStore::default();
+        store.set("flag", false);
+        store.set("small", 1u8);
+        store.set("wide", 1u128);
+        store.set("signed", -1isize);
+        store.set("float", 1.0f64);
+        store.set("text", String::from("old"));
+
+        assert!(store.set_path_json("flag", json!(true)));
+        assert!(store.set_path_json("small", json!(7)));
+        assert!(store.set_path_json("wide", json!("340282366920938463463374607431768211455")));
+        assert!(store.set_path_json("signed", json!("-12")));
+        assert!(store.set_path_json("float", json!("2.5")));
+        assert!(store.set_path_json("text", json!(42)));
+
+        assert_eq!(store.get::<bool>("flag"), Some(&true));
+        assert_eq!(store.get::<u8>("small"), Some(&7u8));
+        assert_eq!(store.get::<u128>("wide"), Some(&u128::MAX));
+        assert_eq!(store.get::<isize>("signed"), Some(&-12isize));
+        assert_eq!(store.get::<f64>("float"), Some(&2.5f64));
+        assert_eq!(store.get::<String>("text"), Some(&String::from("42")));
+    }
+
+    #[test]
+    fn set_path_json_updates_nested_template_projection() {
+        let mut store = UiBindingStore::default();
+
+        assert!(store.set_path_json("info.value", json!("changed")));
+        assert_eq!(store.json_path("info.value"), Some(json!("changed")));
+
+        assert!(store.set_path_json("info.count", json!(3)));
+        assert_eq!(store.json_path("info.count"), Some(json!(3)));
+        assert_eq!(
+            store.json_path("info"),
+            Some(json!({"value": "changed", "count": 3}))
+        );
+    }
+
+    #[test]
+    fn set_path_json_resolves_template_alias_to_store_key() {
+        #[derive(Clone, Default, PartialEq, Serialize)]
+        struct PlayerProfile {
+            name: String,
+        }
+
+        let mut store = UiBindingStore::default();
+        store.set("PlayerProfile", PlayerProfile::default());
+
+        assert!(store.set_path_json("player_profile.name", json!("Ada")));
+        assert_eq!(store.json_path("player_profile.name"), Some(json!("Ada")));
+        assert_eq!(store.json_path("PlayerProfile.name"), Some(json!("Ada")));
     }
 }
 
@@ -587,10 +912,10 @@ fn compile_index_template(
 
             if full_tag_re.is_match(index_html) || self_closing_re.is_match(index_html) {
                 *index_html = full_tag_re
-                    .replace_all(index_html, component_html.as_str())
+                    .replace_all(index_html, regex::NoExpand(component_html.as_str()))
                     .to_string();
                 *index_html = self_closing_re
-                    .replace_all(index_html, component_html.as_str())
+                    .replace_all(index_html, regex::NoExpand(component_html.as_str()))
                     .to_string();
                 for style in &def.styles {
                     used_style_hrefs.insert(build_component_style_href(
@@ -714,10 +1039,10 @@ fn replace_router_outlets(
         build_keep_alive_router_outlet(active_route_component, keep_alive_routes.as_slice(), defs)?
     };
     *html = full_outlet_re
-        .replace_all(html, routed_component.as_str())
+        .replace_all(html, regex::NoExpand(routed_component.as_str()))
         .to_string();
     *html = self_closing_outlet_re
-        .replace_all(html, routed_component.as_str())
+        .replace_all(html, regex::NoExpand(routed_component.as_str()))
         .to_string();
     Ok(())
 }
@@ -773,7 +1098,11 @@ fn route_component_wrapper(component: &str, active: bool) -> String {
         "beu-route beu-route-cached"
     };
 
-    format!(r#"<div class="{class}" style="{style}"><{component}></{component}></div>"#,)
+    format!(
+        r#"<div class="{class}" style="{style}">
+<{component}></{component}>
+</div>"#,
+    )
 }
 
 /// Handles `inject_component_styles` in the extended UI workflow.
@@ -867,4 +1196,21 @@ fn normalize_filesystem_root(path: &str) -> String {
 
 fn simple_type_name(path: &'static str) -> &'static str {
     path.rsplit("::").next().unwrap_or(path)
+}
+
+fn to_template_alias(type_name: &str) -> String {
+    let mut out = String::new();
+    for (index, ch) in type_name.chars().enumerate() {
+        if ch.is_uppercase() {
+            if index != 0 {
+                out.push('_');
+            }
+            for lower in ch.to_lowercase() {
+                out.push(lower);
+            }
+        } else {
+            out.push(ch);
+        }
+    }
+    out
 }

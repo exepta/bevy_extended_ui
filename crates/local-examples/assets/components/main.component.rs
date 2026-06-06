@@ -3,10 +3,11 @@ use bevy::prelude::*;
 use bevy_extended_ui::BeuStore;
 use bevy_extended_ui::framework::UiBindingStore;
 use bevy_extended_ui::html::{HtmlChange, HtmlClick, HtmlInit};
+use bevy_extended_ui::lang::serde_json::{Value as JsonValue, json};
 use bevy_extended_ui::routing::Router;
 use bevy_extended_ui::widgets::{
-    ColorPicker, FieldSelectionMulti, FieldSelectionSingle, InputField, InputValue, RadioButton,
-    ListBox, Slider, ToggleButton,
+    FieldSelectionMulti, FieldSelectionSingle, InputValue, ListBox, RadioButton, Slider,
+    ToggleButton,
 };
 use bevy_extended_ui_macros::*;
 use serde::Serialize;
@@ -133,9 +134,11 @@ impl Default for Info {
 
 #[html_fn("check_state")]
 pub fn check_state(In(_): In<HtmlClick>, mut store: ResMut<UiBindingStore>) {
-    let mut player = store.get_store::<Player>().cloned().unwrap_or_default();
-    player.state = !player.state;
-    store.set_store(player);
+    let current = store
+        .json_path("player.state")
+        .and_then(|value| value.as_bool())
+        .unwrap_or_default();
+    store.set_path_json("player.state", json!(!current));
 }
 
 #[html_fn("go_help")]
@@ -153,28 +156,6 @@ pub fn go_info(In(_): In<HtmlClick>, mut router: ResMut<Router>) {
     router.navigate("/info");
 }
 
-#[html_fn("increase_value")]
-pub fn increase_value(In(_): In<HtmlClick>, mut store: ResMut<UiBindingStore>) {
-    let mut info = store.get_store::<Info>().cloned().unwrap_or_default();
-    info.value = info.value + 1.0;
-    store.set_store(info);
-}
-
-#[html_fn("on_slider_change")]
-pub fn on_slider_change(
-    In(event): In<HtmlChange>,
-    mut store: ResMut<UiBindingStore>,
-    sliders: Query<&Slider>,
-) {
-    let Ok(slider) = sliders.get(event.entity) else {
-        return;
-    };
-
-    let mut info = store.get_store::<Info>().cloned().unwrap_or_default();
-    info.value = slider.value;
-    store.set_store(info);
-}
-
 #[html_fn("set_info_range")]
 pub fn set_info_range(
     In(event): In<HtmlChange>,
@@ -188,25 +169,14 @@ pub fn set_info_range(
     let range_start = slider.range_start.round() as u32;
     let range_end = slider.range_end.round() as u32;
 
-    let mut info = store.get_store::<Info>().cloned().unwrap_or_default();
-    info.range_value = format!("{} - {}", range_start, range_end);
-    info.range_size = range_end.saturating_sub(range_start);
-    store.set_store(info);
-}
-
-#[html_fn("set_name")]
-pub fn set_name(
-    In(event): In<HtmlChange>,
-    mut store: ResMut<UiBindingStore>,
-    inputs: Query<&InputField>,
-) {
-    let Ok(input) = inputs.get(event.entity) else {
-        return;
-    };
-
-    let mut player = store.get_store::<Player>().cloned().unwrap_or_default();
-    player.name = input.text.clone();
-    store.set_store(player);
+    store.set_path_json(
+        "info.range_value",
+        json!(format!("{} - {}", range_start, range_end)),
+    );
+    store.set_path_json(
+        "info.range_size",
+        json!(range_end.saturating_sub(range_start)),
+    );
 }
 
 #[html_fn("set_player_list")]
@@ -226,48 +196,18 @@ pub fn set_player_list(
         .map(str::to_string)
         .collect::<Vec<_>>();
 
-    let mut player = store.get_store::<Player>().cloned().unwrap_or_default();
-    player.list = player
-        .available_list
+    let available_list = json_string_vec(store.json_path("player.available_list"))
+        .unwrap_or_else(|| Player::default().available_list);
+    let selected = available_list
         .iter()
-        .filter(|entry| selected_values.contains(entry))
+        .filter(|entry| selected_values.contains(*entry))
         .cloned()
-        .collect();
-    store.set_store(player);
+        .collect::<Vec<_>>();
+    store.set_path_json("player.list", json!(selected));
 }
 
-#[html_fn("set_value")]
-pub fn set_value(
-    In(event): In<HtmlChange>,
-    mut store: ResMut<UiBindingStore>,
-    inputs: Query<&InputField>,
-) {
-    let Ok(input) = inputs.get(event.entity) else {
-        return;
-    };
-
-    let mut info = store.get_store::<Info>().cloned().unwrap_or_default();
-    info.value = input.text.clone().parse::<f32>().unwrap_or(0.0);
-    store.set_store(info);
-}
-
-#[html_fn("set_info_color")]
-pub fn set_info_color(
-    In(event): In<HtmlChange>,
-    mut store: ResMut<UiBindingStore>,
-    color_pickers: Query<&ColorPicker>,
-) {
-    let Ok(color_picker) = color_pickers.get(event.entity) else {
-        return;
-    };
-
-    let mut info = store.get_store::<Info>().cloned().unwrap_or_default();
-    info.color = color_picker.hex();
-    store.set_store(info);
-}
-
-#[html_fn("set_image_file")]
-pub fn set_image_file(
+#[html_fn("set_info_date_range")]
+pub fn set_info_date_range(
     In(event): In<HtmlChange>,
     mut store: ResMut<UiBindingStore>,
     inputs: Query<&InputValue>,
@@ -276,40 +216,12 @@ pub fn set_image_file(
         return;
     };
 
-    let mut info = store.get_store::<Info>().cloned().unwrap_or_default();
-    info.image_file = input_value.0.clone();
-    store.set_store(info);
-}
-
-#[html_fn("set_info_date")]
-pub fn set_info_date(
-    In(event): In<HtmlChange>,
-    mut store: ResMut<UiBindingStore>,
-    inputs: Query<&InputField>,
-) {
-    let Ok(input) = inputs.get(event.entity) else {
-        return;
-    };
-
-    let mut info = store.get_store::<Info>().cloned().unwrap_or_default();
-    info.date = input.text.clone();
-    store.set_store(info);
-}
-
-#[html_fn("set_info_date_range")]
-pub fn set_info_date_range(
-    In(event): In<HtmlChange>,
-    mut store: ResMut<UiBindingStore>,
-    inputs: Query<&InputField>,
-) {
-    let Ok(input) = inputs.get(event.entity) else {
-        return;
-    };
-
-    let mut info = store.get_store::<Info>().cloned().unwrap_or_default();
-    info.date_range = input.text.clone();
-    info.dates_in_range = filter_dates_by_range(&info.dates, &info.date_range);
-    store.set_store(info);
+    let dates =
+        json_string_vec(store.json_path("info.dates")).unwrap_or_else(|| Info::default().dates);
+    let date_range = input_value.0.clone();
+    let dates_in_range = filter_dates_by_range(&dates, &date_range);
+    store.set_path_json("info.date_range", json!(date_range));
+    store.set_path_json("info.dates_in_range", json!(dates_in_range));
 }
 
 #[html_fn("set_data_pack_selection")]
@@ -381,6 +293,22 @@ pub fn set_data_state(
 
     store.set_store(next_state);
     store.set_store(data_pack);
+}
+
+fn json_string_vec(value: Option<JsonValue>) -> Option<Vec<String>> {
+    let JsonValue::Array(values) = value? else {
+        return None;
+    };
+
+    values
+        .into_iter()
+        .map(|value| match value {
+            JsonValue::String(value) => Some(value),
+            JsonValue::Number(value) => Some(value.to_string()),
+            JsonValue::Bool(value) => Some(value.to_string()),
+            _ => None,
+        })
+        .collect()
 }
 
 fn filter_dates_by_range(dates: &[String], range: &str) -> Vec<String> {

@@ -1,8 +1,12 @@
 mod bindings;
 pub mod builder;
 pub mod converter;
+pub mod inline_functions;
 pub mod reload;
 
+pub use inline_functions::{
+    HtmlInlineAction, HtmlInlineEventBindings, HtmlInlineFunction, parse_html_inline_action,
+};
 pub use inventory;
 
 #[cfg(feature = "extended-framework")]
@@ -819,6 +823,8 @@ pub struct HtmlEventBindings {
     pub ontouchstart: Option<String>,
     pub ontouchmove: Option<String>,
     pub ontouchend: Option<String>,
+    #[reflect(ignore)]
+    pub inline: HtmlInlineEventBindings,
 }
 
 /// Click event sent from HTML widgets.

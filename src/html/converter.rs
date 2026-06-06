@@ -21,8 +21,9 @@ use crate::dialog::{DialogProvider, DialogWidget, DialogWidgetType};
 #[cfg(feature = "extended-framework")]
 use crate::framework::{ExtendedFrameworkConfiguration, compile_framework_template_with_router};
 use crate::html::{
-    HtmlDirty, HtmlEventBindings, HtmlID, HtmlInnerContent, HtmlMeta, HtmlPendingReveal,
-    HtmlSource, HtmlStates, HtmlStructureMap, HtmlStyle, HtmlSystemSet, HtmlWidgetNode,
+    HtmlDirty, HtmlEventBindings, HtmlID, HtmlInlineEventBindings, HtmlInnerContent, HtmlMeta,
+    HtmlPendingReveal, HtmlSource, HtmlStates, HtmlStructureMap, HtmlStyle, HtmlSystemSet,
+    HtmlWidgetNode, parse_html_inline_action,
 };
 use crate::io::{CssAsset, DefaultCssHandle, HtmlAsset};
 use crate::lang::{
@@ -1572,6 +1573,32 @@ fn parse_html_node(
 
 /// Extracts HTML event bindings from element attributes.
 fn bind_html_func(attributes: &Attributes) -> HtmlEventBindings {
+    let inline = HtmlInlineEventBindings {
+        onclick: parse_inline_attribute(attributes, "onclick"),
+        onmousedown: parse_inline_attribute(attributes, "onmousedown"),
+        onmouseup: parse_inline_attribute(attributes, "onmouseup"),
+        onmouseover: parse_inline_attribute(attributes, "onmouseover")
+            .or_else(|| parse_inline_attribute(attributes, "onmouseenter")),
+        onmouseout: parse_inline_attribute(attributes, "onmouseout")
+            .or_else(|| parse_inline_attribute(attributes, "onmouseleave")),
+        onchange: parse_inline_attribute(attributes, "onchange"),
+        oninit: parse_inline_attribute(attributes, "oninit"),
+        onfoucs: parse_inline_attribute(attributes, "onfoucs")
+            .or_else(|| parse_inline_attribute(attributes, "onfocus")),
+        onscroll: parse_inline_attribute(attributes, "onscroll"),
+        onwheel: parse_inline_attribute(attributes, "onwheel")
+            .or_else(|| parse_inline_attribute(attributes, "onmousewheel")),
+        onkeydown: parse_inline_attribute(attributes, "onkeydown"),
+        onkeyup: parse_inline_attribute(attributes, "onkeyup"),
+        ondragstart: parse_inline_attribute(attributes, "ondragstart"),
+        ondrag: parse_inline_attribute(attributes, "ondrag"),
+        ondragstop: parse_inline_attribute(attributes, "ondragstop")
+            .or_else(|| parse_inline_attribute(attributes, "ondragend")),
+        ontouchstart: parse_inline_attribute(attributes, "ontouchstart"),
+        ontouchmove: parse_inline_attribute(attributes, "ontouchmove"),
+        ontouchend: parse_inline_attribute(attributes, "ontouchend"),
+    };
+
     HtmlEventBindings {
         onclick: attributes.get("onclick").map(|s| s.to_string()),
         onmousedown: attributes.get("onmousedown").map(|s| s.to_string()),
@@ -1606,6 +1633,26 @@ fn bind_html_func(attributes: &Attributes) -> HtmlEventBindings {
         ontouchstart: attributes.get("ontouchstart").map(|s| s.to_string()),
         ontouchmove: attributes.get("ontouchmove").map(|s| s.to_string()),
         ontouchend: attributes.get("ontouchend").map(|s| s.to_string()),
+        inline,
+    }
+}
+
+fn parse_inline_attribute(
+    attributes: &Attributes,
+    key: &str,
+) -> Option<crate::html::HtmlInlineAction> {
+    let raw = attributes.get(key)?;
+    let raw = raw.trim();
+    if !raw.starts_with('$') {
+        return None;
+    }
+
+    match parse_html_inline_action(raw) {
+        Ok(action) => Some(action),
+        Err(err) => {
+            warn!("Invalid inline HTML function in attribute '{key}': {err}");
+            None
+        }
     }
 }
 
@@ -3775,7 +3822,7 @@ pub fn extract_inner_bindings(content: &str) -> Vec<String> {
 /// `internal-value-type` attribute hint.
 ///
 /// # Primitive types (parsed directly from the string)
-/// `bool`, `i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64`, `f32`, `f64`, `string` / `str`
+/// `bool`, `i8`..`i128`, `isize`, `u8`..`u128`, `usize`, `f32`, `f64`, `string` / `str`
 ///
 /// # Structured types (deserialized via Bevy reflection)
 /// Any other type name — looked up in the Bevy `TypeRegistry` by short path (e.g. `"MyStruct"`)
@@ -3805,10 +3852,14 @@ fn parse_option_internal_value(
         "i16" => WidgetValue::new(value.trim().parse::<i16>().unwrap_or(0)),
         "i32" => WidgetValue::new(value.trim().parse::<i32>().unwrap_or(0)),
         "i64" => WidgetValue::new(value.trim().parse::<i64>().unwrap_or(0)),
+        "i128" => WidgetValue::new(value.trim().parse::<i128>().unwrap_or(0)),
+        "isize" => WidgetValue::new(value.trim().parse::<isize>().unwrap_or(0)),
         "u8" => WidgetValue::new(value.trim().parse::<u8>().unwrap_or(0)),
         "u16" => WidgetValue::new(value.trim().parse::<u16>().unwrap_or(0)),
         "u32" => WidgetValue::new(value.trim().parse::<u32>().unwrap_or(0)),
         "u64" => WidgetValue::new(value.trim().parse::<u64>().unwrap_or(0)),
+        "u128" => WidgetValue::new(value.trim().parse::<u128>().unwrap_or(0)),
+        "usize" => WidgetValue::new(value.trim().parse::<usize>().unwrap_or(0)),
         "f32" => WidgetValue::new(value.trim().parse::<f32>().unwrap_or(0.0)),
         "f64" => WidgetValue::new(value.trim().parse::<f64>().unwrap_or(0.0)),
         "" | "string" | "str" => WidgetValue::new(value.to_string()),
