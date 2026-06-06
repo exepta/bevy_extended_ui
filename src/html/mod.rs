@@ -110,6 +110,10 @@ pub struct HtmlChangeEvent;
 #[derive(Resource, Default)]
 pub struct HtmlDirty(pub bool, pub HashSet<String>);
 
+/// Tracks HTML keys that must stay hidden until CSS and styles are ready.
+#[derive(Resource, Default)]
+pub struct HtmlPendingReveal(pub HashSet<String>);
+
 /// Component storing parsed inline CSS (`style="..."`) as your custom Style struct.
 /// Component storing parsed inline CSS (`style="..."`) as a `Style`.
 #[derive(Component, Reflect, Debug, Clone)]
@@ -1016,6 +1020,7 @@ impl Plugin for ExtendedUiHtmlPlugin {
         app.init_resource::<HtmlStructureMap>();
         app.init_resource::<HtmlFunctionRegistry>();
         app.init_resource::<HtmlDirty>();
+        app.init_resource::<HtmlPendingReveal>();
         app.init_resource::<HtmlInitDelay>();
         app.init_resource::<UILang>();
         app.init_resource::<UiLangState>();

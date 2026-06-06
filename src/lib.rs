@@ -10,6 +10,7 @@ use crate::io::ExtendedIoPlugin;
 use crate::old::registry::ExtendedRegistryPlugin;
 #[cfg(feature = "providers")]
 use crate::providers::ExtendedUiProviderPlugin;
+use crate::routing::ExtendedRoutingPlugin;
 use crate::services::ExtendedServicePlugin;
 use crate::styles::ExtendedStylingPlugin;
 use crate::widgets::ExtendedWidgetPlugin;
@@ -32,6 +33,7 @@ pub mod old;
 pub mod providers;
 #[deprecated(note = "Legacy module moved to `old::registry`. Use the new component framework.")]
 pub mod registry;
+pub mod routing;
 pub mod services;
 pub mod styles;
 pub mod utils;
@@ -147,6 +149,7 @@ impl Plugin for ExtendedUiPlugin {
         #[cfg(feature = "extended-framework")]
         app.add_plugins(ExtendedComponentPlugin);
         app.add_plugins((
+            ExtendedRoutingPlugin,
             ExtendedWidgetPlugin,
             ExtendedServicePlugin,
             ExtendedStylingPlugin,

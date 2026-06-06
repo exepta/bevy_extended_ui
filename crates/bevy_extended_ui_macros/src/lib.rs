@@ -286,6 +286,25 @@ pub fn beu_registry(_attr: TokenStream, item: TokenStream) -> TokenStream {
     item
 }
 
+/// Registers a `beu.routes.rs` route table entry for the extended framework router.
+#[proc_macro_attribute]
+pub fn beu_routes(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let input_fn = parse_macro_input!(item as ItemFn);
+    let fn_ident = input_fn.sig.ident.clone();
+
+    quote! {
+        #input_fn
+
+        bevy_extended_ui::routing::inventory::submit! {
+            bevy_extended_ui::routing::RoutesRegistration {
+                name: concat!(module_path!(), "::", stringify!(#fn_ident)),
+                build: #fn_ident,
+            }
+        }
+    }
+    .into()
+}
+
 /// Derives a reactive UI binding store registration for a struct or enum.
 #[proc_macro_derive(BeuStore)]
 pub fn derive_beu_store(item: TokenStream) -> TokenStream {

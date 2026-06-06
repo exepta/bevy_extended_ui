@@ -1,10 +1,13 @@
 use bevy::prelude::*;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::html::{
     HtmlAllWidgetsSpawned, HtmlAllWidgetsVisible, HtmlDirty, HtmlEventBindings, HtmlID, HtmlMeta,
-    HtmlStates, HtmlStructureMap, HtmlSystemSet, HtmlWidgetNode, NeedHidden, ShowWidgetsTimer,
+    HtmlPendingReveal, HtmlStates, HtmlStructureMap, HtmlSystemSet, HtmlWidgetNode, NeedHidden,
+    ShowWidgetsTimer,
 };
+use crate::io::CssAsset;
+use crate::styles::components::UiStyle;
 use crate::styles::{CssClass, CssID, CssSource};
 use crate::widgets::body::BodyContentRoot;
 use crate::widgets::div::DivContentRoot;
@@ -47,6 +50,7 @@ pub fn build_html_source(
     mut commands: Commands,
     structure_map: Res<HtmlStructureMap>,
     mut html_dirty: ResMut<HtmlDirty>,
+    mut pending_reveal: Option<ResMut<HtmlPendingReveal>>,
     asset_server: Res<AssetServer>,
     mut event_writer: MessageWriter<HtmlAllWidgetsSpawned>,
     body_query: Query<(Entity, &Body, Option<&HtmlID>)>,
@@ -87,6 +91,9 @@ pub fn build_html_source(
     }
 
     for active in &rebuild_keys {
+        let rebuild_hidden = pending_reveal
+            .as_mut()
+            .is_some_and(|pending_reveal| pending_reveal.0.remove(active));
         let mut matching_entities = Vec::new();
         let mut existing_live_root = None;
 
@@ -106,6 +113,7 @@ pub fn build_html_source(
                 &mut commands,
                 root,
                 active,
+                rebuild_hidden,
                 &structure_map,
                 &asset_server,
                 &children_query,
@@ -114,6 +122,9 @@ pub fn build_html_source(
                 &body_content_root_query,
                 &div_content_root_query,
             );
+            if rebuild_hidden {
+                event_writer.write(HtmlAllWidgetsSpawned);
+            }
             continue;
         }
 
@@ -153,6 +164,7 @@ fn rebuild_structure_children_for_active(
     commands: &mut Commands,
     root: Entity,
     active: &str,
+    start_hidden: bool,
     structure_map: &Res<HtmlStructureMap>,
     asset_server: &Res<AssetServer>,
     children_query: &Query<&Children>,
@@ -183,6 +195,7 @@ fn rebuild_structure_children_for_active(
         commands,
         content_parent,
         new_children,
+        start_hidden,
         asset_server,
         children_query,
         html_id_query,
@@ -196,6 +209,7 @@ fn reconcile_node_children(
     commands: &mut Commands,
     parent: Entity,
     new_nodes: &Vec<HtmlWidgetNode>,
+    start_hidden: bool,
     asset_server: &AssetServer,
     children_query: &Query<&Children>,
     html_id_query: &Query<&HtmlID>,
@@ -222,10 +236,11 @@ fn reconcile_node_children(
         Vec::with_capacity(new_nodes.len() + existing_without_id.len());
 
     for new_node in new_nodes {
+        let node_start_hidden = start_hidden;
         let node_id = get_node_id(new_node).0;
         let relocated_node = is_relocated_widget_node(new_node);
         if let Some(existing_entity) = existing_by_id.remove(&node_id) {
-            update_existing_widget_node(commands, existing_entity, new_node, false);
+            update_existing_widget_node(commands, existing_entity, new_node, node_start_hidden);
 
             if let Some(children) = get_node_children(new_node) {
                 let nested_parent = resolve_content_parent(
@@ -237,6 +252,7 @@ fn reconcile_node_children(
                     commands,
                     nested_parent,
                     children,
+                    node_start_hidden,
                     asset_server,
                     children_query,
                     html_id_query,
@@ -249,10 +265,11 @@ fn reconcile_node_children(
             final_children.push(existing_entity);
         } else if relocated_node {
             if let Some(existing_entity) = find_entity_by_html_id(html_id_entity_query, node_id) {
-                update_existing_widget_node(commands, existing_entity, new_node, false);
+                update_existing_widget_node(commands, existing_entity, new_node, node_start_hidden);
                 update_relocated_node_descendants(
                     commands,
                     new_node,
+                    node_start_hidden,
                     asset_server,
                     children_query,
                     html_id_query,
@@ -263,10 +280,22 @@ fn reconcile_node_children(
                 continue;
             }
 
-            let spawned = spawn_widget_node(commands, new_node, asset_server, Some(parent), false);
+            let spawned = spawn_widget_node(
+                commands,
+                new_node,
+                asset_server,
+                Some(parent),
+                node_start_hidden,
+            );
             final_children.push(spawned);
         } else {
-            let spawned = spawn_widget_node(commands, new_node, asset_server, Some(parent), false);
+            let spawned = spawn_widget_node(
+                commands,
+                new_node,
+                asset_server,
+                Some(parent),
+                node_start_hidden,
+            );
             final_children.push(spawned);
         }
     }
@@ -293,6 +322,7 @@ fn find_entity_by_html_id(
 fn update_relocated_node_descendants(
     commands: &mut Commands,
     node: &HtmlWidgetNode,
+    start_hidden: bool,
     asset_server: &AssetServer,
     children_query: &Query<&Children>,
     html_id_query: &Query<&HtmlID>,
@@ -310,7 +340,7 @@ fn update_relocated_node_descendants(
             continue;
         };
 
-        update_existing_widget_node(commands, existing_child, child, false);
+        update_existing_widget_node(commands, existing_child, child, start_hidden);
 
         if get_node_children(child).is_some() {
             let nested_parent = resolve_content_parent(
@@ -322,6 +352,7 @@ fn update_relocated_node_descendants(
                 commands,
                 nested_parent,
                 get_node_children(child).unwrap(),
+                start_hidden,
                 asset_server,
                 children_query,
                 html_id_query,
@@ -757,6 +788,10 @@ fn update_with_meta<T: Component>(
         commands.entity(entity).remove::<crate::html::HtmlStyle>();
     }
 
+    if start_hidden {
+        commands.entity(entity).remove::<UiStyle>();
+    }
+
     if let Some(validation) = &meta.validation {
         commands.entity(entity).insert(validation.clone());
     } else {
@@ -953,6 +988,10 @@ fn update_meta_components(
         commands.entity(entity).remove::<crate::html::HtmlStyle>();
     }
 
+    if start_hidden {
+        commands.entity(entity).remove::<UiStyle>();
+    }
+
     if let Some(validation) = &meta.validation {
         commands.entity(entity).insert(validation.clone());
     } else {
@@ -1016,6 +1055,11 @@ fn show_all_widgets_finish(
     time: Res<Time>,
     mut timer: ResMut<ShowWidgetsTimer>,
     mut query: Query<(&mut Visibility, &HtmlID), (With<Widget>, Without<NeedHidden>)>,
+    style_query: Query<
+        (&HtmlID, Option<&CssSource>, Option<&UiStyle>),
+        (With<Widget>, Without<NeedHidden>),
+    >,
+    css_assets: Option<Res<Assets<CssAsset>>>,
     current_body: Query<&Body>,
     structure_map: Res<HtmlStructureMap>,
     mut event_writer: MessageWriter<HtmlAllWidgetsVisible>,
@@ -1034,6 +1078,13 @@ fn show_all_widgets_finish(
 
         if valid_ids.is_empty() {
             return;
+        }
+        let valid_id_set = valid_ids.iter().map(|id| id.0).collect::<HashSet<_>>();
+
+        if let Some(css_assets) = css_assets.as_deref() {
+            if !widgets_ready_for_reveal(&valid_id_set, &style_query, css_assets) {
+                return;
+            }
         }
 
         for body in current_body.iter() {
@@ -1056,6 +1107,44 @@ fn show_all_widgets_finish(
             }
         }
     }
+}
+
+fn widgets_ready_for_reveal(
+    valid_ids: &HashSet<usize>,
+    style_query: &Query<
+        (&HtmlID, Option<&CssSource>, Option<&UiStyle>),
+        (With<Widget>, Without<NeedHidden>),
+    >,
+    css_assets: &Assets<CssAsset>,
+) -> bool {
+    let mut checked_any = false;
+
+    for (html_id, css_source, ui_style) in style_query.iter() {
+        if !valid_ids.contains(&html_id.0) {
+            continue;
+        }
+
+        checked_any = true;
+
+        if let Some(css_source) = css_source {
+            let all_css_loaded = css_source
+                .0
+                .iter()
+                .all(|handle| css_assets.get(handle).is_some());
+            if !all_css_loaded {
+                return false;
+            }
+        }
+
+        let Some(ui_style) = ui_style else {
+            return false;
+        };
+        if ui_style.active_style.is_none() {
+            return false;
+        }
+    }
+
+    checked_any
 }
 
 /// Collects all HTML IDs from a node tree.
@@ -1130,7 +1219,14 @@ fn spawn_widget_node(
                 start_hidden,
             );
             for child in children {
-                spawn_widget_node(commands, child, asset_server, Some(entity), start_hidden);
+                let child_start_hidden = start_hidden;
+                spawn_widget_node(
+                    commands,
+                    child,
+                    asset_server,
+                    Some(entity),
+                    child_start_hidden,
+                );
             }
             entity
         }
@@ -1202,7 +1298,14 @@ fn spawn_widget_node(
                 start_hidden,
             );
             for child in children {
-                spawn_widget_node(commands, child, asset_server, Some(entity), start_hidden);
+                let child_start_hidden = start_hidden;
+                spawn_widget_node(
+                    commands,
+                    child,
+                    asset_server,
+                    Some(entity),
+                    child_start_hidden,
+                );
             }
             entity
         }
@@ -1218,7 +1321,14 @@ fn spawn_widget_node(
                 start_hidden,
             );
             for child in children {
-                spawn_widget_node(commands, child, asset_server, Some(entity), start_hidden);
+                let child_start_hidden = start_hidden;
+                spawn_widget_node(
+                    commands,
+                    child,
+                    asset_server,
+                    Some(entity),
+                    child_start_hidden,
+                );
             }
             entity
         }
@@ -1236,7 +1346,14 @@ fn spawn_widget_node(
             );
             commands.entity(entity).insert(NeedHidden);
             for child in children {
-                spawn_widget_node(commands, child, asset_server, Some(entity), start_hidden);
+                let child_start_hidden = start_hidden;
+                spawn_widget_node(
+                    commands,
+                    child,
+                    asset_server,
+                    Some(entity),
+                    child_start_hidden,
+                );
             }
             entity
         }
@@ -1262,7 +1379,14 @@ fn spawn_widget_node(
                 start_hidden,
             );
             for child in children {
-                spawn_widget_node(commands, child, asset_server, Some(entity), start_hidden);
+                let child_start_hidden = start_hidden;
+                spawn_widget_node(
+                    commands,
+                    child,
+                    asset_server,
+                    Some(entity),
+                    child_start_hidden,
+                );
             }
             entity
         }

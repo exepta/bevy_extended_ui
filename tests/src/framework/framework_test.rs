@@ -4,6 +4,7 @@ mod unit_tests {
     use bevy::prelude::{App, MinimalPlugins};
     use bevy_extended_ui::BeuStore;
     use bevy_extended_ui::lang::{UiSharedValues, refresh_shared_values};
+    use bevy_extended_ui::routing::{Router, Routes};
     use serde::Serialize;
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -27,6 +28,49 @@ mod unit_tests {
             fs::create_dir_all(parent).expect("mkdir parent");
         }
         fs::write(path, content).expect("write");
+    }
+
+    fn write_route_component(
+        asset_root: &Path,
+        rust_root: &Path,
+        name: &str,
+        tag: &str,
+        html: &str,
+    ) {
+        write_file(
+            &rust_root.join(format!("{name}.component.rs")),
+            &format!(
+                r#"
+                #[bevy_extended_ui_macros::ui_component]
+                const COMPONENT: Component = Component {{
+                    template_name: "{tag}",
+                    template_file: "{name}.component.html",
+                    styles: ["{name}.component.css"],
+                }};
+                "#
+            ),
+        );
+        write_file(
+            &asset_root
+                .join("components")
+                .join(format!("{name}.component.html")),
+            html,
+        );
+        write_file(
+            &asset_root
+                .join("components")
+                .join(format!("{name}.component.css")),
+            "div { color: white; }",
+        );
+    }
+
+    fn route_test_config(asset_root: &Path, rust_root: &Path) -> ExtendedFrameworkConfiguration {
+        ExtendedFrameworkConfiguration {
+            assets_component_root: "components".to_string(),
+            rust_component_root: rust_root.to_string_lossy().to_string(),
+            asset_root_fs_path: asset_root.to_string_lossy().to_string(),
+            index_html_file: "index.html".to_string(),
+        }
     }
 
     #[test]
@@ -112,6 +156,364 @@ mod unit_tests {
                     .to_string_lossy()
                     .to_string()
             ]
+        );
+
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn compile_framework_template_resolves_router_outlet_to_active_route_component() {
+        let base = unique_temp_dir("router_outlet");
+        let asset_root = base.join("assets");
+        let rust_root = base.join("src/packages");
+
+        write_file(
+            &rust_root.join("help.component.rs"),
+            r#"
+            #[bevy_extended_ui_macros::ui_component]
+            const HELP: Component = Component {
+                template_name: "app-help",
+                template_file: "help.component.html",
+                styles: ["help.component.css"],
+            };
+            "#,
+        );
+        write_file(
+            &asset_root.join("components/help.component.html"),
+            "<section>Help route</section>",
+        );
+        write_file(
+            &asset_root.join("components/help.component.css"),
+            "section { color: white; }",
+        );
+
+        let cfg = ExtendedFrameworkConfiguration {
+            assets_component_root: "components".to_string(),
+            rust_component_root: rust_root.to_string_lossy().to_string(),
+            asset_root_fs_path: asset_root.to_string_lossy().to_string(),
+            index_html_file: "index.html".to_string(),
+        };
+
+        let mut router = Router::default();
+        router.configure(Routes::new().route("/help", "app-help"));
+        router.navigate("/help");
+
+        let result = compile_framework_template_with_router(
+            "<html><head></head><body><router-outlet></router-outlet></body></html>",
+            "index.html",
+            &cfg,
+            Some(&router),
+        );
+
+        assert!(result.html.contains("Help route"));
+        assert!(!result.html.contains("router-outlet"));
+        assert_eq!(
+            result.component_controllers,
+            vec![
+                rust_root
+                    .join("help.component.rs")
+                    .to_string_lossy()
+                    .to_string()
+            ]
+        );
+
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn compile_framework_template_resolves_self_closing_router_outlet() {
+        let base = unique_temp_dir("router_outlet_self_closing");
+        let asset_root = base.join("assets");
+        let rust_root = base.join("src/packages");
+        write_route_component(
+            &asset_root,
+            &rust_root,
+            "main",
+            "app-main",
+            "<div>Home route</div>",
+        );
+
+        let cfg = route_test_config(&asset_root, &rust_root);
+        let router = {
+            let mut router = Router::default();
+            router.configure(Routes::new().route("/", "app-main"));
+            router
+        };
+
+        let result = compile_framework_template_with_router(
+            "<html><head></head><body><router-outlet /></body></html>",
+            "index.html",
+            &cfg,
+            Some(&router),
+        );
+
+        assert!(result.html.contains("Home route"));
+        assert!(!result.html.contains("router-outlet"));
+
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn compile_framework_template_skips_router_work_without_outlet() {
+        let base = unique_temp_dir("router_no_outlet");
+        let asset_root = base.join("assets");
+        let rust_root = base.join("src/packages");
+        write_route_component(
+            &asset_root,
+            &rust_root,
+            "main",
+            "app-main",
+            "<div>Home route</div>",
+        );
+
+        let cfg = route_test_config(&asset_root, &rust_root);
+        let mut router = Router::default();
+        router.configure(Routes::new().route("/", "app-main"));
+
+        let result = compile_framework_template_with_router(
+            "<html><head></head><body><app-main></app-main></body></html>",
+            "index.html",
+            &cfg,
+            Some(&router),
+        );
+
+        assert!(result.html.contains("Home route"));
+        assert!(!result.html.contains("beu-route"));
+        assert!(!result.html.contains("router-outlet"));
+
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn compile_framework_template_keeps_active_load_route_visible() {
+        let base = unique_temp_dir("router_keep_alive_active");
+        let asset_root = base.join("assets");
+        let rust_root = base.join("src/packages");
+        write_route_component(
+            &asset_root,
+            &rust_root,
+            "main",
+            "app-main",
+            "<div>Home route</div>",
+        );
+
+        let cfg = route_test_config(&asset_root, &rust_root);
+        let mut router = Router::default();
+        router.configure(Routes::new().route("/", bevy_extended_ui::load!("app-main")));
+
+        let result = compile_framework_template_with_router(
+            "<html><head></head><body><router-outlet></router-outlet></body></html>",
+            "index.html",
+            &cfg,
+            Some(&router),
+        );
+
+        assert!(result.html.contains("Home route"));
+        assert!(result.html.contains("beu-route-active"));
+        assert!(!result.html.contains("beu-route-cached"));
+
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn compile_framework_template_keeps_load_routes_in_router_outlet() {
+        let base = unique_temp_dir("router_keep_alive");
+        let asset_root = base.join("assets");
+        let rust_root = base.join("src/packages");
+
+        for (name, tag, content) in [
+            ("main", "app-main", "Home route"),
+            ("help", "app-help", "Help route"),
+        ] {
+            write_file(
+                &rust_root.join(format!("{name}.component.rs")),
+                &format!(
+                    r#"
+                    #[bevy_extended_ui_macros::ui_component]
+                    const COMPONENT: Component = Component {{
+                        template_name: "{tag}",
+                        template_file: "{name}.component.html",
+                        styles: ["{name}.component.css"],
+                    }};
+                    "#
+                ),
+            );
+            write_file(
+                &asset_root
+                    .join("components")
+                    .join(format!("{name}.component.html")),
+                &format!("<div>{content}</div>"),
+            );
+            write_file(
+                &asset_root
+                    .join("components")
+                    .join(format!("{name}.component.css")),
+                "div { color: white; }",
+            );
+        }
+
+        let cfg = ExtendedFrameworkConfiguration {
+            assets_component_root: "components".to_string(),
+            rust_component_root: rust_root.to_string_lossy().to_string(),
+            asset_root_fs_path: asset_root.to_string_lossy().to_string(),
+            index_html_file: "index.html".to_string(),
+        };
+
+        let mut router = Router::default();
+        router.configure(
+            Routes::new()
+                .route("/", bevy_extended_ui::load!("app-main"))
+                .route("/help", "app-help"),
+        );
+        router.navigate("/help");
+
+        let result = compile_framework_template_with_router(
+            "<html><head></head><body><router-outlet></router-outlet></body></html>",
+            "index.html",
+            &cfg,
+            Some(&router),
+        );
+
+        assert!(result.html.contains("Home route"));
+        assert!(result.html.contains("Help route"));
+        assert!(result.html.contains("beu-route-cached"));
+        assert!(result.html.contains("display: none"));
+        assert!(result.html.contains("beu-route-active"));
+        assert_eq!(result.component_controllers.len(), 2);
+
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn compile_framework_template_panics_for_missing_active_route_component() {
+        let base = unique_temp_dir("router_missing_active");
+        let asset_root = base.join("assets");
+        let rust_root = base.join("src/packages");
+        write_route_component(
+            &asset_root,
+            &rust_root,
+            "main",
+            "app-main",
+            "<div>Home route</div>",
+        );
+
+        let cfg = route_test_config(&asset_root, &rust_root);
+        let mut router = Router::default();
+        router.configure(Routes::new().route("/", "app-missing"));
+
+        let result = std::panic::catch_unwind(|| {
+            compile_framework_template_with_router(
+                "<html><head></head><body><router-outlet></router-outlet></body></html>",
+                "index.html",
+                &cfg,
+                Some(&router),
+            );
+        });
+
+        assert!(result.is_err());
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn compile_framework_template_panics_for_missing_keep_alive_component() {
+        let base = unique_temp_dir("router_missing_keep_alive");
+        let asset_root = base.join("assets");
+        let rust_root = base.join("src/packages");
+        write_route_component(
+            &asset_root,
+            &rust_root,
+            "help",
+            "app-help",
+            "<div>Help route</div>",
+        );
+
+        let cfg = route_test_config(&asset_root, &rust_root);
+        let mut router = Router::default();
+        router.configure(
+            Routes::new()
+                .route("/", bevy_extended_ui::load!("app-missing"))
+                .route("/help", "app-help"),
+        );
+        router.navigate("/help");
+
+        let result = std::panic::catch_unwind(|| {
+            compile_framework_template_with_router(
+                "<html><head></head><body><router-outlet></router-outlet></body></html>",
+                "index.html",
+                &cfg,
+                Some(&router),
+            );
+        });
+
+        assert!(result.is_err());
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn compile_framework_template_preloads_all_route_component_styles() {
+        let base = unique_temp_dir("router_style_preload");
+        let asset_root = base.join("assets");
+        let rust_root = base.join("src/packages");
+
+        for (name, tag) in [("main", "app-main"), ("help", "app-help")] {
+            write_file(
+                &rust_root.join(format!("{name}.component.rs")),
+                &format!(
+                    r#"
+                    #[bevy_extended_ui_macros::ui_component]
+                    const COMPONENT: Component = Component {{
+                        template_name: "{tag}",
+                        template_file: "{name}.component.html",
+                        styles: ["{name}.component.css"],
+                    }};
+                    "#
+                ),
+            );
+            write_file(
+                &asset_root
+                    .join("components")
+                    .join(format!("{name}.component.html")),
+                &format!("<section>{name}</section>"),
+            );
+            write_file(
+                &asset_root
+                    .join("components")
+                    .join(format!("{name}.component.css")),
+                "section { color: white; }",
+            );
+        }
+
+        let cfg = ExtendedFrameworkConfiguration {
+            assets_component_root: "components".to_string(),
+            rust_component_root: rust_root.to_string_lossy().to_string(),
+            asset_root_fs_path: asset_root.to_string_lossy().to_string(),
+            index_html_file: "index.html".to_string(),
+        };
+
+        let mut router = Router::default();
+        router.configure(
+            Routes::new()
+                .route("/", "app-main")
+                .route("/help", "app-help")
+                .fallback("app-main"),
+        );
+
+        let result = compile_framework_template_with_router(
+            "<html><head></head><body><router-outlet></router-outlet></body></html>",
+            "index.html",
+            &cfg,
+            Some(&router),
+        );
+
+        assert!(
+            result
+                .html
+                .contains("href=\"components/main.component.css\"")
+        );
+        assert!(
+            result
+                .html
+                .contains("href=\"components/help.component.css\"")
         );
 
         let _ = fs::remove_dir_all(&base);
