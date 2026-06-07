@@ -75,6 +75,85 @@ fn spawn_list_widget(mut commands: Commands) {
 }
 ```
 
+### Multi List
+
+Nutze `multiselect`, wenn mehrere Eintraege gleichzeitig aktiv bleiben duerfen.
+In Rust enthaelt `ListBox::values` alle aktuell ausgewaehlten `ChoiceOption`-Eintraege.
+
+<iframe
+  id="listbox-multi"
+  title="Multi List"
+  src="{base.url}/examples/base"
+  width="100%"
+  height="420"
+  loading="lazy">
+</iframe>
+
+#### Html Example
+
+```html
+<listbox id="music-tags" multiselect onchange="log_listbox_multi">
+  <option value="rock" selected>Rock</option>
+  <option value="jazz" selected>Jazz</option>
+  <option value="pop">Pop</option>
+  <option value="electro">Electro</option>
+  <option value="blues">Blues</option>
+</listbox>
+```
+
+#### Rust Example
+
+```rust
+use bevy::prelude::*;
+use bevy_extended_ui::html::HtmlChange;
+use bevy_extended_ui::widgets::{ChoiceOption, ListBox};
+use bevy_extended_ui_macros::html_fn;
+
+fn spawn_multi_list_widget(mut commands: Commands) {
+    let rock = ChoiceOption::new("Rock").with_value(String::from("rock"));
+    let jazz = ChoiceOption::new("Jazz").with_value(String::from("jazz"));
+    let pop = ChoiceOption::new("Pop").with_value(String::from("pop"));
+    let electro = ChoiceOption::new("Electro").with_value(String::from("electro"));
+    let blues = ChoiceOption::new("Blues").with_value(String::from("blues"));
+
+    commands.spawn((
+        ListBox {
+            options: vec![
+                rock.clone(),
+                jazz.clone(),
+                pop,
+                electro,
+                blues,
+            ],
+            values: vec![rock, jazz],
+            multiselect: true,
+            ..default()
+        },
+        Node::default(),
+    ));
+}
+
+#[html_fn("log_listbox_multi")]
+fn log_listbox_multi(In(event): In<HtmlChange>, list_q: Query<&ListBox>) {
+    let Ok(list) = list_q.get(event.entity) else {
+        return;
+    };
+
+    let values: Vec<String> = list
+        .values
+        .iter()
+        .map(|option| {
+            option
+                .value_as_str()
+                .map(ToOwned::to_owned)
+                .unwrap_or_else(|| option.text.clone())
+        })
+        .collect();
+
+    info!("selected list values: {:?}", values);
+}
+```
+
 ### Ersteller vom Widget
 
 <div style="display: flex; align-items: center; justify-content: flex-start; padding: 15px; border: 1px solid #5658db; border-radius: 10px; gap: 15px; width: 300px;">
