@@ -8,9 +8,9 @@ mod tests {
     #[cfg(not(feature = "extended-framework"))]
     use crate::old::registry::{ExtendedRegistryPlugin, UiInitResource, UiRegistry};
     use crate::utils::keycode_to_char;
+    use bevy::camera::Hdr;
     use bevy::camera::visibility::RenderLayers;
     use bevy::prelude::*;
-    use bevy::render::view::Hdr;
 
     #[cfg(not(feature = "extended-framework"))]
     fn source(controller: Option<&str>) -> HtmlSource {

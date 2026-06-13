@@ -8,6 +8,7 @@ mod tests {
     use bevy::asset::AssetPlugin;
     use bevy::prelude::AppTypeRegistry;
     use bevy::prelude::*;
+    use bevy::text::FontSize;
     use std::any::TypeId;
     use std::collections::{HashMap, HashSet};
 
@@ -85,10 +86,10 @@ mod tests {
     }
 
     #[test]
-    fn font_val_get_resolves_px_and_rem() {
-        assert_eq!(FontVal::Px(13.0).get(Some(16.0)), 13.0);
-        assert_eq!(FontVal::Rem(2.0).get(Some(12.0)), 24.0);
-        assert_eq!(FontVal::Rem(2.0).get(None), 2.0);
+    fn font_size_to_px_resolves_px_and_rem() {
+        assert_eq!(font_size_to_px(FontSize::Px(13.0), Some(16.0)), 13.0);
+        assert_eq!(font_size_to_px(FontSize::Rem(2.0), Some(12.0)), 24.0);
+        assert_eq!(font_size_to_px(FontSize::Rem(2.0), None), 2.0);
     }
 
     #[test]
@@ -436,7 +437,6 @@ mod tests {
             BackgroundAttachment::Scroll
         );
         assert_eq!(IconPlace::default(), IconPlace::Right);
-        assert_eq!(FontVal::default(), FontVal::Px(12.0));
         assert_eq!(TransitionTiming::default(), TransitionTiming::EaseInOut);
         assert_eq!(TransitionProperty::default(), TransitionProperty::All);
 

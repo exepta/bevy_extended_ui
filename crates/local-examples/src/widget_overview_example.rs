@@ -79,7 +79,9 @@ fn update_range_slider_debug(
         if id.0 != "range-slider-debug" {
             continue;
         }
-        paragraph.text = text.clone();
+        if paragraph.text != text {
+            paragraph.text = text.clone();
+        }
     }
 }
 

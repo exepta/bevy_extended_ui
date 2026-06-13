@@ -517,6 +517,54 @@ mod tests {
     }
 
     #[test]
+    fn converter_compiles_inline_shorthand_event_functions() {
+        let mut app = setup_converter_app();
+
+        add_html_source(
+            &mut app,
+            "examples/inline_shorthand.html",
+            r#"
+            <html>
+              <head><meta name="inline-key" /></head>
+              <body>
+                <button onclick="$add(info.value, 1)">Increase</button>
+                <input id="name" value="Ada" onchange="$set(player.name, $event.value)" />
+              </body>
+            </html>
+            "#,
+            "inline-key",
+            None,
+        );
+
+        app.update();
+
+        let structure_map = app.world().resource::<HtmlStructureMap>();
+        let nodes = structure_map
+            .html_map
+            .get("inline-key")
+            .expect("expected parsed html structure");
+        let mut all = Vec::new();
+        collect_nodes(nodes, &mut all);
+
+        let button_action = all.iter().find_map(|node| match node {
+            HtmlWidgetNode::Button(_, _, _, bindings, _, _) => bindings.inline.onclick.as_ref(),
+            _ => None,
+        });
+        let input_action = all.iter().find_map(|node| match node {
+            HtmlWidgetNode::Input(_, _, _, bindings, _, _) => bindings.inline.onchange.as_ref(),
+            _ => None,
+        });
+
+        let button_action = button_action.expect("button inline onclick");
+        assert_eq!(button_action.calls()[0].function, HtmlInlineFunction::Add);
+        assert_eq!(button_action.calls()[0].target.as_dotted(), "info.value");
+
+        let input_action = input_action.expect("input inline onchange");
+        assert_eq!(input_action.calls()[0].function, HtmlInlineFunction::Set);
+        assert_eq!(input_action.calls()[0].target.as_dotted(), "player.name");
+    }
+
+    #[test]
     fn converter_parses_complex_html_fixture() {
         let mut app = setup_converter_app();
 
@@ -686,6 +734,7 @@ mod tests {
             node,
             HtmlWidgetNode::ToolTip(tool_tip, _, _, _, _, _)
                 if tool_tip.for_id.as_deref() == Some("email")
+                    && tool_tip.text == "Tip text"
                     && tool_tip.variant == ToolTipVariant::Point
                     && tool_tip.prio == ToolTipPriority::Top
                     && tool_tip.alignment == ToolTipAlignment::Vertical
@@ -1534,15 +1583,18 @@ mod tests {
         #[cfg(feature = "extended-dialog")]
         {
             let mut dialog_still_hidden = false;
-            let mut query = app
-                .world_mut()
-                .query::<(&Visibility, Option<&NeedHidden>, &DialogWidget)>();
-            for (visibility, hidden_marker, _dialog) in query.iter(app.world()) {
+            let mut dialog_ignores_picking = false;
+            let mut query =
+                app.world_mut()
+                    .query::<(&Visibility, &Pickable, Option<&NeedHidden>, &DialogWidget)>();
+            for (visibility, pickable, hidden_marker, _dialog) in query.iter(app.world()) {
                 if hidden_marker.is_some() {
                     dialog_still_hidden = *visibility == Visibility::Hidden;
+                    dialog_ignores_picking = *pickable == Pickable::IGNORE;
                 }
             }
             assert!(dialog_still_hidden);
+            assert!(dialog_ignores_picking);
         }
     }
 

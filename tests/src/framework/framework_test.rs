@@ -3,7 +3,10 @@ mod unit_tests {
     use super::super::*;
     use bevy::prelude::{App, MinimalPlugins};
     use bevy_extended_ui::BeuStore;
-    use bevy_extended_ui::lang::{UiSharedValues, refresh_shared_values};
+    use bevy_extended_ui::html::converter::preprocess_template_directives_with_shared;
+    use bevy_extended_ui::lang::{
+        UiLangVariables, UiSharedValues, refresh_shared_values, serde_json::json,
+    };
     use bevy_extended_ui::routing::{Router, Routes};
     use serde::Serialize;
     use std::fs;
@@ -162,6 +165,47 @@ mod unit_tests {
     }
 
     #[test]
+    fn compile_framework_template_preserves_inline_dollar_functions() {
+        let base = unique_temp_dir("inline_dollar_functions");
+        let asset_root = base.join("assets");
+        let rust_root = base.join("src/packages");
+
+        write_route_component(
+            &asset_root,
+            &rust_root,
+            "main",
+            "app-main",
+            r#"<button onclick="$add(info.value, 1)">Increase</button>
+<input onchange="$set(player.name, $event.value)">"#,
+        );
+
+        let cfg = route_test_config(&asset_root, &rust_root);
+        let router = {
+            let mut router = Router::default();
+            router.configure(Routes::new().route("/", "app-main"));
+            router
+        };
+
+        let result = compile_framework_template_with_router(
+            "<html><head></head><body><router-outlet /></body></html>",
+            "index.html",
+            &cfg,
+            Some(&router),
+        );
+
+        assert!(result.html.contains(r#"onclick="$add(info.value, 1)""#));
+        assert!(
+            result
+                .html
+                .contains(r#"onchange="$set(player.name, $event.value)""#)
+        );
+        assert!(!result.html.contains(r#"onclick="(info.value, 1)""#));
+        assert!(!result.html.contains(r#"onchange="(player.name, .value)""#));
+
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
     fn compile_framework_template_resolves_router_outlet_to_active_route_component() {
         let base = unique_temp_dir("router_outlet");
         let asset_root = base.join("assets");
@@ -311,6 +355,58 @@ mod unit_tests {
         assert!(result.html.contains("Home route"));
         assert!(result.html.contains("beu-route-active"));
         assert!(!result.html.contains("beu-route-cached"));
+
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn compile_framework_template_keeps_component_use_directives_at_line_start() {
+        let base = unique_temp_dir("router_keep_alive_use_directive");
+        let asset_root = base.join("assets");
+        let rust_root = base.join("src/packages");
+        write_route_component(
+            &asset_root,
+            &rust_root,
+            "main",
+            "app-main",
+            r#"@use "crate::data_structs::*";
+<div>
+  <p>Selected DataState: {{ data_state }}</p>
+  <p>DataPack embedded state: {{ data_pack.state }}</p>
+</div>"#,
+        );
+
+        let cfg = route_test_config(&asset_root, &rust_root);
+        let mut router = Router::default();
+        router.configure(Routes::new().route("/", bevy_extended_ui::load!("app-main")));
+
+        let result = compile_framework_template_with_router(
+            "<html><head></head><body><router-outlet></router-outlet></body></html>",
+            "index.html",
+            &cfg,
+            Some(&router),
+        );
+
+        let mut shared = UiSharedValues::default();
+        shared.values.insert(
+            "bevy_extended_ui_tests::data_structs::DataPack".to_string(),
+            bevy_extended_ui::lang::serde_json::from_str(r#"{"state":"Inactive"}"#).unwrap(),
+        );
+        shared.values.insert(
+            "bevy_extended_ui_tests::data_structs::DataState".to_string(),
+            bevy_extended_ui::lang::serde_json::Value::String("Inactive".to_string()),
+        );
+
+        let rendered = preprocess_template_directives_with_shared(
+            &result.html,
+            &UiLangVariables::default(),
+            &shared,
+        );
+
+        assert!(rendered.contains("Selected DataState: Inactive"));
+        assert!(rendered.contains("DataPack embedded state: Inactive"));
+        assert!(!rendered.contains("{{ data_state }}"));
+        assert!(!rendered.contains("{{ data_pack.state }}"));
 
         let _ = fs::remove_dir_all(&base);
     }
@@ -549,6 +645,43 @@ mod unit_tests {
     }
 
     #[test]
+    fn ui_binding_store_path_json_keeps_direct_primitive_types() {
+        let mut store = UiBindingStore::default();
+        store.set("flag", false);
+        store.set("small", 1_u8);
+        store.set("wide", 1_u128);
+        store.set("signed", -1_isize);
+        store.set("float", 1.0_f64);
+        store.set("text", String::from("old"));
+
+        assert!(store.set_path_json("flag", json!(true)));
+        assert!(store.set_path_json("small", json!(7)));
+        assert!(store.set_path_json("wide", json!("340282366920938463463374607431768211455")));
+        assert!(store.set_path_json("signed", json!("-12")));
+        assert!(store.set_path_json("float", json!("2.5")));
+        assert!(store.set_path_json("text", json!(42)));
+
+        assert_eq!(store.get::<bool>("flag"), Some(&true));
+        assert_eq!(store.get::<u8>("small"), Some(&7_u8));
+        assert_eq!(store.get::<u128>("wide"), Some(&u128::MAX));
+        assert_eq!(store.get::<isize>("signed"), Some(&-12_isize));
+        assert_eq!(store.get::<f64>("float"), Some(&2.5_f64));
+        assert_eq!(store.get::<String>("text"), Some(&String::from("42")));
+    }
+
+    #[test]
+    fn ui_binding_store_path_json_resolves_template_aliases() {
+        let mut store = UiBindingStore::default();
+        store.set_store(Player {
+            name: String::from("Ada"),
+        });
+
+        assert!(store.set_path_json("player.name", json!("Grace")));
+        assert_eq!(store.json_path("player.name"), Some(json!("Grace")));
+        assert_eq!(store.json_path("Player.name"), Some(json!("Grace")));
+    }
+
+    #[test]
     fn ui_binding_store_values_are_exposed_to_template_shared_values() {
         let mut app = App::new();
         app.init_resource::<UiSharedValues>();
@@ -566,5 +699,95 @@ mod unit_tests {
             shared.values.get("score").and_then(|value| value.as_u64()),
             Some(7)
         );
+    }
+
+    #[test]
+    fn ui_binding_store_register_type_and_entry_getters_work() {
+        #[derive(Clone, PartialEq)]
+        struct RawOnly(u32);
+
+        let mut store = UiBindingStore::default();
+        assert!(store.register_type::<Player>("player", "crate::Player"));
+        let first_revision = store.revision();
+        assert!(!store.register_type::<Player>("player", "crate::Player"));
+        assert_eq!(store.revision(), first_revision);
+
+        assert!(store.register_type::<Player>("player", "crate::models::Player"));
+        assert!(store.revision() > first_revision);
+        assert!(
+            store
+                .known_types()
+                .any(|known| known == "crate::models::Player")
+        );
+
+        assert!(store.set_raw("raw", RawOnly(7)));
+        let entry = store.data.get("raw").expect("raw entry");
+        assert_eq!(entry.type_name(), "RawOnly");
+        assert!(entry.type_path().ends_with("RawOnly"));
+        assert!(entry.has_value());
+        assert!(entry.revision() > 0);
+        assert_eq!(entry.get::<RawOnly>().map(|value| value.0), Some(7));
+        assert!(entry.json().is_none());
+
+        let value = store
+            .data
+            .get("raw")
+            .and_then(|entry| entry.get::<RawOnly>());
+        assert_eq!(value.map(|value| value.0), Some(7));
+    }
+
+    #[test]
+    fn ui_binding_store_direct_json_conversion_edges_work() {
+        let mut store = UiBindingStore::default();
+        store.set("flag", false);
+        store.set("small", 1_u8);
+        store.set("signed", 1_i8);
+        store.set("float32", 1.0_f32);
+        store.set("float64", 1.0_f64);
+        store.set("text", String::from("old"));
+        store.set("json", json!({"old": true}));
+
+        assert!(store.set_path_json("flag", json!("yes")));
+        assert_eq!(store.get::<bool>("flag"), Some(&true));
+        assert!(!store.set_path_json("flag", json!("maybe")));
+
+        assert!(!store.set_path_json("small", json!(999)));
+        assert_eq!(store.get::<u8>("small"), Some(&1_u8));
+        assert!(store.set_path_json("signed", json!("-5")));
+        assert_eq!(store.get::<i8>("signed"), Some(&-5_i8));
+
+        assert!(store.set_path_json("float32", json!("2.25")));
+        assert_eq!(store.get::<f32>("float32"), Some(&2.25_f32));
+        assert!(store.set_path_json("float64", json!(false)));
+        assert_eq!(store.get::<f64>("float64"), Some(&0.0_f64));
+
+        assert!(store.set_path_json("text", json!([1, 2])));
+        assert_eq!(store.get::<String>("text"), Some(&"[1,2]".to_string()));
+
+        assert!(store.set_path_json("json", json!(["new"])));
+        assert_eq!(
+            store.get::<bevy_extended_ui::lang::serde_json::Value>("json"),
+            Some(&json!(["new"]))
+        );
+    }
+
+    #[test]
+    fn ui_binding_store_path_edge_cases_work() {
+        let mut store = UiBindingStore::default();
+
+        assert!(!store.set_path_json("", json!(1)));
+        assert!(!store.set_path_json("info.", json!(1)));
+        assert_eq!(store.json_path(""), None);
+        assert_eq!(store.json_path(".value"), None);
+
+        assert!(store.set_path_json("info.value", json!(1)));
+        assert!(!store.set_path_json("info.value", json!(1)));
+        assert_eq!(store.json_path("info.value"), Some(json!(1)));
+
+        assert!(store.set_path_json("info.items", json!(["zero", "one"])));
+        assert_eq!(store.json_path("info.items.1"), Some(json!("one")));
+        assert_eq!(store.json_path("info.items.x"), None);
+        assert_eq!(store.json_path("info.items.3"), None);
+        assert_eq!(store.json_path("info.value.missing"), None);
     }
 }

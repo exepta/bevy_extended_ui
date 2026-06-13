@@ -53,6 +53,12 @@
           "iframe_src": "{base.url}/examples/base",
           "html": "<listbox id=\"difficulty\"><option value=\"easy\">Easy</option><option selected value=\"normal\">Normal</option><option value=\"hard\">Hard</option></listbox>",
           "css": "column, al:center"
+        },
+        {
+          "id": "listbox-multi",
+          "iframe_src": "{base.url}/examples/base",
+          "html": "<listbox id=\"music-tags\" multiselect><option value=\"rock\" selected>Rock</option><option value=\"jazz\" selected>Jazz</option><option value=\"pop\">Pop</option><option value=\"electro\">Electro</option><option value=\"blues\">Blues</option></listbox>",
+          "css": "column, al:center",
         }
       ]
     },

@@ -2,13 +2,13 @@ use crate::styles::paint::Colored;
 use crate::styles::{
     AnimationDirection, AnimationKeyframe, AnimationSpec, BackdropFilter, Background,
     BackgroundAttachment, BackgroundPosition, BackgroundPositionValue, BackgroundSize,
-    BackgroundSizeValue, CalcExpr, CalcUnit, CalcValue, CursorStyle, FontFamily, FontVal,
-    FontWeight, GradientStop, GradientStopPosition, LinearGradient, MediaQueryCondition, ParsedCss,
-    Radius, Style, StylePair, TextTransform, TransformStyle, TransitionProperty, TransitionSpec,
+    BackgroundSizeValue, CalcExpr, CalcUnit, CalcValue, CursorStyle, FontFamily, FontWeight,
+    GradientStop, GradientStopPosition, LinearGradient, MediaQueryCondition, ParsedCss, Radius,
+    Style, StylePair, TextTransform, TransformStyle, TransitionProperty, TransitionSpec,
     TransitionTiming,
 };
 use bevy::prelude::*;
-use bevy::text::LineHeight;
+use bevy::text::{FontSize, LineHeight};
 use bevy::ui::Val2;
 use bevy::window::SystemCursorIcon;
 use lightningcss::media_query::{
@@ -2060,25 +2060,25 @@ pub fn convert_to_f32(value: String) -> Option<f32> {
         .map(|val| val.value)
 }
 
-/// Converts a CSS font-size string into a [`FontVal`] (custom type).
+/// Converts a CSS font-size string into a Bevy [`FontSize`].
 ///
 /// # Supported Units
-/// - `"px"` → `FontVal::Px(f32)`
-/// - `"rem"` → `FontVal::Rem(f32)`
+/// - `"px"` → `FontSize::Px(f32)`
+/// - `"rem"` → `FontSize::Rem(f32)`
 ///
 /// # Parameters
 /// - `value`: A [`String`] containing a font size (e.g. `"16px"`, `"1.2rem"`).
 ///
 /// # Returns
-/// - `Some(FontVal)` if the value can be parsed.
+/// - `Some(FontSize)` if the value can be parsed.
 /// - `None` if the value is malformed or unsupported.
 ///
-pub fn convert_to_font_size(value: String) -> Option<FontVal> {
+pub fn convert_to_font_size(value: String) -> Option<FontSize> {
     let parsed = parse_math_value(value.trim())?;
     match parsed.unit {
-        CalcUnit::Px => Some(FontVal::Px(parsed.value)),
-        CalcUnit::Rem => Some(FontVal::Rem(parsed.value)),
-        CalcUnit::None if parsed.value == 0.0 => Some(FontVal::Px(0.0)),
+        CalcUnit::Px => Some(FontSize::Px(parsed.value)),
+        CalcUnit::Rem => Some(FontSize::Rem(parsed.value)),
+        CalcUnit::None if parsed.value == 0.0 => Some(FontSize::Px(0.0)),
         _ => None,
     }
 }

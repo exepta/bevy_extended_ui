@@ -1,13 +1,17 @@
 mod bindings;
 pub mod builder;
 pub mod converter;
+pub mod inline_functions;
 pub mod reload;
 
+pub use bindings::HtmlEventBindingsPlugin;
+pub use inline_functions::{
+    HtmlInlineAction, HtmlInlineEventBindings, HtmlInlineFunction, parse_html_inline_action,
+};
 pub use inventory;
 
 #[cfg(feature = "extended-framework")]
 use crate::framework::sync_ui_binding_store_values;
-use crate::html::bindings::HtmlEventBindingsPlugin;
 use crate::html::builder::HtmlBuilderSystem;
 use crate::html::converter::HtmlConverterSystem;
 use crate::html::reload::HtmlReloadPlugin;
@@ -819,6 +823,8 @@ pub struct HtmlEventBindings {
     pub ontouchstart: Option<String>,
     pub ontouchmove: Option<String>,
     pub ontouchend: Option<String>,
+    #[reflect(ignore)]
+    pub inline: HtmlInlineEventBindings,
 }
 
 /// Click event sent from HTML widgets.
