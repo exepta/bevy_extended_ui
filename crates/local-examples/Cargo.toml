@@ -13,8 +13,12 @@ extended-framework = [
     "bevy_extended_ui/extended-framework",
 ]
 
+[dependencies.bevy]
+version = "0.19.0-rc.2"
+default-features = false
+features = ["ui", "png", "jpeg", "gif", "ico", "webp"]
+
 [dependencies]
-bevy = "0.18.1"
 bevy_extended_ui = { path = "../..", features = ["svg"] }
 bevy_extended_ui_macros = { path = "../bevy_extended_ui_macros" }
 serde = { version = "1", features = ["derive"] }

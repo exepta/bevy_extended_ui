@@ -82,9 +82,11 @@ fn internal_node_creation_system(
 ///
 /// # Example
 /// If a `Paragraph` contains `"Hello, world!"`, the associated `Text` will be updated to show it.
-fn update_text(mut query: Query<(&mut Text, &Paragraph), With<Paragraph>>) {
+fn update_text(mut query: Query<(&mut Text, &Paragraph), Changed<Paragraph>>) {
     for (mut text, p) in query.iter_mut() {
-        text.0 = p.text.clone();
+        if text.0 != p.text {
+            text.0 = p.text.clone();
+        }
     }
 }
 

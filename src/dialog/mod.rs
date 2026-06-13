@@ -55,6 +55,15 @@ pub(crate) fn apply_dialog_widget_overlay_components(
     ));
 }
 
+/// Returns runtime visibility and picking state for an HTML `<dialog>` widget.
+pub(crate) fn dialog_widget_runtime_components(dialog: &DialogWidget) -> (Visibility, Pickable) {
+    if dialog.renderer == DialogProvider::BevyApp && dialog.open {
+        (Visibility::Inherited, Pickable::default())
+    } else {
+        (Visibility::Hidden, Pickable::IGNORE)
+    }
+}
+
 fn apply_dialog_widget_overlay_style(style: &mut Style) {
     style.display = Some(Display::Flex);
     style.position_type = Some(PositionType::Absolute);
@@ -578,7 +587,7 @@ fn initialize_dialog_widgets(
         commands.entity(entity).insert((
             Name::new(dialog_name),
             RenderLayers::layer(layer),
-            Pickable::default(),
+            Pickable::IGNORE,
             TagName("dialog".to_string()),
             CssClass(classes),
             DialogWidgetBase,
@@ -733,7 +742,7 @@ fn spawn_default_dialog_header(commands: &mut Commands, panel: Entity, layer: us
         .id();
 
     let mut title_font = TextFont::default();
-    title_font.font_size = 20.0;
+    title_font.font_size = FontSize::Px(20.0);
 
     let title = commands
         .spawn((
@@ -891,7 +900,7 @@ fn spawn_default_dialog_footer_button(
         .id();
 
     let mut font = TextFont::default();
-    font.font_size = 14.0;
+    font.font_size = FontSize::Px(14.0);
 
     let text = commands
         .spawn((
@@ -976,17 +985,14 @@ fn bind_dialog_triggers(
 /// Handles `sync_dialog_widget_visibility` in the extended UI workflow.
 fn sync_dialog_widget_visibility(
     mut dialogs: Query<
-        (&DialogWidget, &mut Visibility),
+        (&DialogWidget, &mut Visibility, &mut Pickable),
         Or<(Added<DialogWidget>, Changed<DialogWidget>)>,
     >,
 ) {
-    for (dialog, mut visibility) in dialogs.iter_mut() {
-        let should_show = dialog.renderer == DialogProvider::BevyApp && dialog.open;
-        *visibility = if should_show {
-            Visibility::Inherited
-        } else {
-            Visibility::Hidden
-        };
+    for (dialog, mut visibility, mut pickable) in dialogs.iter_mut() {
+        let (next_visibility, next_pickable) = dialog_widget_runtime_components(dialog);
+        *visibility = next_visibility;
+        *pickable = next_pickable;
     }
 }
 
@@ -1267,7 +1273,7 @@ fn spawn_header(
         .id();
 
     let mut title_font = TextFont::default();
-    title_font.font_size = 21.0;
+    title_font.font_size = FontSize::Px(21.0);
 
     let title_entity = commands
         .spawn((
@@ -1326,7 +1332,7 @@ fn spawn_body(
         .id();
 
     let mut body_font = TextFont::default();
-    body_font.font_size = 16.0;
+    body_font.font_size = FontSize::Px(16.0);
 
     let content_entity = commands
         .spawn((
@@ -1436,7 +1442,7 @@ fn spawn_action_button(
         .id();
 
     let mut label_font = TextFont::default();
-    label_font.font_size = 15.0;
+    label_font.font_size = FontSize::Px(15.0);
 
     let label_entity = commands
         .spawn((

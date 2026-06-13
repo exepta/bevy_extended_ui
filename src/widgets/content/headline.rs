@@ -96,9 +96,11 @@ fn internal_node_creation_system(
 ///
 /// # Example
 /// If a `Headline` contains `"Breaking News!"`, the associated `Text` will be updated to show `"Breaking News!"`.
-fn update_text(mut query: Query<(&mut Text, &Headline), With<Headline>>) {
+fn update_text(mut query: Query<(&mut Text, &Headline), Changed<Headline>>) {
     for (mut text, headline) in query.iter_mut() {
-        text.0 = headline.text.clone();
+        if text.0 != headline.text {
+            text.0 = headline.text.clone();
+        }
     }
 }
 

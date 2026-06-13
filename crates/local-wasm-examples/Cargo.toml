@@ -12,8 +12,12 @@ theme-provider = []
 widget-overview = []
 typed-values = []
 
+[dependencies.bevy]
+version = "0.19.0-rc.2"
+default-features = false
+features = ["ui", "png", "jpeg", "gif", "ico", "webp"]
+
 [dependencies]
-bevy = "0.18.1"
 # Keep WASM example portable: avoid native-only default features (e.g. `fluent` -> `rusqlite`).
 bevy_extended_ui = { path = "../..", default-features = false, features = ["wasm-default", "providers", "svg", "extended-dialog"] }
 bevy_extended_ui_macros = { path = "../bevy_extended_ui_macros" }

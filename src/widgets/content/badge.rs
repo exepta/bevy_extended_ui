@@ -107,7 +107,7 @@ fn internal_node_creation_system(
                     Text::new(format_badge_label(badge.value, badge.max)),
                     TextColor::default(),
                     TextFont::default(),
-                    TextLayout::new_with_justify(Justify::Center).with_no_wrap(),
+                    TextLayout::justify(Justify::Center).with_no_wrap(),
                     UiTransform::default(),
                     Pickable::IGNORE,
                     css_source.clone(),

@@ -10,6 +10,7 @@ mod tests {
     use crate::widgets::{Body, Div, Scrollbar, UIGenID, UIWidgetState};
     use bevy::ecs::message::Messages;
     use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
+    use bevy::input::touch::TouchPhase;
     use bevy::prelude::*;
 
     fn computed_node(viewport: Vec2, content: Vec2) -> ComputedNode {
@@ -26,6 +27,7 @@ mod tests {
             x: 0.0,
             y,
             window: Entity::PLACEHOLDER,
+            phase: TouchPhase::Moved,
         }
     }
 
@@ -35,6 +37,7 @@ mod tests {
             x,
             y,
             window: Entity::PLACEHOLDER,
+            phase: TouchPhase::Moved,
         }
     }
 

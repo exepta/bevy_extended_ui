@@ -14,9 +14,9 @@ use crate::routing::ExtendedRoutingPlugin;
 use crate::services::ExtendedServicePlugin;
 use crate::styles::ExtendedStylingPlugin;
 use crate::widgets::ExtendedWidgetPlugin;
+use bevy::camera::Hdr;
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
-use bevy::render::view::Hdr;
 use std::collections::HashMap;
 
 #[cfg(feature = "extended-framework")]
