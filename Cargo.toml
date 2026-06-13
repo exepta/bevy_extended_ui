@@ -78,6 +78,9 @@ features = [
     "bevy_winit",
     "x11",
     "bevy_log",
+    "keyboard",
+    "mouse",
+    "touch",
 ]
 
 # Html Converter

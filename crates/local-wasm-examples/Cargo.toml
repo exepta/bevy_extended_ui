@@ -15,7 +15,7 @@ typed-values = []
 [dependencies.bevy]
 version = "0.19.0-rc.2"
 default-features = false
-features = ["ui", "png", "jpeg", "gif", "ico", "webp"]
+features = ["ui", "png", "jpeg", "gif", "ico", "webp", "keyboard", "mouse", "touch"]
 
 [dependencies]
 # Keep WASM example portable: avoid native-only default features (e.g. `fluent` -> `rusqlite`).

@@ -16,7 +16,7 @@ extended-framework = [
 [dependencies.bevy]
 version = "0.19.0-rc.2"
 default-features = false
-features = ["ui", "png", "jpeg", "gif", "ico", "webp"]
+features = ["ui", "png", "jpeg", "gif", "ico", "webp", "keyboard", "mouse", "touch"]
 
 [dependencies]
 bevy_extended_ui = { path = "../..", features = ["svg"] }
