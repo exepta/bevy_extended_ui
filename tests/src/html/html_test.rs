@@ -734,6 +734,7 @@ mod tests {
             node,
             HtmlWidgetNode::ToolTip(tool_tip, _, _, _, _, _)
                 if tool_tip.for_id.as_deref() == Some("email")
+                    && tool_tip.text == "Tip text"
                     && tool_tip.variant == ToolTipVariant::Point
                     && tool_tip.prio == ToolTipPriority::Top
                     && tool_tip.alignment == ToolTipAlignment::Vertical
@@ -1582,15 +1583,18 @@ mod tests {
         #[cfg(feature = "extended-dialog")]
         {
             let mut dialog_still_hidden = false;
-            let mut query = app
-                .world_mut()
-                .query::<(&Visibility, Option<&NeedHidden>, &DialogWidget)>();
-            for (visibility, hidden_marker, _dialog) in query.iter(app.world()) {
+            let mut dialog_ignores_picking = false;
+            let mut query =
+                app.world_mut()
+                    .query::<(&Visibility, &Pickable, Option<&NeedHidden>, &DialogWidget)>();
+            for (visibility, pickable, hidden_marker, _dialog) in query.iter(app.world()) {
                 if hidden_marker.is_some() {
                     dialog_still_hidden = *visibility == Visibility::Hidden;
+                    dialog_ignores_picking = *pickable == Pickable::IGNORE;
                 }
             }
             assert!(dialog_still_hidden);
+            assert!(dialog_ignores_picking);
         }
     }
 

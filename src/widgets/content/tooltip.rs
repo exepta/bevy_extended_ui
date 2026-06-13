@@ -1,5 +1,5 @@
 use crate::ExtendedUiConfiguration;
-use crate::styles::{CssClass, CssID, CssSource, TagName};
+use crate::styles::{CssClass, CssID, CssSource, TagName, font_size_to_px};
 use crate::widgets::widget_util::{
     resolve_owner_widget, resolve_owner_widget_from_parent, set_css_classes,
 };
@@ -19,10 +19,6 @@ const TOOLTIP_NOSE_Z_INDEX: i32 = 59_999;
 /// Marker component for initialized tooltip widgets.
 #[derive(Component)]
 struct ToolTipBase;
-
-/// Marker component for tooltip text nodes.
-#[derive(Component)]
-struct ToolTipText;
 
 /// Marker component for tooltip nose nodes (point variant).
 #[derive(Component)]
@@ -45,6 +41,7 @@ struct ToolTipNoseClassBase(Vec<String>);
 /// Tracks active click/drag trigger states for tooltip targets.
 #[derive(Resource, Default)]
 struct ToolTipTriggerState {
+    hovered: HashSet<Entity>,
     clicked: HashSet<Entity>,
     dragging: HashSet<Entity>,
 }
@@ -69,6 +66,8 @@ impl Plugin for ToolTipWidget {
     /// Registers systems for tooltip setup and runtime updates.
     fn build(&self, app: &mut App) {
         app.init_resource::<ToolTipTriggerState>();
+        app.add_observer(track_hover_start_trigger);
+        app.add_observer(track_hover_end_trigger);
         app.add_observer(track_click_trigger);
         app.add_observer(track_drag_start_trigger);
         app.add_observer(track_drag_end_trigger);
@@ -139,24 +138,14 @@ fn internal_node_creation_system(
                 ToolTipBase,
                 ToolTipRuntime::default(),
             ))
+            .insert((
+                Text::new(tooltip.text.clone()),
+                TextColor::default(),
+                TextFont::from_font_size(13.0),
+                TextLayout::default(),
+            ))
             .insert(GlobalZIndex(TOOLTIP_Z_INDEX))
             .with_children(|builder| {
-                builder.spawn((
-                    Name::new(format!("ToolTip-Text-{}", tooltip.entry)),
-                    Node::default(),
-                    Text::new(tooltip.text.clone()),
-                    TextColor::default(),
-                    TextFont::default(),
-                    TextLayout::default(),
-                    Pickable::IGNORE,
-                    css_source.clone(),
-                    CssClass(vec!["tooltip-text".to_string()]),
-                    BindToID(ui_id.get()),
-                    UIWidgetState::default(),
-                    RenderLayers::layer(*layer),
-                    ToolTipText,
-                ));
-
                 let mut nose_node = Node::default();
                 nose_node.position_type = PositionType::Absolute;
                 nose_node.width = Val::Px(10.0);
@@ -186,6 +175,36 @@ fn internal_node_creation_system(
                     ))
                     .insert(GlobalZIndex(TOOLTIP_NOSE_Z_INDEX));
             });
+    }
+}
+
+/// Tracks hover state independently from widget-specific hover observers.
+fn track_hover_start_trigger(
+    over_event: On<Pointer<Over>>,
+    mut trigger_state: ResMut<ToolTipTriggerState>,
+    parents_q: Query<&ChildOf>,
+    widget_q: Query<(), With<WidgetId>>,
+    body_q: Query<(), With<Body>>,
+) {
+    if let Some(owner) =
+        resolve_owner_widget(over_event.event_target(), &parents_q, &widget_q, &body_q)
+    {
+        trigger_state.hovered.insert(owner);
+    }
+}
+
+/// Clears tracked hover state when the pointer leaves a widget or one of its children.
+fn track_hover_end_trigger(
+    out_event: On<Pointer<Out>>,
+    mut trigger_state: ResMut<ToolTipTriggerState>,
+    parents_q: Query<&ChildOf>,
+    widget_q: Query<(), With<WidgetId>>,
+    body_q: Query<(), With<Body>>,
+) {
+    if let Some(owner) =
+        resolve_owner_widget(out_event.event_target(), &parents_q, &widget_q, &body_q)
+    {
+        trigger_state.hovered.remove(&owner);
     }
 }
 
@@ -259,17 +278,26 @@ fn resolve_tooltip_targets(
     widget_q: Query<(), With<WidgetId>>,
     body_q: Query<(), With<Body>>,
 ) {
-    let mut by_id: HashMap<&str, Entity> = HashMap::new();
+    let mut by_id: HashMap<String, Entity> = HashMap::new();
     for (entity, css_id) in id_q.iter() {
-        if !css_id.0.is_empty() {
-            by_id.entry(css_id.0.as_str()).or_insert(entity);
+        let raw = css_id.0.trim();
+        if raw.is_empty() {
+            continue;
+        }
+
+        by_id.entry(raw.to_string()).or_insert(entity);
+        let normalized = raw.trim_start_matches('#');
+        if !normalized.is_empty() {
+            by_id.entry(normalized.to_string()).or_insert(entity);
         }
     }
 
     for (tooltip, parent_opt, mut runtime) in tooltip_q.iter_mut() {
         let target = if let Some(for_id) = tooltip.for_id.as_deref() {
             let normalized = for_id.trim().trim_start_matches('#');
-            by_id.get(normalized).copied()
+            by_id.get(normalized).copied().or_else(|| {
+                resolve_owner_widget_from_parent(parent_opt, &parents_q, &widget_q, &body_q)
+            })
         } else {
             resolve_owner_widget_from_parent(parent_opt, &parents_q, &widget_q, &body_q)
         };
@@ -280,14 +308,11 @@ fn resolve_tooltip_targets(
 
 /// Updates tooltip text content when the component changes.
 fn update_tooltip_text(
-    tooltip_q: Query<(&ToolTip, &Children), (With<ToolTip>, With<ToolTipBase>, Changed<ToolTip>)>,
-    mut text_q: Query<&mut Text, With<ToolTipText>>,
+    mut tooltip_q: Query<(&ToolTip, &mut Text), (With<ToolTipBase>, Changed<ToolTip>)>,
 ) {
-    for (tooltip, children) in tooltip_q.iter() {
-        for child in children.iter() {
-            if let Ok(mut text) = text_q.get_mut(child) {
-                text.0 = tooltip.text.clone();
-            }
+    for (tooltip, mut text) in tooltip_q.iter_mut() {
+        if text.0 != tooltip.text {
+            text.0 = tooltip.text.clone();
         }
     }
 }
@@ -407,6 +432,34 @@ fn place_point(
     (x, y, side)
 }
 
+fn estimate_tooltip_size(text: &str, text_font: &TextFont) -> Vec2 {
+    let font_px = font_size_to_px(text_font.font_size, None).max(1.0);
+    let padding_x = 20.0;
+    let padding_y = 20.0;
+    let min_w = 96.0;
+    let max_w = 300.0;
+    let min_h = 26.0;
+    let char_w = font_px * 0.62;
+    let line_h = font_px * 1.25;
+
+    let longest_word_chars = text
+        .split_whitespace()
+        .map(|word| word.chars().count())
+        .max()
+        .unwrap_or(0) as f32;
+    let text_chars = text.chars().count().max(1) as f32;
+    let natural_w = (text_chars * char_w + padding_x).clamp(min_w, max_w);
+    let min_word_w = (longest_word_chars * char_w + padding_x).clamp(min_w, max_w);
+    let width = natural_w.max(min_word_w).clamp(min_w, max_w);
+    let usable_w = (width - padding_x).max(char_w);
+    let chars_per_line = (usable_w / char_w).floor().max(1.0);
+    let explicit_lines = text.lines().count().max(1) as f32;
+    let wrapped_lines = (text_chars / chars_per_line).ceil().max(explicit_lines);
+    let height = (wrapped_lines * line_h + padding_y).max(min_h);
+
+    Vec2::new(width, height)
+}
+
 /// Updates a tooltip nose node so it points towards the target side.
 fn place_nose(node: &mut Node, side: ToolTipSide, tip_w: f32, tip_h: f32) {
     let size = 10.0;
@@ -470,17 +523,14 @@ fn update_tooltip_visuals(
             &mut Visibility,
             &mut CssClass,
             &ToolTipClassBase,
+            &Text,
+            &TextFont,
             Option<&ChildOf>,
             &Children,
             &ToolTipRuntime,
             Option<&ComputedNode>,
         ),
-        (
-            With<ToolTip>,
-            With<ToolTipBase>,
-            Without<ToolTipNose>,
-            Without<ToolTipText>,
-        ),
+        (With<ToolTip>, With<ToolTipBase>, Without<ToolTipNose>),
     >,
     mut nose_q: Query<
         (
@@ -489,7 +539,7 @@ fn update_tooltip_visuals(
             &mut CssClass,
             &ToolTipNoseClassBase,
         ),
-        (With<ToolTipNose>, Without<ToolTip>, Without<ToolTipText>),
+        (With<ToolTipNose>, Without<ToolTip>),
     >,
 ) {
     let Ok(window) = window_q.single() else {
@@ -507,6 +557,8 @@ fn update_tooltip_visuals(
         mut visibility,
         mut css_class,
         class_base,
+        text,
+        text_font,
         parent_opt,
         children,
         runtime,
@@ -525,7 +577,8 @@ fn update_tooltip_visuals(
             continue;
         };
 
-        let target_hovered = target_state.hovered && !target_state.disabled;
+        let target_hovered = (target_state.hovered || trigger_state.hovered.contains(&target))
+            && !target_state.disabled;
         let target_clicked = trigger_state.clicked.contains(&target) && !target_state.disabled;
         let target_dragging = trigger_state.dragging.contains(&target) && !target_state.disabled;
 
@@ -570,13 +623,14 @@ fn update_tooltip_visuals(
             }
         }
 
+        let estimated_size = estimate_tooltip_size(&text.0, text_font);
         let (tip_w, tip_h) = if let Some(computed) = computed {
             (
-                (computed.size().x / sf).max(32.0),
-                (computed.size().y / sf).max(18.0),
+                (computed.size().x / sf).max(estimated_size.x),
+                (computed.size().y / sf).max(estimated_size.y),
             )
         } else {
-            (180.0, 32.0)
+            (estimated_size.x, estimated_size.y)
         };
 
         let margin = 8.0;
@@ -627,6 +681,8 @@ fn update_tooltip_visuals(
         };
 
         node.position_type = PositionType::Absolute;
+        node.width = Val::Px(tip_w);
+        node.height = Val::Px(tip_h);
         node.left = Val::Px(x - parent_top_left.x);
         node.top = Val::Px(y - parent_top_left.y);
 

@@ -12,7 +12,7 @@ use crate::html::HtmlSystemSet;
 use crate::services::image_service::get_or_load_image;
 use crate::styles::components::UiStyle;
 use crate::styles::paint::Colored;
-use crate::styles::{Background, CssClass, CssSource, FontVal, Style, TagName};
+use crate::styles::{CssClass, CssSource, Style, TagName, font_size_to_px};
 use crate::utils::keycode_to_char;
 use crate::widgets::{
     BindToID, InputCap, InputField, InputType, InputValue, UIGenID, UIWidgetState, WidgetId,
@@ -23,7 +23,7 @@ use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
 use arboard::Clipboard;
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
-use bevy::text::{TextBackgroundColor, TextLayoutInfo, TextSpan};
+use bevy::text::{FontSize, TextBackgroundColor, TextLayoutInfo, TextSpan};
 use bevy::ui::{RelativeCursorPosition, ScrollPosition};
 #[cfg(all(not(target_arch = "wasm32"), feature = "extended-dialog"))]
 use rfd::FileDialog;
@@ -201,20 +201,23 @@ impl InputClipboard {
     fn get_text(&mut self) -> Option<String> {
         #[cfg(all(target_arch = "wasm32", feature = "clipboard-wasm"))]
         {
-            return None;
-        }
-
-        #[cfg(not(target_arch = "wasm32"))]
-        if let Some(clipboard) = self.clipboard.as_mut() {
-            if let Ok(text) = clipboard.get_text() {
-                return Some(text);
-            }
-        }
-
-        if self.fallback.is_empty() {
             None
-        } else {
-            Some(self.fallback.clone())
+        }
+
+        #[cfg(not(all(target_arch = "wasm32", feature = "clipboard-wasm")))]
+        {
+            #[cfg(not(target_arch = "wasm32"))]
+            if let Some(clipboard) = self.clipboard.as_mut() {
+                if let Ok(text) = clipboard.get_text() {
+                    return Some(text);
+                }
+            }
+
+            if self.fallback.is_empty() {
+                None
+            } else {
+                Some(self.fallback.clone())
+            }
         }
     }
 
@@ -852,15 +855,7 @@ fn sync_file_input_feedback(
 fn update_cursor_visibility(
     time: Res<Time>,
     mut cursor_blink_timer: ResMut<CursorBlinkTimer>,
-    mut cursor_query: Query<
-        (
-            &mut Visibility,
-            &mut BackgroundColor,
-            &mut UiStyle,
-            &BindToID,
-        ),
-        With<InputCursor>,
-    >,
+    mut cursor_query: Query<(&mut Visibility, &mut BackgroundColor, &BindToID), With<InputCursor>>,
     input_field_query: Query<(&InputField, &UIWidgetState, &UIGenID), With<InputFieldBase>>,
 ) {
     cursor_blink_timer.timer.tick(time.delta());
@@ -886,7 +881,7 @@ fn update_cursor_visibility(
         );
     }
 
-    for (mut visibility, mut background, mut styles, bind_cursor_id) in cursor_query.iter_mut() {
+    for (mut visibility, mut background, bind_cursor_id) in cursor_query.iter_mut() {
         let Some(field) = fields.get(&bind_cursor_id.0) else {
             continue;
         };
@@ -895,13 +890,8 @@ fn update_cursor_visibility(
             let alpha =
                 (cursor_blink_timer.timer.elapsed_secs() * 2.0 * std::f32::consts::PI).sin() * 0.5
                     + 0.5;
-            background.0.set_alpha(alpha);
-
-            for (_, style) in styles.styles.iter_mut() {
-                style.normal.background = Some(Background {
-                    color: background.0,
-                    ..default()
-                });
+            if (background.0.alpha() - alpha).abs() > 0.02 {
+                background.0.set_alpha(alpha);
             }
 
             // Fix: this condition was always true due to `||`.
@@ -925,7 +915,7 @@ fn update_cursor_visibility(
 /// Positions the cursor within the input text container.
 fn update_cursor_position(
     mut key_repeat: ResMut<KeyRepeatTimers>,
-    mut cursor_query: Query<(&mut Node, &mut UiStyle, &BindToID), With<InputCursor>>,
+    mut cursor_query: Query<(&mut Node, &BindToID), With<InputCursor>>,
     mut text_field_query: Query<
         (
             &mut InputField,
@@ -948,7 +938,7 @@ fn update_cursor_position(
         fonts.insert(bind.0, font.clone());
     }
 
-    for (mut cursor_node, mut styles, bind_id) in cursor_query.iter_mut() {
+    for (mut cursor_node, bind_id) in cursor_query.iter_mut() {
         let Some((mut text_field, mut selection, _ui_id, state)) = text_field_query
             .iter_mut()
             .find(|(_, _, ui_id, _)| ui_id.0 == bind_id.0)
@@ -1017,10 +1007,9 @@ fn update_cursor_position(
 
         let cursor_x_position =
             calculate_cursor_x_position(&text_field, text_field.cursor_position, text_font);
-        cursor_node.left = Val::Px(cursor_x_position);
-
-        for (_, style) in styles.styles.iter_mut() {
-            style.normal.left = Some(cursor_node.left);
+        let next_left = Val::Px(cursor_x_position);
+        if cursor_node.left != next_left {
+            cursor_node.left = next_left;
         }
     }
 
@@ -1081,8 +1070,18 @@ fn calculate_correct_text_container_width(
             let reserve = icon_reserve + file_size_reserve;
             let target = (original_width.0 - reserve).max(0.0);
 
-            for (_, value) in style.styles.iter_mut() {
-                value.normal.width = Some(Val::Percent(target));
+            let mut changed = false;
+            {
+                let style = style.bypass_change_detection();
+                for (_, value) in style.styles.iter_mut() {
+                    if value.normal.width != Some(Val::Percent(target)) {
+                        value.normal.width = Some(Val::Percent(target));
+                        changed = true;
+                    }
+                }
+            }
+            if changed {
+                style.set_changed();
             }
         }
     }
@@ -1103,7 +1102,10 @@ fn handle_input_horizontal_scroll(
     // Cache computed node/font by UI id for faster lookup.
     let mut text_meta: HashMap<usize, (Vec2, f32)> = HashMap::new();
     for (node, bind_id, font) in text_node_query.iter() {
-        text_meta.insert(bind_id.0, (node.size(), font.font_size));
+        text_meta.insert(
+            bind_id.0,
+            (node.size(), font_size_to_px(font.font_size, None)),
+        );
     }
 
     for (input_field, ui_id, state) in query.iter() {
@@ -1131,13 +1133,18 @@ fn handle_input_horizontal_scroll(
                     let visible_right = scroll.x + available_width;
 
                     if cursor_x > visible_right {
-                        scroll.x = cursor_x - available_width + char_width;
+                        let next_x = cursor_x - available_width + char_width;
+                        if (scroll.x - next_x).abs() > f32::EPSILON {
+                            scroll.x = next_x;
+                        }
                     } else if cursor_x < visible_left {
-                        scroll.x = cursor_x;
+                        if (scroll.x - cursor_x).abs() > f32::EPSILON {
+                            scroll.x = cursor_x;
+                        }
                     }
 
                     let total_text_width = input_field.text.len() as f32 * char_width;
-                    if total_text_width < available_width {
+                    if total_text_width < available_width && scroll.x != 0.0 {
                         scroll.x = 0.0;
                     }
                 }
@@ -1320,9 +1327,9 @@ fn handle_typing(
                             .active_style
                             .as_ref()
                             .and_then(|s| s.font_size.as_ref())
-                            .cloned()
-                            .unwrap_or(FontVal::Px(13.))
-                            .get(None);
+                            .copied()
+                            .map(|font_size| font_size_to_px(font_size, None))
+                            .unwrap_or(13.0);
 
                         let allowed_char_len = (computed_node.size().x / font_px).round() as usize;
                         if pos >= allowed_char_len {
@@ -1452,18 +1459,23 @@ fn handle_overlay_label(
                 continue;
             }
 
-            let center = (height / 2.0) - text_font.font_size / 1.5;
-            let on_top = text_font.font_size / 2.0;
+            let current_font_size_px = font_size_to_px(text_font.font_size, None);
+            let center = (height / 2.0) - current_font_size_px / 1.5;
+            let on_top = current_font_size_px / 2.0;
 
-            if state.focused {
-                node.top = Val::Px(on_top);
-                text_font.font_size = 10.;
+            let (target_top, target_font_size) = if state.focused {
+                (Val::Px(on_top), FontSize::Px(10.0))
             } else if in_field.text.is_empty() {
-                node.top = Val::Px(center);
-                text_font.font_size = 14.;
+                (Val::Px(center), FontSize::Px(14.0))
             } else {
-                node.top = Val::Px(on_top);
-                text_font.font_size = 10.;
+                (Val::Px(on_top), FontSize::Px(10.0))
+            };
+
+            if node.top != target_top {
+                node.top = target_top;
+            }
+            if text_font.font_size != target_font_size {
+                text_font.font_size = target_font_size;
             }
 
             let expected_left = if let Some(w) = icon_widths.get(&gen_id.0).copied() {
@@ -1480,10 +1492,26 @@ fn handle_overlay_label(
                 node.left = Val::Px(expected_left);
             }
 
-            for (_, style) in styles.styles.iter_mut() {
-                style.normal.top = Some(node.top);
-                style.normal.left = Some(node.left);
-                style.normal.font_size = Some(FontVal::Px(text_font.font_size));
+            let mut changed = false;
+            {
+                let styles = styles.bypass_change_detection();
+                for (_, style) in styles.styles.iter_mut() {
+                    if style.normal.top != Some(node.top) {
+                        style.normal.top = Some(node.top);
+                        changed = true;
+                    }
+                    if style.normal.left != Some(node.left) {
+                        style.normal.left = Some(node.left);
+                        changed = true;
+                    }
+                    if style.normal.font_size != Some(text_font.font_size) {
+                        style.normal.font_size = Some(text_font.font_size);
+                        changed = true;
+                    }
+                }
+            }
+            if changed {
+                styles.set_changed();
             }
         }
     }
@@ -1499,7 +1527,15 @@ fn sync_input_text_spans(
             &UIGenID,
             &UiStyle,
         ),
-        With<InputFieldBase>,
+        (
+            With<InputFieldBase>,
+            Or<(
+                Changed<InputField>,
+                Changed<InputSelection>,
+                Changed<UIWidgetState>,
+                Changed<UiStyle>,
+            )>,
+        ),
     >,
     mut text_query: Query<
         (&mut Text, &mut TextColor, &TextFont, &BindToID),
@@ -1570,8 +1606,12 @@ fn sync_input_text_spans(
                 continue;
             }
 
-            text.0 = prefix.to_string();
-            text_color.0 = base_color;
+            if text.0 != prefix {
+                text.0 = prefix.to_string();
+            }
+            if text_color.0 != base_color {
+                text_color.0 = base_color;
+            }
 
             for (mut span, mut span_color, mut span_bg, mut span_font, span_bind) in
                 selection_span_query.iter_mut()
@@ -1580,18 +1620,28 @@ fn sync_input_text_spans(
                     continue;
                 }
 
-                span.0 = selected.to_string();
-                span_color.0 = if selected.is_empty() {
+                if span.0 != selected {
+                    span.0 = selected.to_string();
+                }
+                let next_span_color = if selected.is_empty() {
                     base_color
                 } else {
                     selection_text
                 };
-                span_bg.0 = if selected.is_empty() {
+                if span_color.0 != next_span_color {
+                    span_color.0 = next_span_color;
+                }
+                let next_span_bg = if selected.is_empty() {
                     Color::NONE
                 } else {
                     selection_bg
                 };
-                *span_font = text_font.clone();
+                if span_bg.0 != next_span_bg {
+                    span_bg.0 = next_span_bg;
+                }
+                if *span_font != *text_font {
+                    *span_font = text_font.clone();
+                }
             }
 
             for (mut span, mut span_color, mut span_font, span_bind) in suffix_span_query.iter_mut()
@@ -1600,9 +1650,15 @@ fn sync_input_text_spans(
                     continue;
                 }
 
-                span.0 = suffix.to_string();
-                span_color.0 = base_color;
-                *span_font = text_font.clone();
+                if span.0 != suffix {
+                    span.0 = suffix.to_string();
+                }
+                if span_color.0 != base_color {
+                    span_color.0 = base_color;
+                }
+                if *span_font != *text_font {
+                    *span_font = text_font.clone();
+                }
             }
         }
     }
@@ -1676,7 +1732,7 @@ fn calculate_cursor_x_position(
 /// Estimates the pixel width of a given text string based on font size.
 /// Estimates the width of a text string for cursor placement.
 fn calculate_text_width(text: &str, style: &TextFont) -> f32 {
-    text.len() as f32 * style.font_size * 0.6
+    text.len() as f32 * font_size_to_px(style.font_size, None) * 0.6
 }
 
 #[cfg(any(
@@ -2047,6 +2103,29 @@ fn selection_range(selection: &InputSelection) -> Option<(usize, usize)> {
     Some((start, end))
 }
 
+fn clamp_to_char_boundary(text: &str, index: usize) -> usize {
+    let mut index = index.min(text.len());
+    while index > 0 && !text.is_char_boundary(index) {
+        index -= 1;
+    }
+    index
+}
+
+fn byte_index_for_section_char_offset(
+    text: &str,
+    section_start: usize,
+    section_end: usize,
+    char_offset: usize,
+) -> usize {
+    let start = clamp_to_char_boundary(text, section_start);
+    let end = clamp_to_char_boundary(text, section_end).max(start);
+    text[start..end]
+        .char_indices()
+        .nth(char_offset)
+        .map(|(offset, _)| start + offset)
+        .unwrap_or(end)
+}
+
 /// Handles `clear_selection` in the extended UI workflow.
 fn clear_selection(selection: &mut InputSelection, cursor: usize) {
     selection.anchor = cursor;
@@ -2103,9 +2182,9 @@ fn insert_text_filtered(
                 .active_style
                 .as_ref()
                 .and_then(|s| s.font_size.as_ref())
-                .cloned()
-                .unwrap_or(FontVal::Px(13.))
-                .get(None);
+                .copied()
+                .map(|font_size| font_size_to_px(font_size, None))
+                .unwrap_or(13.0);
 
             let allowed_char_len = (computed_node.size().x / font_px).round() as usize;
             if pos >= allowed_char_len {
@@ -2246,7 +2325,7 @@ fn selector_specificity_for_selection(selector: &str) -> u32 {
 /// Handles `cursor_position_from_pointer` in the extended UI workflow.
 fn cursor_position_from_pointer(
     ui_id: usize,
-    text_len: usize,
+    text: &str,
     selection: &InputSelection,
     container_query: &Query<
         (
@@ -2261,6 +2340,7 @@ fn cursor_position_from_pointer(
     text_query: &Query<(&TextFont, &BindToID), With<InputFieldText>>,
     layout_query: &Query<(&TextLayoutInfo, &BindToID), With<InputFieldText>>,
 ) -> Option<usize> {
+    let text_len = text.len();
     if text_len == 0 {
         return Some(0);
     }
@@ -2327,19 +2407,41 @@ fn cursor_position_from_pointer(
         let scale = layout.scale_factor.max(1.0);
         let mut last_end = 0usize;
         let mut last_right = 0.0;
+        let mut section_char_offsets: HashMap<usize, usize> = HashMap::new();
+        let line_glyphs: Vec<_> = layout
+            .glyphs
+            .iter()
+            .filter(|glyph| glyph.line_index == 0)
+            .collect();
 
-        for glyph in layout.glyphs.iter().filter(|g| g.line_index == 0) {
+        for (index, glyph) in line_glyphs.iter().enumerate() {
             let g_left = glyph.position.x / scale;
-            let g_right = (glyph.position.x + glyph.size.x) / scale;
+            let fallback_width = glyph.atlas_info.rect.width().max(1.0);
+            let next_x = line_glyphs
+                .get(index + 1)
+                .map(|next| next.position.x)
+                .filter(|next_x| *next_x > glyph.position.x)
+                .unwrap_or(glyph.position.x + fallback_width);
+            let g_right = next_x / scale;
             let mid = (g_left + g_right) * 0.5;
-            let span_offset = match glyph.span_index {
-                0 => 0,
-                1 => selection_offset,
-                2 => suffix_offset,
-                _ => text_len,
+            let (section_start, section_end) = match glyph.section_index {
+                0 => (0, selection_offset),
+                1 => (selection_offset, suffix_offset),
+                2 => (suffix_offset, text_len),
+                _ => (text_len, text_len),
             };
-            let g_start = span_offset.saturating_add(glyph.byte_index);
-            let g_end = span_offset.saturating_add(glyph.byte_index + glyph.byte_length);
+            let char_offset = section_char_offsets
+                .entry(glyph.section_index)
+                .and_modify(|offset| *offset += 1)
+                .or_insert(0);
+            let g_start =
+                byte_index_for_section_char_offset(text, section_start, section_end, *char_offset);
+            let g_end = byte_index_for_section_char_offset(
+                text,
+                section_start,
+                section_end,
+                *char_offset + 1,
+            );
 
             if cursor_x <= mid {
                 return Some(g_start.min(text_len));
@@ -2363,7 +2465,7 @@ fn cursor_position_from_pointer(
     let mut font_size = None;
     for (font, bind) in text_query.iter() {
         if bind.0 == ui_id {
-            font_size = Some(font.font_size);
+            font_size = Some(font_size_to_px(font.font_size, None));
             break;
         }
     }
@@ -2435,7 +2537,7 @@ fn on_internal_press(
 
         if let Some(pos) = cursor_position_from_pointer(
             gen_id.0,
-            field.text.len(),
+            &field.text,
             &selection,
             &container_query,
             &text_query,
@@ -2503,7 +2605,7 @@ fn on_internal_drag(
 
         if let Some(pos) = cursor_position_from_pointer(
             gen_id.0,
-            field.text.len(),
+            &field.text,
             &selection,
             &container_query,
             &text_query,

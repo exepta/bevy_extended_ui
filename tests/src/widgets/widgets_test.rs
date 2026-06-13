@@ -8,6 +8,7 @@ mod tests {
     use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
     use bevy::asset::AssetPlugin;
     use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
+    use bevy::input::touch::TouchPhase;
     use bevy::prelude::*;
 
     fn spawn_icons_once(
@@ -265,6 +266,7 @@ mod tests {
             x: 0.0,
             y: 2.0,
             window: Entity::PLACEHOLDER,
+            phase: TouchPhase::Moved,
         };
         assert_eq!(wheel_delta_y(&line_small, 0.5), 50.0);
 
@@ -273,6 +275,7 @@ mod tests {
             x: 0.0,
             y: 12.0,
             window: Entity::PLACEHOLDER,
+            phase: TouchPhase::Moved,
         };
         assert_eq!(wheel_delta_y(&line_big, 0.5), 6.0);
 
@@ -281,6 +284,7 @@ mod tests {
             x: 0.0,
             y: 30.0,
             window: Entity::PLACEHOLDER,
+            phase: TouchPhase::Moved,
         };
         assert_eq!(wheel_delta_y(&pixel, 0.5), 15.0);
     }
@@ -292,6 +296,7 @@ mod tests {
             x: 2.0,
             y: 0.0,
             window: Entity::PLACEHOLDER,
+            phase: TouchPhase::Moved,
         };
         assert_eq!(wheel_delta_x(&line_small, 0.5), 50.0);
 
@@ -300,6 +305,7 @@ mod tests {
             x: 12.0,
             y: 0.0,
             window: Entity::PLACEHOLDER,
+            phase: TouchPhase::Moved,
         };
         assert_eq!(wheel_delta_x(&line_big, 0.5), 6.0);
 
@@ -308,6 +314,7 @@ mod tests {
             x: 30.0,
             y: 0.0,
             window: Entity::PLACEHOLDER,
+            phase: TouchPhase::Moved,
         };
         assert_eq!(wheel_delta_x(&pixel, 0.5), 15.0);
     }

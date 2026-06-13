@@ -777,6 +777,7 @@ badge {
 tool-tip {
     position: absolute;
     width: auto;
+    min-width: 96px;
     max-width: 300px;
     min-height: 26px;
     display: flex;
@@ -789,6 +790,7 @@ tool-tip {
     border-color: var(--primary-hover);
     color: var(--text-color);
     font-size: 13px;
+    text-wrap: wrap;
     z-index: 60000;
     pointer-events: none;
 

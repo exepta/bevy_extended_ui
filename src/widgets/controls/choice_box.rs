@@ -1,7 +1,7 @@
 use crate::services::image_service::{DEFAULT_CHOICE_BOX_KEY, get_or_load_image};
 use crate::styles::components::UiStyle;
 use crate::styles::paint::Colored;
-use crate::styles::{CssClass, CssSource, FontVal, TagName};
+use crate::styles::{CssClass, CssSource, TagName};
 use crate::widgets::widget_util::{
     apply_overlay_state_for_bind, clear_active_scroll_target_for_entity,
     first_child_logical_height, set_z_index_pair, wheel_delta_y,
@@ -337,20 +337,20 @@ fn handle_overlay_label(
 
                 if state.focused {
                     node.top = Val::Px(5.);
-                    text_font.font_size = 10.;
+                    text_font.font_size = FontSize::Px(10.0);
                 } else {
                     if choice_box.value.text.is_empty() && choice_box.value.icon_path.is_none() {
                         node.top = Val::Px(19.5);
-                        text_font.font_size = 14.;
+                        text_font.font_size = FontSize::Px(14.0);
                     } else {
                         node.top = Val::Px(5.);
-                        text_font.font_size = 10.;
+                        text_font.font_size = FontSize::Px(10.0);
                     }
                 }
 
                 for (_, style) in styles.styles.iter_mut() {
                     style.normal.top = Some(node.top);
-                    style.normal.font_size = Some(FontVal::Px(text_font.font_size));
+                    style.normal.font_size = Some(text_font.font_size);
                 }
             }
         }

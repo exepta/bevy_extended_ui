@@ -7,8 +7,8 @@ use crate::styles::components::UiStyle;
 use crate::styles::{
     AnimationDirection, AnimationKeyframe, AnimationSpec, BackdropFilter, BackgroundAttachment,
     BackgroundPosition, BackgroundPositionValue, BackgroundSize, BackgroundSizeValue, CalcContext,
-    CalcExpr, CursorStyle, FontVal, FontWeight, GradientStopPosition, LinearGradient, Radius,
-    Style, TextTransform, TransformStyle, TransitionProperty, TransitionSpec,
+    CalcExpr, CursorStyle, FontWeight, GradientStopPosition, LinearGradient, Radius, Style,
+    TextTransform, TransformStyle, TransitionProperty, TransitionSpec,
 };
 use crate::widgets::UIWidgetState;
 use std::collections::{HashMap, HashSet};
@@ -16,7 +16,7 @@ use std::collections::{HashMap, HashSet};
 use bevy::asset::RenderAssetUsages;
 use bevy::asset::{load_internal_asset, uuid_handle};
 use bevy::color::Srgba;
-use bevy::core_pipeline::core_2d::graph::{Core2d, Node2d};
+use bevy::core_pipeline::{Core2d, upscaling::upscaling};
 use bevy::image::{ImageSampler, TRANSPARENT_IMAGE_HANDLE};
 use bevy::math::Rot2;
 use bevy::prelude::*;
@@ -25,9 +25,6 @@ use bevy::render::RenderApp;
 use bevy::render::camera::ExtractedCamera;
 use bevy::render::extract_resource::{ExtractResource, ExtractResourcePlugin};
 use bevy::render::render_asset::RenderAssets;
-use bevy::render::render_graph::{
-    NodeRunError, RenderGraphContext, RenderGraphExt, RenderLabel, ViewNode, ViewNodeRunner,
-};
 use bevy::render::render_phase::{
     DrawFunctions, PhaseItem, SortedRenderPhase, ViewSortedRenderPhases,
 };
@@ -35,15 +32,15 @@ use bevy::render::render_resource::{
     AsBindGroup, Extent3d, Origin3d, ShaderType, TexelCopyTextureInfo, TextureAspect,
     TextureDimension, TextureFormat,
 };
+use bevy::render::renderer::{RenderContext, ViewQuery};
 use bevy::render::texture::GpuImage;
 use bevy::render::view::{ExtractedView, RetainedViewEntity, ViewTarget};
 use bevy::shader::{Shader, ShaderRef};
-use bevy::text::LineHeight;
+use bevy::text::{FontSize, FontSource, LineHeight};
 use bevy::ui::{
     ComputedNode, ComputedUiRenderTargetInfo, UiGlobalTransform, UiSystems, UiTransform, Val2,
 };
-use bevy::ui_render::graph::NodeUi;
-use bevy::ui_render::{DrawUiMaterial, TransparentUi, UiCameraView};
+use bevy::ui_render::{DrawUiMaterial, TransparentUi, UiCameraView, render_pass::ui_pass};
 use bevy::window::{
     CursorIcon, CustomCursor, CustomCursorImage, PrimaryWindow, SystemCursorIcon, WindowResized,
 };
@@ -126,24 +123,18 @@ impl Plugin for StyleService {
             .add_systems(
                 bevy::render::Render,
                 split_backdrop_ui_phase_items_system
-                    .in_set(bevy::render::RenderSystems::Prepare)
+                    .in_set(bevy::render::RenderSystems::PrepareBindGroups)
                     .after(bevy::ui_render::prepare_uimaterial_nodes::<BackdropBlurMaterial>),
             )
-            .add_render_graph_node::<ViewNodeRunner<BackdropCaptureCopyNode>>(
-                Core2d,
-                BackdropCaptureCopyPass,
-            )
-            .add_render_graph_node::<ViewNodeRunner<BackdropDeferredDrawNode>>(
-                Core2d,
-                BackdropDeferredDrawPass,
-            )
-            .add_render_graph_edges(
+            .add_systems(
                 Core2d,
                 (
-                    NodeUi::UiPass,
-                    BackdropCaptureCopyPass,
-                    BackdropDeferredDrawPass,
-                    Node2d::Upscaling,
+                    backdrop_capture_copy_pass_system
+                        .after(ui_pass)
+                        .before(upscaling),
+                    backdrop_deferred_draw_pass_system
+                        .after(backdrop_capture_copy_pass_system)
+                        .before(upscaling),
                 ),
             );
     }
@@ -202,7 +193,7 @@ struct BackgroundGradientApplied;
 struct BackgroundImageApplied;
 
 /// Represents the `BackdropBlurUniform` data structure used by the extended UI system.
-#[derive(ShaderType, Clone, Copy, Debug)]
+#[derive(ShaderType, Clone, Copy, Debug, PartialEq)]
 struct BackdropBlurUniform {
     blur_radius_px: f32,
     overlay_alpha: f32,
@@ -239,22 +230,6 @@ struct BackdropCaptureState {
     captured_format: Option<TextureFormat>,
     warmup_frames: u8,
 }
-
-/// Represents the `BackdropCaptureCopyPass` data structure used by the extended UI system.
-#[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
-struct BackdropCaptureCopyPass;
-
-/// Represents the `BackdropDeferredDrawPass` data structure used by the extended UI system.
-#[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
-struct BackdropDeferredDrawPass;
-
-/// Represents the `BackdropCaptureCopyNode` data structure used by the extended UI system.
-#[derive(Default)]
-struct BackdropCaptureCopyNode;
-
-/// Represents the `BackdropDeferredDrawNode` data structure used by the extended UI system.
-#[derive(Default)]
-struct BackdropDeferredDrawNode;
 
 /// Represents the `DeferredBackdropUiPhases` data structure used by the extended UI system.
 #[derive(Resource, Default)]
@@ -1312,20 +1287,7 @@ fn sync_backdrop_blur_materials_system(
         }
 
         if let Some(material_node) = material_node_opt {
-            if let Some(material) = materials.get_mut(material_node.id()) {
-                material.uniform = uniform;
-                if let Some(screen_texture) = capture_state.screen_texture.clone() {
-                    let overlay_texture = if has_overlay {
-                        image_node_opt
-                            .map(|img| img.image.clone())
-                            .unwrap_or_else(|| screen_texture.clone())
-                    } else {
-                        screen_texture.clone()
-                    };
-                    material.screen_texture = screen_texture;
-                    material.overlay_texture = overlay_texture;
-                }
-            } else if let Some(screen_texture) = capture_state.screen_texture.clone() {
+            if let Some(screen_texture) = capture_state.screen_texture.clone() {
                 let overlay_texture = if has_overlay {
                     image_node_opt
                         .map(|img| img.image.clone())
@@ -1333,12 +1295,34 @@ fn sync_backdrop_blur_materials_system(
                 } else {
                     screen_texture.clone()
                 };
-                let handle = materials.add(BackdropBlurMaterial {
-                    uniform,
-                    screen_texture,
-                    overlay_texture,
+
+                let needs_update = materials.get(material_node.id()).is_none_or(|material| {
+                    material.uniform != uniform
+                        || material.screen_texture != screen_texture
+                        || material.overlay_texture != overlay_texture
                 });
-                commands.entity(entity).insert(MaterialNode(handle));
+
+                if needs_update {
+                    if let Some(mut material) = materials.get_mut(material_node.id()) {
+                        material.uniform = uniform;
+                        material.screen_texture = screen_texture;
+                        material.overlay_texture = overlay_texture;
+                    } else {
+                        let handle = materials.add(BackdropBlurMaterial {
+                            uniform,
+                            screen_texture,
+                            overlay_texture,
+                        });
+                        commands.entity(entity).insert(MaterialNode(handle));
+                    }
+                }
+            } else if materials
+                .get(material_node.id())
+                .is_some_and(|material| material.uniform != uniform)
+            {
+                if let Some(mut material) = materials.get_mut(material_node.id()) {
+                    material.uniform = uniform;
+                }
             }
             continue;
         }
@@ -1425,7 +1409,7 @@ fn ensure_backdrop_capture_texture_system(
     image.sampler = ImageSampler::linear();
 
     let handle = if let Some(handle) = capture_state.screen_texture.clone() {
-        if let Some(existing) = images.get_mut(handle.id()) {
+        if let Some(mut existing) = images.get_mut(handle.id()) {
             *existing = image;
             handle
         } else {
@@ -1442,85 +1426,70 @@ fn ensure_backdrop_capture_texture_system(
     capture_state.warmup_frames = 1;
 }
 
-impl ViewNode for BackdropCaptureCopyNode {
-    /// Type alias used for `ViewQuery` values in the extended UI API.
-    type ViewQuery = (
-        Entity,
-        &'static ExtractedCamera,
-        &'static ViewTarget,
-        Option<&'static UiCameraView>,
-    );
-
-    /// Handles `run` in the extended UI workflow.
-    fn run(
-        &self,
-        _graph: &mut RenderGraphContext,
-        render_context: &mut bevy::render::renderer::RenderContext,
-        (view_entity, camera, view_target, ui_camera_view): bevy::ecs::query::QueryItem<
-            Self::ViewQuery,
-        >,
-        world: &World,
-    ) -> Result<(), NodeRunError> {
-        let ui_view_entity = ui_camera_view.map(|v| v.0).unwrap_or(view_entity);
-        let Some(ui_view) = world.get::<ExtractedView>(ui_view_entity) else {
-            return Ok(());
-        };
-        let deferred_phases = world.resource::<DeferredBackdropUiPhases>();
-        let Some(phase) = deferred_phases.0.get(&ui_view.retained_view_entity) else {
-            return Ok(());
-        };
-        if phase.items.is_empty() {
-            return Ok(());
-        }
-
-        let Some(target_size) = camera.physical_target_size else {
-            return Ok(());
-        };
-        if target_size == UVec2::ZERO {
-            return Ok(());
-        }
-
-        let capture_state = world.resource::<BackdropCaptureState>();
-        let Some(screen_texture) = capture_state.screen_texture.clone() else {
-            return Ok(());
-        };
-
-        let gpu_images = world.resource::<RenderAssets<GpuImage>>();
-        let Some(gpu_image) = gpu_images.get(screen_texture.id()) else {
-            return Ok(());
-        };
-
-        if view_target.main_texture_format() != gpu_image.texture_format {
-            return Ok(());
-        }
-
-        let copy_size = Extent3d {
-            width: target_size.x.min(gpu_image.size.width),
-            height: target_size.y.min(gpu_image.size.height),
-            depth_or_array_layers: 1,
-        };
-        if copy_size.width == 0 || copy_size.height == 0 {
-            return Ok(());
-        }
-
-        render_context.command_encoder().copy_texture_to_texture(
-            TexelCopyTextureInfo {
-                texture: view_target.main_texture(),
-                mip_level: 0,
-                origin: Origin3d::ZERO,
-                aspect: TextureAspect::All,
-            },
-            TexelCopyTextureInfo {
-                texture: &gpu_image.texture,
-                mip_level: 0,
-                origin: Origin3d::ZERO,
-                aspect: TextureAspect::All,
-            },
-            copy_size,
-        );
-
-        Ok(())
+/// Copies the already-rendered UI/background into the backdrop texture for the current view.
+fn backdrop_capture_copy_pass_system(
+    world: &World,
+    view: ViewQuery<(Entity, &ExtractedCamera, &ViewTarget, Option<&UiCameraView>)>,
+    mut render_context: RenderContext,
+) {
+    let (view_entity, camera, view_target, ui_camera_view) = view.into_inner();
+    let ui_view_entity = ui_camera_view.map(|v| v.0).unwrap_or(view_entity);
+    let Some(ui_view) = world.get::<ExtractedView>(ui_view_entity) else {
+        return;
+    };
+    let deferred_phases = world.resource::<DeferredBackdropUiPhases>();
+    let Some(phase) = deferred_phases.0.get(&ui_view.retained_view_entity) else {
+        return;
+    };
+    if phase.items.is_empty() {
+        return;
     }
+
+    let Some(target_size) = camera.physical_target_size else {
+        return;
+    };
+    if target_size == UVec2::ZERO {
+        return;
+    }
+
+    let capture_state = world.resource::<BackdropCaptureState>();
+    let Some(screen_texture) = capture_state.screen_texture.clone() else {
+        return;
+    };
+
+    let gpu_images = world.resource::<RenderAssets<GpuImage>>();
+    let Some(gpu_image) = gpu_images.get(screen_texture.id()) else {
+        return;
+    };
+
+    if view_target.main_texture_format() != gpu_image.texture_descriptor.format {
+        return;
+    }
+
+    let copy_size = Extent3d {
+        width: target_size.x.min(gpu_image.texture_descriptor.size.width),
+        height: target_size.y.min(gpu_image.texture_descriptor.size.height),
+        depth_or_array_layers: 1,
+    };
+    if copy_size.width == 0 || copy_size.height == 0 {
+        return;
+    }
+
+    render_context.command_encoder().copy_texture_to_texture(
+        TexelCopyTextureInfo {
+            texture: view_target.main_texture(),
+            mip_level: 0,
+            origin: Origin3d::ZERO,
+            aspect: TextureAspect::All,
+        },
+        TexelCopyTextureInfo {
+            texture: &gpu_image.texture,
+            mip_level: 0,
+            origin: Origin3d::ZERO,
+            aspect: TextureAspect::All,
+        },
+        copy_size,
+    );
 }
 
 /// Handles `split_backdrop_ui_phase_items_system` in the extended UI workflow.
@@ -1545,66 +1514,70 @@ fn split_backdrop_ui_phase_items_system(
         let first_backdrop_index = phase
             .items
             .iter()
-            .position(|item| item.draw_function() == backdrop_draw_function);
+            .position(|(_, item)| item.draw_function() == backdrop_draw_function);
         let Some(first_backdrop_index) = first_backdrop_index else {
             continue;
         };
 
         let deferred = phase.items.split_off(first_backdrop_index);
         if !deferred.is_empty() {
-            deferred_phases
-                .0
-                .insert(*retained_view, SortedRenderPhase { items: deferred });
+            let deferred_keys: HashSet<_> = deferred.keys().copied().collect();
+            let mut transient_items = Vec::new();
+            phase.transient_items.retain(|key| {
+                if deferred_keys.contains(key) {
+                    transient_items.push(*key);
+                    false
+                } else {
+                    true
+                }
+            });
+
+            deferred_phases.0.insert(
+                *retained_view,
+                SortedRenderPhase {
+                    items: deferred,
+                    transient_items,
+                },
+            );
         }
     }
 }
 
-impl ViewNode for BackdropDeferredDrawNode {
-    /// Type alias used for `ViewQuery` values in the extended UI API.
-    type ViewQuery = (
-        Entity,
-        &'static ViewTarget,
-        &'static ExtractedCamera,
-        Option<&'static UiCameraView>,
-    );
+/// Draws the deferred backdrop material and all UI items above it for the current view.
+fn backdrop_deferred_draw_pass_system(
+    world: &World,
+    view: ViewQuery<(Entity, &ViewTarget, &ExtractedCamera, Option<&UiCameraView>)>,
+    mut render_context: RenderContext,
+) {
+    let (view_entity, target, camera, ui_camera_view) = view.into_inner();
+    let ui_view_entity = ui_camera_view.map(|v| v.0).unwrap_or(view_entity);
 
-    /// Handles `run` in the extended UI workflow.
-    fn run(
-        &self,
-        _graph: &mut RenderGraphContext,
-        render_context: &mut bevy::render::renderer::RenderContext,
-        (view_entity, target, camera, ui_camera_view): bevy::ecs::query::QueryItem<Self::ViewQuery>,
-        world: &World,
-    ) -> Result<(), NodeRunError> {
-        let ui_view_entity = ui_camera_view.map(|v| v.0).unwrap_or(view_entity);
-
-        let Some(ui_view) = world.get::<ExtractedView>(ui_view_entity) else {
-            return Ok(());
-        };
-        let deferred_phases = world.resource::<DeferredBackdropUiPhases>();
-        let Some(phase) = deferred_phases.0.get(&ui_view.retained_view_entity) else {
-            return Ok(());
-        };
-        if phase.items.is_empty() {
-            return Ok(());
-        }
-
-        let mut render_pass = render_context.begin_tracked_render_pass(
-            bevy::render::render_resource::RenderPassDescriptor {
-                label: Some("backdrop_deferred_ui"),
-                color_attachments: &[Some(target.get_unsampled_color_attachment())],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-            },
-        );
-        if let Some(viewport) = camera.viewport.as_ref() {
-            render_pass.set_camera_viewport(viewport);
-        }
-
-        let _ = phase.render(&mut render_pass, world, ui_view_entity);
-        Ok(())
+    let Some(ui_view) = world.get::<ExtractedView>(ui_view_entity) else {
+        return;
+    };
+    let deferred_phases = world.resource::<DeferredBackdropUiPhases>();
+    let Some(phase) = deferred_phases.0.get(&ui_view.retained_view_entity) else {
+        return;
+    };
+    if phase.items.is_empty() {
+        return;
     }
+
+    let mut render_pass = render_context.begin_tracked_render_pass(
+        bevy::render::render_resource::RenderPassDescriptor {
+            label: Some("backdrop_deferred_ui"),
+            color_attachments: &[Some(target.get_unsampled_color_attachment())],
+            depth_stencil_attachment: None,
+            timestamp_writes: None,
+            occlusion_query_set: None,
+            multiview_mask: None,
+        },
+    );
+    if let Some(viewport) = camera.viewport.as_ref() {
+        render_pass.set_camera_viewport(viewport);
+    }
+
+    let _ = phase.render(&mut render_pass, world, ui_view_entity);
 }
 
 /// Type alias used for `StyleCandidate` values in the extended UI API.
@@ -2143,7 +2116,7 @@ fn apply_style_components(
     // TextFont
     if let Some(tf) = components.5.as_mut() {
         if let Some(font_size) = style.font_size.clone() {
-            tf.font_size = font_size.get(None);
+            tf.font_size = font_size;
         }
 
         if let Some(font_family) = style.font_family.as_ref() {
@@ -2152,7 +2125,7 @@ fn apply_style_components(
             if font_path_str.eq_ignore_ascii_case("default") {
                 tf.font = Default::default();
             } else if font_path_str.ends_with(".ttf") {
-                tf.font = asset_server.load(font_path_str);
+                tf.font = FontSource::Handle(asset_server.load(font_path_str));
             } else {
                 let folder = font_path_str.trim().trim_matches('"').trim_matches('\'');
 
@@ -2160,7 +2133,11 @@ fn apply_style_components(
                     tf.font = Default::default();
                 } else {
                     let weight_opt = style.font_weight.clone();
-                    tf.font = load_weighted_font_from_folder(asset_server, folder, weight_opt);
+                    tf.font = FontSource::Handle(load_weighted_font_from_folder(
+                        asset_server,
+                        folder,
+                        weight_opt,
+                    ));
                 }
             }
         }
@@ -2289,7 +2266,7 @@ fn blend_animation_style(from: &Style, to: &Style, t: f32) -> Style {
     blended.max_height = blend_val_opt(from.max_height.clone(), to.max_height.clone(), t);
     blended.padding = blend_ui_rect_opt(&from.padding, &to.padding, t);
     blended.margin = blend_ui_rect_opt(&from.margin, &to.margin, t);
-    blended.font_size = blend_font_val_opt(&from.font_size, &to.font_size, t);
+    blended.font_size = blend_font_size_opt(&from.font_size, &to.font_size, t);
     blended.border_radius = blend_radius_opt(&from.border_radius, &to.border_radius, t);
     blended
 }
@@ -2446,20 +2423,24 @@ fn blend_radius_opt(from: &Option<Radius>, to: &Option<Radius>, t: f32) -> Optio
 }
 
 /// Blends two font size values.
-fn blend_font_val(from: &FontVal, to: &FontVal, t: f32) -> FontVal {
+fn blend_font_size(from: FontSize, to: FontSize, t: f32) -> FontSize {
     match (from, to) {
-        (FontVal::Px(a), FontVal::Px(b)) => FontVal::Px(lerp(*a, *b, t)),
-        (FontVal::Rem(a), FontVal::Rem(b)) => FontVal::Rem(lerp(*a, *b, t)),
-        _ => to.clone(),
+        (FontSize::Px(a), FontSize::Px(b)) => FontSize::Px(lerp(a, b, t)),
+        (FontSize::Rem(a), FontSize::Rem(b)) => FontSize::Rem(lerp(a, b, t)),
+        (FontSize::Vw(a), FontSize::Vw(b)) => FontSize::Vw(lerp(a, b, t)),
+        (FontSize::Vh(a), FontSize::Vh(b)) => FontSize::Vh(lerp(a, b, t)),
+        (FontSize::VMin(a), FontSize::VMin(b)) => FontSize::VMin(lerp(a, b, t)),
+        (FontSize::VMax(a), FontSize::VMax(b)) => FontSize::VMax(lerp(a, b, t)),
+        _ => to,
     }
 }
 
 /// Blends optional font sizes when both are set.
-fn blend_font_val_opt(from: &Option<FontVal>, to: &Option<FontVal>, t: f32) -> Option<FontVal> {
+fn blend_font_size_opt(from: &Option<FontSize>, to: &Option<FontSize>, t: f32) -> Option<FontSize> {
     match (from, to) {
-        (Some(a), Some(b)) => Some(blend_font_val(a, b, t)),
-        (None, Some(b)) => Some(b.clone()),
-        (Some(a), None) => Some(a.clone()),
+        (Some(a), Some(b)) => Some(blend_font_size(*a, *b, t)),
+        (None, Some(b)) => Some(*b),
+        (Some(a), None) => Some(*a),
         _ => None,
     }
 }
@@ -3064,9 +3045,8 @@ fn propagate_recursive(
         if !has_local_size {
             if let Some(parent_size_val) = inherited_style.and_then(|s| s.font_size.as_ref()) {
                 if let Some(text_font) = text_font_opt.as_mut() {
-                    let size_px = parent_size_val.get(Some(12.0));
-                    if text_font.font_size != size_px {
-                        text_font.font_size = size_px;
+                    if text_font.font_size != *parent_size_val {
+                        text_font.font_size = *parent_size_val;
                     }
                 }
             }
@@ -3098,8 +3078,9 @@ fn propagate_recursive(
 
                     let handle = asset_server.load(full_path);
                     if let Some(text_font) = text_font_opt.as_mut() {
-                        if text_font.font != handle {
-                            text_font.font = handle;
+                        let font = FontSource::Handle(handle);
+                        if text_font.font != font {
+                            text_font.font = font;
                         }
                     }
                 }

@@ -905,19 +905,13 @@ fn update_dialog_with_meta(
             entity_mut.insert(next);
         }
 
-        let visibility = world
+        let runtime_components = world
             .get::<crate::dialog::DialogWidget>(entity)
-            .map(|dialog| {
-                if dialog.renderer == crate::dialog::DialogProvider::BevyApp && dialog.open {
-                    Visibility::Inherited
-                } else {
-                    Visibility::Hidden
-                }
-            })
-            .unwrap_or(Visibility::Hidden);
+            .map(crate::dialog::dialog_widget_runtime_components)
+            .unwrap_or((Visibility::Hidden, Pickable::IGNORE));
 
         if let Ok(mut entity_mut) = world.get_entity_mut(entity) {
-            entity_mut.insert(visibility);
+            entity_mut.insert(runtime_components);
         }
     });
 }

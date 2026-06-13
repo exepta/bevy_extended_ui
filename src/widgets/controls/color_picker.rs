@@ -11,7 +11,8 @@ use bevy::camera::visibility::RenderLayers;
 use bevy::image::ImageSampler;
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
-use bevy::ui::RelativeCursorPosition;
+use bevy::ui::{RelativeCursorPosition, UiGlobalTransform, UiScale};
+use bevy::window::PrimaryWindow;
 
 const SV_CANVAS_SIZE: u32 = 192;
 const TRACK_WIDTH: u32 = 256;
@@ -127,6 +128,7 @@ impl Plugin for ColorPickerWidget {
             )
                 .chain(),
         );
+        app.add_systems(Last, update_modal_position);
     }
 }
 
@@ -253,7 +255,7 @@ fn internal_node_creation_system(
                             .spawn((
                                 Name::new(format!("ColorPicker-Canvas-{}", picker.entry)),
                                 Node::default(),
-                                ImageNode::new(canvas),
+                                ImageNode::new(canvas).with_mode(NodeImageMode::Stretch),
                                 BackgroundColor::default(),
                                 BorderColor::default(),
                                 RelativeCursorPosition::default(),
@@ -295,7 +297,7 @@ fn internal_node_creation_system(
                             .spawn((
                                 Name::new(format!("ColorPicker-Hue-{}", picker.entry)),
                                 Node::default(),
-                                ImageNode::new(hue),
+                                ImageNode::new(hue).with_mode(NodeImageMode::Stretch),
                                 BackgroundColor::default(),
                                 BorderColor::default(),
                                 RelativeCursorPosition::default(),
@@ -336,7 +338,7 @@ fn internal_node_creation_system(
                             .spawn((
                                 Name::new(format!("ColorPicker-Alpha-{}", picker.entry)),
                                 Node::default(),
-                                ImageNode::new(alpha),
+                                ImageNode::new(alpha).with_mode(NodeImageMode::Stretch),
                                 BackgroundColor::default(),
                                 BorderColor::default(),
                                 RelativeCursorPosition::default(),
@@ -461,24 +463,35 @@ fn update_modal_visibility(
 
 /// Positions the modal centered under the trigger with 10px gap.
 fn update_modal_position(
-    picker_q: Query<(&UIGenID, &UIWidgetState), With<ColorPicker>>,
-    trigger_q: Query<(&BindToID, &ComputedNode), With<ColorPickerTrigger>>,
+    window_q: Query<&Window, With<PrimaryWindow>>,
+    ui_scale: Res<UiScale>,
+    picker_q: Query<
+        (&UIGenID, &UIWidgetState, &ComputedNode, &UiGlobalTransform),
+        With<ColorPicker>,
+    >,
+    trigger_q: Query<(&BindToID, &ComputedNode, &UiGlobalTransform), With<ColorPickerTrigger>>,
     mut modal_q: Query<
         (&mut Node, &BindToID, &ComputedNode, Option<&mut UiStyle>),
         With<ColorPickerModal>,
     >,
 ) {
+    let Ok(window) = window_q.single() else {
+        return;
+    };
     let gap = 10.0;
+    let margin = 8.0;
+    let scale = (window.scale_factor() * ui_scale.0).max(f32::EPSILON);
+    let viewport_size = Vec2::new(window.width(), window.height());
 
-    for (id, state) in picker_q.iter() {
+    for (id, state, root_node, root_transform) in picker_q.iter() {
         if !state.open {
             continue;
         }
 
-        let Some(trigger_node) = trigger_q
+        let Some((trigger_node, trigger_transform)) = trigger_q
             .iter()
-            .find(|(bind, _)| bind.0 == id.0)
-            .map(|(_, node)| node)
+            .find(|(bind, _, _)| bind.0 == id.0)
+            .map(|(_, node, transform)| (node, transform))
         else {
             continue;
         };
@@ -493,25 +506,90 @@ fn update_modal_position(
 
         let trigger_size = logical_size(trigger_node);
         let modal_size = logical_size(modal_computed);
+        let root_top_left = top_left_ui(root_node, root_transform, scale);
+        let trigger_top_left = top_left_ui(trigger_node, trigger_transform, scale);
 
         let trigger_w = trigger_size.x.max(1.0);
         let trigger_h = trigger_size.y.max(1.0);
-        let modal_w = if modal_size.x.is_finite() && modal_size.x > 8.0 {
+        let raw_modal_w = if modal_size.x.is_finite() && modal_size.x > 8.0 {
             modal_size.x
         } else {
             MODAL_FALLBACK_WIDTH
         };
+        let raw_modal_h = if modal_size.y.is_finite() && modal_size.y > 8.0 {
+            modal_size.y
+        } else {
+            294.0
+        };
+        let modal_w = raw_modal_w.min((viewport_size.x - margin * 2.0).max(160.0));
+        let modal_h = raw_modal_h.min((viewport_size.y - margin * 2.0).max(180.0));
 
-        let local_left = Val::Px((trigger_w - modal_w) * 0.5);
-        let local_top = Val::Px(trigger_h + gap);
+        let ideal_x = trigger_top_left.x + (trigger_w - modal_w) * 0.5;
+        let max_x = (viewport_size.x - modal_w - margin).max(margin);
+        let absolute_x = ideal_x.clamp(margin, max_x);
+
+        let below_y = trigger_top_left.y + trigger_h + gap;
+        let above_y = trigger_top_left.y - modal_h - gap;
+        let absolute_y = if below_y + modal_h <= viewport_size.y - margin || above_y < margin {
+            below_y
+        } else {
+            above_y
+        }
+        .clamp(margin, (viewport_size.y - modal_h - margin).max(margin));
+
+        let local_left = Val::Px(absolute_x - root_top_left.x);
+        let local_top = Val::Px(absolute_y - root_top_left.y);
+        let local_width = Val::Px(modal_w);
+        let local_max_height = Val::Px(modal_h);
 
         set_if_changed(&mut modal_node.left, local_left);
         set_if_changed(&mut modal_node.top, local_top);
+        set_if_changed(&mut modal_node.width, local_width);
+        set_if_changed(&mut modal_node.max_height, local_max_height);
 
         if let Some(mut styles) = maybe_styles {
-            for (_, style) in styles.styles.iter_mut() {
-                style.normal.left = Some(local_left);
-                style.normal.top = Some(local_top);
+            let mut changed = false;
+            {
+                let styles = styles.bypass_change_detection();
+                if let Some(active) = styles.active_style.as_mut() {
+                    if active.left != Some(local_left) {
+                        active.left = Some(local_left);
+                        changed = true;
+                    }
+                    if active.top != Some(local_top) {
+                        active.top = Some(local_top);
+                        changed = true;
+                    }
+                    if active.width != Some(local_width) {
+                        active.width = Some(local_width);
+                        changed = true;
+                    }
+                    if active.max_height != Some(local_max_height) {
+                        active.max_height = Some(local_max_height);
+                        changed = true;
+                    }
+                }
+                for (_, style) in styles.styles.iter_mut() {
+                    if style.normal.left != Some(local_left) {
+                        style.normal.left = Some(local_left);
+                        changed = true;
+                    }
+                    if style.normal.top != Some(local_top) {
+                        style.normal.top = Some(local_top);
+                        changed = true;
+                    }
+                    if style.normal.width != Some(local_width) {
+                        style.normal.width = Some(local_width);
+                        changed = true;
+                    }
+                    if style.normal.max_height != Some(local_max_height) {
+                        style.normal.max_height = Some(local_max_height);
+                        changed = true;
+                    }
+                }
+            }
+            if changed {
+                styles.set_changed();
             }
         }
     }
@@ -521,6 +599,11 @@ fn update_modal_position(
 fn logical_size(node: &ComputedNode) -> Vec2 {
     let inv = node.inverse_scale_factor.max(f32::EPSILON);
     node.size() * inv
+}
+
+fn top_left_ui(node: &ComputedNode, transform: &UiGlobalTransform, scale: f32) -> Vec2 {
+    let half = node.size() * 0.5;
+    transform.affine().transform_point2(-half) / scale
 }
 
 /// Syncs generated textures, preview and labels when the color changes.
@@ -563,12 +646,12 @@ fn sync_color_picker_visual_state(
         });
 
         if hue_changed {
-            if let Some(canvas_image) = images.get_mut(&textures.canvas) {
+            if let Some(mut canvas_image) = images.get_mut(&textures.canvas) {
                 *canvas_image = generate_sv_canvas_image(picker.hue);
             }
         }
         if rgb_changed {
-            if let Some(alpha_image) = images.get_mut(&textures.alpha) {
+            if let Some(mut alpha_image) = images.get_mut(&textures.alpha) {
                 *alpha_image = generate_alpha_track_image(picker.red, picker.green, picker.blue);
             }
         }
