@@ -120,7 +120,7 @@ pub struct HtmlPendingReveal(pub HashSet<String>);
 
 /// Component storing parsed inline CSS (`style="..."`) as your custom Style struct.
 /// Component storing parsed inline CSS (`style="..."`) as a `Style`.
-#[derive(Component, Reflect, Debug, Clone)]
+#[derive(Component, Reflect, Debug, Clone, PartialEq)]
 #[reflect(Component)]
 pub struct HtmlStyle(pub Style);
 
@@ -150,8 +150,16 @@ impl HtmlStyle {
     }
 }
 
+/// Runtime metadata for simple text bindings that can be patched without rebuilding the template.
+#[derive(Component, Reflect, Debug, Clone, Default, PartialEq)]
+#[reflect(Component)]
+pub struct HtmlTextBinding {
+    pub template: String,
+    pub bindings: Vec<String>,
+}
+
 /// Metadata collected from HTML attributes.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct HtmlMeta {
     /// All referenced CSS assets for this node.
     pub css: Vec<Handle<CssAsset>>,
@@ -160,6 +168,7 @@ pub struct HtmlMeta {
     pub style: Option<HtmlStyle>,
     pub validation: Option<ValidationRules>,
     pub inner_content: HtmlInnerContent,
+    pub text_binding: Option<HtmlTextBinding>,
 }
 
 /// Captures textual and reactive inner content for an HTML element.
@@ -168,7 +177,7 @@ pub struct HtmlMeta {
 /// - `inner_text`: plain text inside the element
 /// - `inner_html`: serialized child HTML
 /// - `inner_bindings`: placeholders such as `{{user.name}}`
-#[derive(Component, Reflect, Debug, Clone, Default)]
+#[derive(Component, Reflect, Debug, Clone, Default, PartialEq)]
 #[reflect(Component)]
 pub struct HtmlInnerContent {
     inner_text: String,
@@ -222,7 +231,7 @@ impl HtmlInnerContent {
 }
 
 /// Common HTML state flags for nodes.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct HtmlStates {
     pub hidden: bool,
     pub disabled: bool,
@@ -621,7 +630,7 @@ impl Default for HtmlStructureMap {
 }
 
 /// Unique identifier for HTML nodes.
-#[derive(Clone, Debug, PartialEq, Component)]
+#[derive(Clone, Debug, PartialEq, Eq, Component)]
 pub struct HtmlID(pub usize);
 
 impl Default for HtmlID {
@@ -802,7 +811,7 @@ pub struct HtmlFunctionRegistry {
 }
 
 /// Component storing event handler names attached in HTML.
-#[derive(Component, Reflect, Default, Clone, Debug)]
+#[derive(Component, Reflect, Default, Clone, Debug, PartialEq)]
 #[reflect(Component)]
 pub struct HtmlEventBindings {
     pub onclick: Option<String>,
@@ -1037,6 +1046,7 @@ impl Plugin for ExtendedUiHtmlPlugin {
         app.register_type::<HtmlSource>();
         app.register_type::<HtmlStyle>();
         app.register_type::<HtmlInnerContent>();
+        app.register_type::<HtmlTextBinding>();
 
         app.configure_sets(
             Update,

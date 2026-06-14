@@ -306,19 +306,37 @@ fn on_option_click(
 ) {
     let clicked_entity = trigger.entity;
 
-    let (clicked_parent_id, _clicked_option, was_checked) =
+    let (clicked_parent_id, clicked_option, was_checked) =
         if let Ok((_, state, option, bind_id, _)) = option_query.get(clicked_entity) {
             (bind_id.0, option.clone(), state.checked)
         } else {
             return;
         };
 
-    // Find the parent list box to read multiselect flag.
-    let multiselect = parent_query
-        .iter()
+    let Some((_, mut list_box)) = parent_query
+        .iter_mut()
         .find(|(id, _)| id.0 == clicked_parent_id)
-        .map(|(_, lb)| lb.multiselect)
-        .unwrap_or(false);
+    else {
+        return;
+    };
+
+    if list_box.multiselect {
+        let new_checked = !was_checked;
+        if let Ok((_, mut state, _, _, children)) = option_query.get_mut(clicked_entity) {
+            sync_option_checked_state(new_checked, &mut state, children, &mut inner_query);
+        }
+
+        if new_checked {
+            if !list_box.values.contains(&clicked_option) {
+                list_box.values.push(clicked_option);
+            }
+        } else {
+            list_box.values.retain(|option| option != &clicked_option);
+        }
+
+        trigger.propagate(false);
+        return;
+    }
 
     // Update checked states on all sibling options.
     for (entity, mut state, _, bind_id, children) in option_query.iter_mut() {
@@ -326,41 +344,38 @@ fn on_option_click(
             continue;
         }
 
-        let new_checked = if multiselect {
-            // toggle only the clicked option
-            if entity == clicked_entity {
-                !was_checked
-            } else {
-                state.checked
-            }
-        } else {
-            // single-select: only the clicked option becomes checked
-            entity == clicked_entity
-        };
-
-        state.checked = new_checked;
-
-        for child in children.iter() {
-            if let Ok(mut inner_state) = inner_query.get_mut(child) {
-                inner_state.checked = new_checked;
-            }
-        }
+        sync_option_checked_state(
+            entity == clicked_entity,
+            &mut state,
+            children,
+            &mut inner_query,
+        );
     }
 
-    // Rebuild values on the parent ListBox.
-    for (id, mut list_box) in parent_query.iter_mut() {
-        if id.0 != clicked_parent_id {
-            continue;
-        }
-
-        list_box.values = option_query
-            .iter()
-            .filter(|(_, state, _, bind_id, _)| bind_id.0 == clicked_parent_id && state.checked)
-            .map(|(_, _, option, _, _)| option.clone())
-            .collect();
+    let selected_values = vec![clicked_option];
+    if list_box.values != selected_values {
+        list_box.values = selected_values;
     }
 
     trigger.propagate(false);
+}
+
+fn sync_option_checked_state(
+    checked: bool,
+    state: &mut UIWidgetState,
+    children: &Children,
+    inner_query: &mut Query<&mut UIWidgetState, (Without<ListBoxOptionBase>, Without<ListBox>)>,
+) {
+    if state.checked == checked {
+        return;
+    }
+
+    state.checked = checked;
+    for child in children.iter() {
+        if let Ok(mut inner_state) = inner_query.get_mut(child) {
+            inner_state.checked = checked;
+        }
+    }
 }
 
 /// Sets `hovered = true` on a list box option and its visual children.
@@ -370,6 +385,9 @@ fn on_option_cursor_entered(
     mut inner_query: Query<&mut UIWidgetState, Without<ListBoxOptionBase>>,
 ) {
     if let Ok((mut state, children)) = query.get_mut(trigger.entity) {
+        if state.hovered {
+            return;
+        }
         state.hovered = true;
 
         for child in children.iter() {
@@ -387,6 +405,9 @@ fn on_option_cursor_leave(
     mut inner_query: Query<&mut UIWidgetState, Without<ListBoxOptionBase>>,
 ) {
     if let Ok((mut state, children)) = query.get_mut(trigger.entity) {
+        if !state.hovered {
+            return;
+        }
         state.hovered = false;
 
         for child in children.iter() {

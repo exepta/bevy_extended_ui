@@ -4,6 +4,8 @@ mod tests {
     use crate::ExtendedUiConfiguration;
     #[cfg(feature = "extended-dialog")]
     use crate::dialog::{DialogProvider, DialogWidget, DialogWidgetType, ExtendedDialogPlugin};
+    #[cfg(feature = "extended-framework")]
+    use crate::framework::ExtendedFrameworkConfiguration;
     use crate::html::builder;
     use crate::html::converter::{self, HtmlConverterSystem};
     use crate::html::reload::{CssDirty, HtmlReloadPlugin};
@@ -11,6 +13,7 @@ mod tests {
     use crate::lang::{UILang, UiLangState, UiLangVariables, UiSharedValues};
     #[cfg(feature = "providers")]
     use crate::providers::{ThemeProvider, UiProviderRegistry};
+    use crate::styles::components::UiStyle;
     use crate::styles::{CssClass, CssID, CssSource, IconPlace};
     use crate::widgets::{
         BadgeAnchor, Body, Button, ButtonType, DateFormat, FieldMode, FormValidationMode,
@@ -22,6 +25,12 @@ mod tests {
     use bevy::ecs::message::Messages;
     use bevy::ecs::system::SystemId;
     use bevy::prelude::*;
+    #[cfg(feature = "extended-framework")]
+    use bevy_extended_ui::routing::{Router, Routes};
+    #[cfg(feature = "extended-framework")]
+    use std::path::{Path, PathBuf};
+    #[cfg(feature = "extended-framework")]
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     fn build_test_html_event(world: &mut World) -> SystemId<In<HtmlEvent>, ()> {
         world.register_system(|In(_event): In<HtmlEvent>| {})
@@ -273,6 +282,16 @@ mod tests {
             .collect()
     }
 
+    #[derive(Resource, Default)]
+    struct ChangedButtonEntities(Vec<Entity>);
+
+    fn collect_changed_buttons(
+        mut changed: ResMut<ChangedButtonEntities>,
+        query: Query<Entity, Changed<Button>>,
+    ) {
+        changed.0 = query.iter().collect();
+    }
+
     fn has_css_handle_path(handles: &[Handle<CssAsset>], expected_path: &str) -> bool {
         handles.iter().any(|handle| {
             handle
@@ -288,6 +307,58 @@ mod tests {
         css_assets.add(CssAsset {
             text: css_text.to_string(),
         })
+    }
+
+    #[cfg(feature = "extended-framework")]
+    fn unique_temp_dir(prefix: &str) -> PathBuf {
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time")
+            .as_nanos();
+        std::env::temp_dir().join(format!("bevy_extended_ui_html_{prefix}_{stamp}"))
+    }
+
+    #[cfg(feature = "extended-framework")]
+    fn write_file(path: &Path, content: &str) {
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).expect("mkdir parent");
+        }
+        std::fs::write(path, content).expect("write file");
+    }
+
+    #[cfg(feature = "extended-framework")]
+    fn write_test_component(
+        asset_root: &Path,
+        rust_root: &Path,
+        name: &str,
+        tag: &str,
+        html: &str,
+    ) {
+        write_file(
+            &rust_root.join(format!("{name}.component.rs")),
+            &format!(
+                r#"
+                #[bevy_extended_ui_macros::ui_component]
+                const COMPONENT: Component = Component {{
+                    template_name: "{tag}",
+                    template_file: "{name}.component.html",
+                    styles: ["{name}.component.css"],
+                }};
+                "#
+            ),
+        );
+        write_file(
+            &asset_root
+                .join("components")
+                .join(format!("{name}.component.html")),
+            html,
+        );
+        write_file(
+            &asset_root
+                .join("components")
+                .join(format!("{name}.component.css")),
+            "p { color: white; }",
+        );
     }
 
     fn collect_nodes<'a>(nodes: &'a [HtmlWidgetNode], out: &mut Vec<&'a HtmlWidgetNode>) {
@@ -1150,6 +1221,7 @@ mod tests {
         let mut app = setup_converter_app();
         app.add_message::<HtmlAllWidgetsSpawned>();
         app.add_systems(Update, builder::build_html_source);
+        app.init_resource::<HtmlPendingReveal>();
 
         add_html_source(
             &mut app,
@@ -1200,6 +1272,7 @@ mod tests {
         let mut app = setup_converter_app();
         app.add_message::<HtmlAllWidgetsSpawned>();
         app.add_systems(Update, builder::build_html_source);
+        app.init_resource::<HtmlPendingReveal>();
 
         add_html_source(
             &mut app,
@@ -1354,6 +1427,310 @@ mod tests {
     }
 
     #[test]
+    fn builder_does_not_mark_unchanged_widgets_changed_on_template_refresh() {
+        let mut app = setup_converter_app();
+        app.add_message::<HtmlAllWidgetsSpawned>();
+        app.add_systems(Update, builder::build_html_source);
+        app.init_resource::<ChangedButtonEntities>();
+        app.add_systems(Update, collect_changed_buttons);
+
+        app.world_mut()
+            .resource_mut::<UiLangVariables>()
+            .set("data", r#"{"text":"First"}"#);
+
+        add_html_source(
+            &mut app,
+            "examples/build_partial_dynamic_fixture.html",
+            r#"
+            <html>
+              <head><meta name="build-partial-dynamic-key" /></head>
+              <body>
+                <button>Static</button>
+                <button>{{ data.text }}</button>
+              </body>
+            </html>
+            "#,
+            "build-partial-dynamic-key",
+            None,
+        );
+
+        app.update();
+
+        {
+            let mut map = app.world_mut().resource_mut::<HtmlStructureMap>();
+            map.active = Some(vec!["build-partial-dynamic-key".to_string()]);
+        }
+        app.world_mut().resource_mut::<HtmlDirty>().0 = true;
+        app.update();
+
+        let mut button_query = app.world_mut().query::<(Entity, &Button)>();
+        let buttons = button_query
+            .iter(app.world())
+            .map(|(entity, button)| (entity, button.entry, button.text.clone()))
+            .collect::<Vec<_>>();
+        let (static_entity, static_entry, _) = buttons
+            .iter()
+            .find(|(_, _, text)| text == "Static")
+            .expect("expected static button");
+        let (dynamic_entity, dynamic_entry, _) = buttons
+            .iter()
+            .find(|(_, _, text)| text == "First")
+            .expect("expected dynamic button");
+        let static_entity = *static_entity;
+        let static_entry = *static_entry;
+        let dynamic_entity = *dynamic_entity;
+        let dynamic_entry = *dynamic_entry;
+
+        app.world_mut().clear_trackers();
+        app.world_mut()
+            .resource_mut::<ChangedButtonEntities>()
+            .0
+            .clear();
+        app.world_mut()
+            .resource_mut::<UiLangVariables>()
+            .set("data", r#"{"text":"Second"}"#);
+
+        app.update();
+        app.update();
+        app.update();
+
+        let changed_buttons = &app.world().resource::<ChangedButtonEntities>().0;
+        assert!(
+            changed_buttons.is_empty(),
+            "simple text bindings should patch in place without a builder-driven Button change"
+        );
+
+        let static_button = app
+            .world()
+            .get::<Button>(static_entity)
+            .expect("static button still exists");
+        let dynamic_button = app
+            .world()
+            .get::<Button>(dynamic_entity)
+            .expect("dynamic button still exists");
+
+        assert_eq!(static_button.text, "Static");
+        assert_eq!(static_button.entry, static_entry);
+        assert_eq!(dynamic_button.text, "Second");
+        assert_eq!(dynamic_button.entry, dynamic_entry);
+    }
+
+    #[test]
+    fn simple_paragraph_binding_updates_without_rebuild() {
+        let mut app = setup_converter_app();
+        app.add_message::<HtmlAllWidgetsSpawned>();
+        app.add_systems(Update, builder::build_html_source);
+
+        app.world_mut()
+            .resource_mut::<UiLangVariables>()
+            .set("data", r#"{"text":"First"}"#);
+
+        add_html_source(
+            &mut app,
+            "examples/build_paragraph_fast_binding_fixture.html",
+            r#"
+            <html>
+              <head><meta name="build-paragraph-fast-binding-key" /></head>
+              <body><p>{{ data.text }}</p></body>
+            </html>
+            "#,
+            "build-paragraph-fast-binding-key",
+            None,
+        );
+
+        app.update();
+        {
+            let mut map = app.world_mut().resource_mut::<HtmlStructureMap>();
+            map.active = Some(vec!["build-paragraph-fast-binding-key".to_string()]);
+        }
+        app.world_mut().resource_mut::<HtmlDirty>().0 = true;
+        app.update();
+
+        let mut paragraph_query = app.world_mut().query::<(Entity, &Paragraph)>();
+        let (paragraph_entity, paragraph) = paragraph_query
+            .iter(app.world())
+            .next()
+            .expect("expected paragraph");
+        assert_eq!(paragraph.text, "First");
+        let paragraph_entity = paragraph_entity;
+
+        app.world_mut()
+            .resource_mut::<UiLangVariables>()
+            .set("data", r#"{"text":"Second"}"#);
+        app.update();
+
+        let paragraph = app
+            .world()
+            .get::<Paragraph>(paragraph_entity)
+            .expect("paragraph entity remains");
+        assert_eq!(paragraph.text, "Second");
+        assert!(
+            !app.world().resource::<HtmlDirty>().0,
+            "simple paragraph binding should not mark the HTML tree dirty"
+        );
+    }
+
+    #[test]
+    fn builder_keeps_existing_ui_style_during_hidden_rebuild() {
+        let mut app = setup_converter_app();
+        app.add_message::<HtmlAllWidgetsSpawned>();
+        app.add_systems(Update, builder::build_html_source);
+        app.init_resource::<HtmlPendingReveal>();
+
+        add_html_source(
+            &mut app,
+            "examples/build_hidden_rebuild_fixture.html",
+            r#"
+            <html>
+              <head><meta name="build-hidden-rebuild-key" /></head>
+              <body><button>Static</button></body>
+            </html>
+            "#,
+            "build-hidden-rebuild-key",
+            None,
+        );
+
+        app.update();
+        {
+            let mut map = app.world_mut().resource_mut::<HtmlStructureMap>();
+            map.active = Some(vec!["build-hidden-rebuild-key".to_string()]);
+        }
+        app.world_mut().resource_mut::<HtmlDirty>().0 = true;
+        app.update();
+
+        let mut button_query = app.world_mut().query_filtered::<Entity, With<Button>>();
+        let button_entity = button_query
+            .iter(app.world())
+            .next()
+            .expect("expected button");
+        let css_handle = add_test_css_asset(&mut app, "button { color: white; }");
+        app.world_mut().entity_mut(button_entity).insert(UiStyle {
+            css: css_handle,
+            styles: Default::default(),
+            keyframes: Default::default(),
+            active_style: Some(Default::default()),
+        });
+
+        app.world_mut()
+            .resource_mut::<HtmlPendingReveal>()
+            .0
+            .insert("build-hidden-rebuild-key".to_string());
+        {
+            let mut dirty = app.world_mut().resource_mut::<HtmlDirty>();
+            dirty.0 = true;
+            dirty.1.insert("build-hidden-rebuild-key".to_string());
+        }
+
+        app.update();
+
+        assert!(
+            app.world().entity(button_entity).contains::<UiStyle>(),
+            "hidden rebuild must keep existing styles so reveal does not wait forever"
+        );
+    }
+
+    #[cfg(feature = "extended-framework")]
+    #[test]
+    fn builder_updates_keep_alive_route_wrappers_after_navigation() {
+        let mut app = setup_converter_app();
+        app.add_message::<HtmlAllWidgetsSpawned>();
+        app.add_systems(Update, builder::build_html_source);
+
+        let base = unique_temp_dir("route_wrapper_update");
+        let asset_root = base.join("assets");
+        let rust_root = base.join("src/packages");
+        write_test_component(
+            &asset_root,
+            &rust_root,
+            "main",
+            "app-main",
+            "<div><button>Main</button></div>",
+        );
+        write_test_component(
+            &asset_root,
+            &rust_root,
+            "help",
+            "app-help",
+            "<div><button>Help</button></div>",
+        );
+
+        app.insert_resource(ExtendedFrameworkConfiguration {
+            assets_component_root: "components".to_string(),
+            rust_component_root: rust_root.to_string_lossy().to_string(),
+            asset_root_fs_path: asset_root.to_string_lossy().to_string(),
+            index_html_file: "index.html".to_string(),
+        });
+        let mut router = Router::default();
+        router.configure(
+            Routes::new()
+                .route("/", bevy_extended_ui::load!("app-main"))
+                .route("/help", bevy_extended_ui::load!("app-help")),
+        );
+        app.insert_resource(router);
+
+        add_html_source(
+            &mut app,
+            "index.html",
+            r#"
+            <html>
+              <head><meta name="route-wrapper-key" /></head>
+              <body><router-outlet></router-outlet></body>
+            </html>
+            "#,
+            "route-wrapper-key",
+            None,
+        );
+
+        for _ in 0..4 {
+            app.update();
+        }
+
+        let route_classes = |app: &mut App| {
+            let mut query = app.world_mut().query::<(&CssClass, &HtmlStyle)>();
+            query
+                .iter(app.world())
+                .filter_map(|(classes, style)| {
+                    classes
+                        .0
+                        .iter()
+                        .any(|class| class == "beu-route")
+                        .then(|| (classes.0.clone(), style.0.display))
+                })
+                .collect::<Vec<_>>()
+        };
+
+        let initial_routes = route_classes(&mut app);
+        assert_eq!(initial_routes.len(), 2);
+        assert!(initial_routes.iter().any(|(classes, display)| {
+            classes.iter().any(|class| class == "beu-route-active")
+                && *display == Some(Display::Flex)
+        }));
+        assert!(initial_routes.iter().any(|(classes, display)| {
+            classes.iter().any(|class| class == "beu-route-cached")
+                && *display == Some(Display::None)
+        }));
+
+        app.world_mut().resource_mut::<Router>().navigate("/help");
+
+        for _ in 0..4 {
+            app.update();
+        }
+
+        let navigated_routes = route_classes(&mut app);
+        assert_eq!(navigated_routes.len(), 2);
+        assert!(navigated_routes.iter().any(|(classes, display)| {
+            classes.iter().any(|class| class == "beu-route-active")
+                && *display == Some(Display::Flex)
+        }));
+        assert!(navigated_routes.iter().any(|(classes, display)| {
+            classes.iter().any(|class| class == "beu-route-cached")
+                && *display == Some(Display::None)
+        }));
+
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
     fn builder_skips_when_dirty_keys_do_not_match_active() {
         let mut app = setup_converter_app();
         app.add_message::<HtmlAllWidgetsSpawned>();
@@ -1485,6 +1862,7 @@ mod tests {
             style: None,
             validation: None,
             inner_content: HtmlInnerContent::default(),
+            text_binding: None,
         };
         let mk_bindings = || HtmlEventBindings::default();
         let mk_widget = || Widget(None);

@@ -351,8 +351,8 @@ pub fn update_widget_styles_system(
     mut query: Query<
         (
             Entity,
-            Option<&UIWidgetState>,
-            Option<&HtmlStyle>,
+            Option<Ref<UIWidgetState>>,
+            Option<Ref<HtmlStyle>>,
             Option<&StyleRefreshOnNodeAdded>,
             &mut UiStyle,
         ),
@@ -373,7 +373,22 @@ pub fn update_widget_styles_system(
 ) {
     for (entity, state_opt, html_style_opt, refresh_on_node_added, mut ui_style) in query.iter_mut()
     {
-        let state = state_opt.cloned().unwrap_or_default();
+        let state_changed = state_opt.as_ref().is_some_and(|state| state.is_changed());
+        let html_style_changed = html_style_opt
+            .as_ref()
+            .is_some_and(|html_style| html_style.is_changed());
+        let ui_style_changed = ui_style.is_changed();
+        if state_changed
+            && !html_style_changed
+            && !ui_style_changed
+            && refresh_on_node_added.is_none()
+            && ui_style.active_style.is_some()
+            && !ui_style_has_stateful_selectors(&ui_style)
+        {
+            continue;
+        }
+
+        let state = state_opt.as_deref().cloned().unwrap_or_default();
         let node_added = refresh_on_node_added.is_some();
 
         let mut base_styles: Vec<(&String, u32, usize)> = vec![];
@@ -529,6 +544,19 @@ pub fn update_widget_styles_system(
             commands.entity(entity).remove::<StyleRefreshOnNodeAdded>();
         }
     }
+}
+
+fn ui_style_has_stateful_selectors(ui_style: &UiStyle) -> bool {
+    ui_style.styles.iter().any(|(key, style_pair)| {
+        let selector = if style_pair.selector.is_empty() {
+            key.as_str()
+        } else {
+            style_pair.selector.as_str()
+        };
+
+        let metadata = selector_metadata(selector);
+        !metadata.skip && metadata.has_pseudo
+    })
 }
 
 /// Advances and applies style transitions based on time.

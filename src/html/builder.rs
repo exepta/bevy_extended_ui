@@ -1,3 +1,4 @@
+use bevy::ecs::component::Mutable;
 use bevy::prelude::*;
 use std::collections::{HashMap, HashSet};
 
@@ -15,6 +16,40 @@ use crate::widgets::{Body, ColorPicker, DatePicker, InputField, UIWidgetState, W
 
 /// Plugin that spawns Bevy UI entities from parsed HTML node structures.
 pub struct HtmlBuilderSystem;
+
+#[derive(Component, Clone, Copy, Debug, Eq, PartialEq)]
+pub struct HtmlNodeKind {
+    discriminant: HtmlNodeKindDiscriminant,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum HtmlNodeKindDiscriminant {
+    Body,
+    Div,
+    Form,
+    Dialog,
+    Divider,
+    Button,
+    CheckBox,
+    ColorPicker,
+    ChoiceBox,
+    DatePicker,
+    FieldSet,
+    Headline,
+    HyperLink,
+    Img,
+    Input,
+    Paragraph,
+    ToolTip,
+    Badge,
+    ProgressBar,
+    RadioButton,
+    Scrollbar,
+    Slider,
+    SwitchButton,
+    ToggleButton,
+    ListBox,
+}
 
 impl Plugin for HtmlBuilderSystem {
     /// Registers systems to build HTML structures into UI entities.
@@ -56,6 +91,7 @@ pub fn build_html_source(
     body_query: Query<(Entity, &Body, Option<&HtmlID>)>,
     children_query: Query<&Children>,
     html_id_query: Query<&HtmlID>,
+    node_kind_query: Query<&HtmlNodeKind>,
     html_id_entity_query: Query<(Entity, &HtmlID)>,
     body_content_root_query: Query<&BodyContentRoot>,
     div_content_root_query: Query<&DivContentRoot>,
@@ -90,6 +126,8 @@ pub fn build_html_source(
         return;
     }
 
+    let html_entity_index = build_html_entity_index(&html_id_entity_query);
+
     for active in &rebuild_keys {
         let rebuild_hidden = pending_reveal
             .as_mut()
@@ -118,7 +156,8 @@ pub fn build_html_source(
                 &asset_server,
                 &children_query,
                 &html_id_query,
-                &html_id_entity_query,
+                &node_kind_query,
+                &html_entity_index,
                 &body_content_root_query,
                 &div_content_root_query,
             );
@@ -169,7 +208,8 @@ fn rebuild_structure_children_for_active(
     asset_server: &Res<AssetServer>,
     children_query: &Query<&Children>,
     html_id_query: &Query<&HtmlID>,
-    html_id_entity_query: &Query<(Entity, &HtmlID)>,
+    node_kind_query: &Query<&HtmlNodeKind>,
+    html_entity_index: &HashMap<usize, Entity>,
     body_content_root_query: &Query<&BodyContentRoot>,
     div_content_root_query: &Query<&DivContentRoot>,
 ) {
@@ -199,7 +239,8 @@ fn rebuild_structure_children_for_active(
         asset_server,
         children_query,
         html_id_query,
-        html_id_entity_query,
+        node_kind_query,
+        html_entity_index,
         body_content_root_query,
         div_content_root_query,
     );
@@ -213,7 +254,8 @@ fn reconcile_node_children(
     asset_server: &AssetServer,
     children_query: &Query<&Children>,
     html_id_query: &Query<&HtmlID>,
-    html_id_entity_query: &Query<(Entity, &HtmlID)>,
+    node_kind_query: &Query<&HtmlNodeKind>,
+    html_entity_index: &HashMap<usize, Entity>,
     body_content_root_query: &Query<&BodyContentRoot>,
     div_content_root_query: &Query<&DivContentRoot>,
 ) {
@@ -240,6 +282,14 @@ fn reconcile_node_children(
         let node_id = get_node_id(new_node).0;
         let relocated_node = is_relocated_widget_node(new_node);
         if let Some(existing_entity) = existing_by_id.remove(&node_id) {
+            if !existing_node_kind_matches(new_node, existing_entity, node_kind_query) {
+                commands.entity(existing_entity).despawn();
+                let spawned =
+                    spawn_widget_node(commands, new_node, asset_server, Some(parent), start_hidden);
+                final_children.push(spawned);
+                continue;
+            }
+
             update_existing_widget_node(commands, existing_entity, new_node, node_start_hidden);
 
             if let Some(children) = get_node_children(new_node) {
@@ -256,7 +306,8 @@ fn reconcile_node_children(
                     asset_server,
                     children_query,
                     html_id_query,
-                    html_id_entity_query,
+                    node_kind_query,
+                    html_entity_index,
                     body_content_root_query,
                     div_content_root_query,
                 );
@@ -264,7 +315,19 @@ fn reconcile_node_children(
 
             final_children.push(existing_entity);
         } else if relocated_node {
-            if let Some(existing_entity) = find_entity_by_html_id(html_id_entity_query, node_id) {
+            if let Some(existing_entity) = find_entity_by_html_id(html_entity_index, node_id) {
+                if !existing_node_kind_matches(new_node, existing_entity, node_kind_query) {
+                    let spawned = spawn_widget_node(
+                        commands,
+                        new_node,
+                        asset_server,
+                        Some(parent),
+                        node_start_hidden,
+                    );
+                    final_children.push(spawned);
+                    continue;
+                }
+
                 update_existing_widget_node(commands, existing_entity, new_node, node_start_hidden);
                 update_relocated_node_descendants(
                     commands,
@@ -273,7 +336,8 @@ fn reconcile_node_children(
                     asset_server,
                     children_query,
                     html_id_query,
-                    html_id_entity_query,
+                    node_kind_query,
+                    html_entity_index,
                     body_content_root_query,
                     div_content_root_query,
                 );
@@ -310,13 +374,17 @@ fn reconcile_node_children(
     }
 }
 
-fn find_entity_by_html_id(
+fn find_entity_by_html_id(html_entity_index: &HashMap<usize, Entity>, id: usize) -> Option<Entity> {
+    html_entity_index.get(&id).copied()
+}
+
+fn build_html_entity_index(
     html_id_entity_query: &Query<(Entity, &HtmlID)>,
-    id: usize,
-) -> Option<Entity> {
+) -> HashMap<usize, Entity> {
     html_id_entity_query
         .iter()
-        .find_map(|(entity, html_id)| (html_id.0 == id).then_some(entity))
+        .map(|(entity, html_id)| (html_id.0, entity))
+        .collect()
 }
 
 fn update_relocated_node_descendants(
@@ -326,7 +394,8 @@ fn update_relocated_node_descendants(
     asset_server: &AssetServer,
     children_query: &Query<&Children>,
     html_id_query: &Query<&HtmlID>,
-    html_id_entity_query: &Query<(Entity, &HtmlID)>,
+    node_kind_query: &Query<&HtmlNodeKind>,
+    html_entity_index: &HashMap<usize, Entity>,
     body_content_root_query: &Query<&BodyContentRoot>,
     div_content_root_query: &Query<&DivContentRoot>,
 ) {
@@ -336,9 +405,12 @@ fn update_relocated_node_descendants(
 
     for child in children {
         let child_id = get_node_id(child).0;
-        let Some(existing_child) = find_entity_by_html_id(html_id_entity_query, child_id) else {
+        let Some(existing_child) = find_entity_by_html_id(html_entity_index, child_id) else {
             continue;
         };
+        if !existing_node_kind_matches(child, existing_child, node_kind_query) {
+            continue;
+        }
 
         update_existing_widget_node(commands, existing_child, child, start_hidden);
 
@@ -356,7 +428,8 @@ fn update_relocated_node_descendants(
                 asset_server,
                 children_query,
                 html_id_query,
-                html_id_entity_query,
+                node_kind_query,
+                html_entity_index,
                 body_content_root_query,
                 div_content_root_query,
             );
@@ -385,6 +458,16 @@ fn is_relocated_widget_node(node: &HtmlWidgetNode) -> bool {
     false
 }
 
+fn existing_node_kind_matches(
+    node: &HtmlWidgetNode,
+    entity: Entity,
+    node_kind_query: &Query<&HtmlNodeKind>,
+) -> bool {
+    node_kind_query
+        .get(entity)
+        .is_ok_and(|existing| *existing == get_node_kind(node))
+}
+
 fn resolve_content_parent(
     entity: Entity,
     body_content_root_query: &Query<&BodyContentRoot>,
@@ -397,6 +480,62 @@ fn resolve_content_parent(
         return content.0;
     }
     entity
+}
+
+trait HtmlRuntimePreserve {
+    fn preserve_runtime_fields(&mut self, existing: &Self);
+}
+
+macro_rules! preserve_entry {
+    ($($ty:ty),* $(,)?) => {
+        $(
+            impl HtmlRuntimePreserve for $ty {
+                fn preserve_runtime_fields(&mut self, existing: &Self) {
+                    self.entry = existing.entry;
+                }
+            }
+        )*
+    };
+}
+
+preserve_entry!(
+    Body,
+    crate::widgets::Form,
+    crate::widgets::Button,
+    crate::widgets::CheckBox,
+    crate::widgets::ChoiceBox,
+    ColorPicker,
+    DatePicker,
+    crate::widgets::Divider,
+    crate::widgets::FieldSet,
+    crate::widgets::Headline,
+    InputField,
+    crate::widgets::Img,
+    crate::widgets::HyperLink,
+    crate::widgets::Paragraph,
+    crate::widgets::ToolTip,
+    crate::widgets::Badge,
+    crate::widgets::ProgressBar,
+    crate::widgets::RadioButton,
+    crate::widgets::Slider,
+    crate::widgets::SwitchButton,
+    crate::widgets::ToggleButton,
+    crate::widgets::ListBox,
+);
+
+impl HtmlRuntimePreserve for crate::widgets::Div {
+    fn preserve_runtime_fields(&mut self, existing: &Self) {
+        self.0 = existing.0;
+    }
+}
+
+impl HtmlRuntimePreserve for crate::widgets::Scrollbar {
+    fn preserve_runtime_fields(&mut self, existing: &Self) {
+        self.entry = existing.entry;
+        self.entity = existing.entity;
+        self.viewport_extent = existing.viewport_extent;
+        self.content_extent = existing.content_extent;
+    }
 }
 
 fn get_node_children(node: &HtmlWidgetNode) -> Option<&Vec<HtmlWidgetNode>> {
@@ -425,6 +564,8 @@ fn update_existing_widget_node(
     node: &HtmlWidgetNode,
     start_hidden: bool,
 ) {
+    sync_meta_component(commands, entity, get_node_kind(node));
+
     match node {
         HtmlWidgetNode::Body(body, meta, states, _, functions, widget, id) => {
             update_with_meta(
@@ -755,7 +896,7 @@ fn update_existing_widget_node(
     }
 }
 
-fn update_with_meta<T: Component>(
+fn update_with_meta<T: Component<Mutability = Mutable> + PartialEq + HtmlRuntimePreserve>(
     commands: &mut Commands,
     entity: Entity,
     component: T,
@@ -766,34 +907,115 @@ fn update_with_meta<T: Component>(
     id: &HtmlID,
     start_hidden: bool,
 ) {
-    commands.entity(entity).insert((
-        component,
-        functions.clone(),
-        widget.clone(),
-        id.clone(),
-        meta.inner_content.clone(),
-        CssSource(meta.css.clone()),
+    update_meta_components(
+        commands,
+        entity,
+        meta,
+        states,
+        functions,
+        widget,
+        id,
+        start_hidden,
+    );
+    sync_component(commands, entity, component);
+}
+
+fn sync_component<T>(commands: &mut Commands, entity: Entity, component: T)
+where
+    T: Component<Mutability = Mutable> + PartialEq + HtmlRuntimePreserve,
+{
+    commands.queue(move |world: &mut World| {
+        let mut next = component;
+        if let Some(mut existing) = world.get_mut::<T>(entity) {
+            next.preserve_runtime_fields(&existing);
+            if *existing != next {
+                *existing = next;
+            }
+        } else if let Ok(mut entity_mut) = world.get_entity_mut(entity) {
+            entity_mut.insert(next);
+        }
+    });
+}
+
+fn sync_meta_component<T>(commands: &mut Commands, entity: Entity, component: T)
+where
+    T: Component<Mutability = Mutable> + PartialEq,
+{
+    commands.queue(move |world: &mut World| {
+        if let Some(mut existing) = world.get_mut::<T>(entity) {
+            if *existing != component {
+                *existing = component;
+            }
+        } else if let Ok(mut entity_mut) = world.get_entity_mut(entity) {
+            entity_mut.insert(component);
+        }
+    });
+}
+
+fn update_widget_state_from_html(commands: &mut Commands, entity: Entity, states: &HtmlStates) {
+    let readonly = states.readonly;
+    let disabled = states.disabled;
+    commands.queue(move |world: &mut World| {
+        let Some(mut state) = world.get_mut::<UIWidgetState>(entity) else {
+            return;
+        };
+        if state.readonly != readonly {
+            state.readonly = readonly;
+        }
+        if state.disabled != disabled {
+            state.disabled = disabled;
+        }
+    });
+}
+
+fn update_meta_components(
+    commands: &mut Commands,
+    entity: Entity,
+    meta: &HtmlMeta,
+    states: &HtmlStates,
+    functions: &HtmlEventBindings,
+    widget: &Widget,
+    id: &HtmlID,
+    start_hidden: bool,
+) {
+    sync_meta_component(commands, entity, functions.clone());
+    sync_meta_component(commands, entity, widget.clone());
+    sync_meta_component(commands, entity, id.clone());
+    sync_meta_component(commands, entity, meta.inner_content.clone());
+    sync_meta_component(commands, entity, CssSource(meta.css.clone()));
+    sync_meta_component(
+        commands,
+        entity,
         CssClass(meta.class.clone().unwrap_or_default()),
-        CssID(meta.id.clone().unwrap_or_default()),
+    );
+    sync_meta_component(commands, entity, CssID(meta.id.clone().unwrap_or_default()));
+    sync_meta_component(
+        commands,
+        entity,
         if start_hidden || states.hidden {
             Visibility::Hidden
         } else {
             Visibility::Inherited
         },
-    ));
+    );
+    update_widget_state_from_html(commands, entity, states);
 
     if let Some(inline_style) = &meta.style {
-        commands.entity(entity).insert(inline_style.clone());
+        sync_meta_component(commands, entity, inline_style.clone());
     } else {
         commands.entity(entity).remove::<crate::html::HtmlStyle>();
     }
 
-    if start_hidden {
-        commands.entity(entity).remove::<UiStyle>();
+    if let Some(text_binding) = &meta.text_binding {
+        sync_meta_component(commands, entity, text_binding.clone());
+    } else {
+        commands
+            .entity(entity)
+            .remove::<crate::html::HtmlTextBinding>();
     }
 
     if let Some(validation) = &meta.validation {
-        commands.entity(entity).insert(validation.clone());
+        sync_meta_component(commands, entity, validation.clone());
     } else {
         commands
             .entity(entity)
@@ -951,56 +1173,6 @@ fn update_color_picker_with_meta(
     });
 }
 
-fn update_meta_components(
-    commands: &mut Commands,
-    entity: Entity,
-    meta: &HtmlMeta,
-    states: &HtmlStates,
-    functions: &HtmlEventBindings,
-    widget: &Widget,
-    id: &HtmlID,
-    start_hidden: bool,
-) {
-    commands.entity(entity).insert((
-        functions.clone(),
-        widget.clone(),
-        id.clone(),
-        meta.inner_content.clone(),
-        CssSource(meta.css.clone()),
-        CssClass(meta.class.clone().unwrap_or_default()),
-        CssID(meta.id.clone().unwrap_or_default()),
-        if start_hidden || states.hidden {
-            Visibility::Hidden
-        } else {
-            Visibility::Inherited
-        },
-    ));
-
-    if let Some(inline_style) = &meta.style {
-        commands.entity(entity).insert(inline_style.clone());
-    } else {
-        commands.entity(entity).remove::<crate::html::HtmlStyle>();
-    }
-
-    if start_hidden {
-        commands.entity(entity).remove::<UiStyle>();
-    }
-
-    if let Some(validation) = &meta.validation {
-        commands.entity(entity).insert(validation.clone());
-    } else {
-        commands
-            .entity(entity)
-            .remove::<crate::widgets::ValidationRules>();
-    }
-
-    if states.hidden {
-        commands.entity(entity).insert(NeedHidden);
-    } else {
-        commands.entity(entity).remove::<NeedHidden>();
-    }
-}
-
 fn get_node_id(node: &HtmlWidgetNode) -> &HtmlID {
     match node {
         HtmlWidgetNode::Body(_, _, _, _, _, _, id)
@@ -1030,6 +1202,39 @@ fn get_node_id(node: &HtmlWidgetNode) -> &HtmlID {
         #[cfg(feature = "extended-dialog")]
         HtmlWidgetNode::Dialog(_, _, _, _, _, _, id) => id,
     }
+}
+
+fn get_node_kind(node: &HtmlWidgetNode) -> HtmlNodeKind {
+    let discriminant = match node {
+        HtmlWidgetNode::Body(..) => HtmlNodeKindDiscriminant::Body,
+        HtmlWidgetNode::Div(..) => HtmlNodeKindDiscriminant::Div,
+        HtmlWidgetNode::Form(..) => HtmlNodeKindDiscriminant::Form,
+        #[cfg(feature = "extended-dialog")]
+        HtmlWidgetNode::Dialog(..) => HtmlNodeKindDiscriminant::Dialog,
+        HtmlWidgetNode::Divider(..) => HtmlNodeKindDiscriminant::Divider,
+        HtmlWidgetNode::Button(..) => HtmlNodeKindDiscriminant::Button,
+        HtmlWidgetNode::CheckBox(..) => HtmlNodeKindDiscriminant::CheckBox,
+        HtmlWidgetNode::ColorPicker(..) => HtmlNodeKindDiscriminant::ColorPicker,
+        HtmlWidgetNode::ChoiceBox(..) => HtmlNodeKindDiscriminant::ChoiceBox,
+        HtmlWidgetNode::DatePicker(..) => HtmlNodeKindDiscriminant::DatePicker,
+        HtmlWidgetNode::FieldSet(..) => HtmlNodeKindDiscriminant::FieldSet,
+        HtmlWidgetNode::Headline(..) => HtmlNodeKindDiscriminant::Headline,
+        HtmlWidgetNode::HyperLink(..) => HtmlNodeKindDiscriminant::HyperLink,
+        HtmlWidgetNode::Img(..) => HtmlNodeKindDiscriminant::Img,
+        HtmlWidgetNode::Input(..) => HtmlNodeKindDiscriminant::Input,
+        HtmlWidgetNode::Paragraph(..) => HtmlNodeKindDiscriminant::Paragraph,
+        HtmlWidgetNode::ToolTip(..) => HtmlNodeKindDiscriminant::ToolTip,
+        HtmlWidgetNode::Badge(..) => HtmlNodeKindDiscriminant::Badge,
+        HtmlWidgetNode::ProgressBar(..) => HtmlNodeKindDiscriminant::ProgressBar,
+        HtmlWidgetNode::RadioButton(..) => HtmlNodeKindDiscriminant::RadioButton,
+        HtmlWidgetNode::Scrollbar(..) => HtmlNodeKindDiscriminant::Scrollbar,
+        HtmlWidgetNode::Slider(..) => HtmlNodeKindDiscriminant::Slider,
+        HtmlWidgetNode::SwitchButton(..) => HtmlNodeKindDiscriminant::SwitchButton,
+        HtmlWidgetNode::ToggleButton(..) => HtmlNodeKindDiscriminant::ToggleButton,
+        HtmlWidgetNode::ListBox(..) => HtmlNodeKindDiscriminant::ListBox,
+    };
+
+    HtmlNodeKind { discriminant }
 }
 
 /// Starts the delayed visibility timer after widgets are spawned.
@@ -1085,7 +1290,7 @@ fn show_all_widgets_finish(
             if let Some(bind) = body.html_key.as_ref() {
                 if active_list.iter().any(|active| active == bind) {
                     for (mut visibility, widget_id) in query.iter_mut() {
-                        if valid_ids.contains(widget_id) {
+                        if valid_id_set.contains(&widget_id.0) {
                             *visibility = Visibility::Inherited;
                         }
                     }
@@ -1544,6 +1749,8 @@ fn spawn_widget_node(
         commands.entity(parent).add_child(entity);
     }
 
+    commands.entity(entity).insert(get_node_kind(node));
+
     entity
 }
 
@@ -1584,6 +1791,10 @@ fn spawn_with_meta<T: Component>(
 
     if let Some(inline_style) = &meta.style {
         commands.entity(entity).insert(inline_style.clone());
+    }
+
+    if let Some(text_binding) = &meta.text_binding {
+        commands.entity(entity).insert(text_binding.clone());
     }
 
     if let Some(validation) = &meta.validation {
