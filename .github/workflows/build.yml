@@ -55,7 +55,7 @@ jobs:
 
       - name: Run cargo test coverage
         run: |
-          IGNORE_REGEX='(crates/bevy_extended_ui_macros|src/widgets/(content|controls)|src/widgets/body.rs|src/widgets/div.rs|src/widgets/form.rs|src/widgets/validation.rs|src/widgets/mod.rs|src/widgets/widget_util.rs|src/services/style_service.rs|src/services/css_service.rs|src/services/image_service.rs|src/services/state_service.rs|src/services/mod.rs|src/styles/parser.rs|src/styles/paint.rs|src/html/bindings.rs|src/html/converter.rs|src/html/builder.rs|src/providers/theme_provider.rs|src/providers/mod.rs|src/utils.rs|src/example_utils.rs|src/old/registry.rs|src/dialog/mod.rs|src/io/mod.rs|src/lang.rs|src/lib.rs)'
+          IGNORE_REGEX='(crates/bevy_extended_ui_macros|src/widgets/(content|controls)|src/widgets/body.rs|src/widgets/div.rs|src/widgets/form.rs|src/widgets/validation.rs|src/widgets/mod.rs|src/widgets/widget_util.rs|src/services/style_service.rs|src/services/style_service/.*|src/services/css_service.rs|src/services/image_service.rs|src/services/state_service.rs|src/services/mod.rs|src/styles/parser.rs|src/styles/paint.rs|src/html/bindings.rs|src/html/converter.rs|src/html/builder.rs|src/providers/theme_provider.rs|src/providers/mod.rs|src/utils.rs|src/example_utils.rs|src/old/registry.rs|src/dialog/mod.rs|src/io/mod.rs|src/lang.rs|src/lib.rs)'
           cargo llvm-cov \
             --workspace \
             --features extended-framework \

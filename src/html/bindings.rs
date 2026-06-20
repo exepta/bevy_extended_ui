@@ -3,7 +3,9 @@ use crate::html::inline_functions::queue_html_inline_action;
 use crate::html::*;
 use crate::widgets::controls::color_picker::ColorPickerUserChanged;
 use crate::widgets::controls::input::InputUserChanged;
-use crate::widgets::controls::slider::SliderUserChanged;
+use crate::widgets::controls::slider::{
+    SliderChangeCommitted, SliderLiveChanged, SliderUserChanged,
+};
 use crate::widgets::{
     BindToID, Button, ButtonType, CheckBox, ChoiceBox, DatePicker, FieldSelectionMulti,
     FieldSelectionSingle, Form, FormValidationMode, InputField, InputValue, ListBox, RadioButton,
@@ -28,6 +30,13 @@ pub(crate) struct HtmlScrollTracker {
     scrollbar_values: HashMap<Entity, f32>,
 }
 
+#[derive(Resource, Default)]
+pub(crate) struct SliderLiveChangeThrottle {
+    last_emit: HashMap<Entity, f32>,
+}
+
+const SLIDER_LIVE_CHANGE_INTERVAL_SECS: f32 = 1.0 / 30.0;
+
 /// Plugin that wires HTML event bindings into Bevy observers and systems.
 pub struct HtmlEventBindingsPlugin;
 
@@ -35,6 +44,7 @@ impl Plugin for HtmlEventBindingsPlugin {
     /// Registers observers and systems for HTML events.
     fn build(&self, app: &mut App) {
         app.init_resource::<HtmlScrollTracker>();
+        app.init_resource::<SliderLiveChangeThrottle>();
 
         // observer (click)
         app.add_observer(emit_html_click_events);
@@ -790,11 +800,43 @@ pub(crate) fn emit_field_set_change(
 /// Emits change events for slider widgets.
 pub(crate) fn emit_slider_change(
     mut commands: Commands,
-    query: Query<(Entity, &HtmlEventBindings), With<SliderUserChanged>>,
+    time: Res<Time>,
+    mut throttle: ResMut<SliderLiveChangeThrottle>,
+    query: Query<
+        (
+            Entity,
+            &HtmlEventBindings,
+            Option<&SliderLiveChanged>,
+            Option<&SliderChangeCommitted>,
+        ),
+        With<SliderUserChanged>,
+    >,
 ) {
-    for (entity, binding) in &query {
-        emit_change_if_bound(&mut commands, binding, entity, HtmlChangeAction::State);
+    let now = time.elapsed_secs();
+
+    for (entity, binding, live, committed) in &query {
+        let is_live = live.is_some();
+        let is_committed = committed.is_some();
+        let force_emit = is_committed || !is_live;
+        let should_emit = force_emit
+            || throttle
+                .last_emit
+                .get(&entity)
+                .is_none_or(|last_emit| now - *last_emit >= SLIDER_LIVE_CHANGE_INTERVAL_SECS);
+
+        if should_emit {
+            emit_change_if_bound(&mut commands, binding, entity, HtmlChangeAction::State);
+            throttle.last_emit.insert(entity, now);
+        }
+
         commands.entity(entity).remove::<SliderUserChanged>();
+        if is_live {
+            commands.entity(entity).remove::<SliderLiveChanged>();
+        }
+        if is_committed {
+            commands.entity(entity).remove::<SliderChangeCommitted>();
+            throttle.last_emit.remove(&entity);
+        }
     }
 }
 

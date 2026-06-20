@@ -542,7 +542,10 @@ fn read_store_path(world: &World, path: &HtmlInlinePath) -> Option<JsonValue> {
 fn write_store_path(world: &mut World, path: &HtmlInlinePath, value: JsonValue) -> bool {
     #[cfg(feature = "extended-framework")]
     if let Some(mut store) = world.get_resource_mut::<UiBindingStore>() {
-        return store.set_path_json(&path.as_dotted(), value);
+        let path = path.as_dotted();
+        let expected = value.clone();
+        return store.set_path_json(&path, value)
+            || store.json_path(&path).as_ref() == Some(&expected);
     }
 
     #[cfg(not(feature = "extended-framework"))]

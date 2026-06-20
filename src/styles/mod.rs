@@ -5,7 +5,7 @@ pub mod parser;
 use crate::io::CssAsset;
 use crate::styles::components::UiStyle;
 use bevy::prelude::*;
-use bevy::text::LineHeight;
+use bevy::text::{FontSize, LineHeight};
 use bevy::window::SystemCursorIcon;
 use std::cmp::PartialEq;
 use std::collections::{HashMap, HashSet};
@@ -24,17 +24,17 @@ pub struct ExistingCssIDs(pub HashSet<String>);
 pub struct TagName(pub String);
 
 /// Component representing one or more CSS classes applied to an element.
-#[derive(Component, Reflect, Debug, Clone)]
+#[derive(Component, Reflect, Debug, Clone, PartialEq, Eq)]
 #[reflect(Component)]
 pub struct CssClass(pub Vec<String>);
 
 /// Component representing the CSS ID of an element.
-#[derive(Component, Reflect, Debug, Clone)]
+#[derive(Component, Reflect, Debug, Clone, PartialEq, Eq)]
 #[reflect(Component)]
 pub struct CssID(pub String);
 
 /// Component that stores one or more CSS asset handles for an entity.
-#[derive(Component, Reflect, Debug, Clone, Default)]
+#[derive(Component, Reflect, Debug, Clone, Default, PartialEq)]
 #[reflect(Component)]
 pub struct CssSource(pub Vec<Handle<CssAsset>>);
 
@@ -283,7 +283,7 @@ impl FontWeight {
 }
 
 /// Placement of an icon relative to text.
-#[derive(Reflect, Debug, Clone, Copy, PartialEq)]
+#[derive(Reflect, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IconPlace {
     /// Variant `Left`.
     Left,
@@ -298,30 +298,9 @@ impl Default for IconPlace {
     }
 }
 
-/// Represents a font size value, either in pixels or rem units.
-#[derive(Reflect, Debug, Clone, PartialEq)]
-pub enum FontVal {
-    /// Variant `Px`.
-    Px(f32),
-    /// Variant `Rem`.
-    Rem(f32),
-}
-
-impl Default for FontVal {
-    /// Returns the default font size of 12 pixels.
-    fn default() -> Self {
-        FontVal::Px(12.0)
-    }
-}
-
-impl FontVal {
-    /// Computes the absolute font size in pixels, resolving rem units using a base size.
-    pub fn get(&self, base: Option<f32>) -> f32 {
-        match self {
-            FontVal::Px(x) => x.clone(),
-            FontVal::Rem(x) => x * base.unwrap_or(1.0),
-        }
-    }
+/// Resolves a Bevy [`FontSize`] to logical pixels for layout estimates.
+pub fn font_size_to_px(font_size: FontSize, rem_size: Option<f32>) -> f32 {
+    font_size.eval(Vec2::ZERO, rem_size.unwrap_or(1.0))
 }
 
 /// Defines the available `CalcUnit` variants for this part of the UI runtime.
@@ -967,7 +946,7 @@ pub struct Style {
     pub outline_width: Option<Val>,
     pub outline_offset: Option<Val>,
     pub outline_color: Option<Color>,
-    pub font_size: Option<FontVal>,
+    pub font_size: Option<FontSize>,
     pub font_family: Option<FontFamily>,
     pub font_weight: Option<FontWeight>,
     pub line_height: Option<LineHeight>,

@@ -84,11 +84,11 @@ pub struct UIWidgetState {
 }
 
 /// Component storing an optional widget controller name.
-#[derive(Component, Default, Clone, Debug)]
+#[derive(Component, Default, Clone, Debug, PartialEq, Eq)]
 pub struct Widget(pub Option<String>);
 
 /// Validation rules parsed from HTML attributes.
-#[derive(Component, Reflect, Debug, Clone, Default)]
+#[derive(Component, Reflect, Debug, Clone, Default, PartialEq, Eq)]
 #[reflect(Component)]
 pub struct ValidationRules {
     pub required: bool,
@@ -274,7 +274,7 @@ impl Plugin for ExtendedWidgetPlugin {
 // ===============================================
 
 /// Root widget representing the HTML `<body>` element.
-#[derive(Component, Reflect, Debug, Clone)]
+#[derive(Component, Reflect, Debug, Clone, PartialEq, Eq)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, GlobalTransform, InheritedVisibility, Widget)]
 pub struct Body {
@@ -299,7 +299,7 @@ impl Default for Body {
 // ===============================================
 
 /// Container widget representing a `<div>` element.
-#[derive(Component, Reflect, Debug, Clone)]
+#[derive(Component, Reflect, Debug, Clone, PartialEq, Eq)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, GlobalTransform, InheritedVisibility, Widget)]
 pub struct Div(pub usize);
@@ -317,7 +317,7 @@ impl Default for Div {
 // ===============================================
 
 /// Form the container widget with an optional submit action handler name.
-#[derive(Component, Reflect, Debug, Clone)]
+#[derive(Component, Reflect, Debug, Clone, PartialEq, Eq)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, GlobalTransform, InheritedVisibility, Widget)]
 pub struct Form {
@@ -393,7 +393,7 @@ impl ButtonType {
 }
 
 /// Button widget with optional icon.
-#[derive(Component, Reflect, Debug, Clone)]
+#[derive(Component, Reflect, Debug, Clone, PartialEq, Eq)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, Widget)]
 pub struct Button {
@@ -424,7 +424,7 @@ impl Default for Button {
 // ===============================================
 
 /// Checkbox widget with label and checked state.
-#[derive(Component, Reflect, Debug, Clone)]
+#[derive(Component, Reflect, Debug, Clone, PartialEq, Eq)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, Widget)]
 pub struct CheckBox {
@@ -453,7 +453,7 @@ impl Default for CheckBox {
 // ===============================================
 
 /// Choice box widget with selectable options.
-#[derive(Component, Reflect, Debug, Clone)]
+#[derive(Component, Reflect, Debug, Clone, PartialEq, Eq)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, Widget)]
 pub struct ChoiceBox {
@@ -585,7 +585,7 @@ impl ReflectedValue {
 ///
 /// Unlike [`ChoiceBox`], all options are always visible (no dropdown).
 /// Supports both single-select and multiselect modes via [`ListBox::multiselect`].
-#[derive(Component, Reflect, Debug, Clone)]
+#[derive(Component, Reflect, Debug, Clone, PartialEq, Eq)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, Widget)]
 pub struct ListBox {
@@ -621,7 +621,7 @@ impl Default for ListBox {
 // ===============================================
 
 /// Divider widget with an alignment direction.
-#[derive(Component, Reflect, Debug, Clone)]
+#[derive(Component, Reflect, Debug, Clone, PartialEq, Eq)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, Widget)]
 pub struct Divider {
@@ -677,7 +677,7 @@ impl fmt::Display for DividerAlignment {
 // ===============================================
 
 /// Field set widget grouping selectable children.
-#[derive(Component, Reflect, Debug, Clone)]
+#[derive(Component, Reflect, Debug, Clone, PartialEq, Eq)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, Widget)]
 pub struct FieldSet {
@@ -763,7 +763,7 @@ pub struct FieldSelectionMulti(pub Vec<Entity>);
 // ===============================================
 
 /// Headline widget with a selectable heading level.
-#[derive(Component, Reflect, Debug, Clone)]
+#[derive(Component, Reflect, Debug, Clone, PartialEq, Eq)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, Widget)]
 pub struct Headline {
@@ -822,7 +822,7 @@ impl fmt::Display for HeadlineType {
 // ===============================================
 
 /// Image widget referencing an optional source path.
-#[derive(Component, Reflect, Debug, Clone)]
+#[derive(Component, Reflect, Debug, Clone, PartialEq, Eq)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, GlobalTransform, InheritedVisibility, Widget)]
 pub struct Img {
@@ -1125,7 +1125,7 @@ fn normalize_browser_name(value: &str) -> String {
 }
 
 /// Hyperlink widget mapped from HTML `<a>`.
-#[derive(Component, Reflect, Debug, Clone)]
+#[derive(Component, Reflect, Debug, Clone, PartialEq, Eq)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, Widget)]
 pub struct HyperLink {
@@ -1155,7 +1155,7 @@ impl Default for HyperLink {
 // ===============================================
 
 /// Paragraph widget for body text.
-#[derive(Component, Reflect, Debug, Clone)]
+#[derive(Component, Reflect, Debug, Clone, PartialEq, Eq)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, Widget)]
 pub struct Paragraph {
@@ -1235,7 +1235,7 @@ impl BadgeAnchor {
 }
 
 /// Notification badge widget bound to a target via `for` or parent relationship.
-#[derive(Component, Reflect, Debug, Clone)]
+#[derive(Component, Reflect, Debug, Clone, PartialEq, Eq)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, Widget)]
 pub struct Badge {
@@ -1358,7 +1358,7 @@ impl ToolTipTrigger {
 }
 
 /// Tooltip widget that binds to either a parent element or an explicit `for` id target.
-#[derive(Component, Reflect, Debug, Clone)]
+#[derive(Component, Reflect, Debug, Clone, PartialEq, Eq)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, Widget)]
 pub struct ToolTip {
@@ -1393,7 +1393,7 @@ impl Default for ToolTip {
 // ===============================================
 
 /// Progress bar widget with numeric range.
-#[derive(Component, Reflect, Debug, Clone)]
+#[derive(Component, Reflect, Debug, Clone, PartialEq)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, InheritedVisibility, Widget)]
 pub struct ProgressBar {
@@ -1422,7 +1422,7 @@ impl Default for ProgressBar {
 // ===============================================
 
 /// Radio button widget with a selectable value.
-#[derive(Component, Reflect, Debug, Clone)]
+#[derive(Component, Reflect, Debug, Clone, PartialEq)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, Widget)]
 pub struct RadioButton {
@@ -1477,6 +1477,22 @@ impl RadioButton {
 /// Represents the `WidgetValue` data structure used by the extended UI system.
 #[derive(Debug, Clone)]
 pub struct WidgetValue(Option<Arc<dyn Any + Send + Sync>>);
+
+impl PartialEq for WidgetValue {
+    /// Compares common string-backed values by value and other typed values by shared identity.
+    fn eq(&self, other: &Self) -> bool {
+        match (&self.0, &other.0) {
+            (None, None) => true,
+            (Some(a), Some(b)) => match (a.downcast_ref::<String>(), b.downcast_ref::<String>()) {
+                (Some(sa), Some(sb)) => sa == sb,
+                _ => Arc::ptr_eq(a, b),
+            },
+            _ => false,
+        }
+    }
+}
+
+impl Eq for WidgetValue {}
 
 impl Default for WidgetValue {
     /// Handles `default` in the extended UI workflow.
@@ -1550,7 +1566,7 @@ impl WidgetValue {
 // ===============================================
 
 /// Scrollbar widget for scrollable containers.
-#[derive(Component, Reflect, Debug, Clone)]
+#[derive(Component, Reflect, Debug, Clone, PartialEq)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, Widget)]
 pub struct Scrollbar {
@@ -1630,7 +1646,7 @@ impl SliderDotAnchor {
 }
 
 /// Slider widget with numeric range.
-#[derive(Component, Reflect, Debug, Clone)]
+#[derive(Component, Reflect, Debug, Clone, PartialEq)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, Widget)]
 pub struct Slider {
@@ -1827,7 +1843,7 @@ fn rgb_u8_to_hsv(red: u8, green: u8, blue: u8) -> (f32, f32, f32) {
 // ===============================================
 
 /// Switch button widget with a label and optional icon.
-#[derive(Component, Reflect, Debug, Clone)]
+#[derive(Component, Reflect, Debug, Clone, PartialEq, Eq)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, Widget)]
 pub struct SwitchButton {
@@ -1856,7 +1872,7 @@ impl Default for SwitchButton {
 // ===============================================
 
 /// Toggle button widget with selectable state.
-#[derive(Component, Reflect, Debug, Clone)]
+#[derive(Component, Reflect, Debug, Clone, PartialEq)]
 #[reflect(Component)]
 #[require(UIGenID, UIWidgetState, Widget)]
 pub struct ToggleButton {

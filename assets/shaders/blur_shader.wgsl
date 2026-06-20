@@ -136,5 +136,6 @@ fn fragment(in: UiVertexOutput) -> @location(0) vec4<f32> {
         in.size,
         in.border_radius,
         in.border_widths,
+        0u,
     );
 }

@@ -6,7 +6,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::services::image_service::{DEFAULT_CHOICE_BOX_KEY, get_or_load_image};
 use crate::styles::components::UiStyle;
 use crate::styles::paint::Colored;
-use crate::styles::{CssClass, CssID, CssSource, FontVal, TagName};
+use crate::styles::{CssClass, CssID, CssSource, TagName};
 use crate::widgets::controls::input::InputUserChanged;
 use crate::widgets::widget_util::wheel_delta_y;
 use crate::widgets::{
@@ -17,7 +17,8 @@ use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
 use bevy::camera::visibility::RenderLayers;
 use bevy::input::mouse::MouseWheel;
 use bevy::prelude::*;
-use bevy::ui::RelativeCursorPosition;
+use bevy::ui::{RelativeCursorPosition, UiGlobalTransform, UiScale};
+use bevy::window::PrimaryWindow;
 
 /// Marker component for initialized date picker widgets.
 #[derive(Component)]
@@ -104,6 +105,8 @@ struct DatePickerDayText {
 }
 
 const DATE_PICKER_OVERLAY_Z: i32 = 40_000;
+const DATE_PICKER_FALLBACK_WIDTH: f32 = 320.0;
+const DATE_PICKER_FALLBACK_HEIGHT: f32 = 344.0;
 
 fn set_if_changed<T: PartialEq>(target: &mut T, value: T) {
     if *target != value {
@@ -228,6 +231,7 @@ impl Plugin for DatePickerWidget {
                 sync_bound_date_picker_targets,
                 sync_date_picker_visuals,
                 sync_year_picker_panel,
+                update_date_picker_popover_position,
                 handle_year_scroll_events,
                 close_unfocused_date_pickers,
             )
@@ -237,7 +241,12 @@ impl Plugin for DatePickerWidget {
         // (e.g. off-month cells briefly using current-month colors).
         app.add_systems(
             Last,
-            (sync_date_picker_visuals, sync_year_picker_panel).chain(),
+            (
+                sync_date_picker_visuals,
+                sync_year_picker_panel,
+                update_date_picker_popover_position,
+            )
+                .chain(),
         );
     }
 }
@@ -505,8 +514,7 @@ fn internal_node_creation_system(
                                             Text::new("<"),
                                             TextColor::default(),
                                             TextFont::default(),
-                                            TextLayout::new_with_justify(Justify::Center)
-                                                .with_no_wrap(),
+                                            TextLayout::justify(Justify::Center).with_no_wrap(),
                                             UIWidgetState::default(),
                                             css_source.clone(),
                                             CssClass(vec!["date-picker-nav-text".to_string()]),
@@ -605,7 +613,7 @@ fn internal_node_creation_system(
                                                     Text::new(""),
                                                     TextColor::default(),
                                                     TextFont::default(),
-                                                    TextLayout::new_with_justify(Justify::Center)
+                                                    TextLayout::justify(Justify::Center)
                                                         .with_no_wrap(),
                                                     UIWidgetState::default(),
                                                     css_source.clone(),
@@ -648,8 +656,7 @@ fn internal_node_creation_system(
                                             Text::new(">"),
                                             TextColor::default(),
                                             TextFont::default(),
-                                            TextLayout::new_with_justify(Justify::Center)
-                                                .with_no_wrap(),
+                                            TextLayout::justify(Justify::Center).with_no_wrap(),
                                             UIWidgetState::default(),
                                             css_source.clone(),
                                             CssClass(vec!["date-picker-nav-text".to_string()]),
@@ -700,8 +707,7 @@ fn internal_node_creation_system(
                                                 Text::new(day),
                                                 TextColor::default(),
                                                 TextFont::default(),
-                                                TextLayout::new_with_justify(Justify::Center)
-                                                    .with_no_wrap(),
+                                                TextLayout::justify(Justify::Center).with_no_wrap(),
                                                 UIWidgetState::default(),
                                                 css_source.clone(),
                                                 CssClass(vec![
@@ -753,8 +759,7 @@ fn internal_node_creation_system(
                                             Text::new(""),
                                             TextColor(Color::srgb(0.84, 0.86, 0.96)),
                                             TextFont::default(),
-                                            TextLayout::new_with_justify(Justify::Center)
-                                                .with_no_wrap(),
+                                            TextLayout::justify(Justify::Center).with_no_wrap(),
                                             UIWidgetState::default(),
                                             css_source.clone(),
                                             CssClass(vec!["date-picker-day-text".to_string()]),
@@ -813,8 +818,7 @@ fn internal_node_creation_system(
                                                 Text::new(year.to_string()),
                                                 TextColor::default(),
                                                 TextFont::default(),
-                                                TextLayout::new_with_justify(Justify::Center)
-                                                    .with_no_wrap(),
+                                                TextLayout::justify(Justify::Center).with_no_wrap(),
                                                 UIWidgetState::default(),
                                                 css_source.clone(),
                                                 CssClass(vec![
@@ -874,8 +878,7 @@ fn internal_node_creation_system(
                                                 Text::new(month_short_name(month).to_string()),
                                                 TextColor::default(),
                                                 TextFont::default(),
-                                                TextLayout::new_with_justify(Justify::Center)
-                                                    .with_no_wrap(),
+                                                TextLayout::justify(Justify::Center).with_no_wrap(),
                                                 UIWidgetState::default(),
                                                 css_source.clone(),
                                                 CssClass(vec![
@@ -1385,16 +1388,16 @@ fn sync_date_picker_visuals(
                 set_if_changed(&mut label_text.0, picker.label.clone());
                 if float_label {
                     set_if_changed(&mut label_node.top, Val::Px(7.0));
-                    set_if_changed(&mut label_font.font_size, 11.0);
+                    set_if_changed(&mut label_font.font_size, FontSize::Px(11.0));
                 } else {
                     set_if_changed(&mut label_node.top, Val::Px(19.0));
-                    set_if_changed(&mut label_font.font_size, 16.0);
+                    set_if_changed(&mut label_font.font_size, FontSize::Px(16.0));
                 }
 
                 if let Some(mut style) = style_opt {
                     for (_, rules) in style.styles.iter_mut() {
                         rules.normal.top = Some(label_node.top);
-                        rules.normal.font_size = Some(FontVal::Px(label_font.font_size));
+                        rules.normal.font_size = Some(label_font.font_size);
                     }
                 }
             }
@@ -1636,6 +1639,162 @@ fn sync_date_picker_visuals(
 
         commands.entity(entity).insert(next_snapshot);
     }
+}
+
+fn update_date_picker_popover_position(
+    window_q: Query<&Window, With<PrimaryWindow>>,
+    ui_scale: Res<UiScale>,
+    picker_q: Query<
+        (
+            &UIGenID,
+            &DatePicker,
+            &UIWidgetState,
+            &ComputedNode,
+            &UiGlobalTransform,
+        ),
+        (
+            With<DatePickerBase>,
+            Without<DatePickerPopover>,
+            Without<DatePickerField>,
+            Without<InputField>,
+        ),
+    >,
+    field_q: Query<
+        (&BindToID, &ComputedNode, &UiGlobalTransform),
+        (With<DatePickerField>, Without<DatePickerBase>),
+    >,
+    input_q: Query<
+        (&CssID, &ComputedNode, &UiGlobalTransform),
+        (With<InputField>, Without<DatePickerBase>),
+    >,
+    mut popover_q: Query<
+        (&mut Node, &BindToID, &ComputedNode, Option<&mut UiStyle>),
+        (With<DatePickerPopover>, Without<DatePickerBase>),
+    >,
+) {
+    let Ok(window) = window_q.single() else {
+        return;
+    };
+
+    let gap = 6.0;
+    let margin = 8.0;
+    let scale = (window.scale_factor() * ui_scale.0).max(f32::EPSILON);
+    let viewport_size = Vec2::new(window.width(), window.height());
+
+    for (id, picker, state, root_node, root_transform) in picker_q.iter() {
+        if !state.open || state.disabled {
+            continue;
+        }
+
+        let Some((anchor_node, anchor_transform)) =
+            resolve_date_picker_anchor(id, picker, &field_q, &input_q)
+        else {
+            continue;
+        };
+
+        let Some((mut popover_node, popover_computed, maybe_styles)) = popover_q
+            .iter_mut()
+            .find(|(_, bind, _, _)| bind.0 == id.0)
+            .map(|(node, _, computed, styles)| (node, computed, styles))
+        else {
+            continue;
+        };
+
+        let anchor_size = logical_size(anchor_node);
+        let popover_size = logical_size(popover_computed);
+        let root_top_left = top_left_ui(root_node, root_transform, scale);
+        let anchor_top_left = top_left_ui(anchor_node, anchor_transform, scale);
+
+        let anchor_w = anchor_size.x.max(1.0);
+        let anchor_h = anchor_size.y.max(1.0);
+        let raw_popover_w = if popover_size.x.is_finite() && popover_size.x > 8.0 {
+            popover_size.x
+        } else {
+            DATE_PICKER_FALLBACK_WIDTH
+        };
+        let raw_popover_h = if popover_size.y.is_finite() && popover_size.y > 8.0 {
+            popover_size.y
+        } else {
+            DATE_PICKER_FALLBACK_HEIGHT
+        };
+
+        let popover_w = raw_popover_w.min((viewport_size.x - margin * 2.0).max(160.0));
+        let popover_h = raw_popover_h.min((viewport_size.y - margin * 2.0).max(180.0));
+        let ideal_x = anchor_top_left.x + (anchor_w - popover_w) * 0.5;
+        let max_x = (viewport_size.x - popover_w - margin).max(margin);
+        let absolute_x = ideal_x.clamp(margin, max_x);
+
+        let below_y = anchor_top_left.y + anchor_h + gap;
+        let above_y = anchor_top_left.y - popover_h - gap;
+        let absolute_y = if below_y + popover_h <= viewport_size.y - margin || above_y < margin {
+            below_y
+        } else {
+            above_y
+        }
+        .clamp(margin, (viewport_size.y - popover_h - margin).max(margin));
+
+        let local_left = Val::Px(absolute_x - root_top_left.x);
+        let local_top = Val::Px(absolute_y - root_top_left.y);
+        set_if_changed(&mut popover_node.left, local_left);
+        set_if_changed(&mut popover_node.top, local_top);
+
+        if let Some(mut styles) = maybe_styles {
+            let mut changed = false;
+            {
+                let styles = styles.bypass_change_detection();
+                if let Some(active) = styles.active_style.as_mut() {
+                    if active.left != Some(local_left) {
+                        active.left = Some(local_left);
+                        changed = true;
+                    }
+                    if active.top != Some(local_top) {
+                        active.top = Some(local_top);
+                        changed = true;
+                    }
+                }
+            }
+            if changed {
+                styles.set_changed();
+            }
+        }
+    }
+}
+
+fn resolve_date_picker_anchor<'a>(
+    id: &UIGenID,
+    picker: &DatePicker,
+    field_q: &'a Query<
+        (&BindToID, &ComputedNode, &UiGlobalTransform),
+        (With<DatePickerField>, Without<DatePickerBase>),
+    >,
+    input_q: &'a Query<
+        (&CssID, &ComputedNode, &UiGlobalTransform),
+        (With<InputField>, Without<DatePickerBase>),
+    >,
+) -> Option<(&'a ComputedNode, &'a UiGlobalTransform)> {
+    if let Some(for_id) = picker.for_id.as_deref() {
+        let normalized = for_id.trim().trim_start_matches('#');
+        for (css_id, node, transform) in input_q.iter() {
+            if css_id.0.trim().trim_start_matches('#') == normalized {
+                return Some((node, transform));
+            }
+        }
+    }
+
+    field_q
+        .iter()
+        .find(|(bind, _, _)| bind.0 == id.0)
+        .map(|(_, node, transform)| (node, transform))
+}
+
+fn logical_size(node: &ComputedNode) -> Vec2 {
+    let inv = node.inverse_scale_factor.max(f32::EPSILON);
+    node.size() * inv
+}
+
+fn top_left_ui(node: &ComputedNode, transform: &UiGlobalTransform, scale: f32) -> Vec2 {
+    let half = node.size() * 0.5;
+    transform.affine().transform_point2(-half) / scale
 }
 
 /// Synchronizes month/year panel visibility and option states.

@@ -55,6 +55,15 @@ pub(crate) fn apply_dialog_widget_overlay_components(
     ));
 }
 
+/// Returns runtime visibility and picking state for an HTML `<dialog>` widget.
+pub(crate) fn dialog_widget_runtime_components(dialog: &DialogWidget) -> (Visibility, Pickable) {
+    if dialog.renderer == DialogProvider::BevyApp && dialog.open {
+        (Visibility::Inherited, Pickable::default())
+    } else {
+        (Visibility::Hidden, Pickable::IGNORE)
+    }
+}
+
 fn apply_dialog_widget_overlay_style(style: &mut Style) {
     style.display = Some(Display::Flex);
     style.position_type = Some(PositionType::Absolute);
@@ -409,7 +418,18 @@ struct DialogWidgetPanel;
 
 /// Represents the `DialogTriggerTargets` data structure used by the extended UI system.
 #[derive(Component, Debug, Clone)]
-struct DialogTriggerTargets(Vec<Entity>);
+struct DialogTriggerTargets {
+    trigger_id: String,
+    targets: Vec<DialogTriggerTarget>,
+}
+
+#[derive(Debug, Clone)]
+struct DialogTriggerTarget {
+    entity: Entity,
+    renderer: DialogProvider,
+    dialog_type: DialogWidgetType,
+    content_text: String,
+}
 
 /// Represents the `DialogTriggerObserver` data structure used by the extended UI system.
 #[derive(Component, Debug, Clone, Copy)]
@@ -578,7 +598,7 @@ fn initialize_dialog_widgets(
         commands.entity(entity).insert((
             Name::new(dialog_name),
             RenderLayers::layer(layer),
-            Pickable::default(),
+            Pickable::IGNORE,
             TagName("dialog".to_string()),
             CssClass(classes),
             DialogWidgetBase,
@@ -733,7 +753,7 @@ fn spawn_default_dialog_header(commands: &mut Commands, panel: Entity, layer: us
         .id();
 
     let mut title_font = TextFont::default();
-    title_font.font_size = 20.0;
+    title_font.font_size = FontSize::Px(20.0);
 
     let title = commands
         .spawn((
@@ -891,7 +911,7 @@ fn spawn_default_dialog_footer_button(
         .id();
 
     let mut font = TextFont::default();
-    font.font_size = 14.0;
+    font.font_size = FontSize::Px(14.0);
 
     let text = commands
         .spawn((
@@ -913,14 +933,32 @@ fn spawn_default_dialog_footer_button(
 /// Handles `on_dialog_widget_button_click` in the extended UI workflow.
 fn on_dialog_widget_button_click(
     mut trigger: On<Pointer<Click>>,
-    mut dialogs: Query<&mut DialogWidget>,
+    mut commands: Commands,
+    mut dialogs: Query<(
+        Option<&mut DialogWidget>,
+        Option<&mut Visibility>,
+        Option<&mut Pickable>,
+    )>,
     actions: Query<&DialogWidgetButtonAction>,
 ) {
     let Ok(action) = actions.get(trigger.entity) else {
         return;
     };
-    if let Ok(mut dialog) = dialogs.get_mut(action.dialog) {
-        dialog.open = false;
+    if let Ok((mut dialog, visibility_opt, pickable_opt)) = dialogs.get_mut(action.dialog) {
+        if let Some(dialog) = dialog.as_deref_mut() {
+            dialog.open = false;
+        }
+        let next_visibility = Visibility::Hidden;
+        let next_pickable = Pickable::IGNORE;
+        if let Some(mut visibility) = visibility_opt {
+            *visibility = next_visibility;
+        }
+        if let Some(mut pickable) = pickable_opt {
+            *pickable = next_pickable;
+        }
+        commands
+            .entity(action.dialog)
+            .insert((next_visibility, next_pickable));
     }
     trigger.propagate(false);
 }
@@ -953,20 +991,31 @@ fn bind_dialog_triggers(
         };
 
         if let Ok(mut list) = target_lists.get_mut(target_entity) {
-            if !list.0.contains(&dialog_entity) {
-                list.0.push(dialog_entity);
+            if list.trigger_id.is_empty() {
+                list.trigger_id = trigger_id.clone();
+            }
+            if let Some(target) = list
+                .targets
+                .iter_mut()
+                .find(|target| target.entity == dialog_entity)
+            {
+                *target = dialog_trigger_target(dialog_entity, dialog);
+            } else {
+                list.targets
+                    .push(dialog_trigger_target(dialog_entity, dialog));
             }
         } else {
-            commands
-                .entity(target_entity)
-                .insert(DialogTriggerTargets(vec![dialog_entity]));
+            commands.entity(target_entity).insert(DialogTriggerTargets {
+                trigger_id: trigger_id.clone(),
+                targets: vec![dialog_trigger_target(dialog_entity, dialog)],
+            });
         }
 
         if trigger_observers.get(target_entity).is_err() {
             commands
                 .entity(target_entity)
                 .insert(DialogTriggerObserver)
-                .observe(on_dialog_trigger_click);
+                .observe(on_dialog_trigger_press);
         }
 
         commands.entity(dialog_entity).insert(DialogTriggerBound);
@@ -976,58 +1025,181 @@ fn bind_dialog_triggers(
 /// Handles `sync_dialog_widget_visibility` in the extended UI workflow.
 fn sync_dialog_widget_visibility(
     mut dialogs: Query<
-        (&DialogWidget, &mut Visibility),
+        (&DialogWidget, &mut Visibility, &mut Pickable),
         Or<(Added<DialogWidget>, Changed<DialogWidget>)>,
     >,
 ) {
-    for (dialog, mut visibility) in dialogs.iter_mut() {
-        let should_show = dialog.renderer == DialogProvider::BevyApp && dialog.open;
-        *visibility = if should_show {
-            Visibility::Inherited
-        } else {
-            Visibility::Hidden
-        };
+    for (dialog, mut visibility, mut pickable) in dialogs.iter_mut() {
+        let (next_visibility, next_pickable) = dialog_widget_runtime_components(dialog);
+        *visibility = next_visibility;
+        *pickable = next_pickable;
     }
 }
 
-/// Handles `on_dialog_trigger_click` in the extended UI workflow.
-fn on_dialog_trigger_click(
-    trigger: On<Pointer<Click>>,
-    targets: Query<&DialogTriggerTargets>,
-    mut dialogs: Query<&mut DialogWidget>,
+/// Handles `on_dialog_trigger_press` in the extended UI workflow.
+fn on_dialog_trigger_press(
+    trigger: On<Pointer<Press>>,
+    mut commands: Commands,
+    mut target_lists: Query<&mut DialogTriggerTargets>,
+    trigger_ids: Query<&CssID>,
+    mut dialogs: Query<(
+        Entity,
+        &mut DialogWidget,
+        Option<&mut Visibility>,
+        Option<&mut Pickable>,
+    )>,
+    entities: Query<()>,
+    mut show_dialogs: MessageWriter<ShowDialog>,
 ) {
-    let Ok(targets) = targets.get(trigger.entity) else {
+    let Ok(mut targets) = target_lists.get_mut(trigger.entity) else {
         return;
     };
 
-    for dialog_entity in targets.0.iter().copied() {
-        let Ok(mut dialog) = dialogs.get_mut(dialog_entity) else {
+    let configured_targets = targets.targets.clone();
+    let trigger_id = trigger_ids
+        .get(trigger.entity)
+        .ok()
+        .map(|css_id| normalize_trigger_id(&css_id.0))
+        .filter(|id| !id.is_empty())
+        .or_else(|| {
+            if targets.trigger_id.is_empty() {
+                None
+            } else {
+                Some(targets.trigger_id.clone())
+            }
+        });
+    let mut live_targets: Vec<DialogTriggerTarget> = Vec::new();
+    let mut seen_dialogs = 0usize;
+
+    for (dialog_entity, mut dialog, visibility_opt, pickable_opt) in dialogs.iter_mut() {
+        seen_dialogs += 1;
+        let is_configured_target = configured_targets
+            .iter()
+            .any(|target| target.entity == dialog_entity);
+        let matches_trigger_id = trigger_id
+            .as_ref()
+            .zip(dialog.trigger.as_ref())
+            .map(|(trigger_id, dialog_trigger)| normalize_trigger_id(dialog_trigger) == *trigger_id)
+            .unwrap_or(false);
+
+        if !is_configured_target && !matches_trigger_id {
             continue;
-        };
+        }
+
+        if !live_targets
+            .iter()
+            .any(|target| target.entity == dialog_entity)
+        {
+            live_targets.push(dialog_trigger_target(dialog_entity, &dialog));
+        }
 
         match dialog.renderer {
             DialogProvider::BevyApp => {
                 dialog.open = true;
+                let (next_visibility, next_pickable) = dialog_widget_runtime_components(&dialog);
+                if let Some(mut visibility) = visibility_opt {
+                    *visibility = next_visibility;
+                }
+                if let Some(mut pickable) = pickable_opt {
+                    *pickable = next_pickable;
+                }
+                commands
+                    .entity(dialog_entity)
+                    .insert((next_visibility, next_pickable));
             }
             DialogProvider::System => {
                 let _ = show_system_message(dialog.dialog_type, &dialog.content_text);
             }
         }
     }
+
+    if !live_targets.is_empty() {
+        targets.targets = live_targets;
+        return;
+    }
+
+    for cached_target in configured_targets {
+        match cached_target.renderer {
+            DialogProvider::BevyApp => {
+                if entities.get(cached_target.entity).is_ok() {
+                    commands
+                        .entity(cached_target.entity)
+                        .insert((Visibility::Inherited, Pickable::default()));
+                } else {
+                    // The HTML builder may replace dialog entities during WASM rebuilds after the
+                    // trigger observer is bound. Fall back to the runtime dialog pipeline.
+                    let content = if cached_target.content_text.trim().is_empty() {
+                        "Dialog".to_string()
+                    } else {
+                        cached_target.content_text.clone()
+                    };
+                    let mut config = DialogConfig::default_modal("Dialog", content);
+                    config.provider = DialogProvider::BevyApp;
+                    config.close_on_backdrop = true;
+                    show_dialogs.write(ShowDialog::new(config));
+                }
+                live_targets.push(cached_target);
+            }
+            DialogProvider::System => {
+                let _ = show_system_message(cached_target.dialog_type, &cached_target.content_text);
+                live_targets.push(cached_target);
+            }
+        }
+    }
+
+    if live_targets.is_empty() {
+        warn!(
+            "Dialog trigger {:?} found no live targets after scanning {} dialog(s)",
+            trigger_id, seen_dialogs
+        );
+    } else {
+        targets.targets = live_targets;
+    }
 }
 
 /// Handles `on_dialog_widget_overlay_click` in the extended UI workflow.
 fn on_dialog_widget_overlay_click(
     mut trigger: On<Pointer<Click>>,
-    mut dialogs: Query<&mut DialogWidget>,
+    mut commands: Commands,
+    mut dialogs: Query<(
+        Option<&mut DialogWidget>,
+        Option<&mut Visibility>,
+        Option<&mut Pickable>,
+    )>,
 ) {
-    let Ok(mut dialog) = dialogs.get_mut(trigger.entity) else {
+    let Ok((mut dialog, visibility_opt, pickable_opt)) = dialogs.get_mut(trigger.entity) else {
         return;
     };
-    if dialog.renderer == DialogProvider::BevyApp {
-        dialog.open = false;
+    if dialog
+        .as_deref()
+        .map(|dialog| dialog.renderer == DialogProvider::BevyApp)
+        .unwrap_or(true)
+    {
+        if let Some(dialog) = dialog.as_deref_mut() {
+            dialog.open = false;
+        }
+        let next_visibility = Visibility::Hidden;
+        let next_pickable = Pickable::IGNORE;
+        if let Some(mut visibility) = visibility_opt {
+            *visibility = next_visibility;
+        }
+        if let Some(mut pickable) = pickable_opt {
+            *pickable = next_pickable;
+        }
+        commands
+            .entity(trigger.entity)
+            .insert((next_visibility, next_pickable));
     }
     trigger.propagate(false);
+}
+
+fn dialog_trigger_target(entity: Entity, dialog: &DialogWidget) -> DialogTriggerTarget {
+    DialogTriggerTarget {
+        entity,
+        renderer: dialog.renderer,
+        dialog_type: dialog.dialog_type,
+        content_text: dialog.content_text.clone(),
+    }
 }
 
 /// Handles `normalize_trigger_id` in the extended UI workflow.
@@ -1267,7 +1439,7 @@ fn spawn_header(
         .id();
 
     let mut title_font = TextFont::default();
-    title_font.font_size = 21.0;
+    title_font.font_size = FontSize::Px(21.0);
 
     let title_entity = commands
         .spawn((
@@ -1326,7 +1498,7 @@ fn spawn_body(
         .id();
 
     let mut body_font = TextFont::default();
-    body_font.font_size = 16.0;
+    body_font.font_size = FontSize::Px(16.0);
 
     let content_entity = commands
         .spawn((
@@ -1436,7 +1608,7 @@ fn spawn_action_button(
         .id();
 
     let mut label_font = TextFont::default();
-    label_font.font_size = 15.0;
+    label_font.font_size = FontSize::Px(15.0);
 
     let label_entity = commands
         .spawn((
@@ -1769,5 +1941,157 @@ fn show_system_dialog(dialog: &DialogConfig) -> DialogResult {
             let _ = (title, description);
             return DialogResult::Unavailable;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bevy::camera::NormalizedRenderTarget;
+    use bevy::picking::backend::HitData;
+    use bevy::picking::pointer::{Location, PointerButton, PointerId};
+
+    #[test]
+    fn dialog_trigger_opens_on_pointer_press() {
+        let mut app = App::new();
+        app.add_message::<ShowDialog>();
+        app.add_systems(Update, bind_dialog_triggers);
+
+        let target = app.world_mut().spawn(CssID("open".to_string())).id();
+        let dialog_entity = app
+            .world_mut()
+            .spawn((
+                DialogWidget {
+                    trigger: Some("open".to_string()),
+                    renderer: DialogProvider::BevyApp,
+                    dialog_type: DialogWidgetType::Info,
+                    content_text: String::new(),
+                    open: false,
+                },
+                Visibility::Hidden,
+                Pickable::IGNORE,
+            ))
+            .id();
+
+        app.update();
+
+        app.world_mut().entity_mut(target).trigger(|entity| {
+            Pointer::new(
+                PointerId::Mouse,
+                Location {
+                    target: NormalizedRenderTarget::None {
+                        width: 800,
+                        height: 600,
+                    },
+                    position: Vec2::ZERO,
+                },
+                Press {
+                    button: PointerButton::Primary,
+                    count: 1,
+                    hit: HitData {
+                        camera: Entity::PLACEHOLDER,
+                        depth: 0.0,
+                        position: None,
+                        normal: None,
+                        extra: None,
+                    },
+                },
+                entity,
+            )
+        });
+
+        let dialog = app.world().get::<DialogWidget>(dialog_entity).unwrap();
+        assert!(dialog.open);
+        let visibility = app.world().get::<Visibility>(dialog_entity).unwrap();
+        assert_eq!(*visibility, Visibility::Inherited);
+    }
+
+    #[test]
+    fn dialog_trigger_ignores_stale_cached_targets_when_live_target_exists() {
+        let mut app = App::new();
+        app.add_message::<ShowDialog>();
+
+        let trigger = app.world_mut().spawn(CssID("open".to_string())).id();
+        let stale_dialog = app
+            .world_mut()
+            .spawn(DialogWidget {
+                trigger: Some("open".to_string()),
+                renderer: DialogProvider::BevyApp,
+                dialog_type: DialogWidgetType::Info,
+                content_text: "stale".to_string(),
+                open: false,
+            })
+            .id();
+        app.world_mut().despawn(stale_dialog);
+
+        let live_dialog = app
+            .world_mut()
+            .spawn((
+                DialogWidget {
+                    trigger: Some("open".to_string()),
+                    renderer: DialogProvider::BevyApp,
+                    dialog_type: DialogWidgetType::Info,
+                    content_text: "live".to_string(),
+                    open: false,
+                },
+                Visibility::Hidden,
+                Pickable::IGNORE,
+            ))
+            .id();
+
+        let live_target = dialog_trigger_target(
+            live_dialog,
+            app.world().get::<DialogWidget>(live_dialog).unwrap(),
+        );
+
+        app.world_mut()
+            .entity_mut(trigger)
+            .insert(DialogTriggerTargets {
+                trigger_id: "open".to_string(),
+                targets: vec![
+                    DialogTriggerTarget {
+                        entity: stale_dialog,
+                        renderer: DialogProvider::BevyApp,
+                        dialog_type: DialogWidgetType::Info,
+                        content_text: "stale".to_string(),
+                    },
+                    live_target,
+                ],
+            });
+
+        app.world_mut()
+            .entity_mut(trigger)
+            .observe(on_dialog_trigger_press);
+        app.world_mut().entity_mut(trigger).trigger(|entity| {
+            Pointer::new(
+                PointerId::Mouse,
+                Location {
+                    target: NormalizedRenderTarget::None {
+                        width: 800,
+                        height: 600,
+                    },
+                    position: Vec2::ZERO,
+                },
+                Press {
+                    button: PointerButton::Primary,
+                    count: 1,
+                    hit: HitData {
+                        camera: Entity::PLACEHOLDER,
+                        depth: 0.0,
+                        position: None,
+                        normal: None,
+                        extra: None,
+                    },
+                },
+                entity,
+            )
+        });
+
+        let dialog = app.world().get::<DialogWidget>(live_dialog).unwrap();
+        assert!(dialog.open);
+        let visibility = app.world().get::<Visibility>(live_dialog).unwrap();
+        assert_eq!(*visibility, Visibility::Inherited);
+        let messages = app.world().resource::<Messages<ShowDialog>>();
+        assert_eq!(messages.len(), 0);
     }
 }

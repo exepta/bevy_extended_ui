@@ -165,6 +165,71 @@ mod unit_tests {
     }
 
     #[test]
+    fn compile_framework_template_cached_reuses_templates_and_resets_on_config_change() {
+        let base = unique_temp_dir("compile_cache");
+        let asset_root = base.join("assets");
+        let rust_root = base.join("src/packages");
+        write_route_component(
+            &asset_root,
+            &rust_root,
+            "main",
+            "app-main",
+            "<section>First</section>",
+        );
+
+        let cfg = route_test_config(&asset_root, &rust_root);
+        let template = "<html><head></head><body><app-main /></body></html>";
+        let mut cache = FrameworkCompileCache::default();
+
+        let first = compile_framework_template_with_router_cached(
+            template,
+            "index.html",
+            &cfg,
+            None,
+            &mut cache,
+        );
+        assert!(first.html.contains("First"));
+
+        write_file(
+            &asset_root.join("components/main.component.html"),
+            "<section>Changed on disk</section>",
+        );
+
+        let cached = compile_framework_template_with_router_cached(
+            template,
+            "index.html",
+            &cfg,
+            None,
+            &mut cache,
+        );
+        assert!(cached.html.contains("First"));
+        assert!(!cached.html.contains("Changed on disk"));
+
+        let next_asset_root = base.join("assets_next");
+        let next_rust_root = base.join("src/packages_next");
+        write_route_component(
+            &next_asset_root,
+            &next_rust_root,
+            "main",
+            "app-main",
+            "<section>Next config</section>",
+        );
+        let next_cfg = route_test_config(&next_asset_root, &next_rust_root);
+
+        let refreshed = compile_framework_template_with_router_cached(
+            template,
+            "index.html",
+            &next_cfg,
+            None,
+            &mut cache,
+        );
+        assert!(refreshed.html.contains("Next config"));
+        assert!(!refreshed.html.contains("First"));
+
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
     fn compile_framework_template_preserves_inline_dollar_functions() {
         let base = unique_temp_dir("inline_dollar_functions");
         let asset_root = base.join("assets");

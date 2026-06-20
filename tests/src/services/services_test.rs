@@ -12,15 +12,14 @@ mod tests {
     use crate::io::CssAsset;
     use crate::styles::components::UiStyle;
     use crate::styles::{
-        CssClass, CssID, CssSource, FontVal, Style, StylePair, TagName, TextTransform,
-        TransitionSpec,
+        CssClass, CssID, CssSource, Style, StylePair, TagName, TextTransform, TransitionSpec,
     };
     use crate::widgets::{BindToID, UIGenID, UIWidgetState};
     use crate::{CurrentWidgetState, ExtendedUiConfiguration, ImageCache};
     use bevy::asset::AssetPlugin;
     use bevy::input::ButtonInput;
     use bevy::prelude::*;
-    use bevy::text::LineHeight;
+    use bevy::text::{FontSize, LineHeight};
     use std::collections::{HashMap, HashSet};
     use std::fs;
     use std::path::PathBuf;
@@ -650,7 +649,7 @@ mod tests {
 
         let mut root_style = Style::default();
         root_style.color = Some(Color::srgb(1.0, 0.0, 0.0));
-        root_style.font_size = Some(FontVal::Px(32.0));
+        root_style.font_size = Some(FontSize::Px(32.0));
 
         let mut root_ui = empty_ui_style();
         root_ui.active_style = Some(root_style);
@@ -663,7 +662,7 @@ mod tests {
                 empty_ui_style(),
                 TextColor(Color::NONE),
                 TextFont {
-                    font_size: 7.0,
+                    font_size: FontSize::Px(7.0),
                     ..default()
                 },
                 ImageNode {
@@ -691,7 +690,7 @@ mod tests {
 
         assert_eq!(child_text.0, Color::srgb(1.0, 0.0, 0.0));
         assert_eq!(child_image.color, Color::srgb(1.0, 0.0, 0.0));
-        assert_eq!(child_font.font_size, 32.0);
+        assert_eq!(child_font.font_size, FontSize::Px(32.0));
     }
 
     #[test]
@@ -702,7 +701,7 @@ mod tests {
 
         let mut parent_style = Style::default();
         parent_style.color = Some(Color::srgb(1.0, 0.0, 0.0));
-        parent_style.font_size = Some(FontVal::Px(40.0));
+        parent_style.font_size = Some(FontSize::Px(40.0));
         let mut parent_ui = empty_ui_style();
         parent_ui.active_style = Some(parent_style);
 
@@ -710,7 +709,7 @@ mod tests {
 
         let mut local_style = Style::default();
         local_style.color = Some(Color::srgb(0.0, 0.0, 1.0));
-        local_style.font_size = Some(FontVal::Px(13.0));
+        local_style.font_size = Some(FontSize::Px(13.0));
         let mut child_ui = empty_ui_style();
         child_ui.active_style = Some(local_style);
 
@@ -721,7 +720,7 @@ mod tests {
                 child_ui,
                 TextColor(sentinel_color),
                 TextFont {
-                    font_size: 9.0,
+                    font_size: FontSize::Px(9.0),
                     ..default()
                 },
                 ImageNode {
@@ -749,7 +748,7 @@ mod tests {
 
         assert_eq!(child_text.0, sentinel_color);
         assert_eq!(child_image.color, sentinel_color);
-        assert_eq!(child_font.font_size, 9.0);
+        assert_eq!(child_font.font_size, FontSize::Px(9.0));
     }
 
     #[test]

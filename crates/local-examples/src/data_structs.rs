@@ -1,3 +1,4 @@
+use bevy::prelude::Component;
 use bevy_extended_ui::BeuStore;
 use bevy_extended_ui_macros::html_shared;
 use serde::Serialize;
@@ -9,7 +10,7 @@ use serde::Serialize;
 /// - `data` (Vec<u8>): A vector of bytes that stores the binary content of the data pack.
 /// - `used` (bool): A boolean flag indicating whether the data pack has been used or not.
 #[html_shared]
-#[derive(BeuStore, PartialEq, Clone, Debug, Serialize)]
+#[derive(Component, BeuStore, PartialEq, Clone, Debug, Serialize)]
 pub struct DataPack {
     pub version: String,
     pub available_data: Vec<u8>,
@@ -53,7 +54,7 @@ impl DataPack {
 /// - `#[derive(Debug, Default, Serialize)]`: Automatically derives the `Debug`, `Default`, and `Serialize` traits for the `DataState` enum.
 /// - `#[allow(dead_code)]`: Prevents warnings for unused code related to this enum.
 #[html_shared]
-#[derive(BeuStore, PartialEq, Clone, Debug, Default, Serialize)]
+#[derive(Component, BeuStore, PartialEq, Clone, Debug, Default, Serialize)]
 #[allow(dead_code)]
 pub enum DataState {
     Active,

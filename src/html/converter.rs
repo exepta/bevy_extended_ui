@@ -8,7 +8,9 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::de::DeserializeSeed;
 use serde_json::Value as JsonValue;
+use std::collections::hash_map::DefaultHasher;
 use std::collections::{HashMap, HashSet};
+use std::hash::{Hash, Hasher};
 #[cfg(feature = "extended-framework")]
 use std::{
     fs,
@@ -19,11 +21,14 @@ use crate::ExtendedUiConfiguration;
 #[cfg(feature = "extended-dialog")]
 use crate::dialog::{DialogProvider, DialogWidget, DialogWidgetType};
 #[cfg(feature = "extended-framework")]
-use crate::framework::{ExtendedFrameworkConfiguration, compile_framework_template_with_router};
+use crate::framework::{
+    ExtendedFrameworkConfiguration, FrameworkCompileCache,
+    compile_framework_template_with_router_cached,
+};
 use crate::html::{
     HtmlDirty, HtmlEventBindings, HtmlID, HtmlInlineEventBindings, HtmlInnerContent, HtmlMeta,
     HtmlPendingReveal, HtmlSource, HtmlStates, HtmlStructureMap, HtmlStyle, HtmlSystemSet,
-    HtmlWidgetNode, parse_html_inline_action,
+    HtmlTextBinding, HtmlWidgetNode, parse_html_inline_action,
 };
 use crate::io::{CssAsset, DefaultCssHandle, HtmlAsset};
 use crate::lang::{
@@ -61,7 +66,23 @@ pub struct HtmlConverterSystem;
 impl Plugin for HtmlConverterSystem {
     /// Registers the HTML conversion system.
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, update_html_ui.in_set(HtmlSystemSet::Convert));
+        #[cfg(feature = "extended-framework")]
+        app.init_resource::<FrameworkCompileCache>();
+        app.init_resource::<HtmlBindingValueTracker>();
+        app.init_resource::<HtmlTemplateBindingProfiles>();
+        app.init_resource::<HtmlTemplateBindingAnalysisCache>();
+        app.add_systems(
+            Update,
+            (track_html_binding_value_changes, update_html_ui)
+                .chain()
+                .in_set(HtmlSystemSet::Convert),
+        );
+        app.add_systems(
+            Update,
+            patch_html_text_bindings
+                .in_set(HtmlSystemSet::Build)
+                .after(crate::html::builder::build_html_source),
+        );
     }
 }
 
@@ -91,10 +112,136 @@ struct TemplateInputs<'w> {
 struct HtmlRuntimeState<'w> {
     structure_map: ResMut<'w, HtmlStructureMap>,
     html_dirty: ResMut<'w, HtmlDirty>,
+    binding_profiles: ResMut<'w, HtmlTemplateBindingProfiles>,
+    binding_analysis_cache: ResMut<'w, HtmlTemplateBindingAnalysisCache>,
     #[allow(dead_code)]
     pending_reveal: Option<ResMut<'w, HtmlPendingReveal>>,
     ui_lang: ResMut<'w, UILang>,
     lang_state: ResMut<'w, UiLangState>,
+}
+
+#[derive(Resource, Default)]
+struct HtmlBindingValueTracker {
+    vars: HashMap<String, String>,
+    shared_values: HashMap<String, JsonValue>,
+    changed_roots: HashSet<String>,
+    values_changed: bool,
+}
+
+#[derive(Clone, Default)]
+struct HtmlTemplateBindingProfile {
+    text_roots: HashSet<String>,
+    unpatchable_roots: HashSet<String>,
+    force_reparse_on_value_change: bool,
+}
+
+impl HtmlTemplateBindingProfile {
+    fn requires_reparse(&self, changed_roots: &HashSet<String>) -> bool {
+        self.force_reparse_on_value_change || !self.unpatchable_roots.is_disjoint(changed_roots)
+    }
+}
+
+#[derive(Resource, Default)]
+struct HtmlTemplateBindingProfiles {
+    by_key: HashMap<String, HtmlTemplateBindingProfile>,
+}
+
+#[derive(Clone)]
+struct HtmlTemplateBindingAnalysis {
+    text_bindings: HashMap<String, HtmlTextBinding>,
+    profile: HtmlTemplateBindingProfile,
+}
+
+#[derive(Resource, Default)]
+struct HtmlTemplateBindingAnalysisCache {
+    by_template_hash: HashMap<u64, HtmlTemplateBindingAnalysis>,
+}
+
+fn track_html_binding_value_changes(
+    mut tracker: ResMut<HtmlBindingValueTracker>,
+    vars: Res<UiLangVariables>,
+    shared_values: Res<UiSharedValues>,
+) {
+    let mut changed_roots = HashSet::new();
+
+    for (key, value) in &vars.vars {
+        if tracker.vars.get(key) != Some(value) {
+            changed_roots.insert(key.clone());
+        }
+    }
+    for key in tracker.vars.keys() {
+        if !vars.vars.contains_key(key) {
+            changed_roots.insert(key.clone());
+        }
+    }
+
+    for (key, value) in &shared_values.values {
+        if tracker.shared_values.get(key) != Some(value) {
+            changed_roots.insert(binding_root(key));
+        }
+    }
+    for key in tracker.shared_values.keys() {
+        if !shared_values.values.contains_key(key) {
+            changed_roots.insert(binding_root(key));
+        }
+    }
+
+    tracker.values_changed = !changed_roots.is_empty();
+    tracker.changed_roots = changed_roots;
+    tracker.vars = vars.vars.clone();
+    tracker.shared_values = shared_values.values.clone();
+}
+
+fn patch_html_text_bindings(
+    tracker: Res<HtmlBindingValueTracker>,
+    vars: Res<UiLangVariables>,
+    shared_values: Res<UiSharedValues>,
+    mut query: Query<(
+        &HtmlTextBinding,
+        Option<&mut Paragraph>,
+        Option<&mut Headline>,
+        Option<&mut Button>,
+        Option<&mut Text>,
+    )>,
+) {
+    if !tracker.values_changed {
+        return;
+    }
+
+    for (binding, paragraph, headline, button, text) in query.iter_mut() {
+        if binding
+            .bindings
+            .iter()
+            .map(|binding| binding_root(binding))
+            .all(|root| !tracker.changed_roots.contains(&root))
+        {
+            continue;
+        }
+
+        let rendered =
+            preprocess_template_directives_with_shared(&binding.template, &vars, &shared_values);
+
+        if let Some(mut paragraph) = paragraph {
+            if paragraph.text != rendered {
+                paragraph.text = rendered.clone();
+            }
+        }
+        if let Some(mut headline) = headline {
+            if headline.text != rendered {
+                headline.text = rendered.clone();
+            }
+        }
+        if let Some(mut button) = button {
+            if button.text != rendered {
+                button.text = rendered.clone();
+            }
+        }
+        if let Some(mut text) = text {
+            if text.0 != rendered {
+                text.0 = rendered;
+            }
+        }
+    }
 }
 
 /// Bundled framework inputs for route-aware template compilation.
@@ -103,6 +250,7 @@ struct HtmlRuntimeState<'w> {
 struct FrameworkInputs<'w, 's> {
     framework_config: Option<Res<'w, ExtendedFrameworkConfiguration>>,
     router: Option<Res<'w, Router>>,
+    cache: ResMut<'w, FrameworkCompileCache>,
     last_router_revision: Local<'s, u64>,
 }
 
@@ -125,6 +273,7 @@ fn update_html_ui(
 
     type_registry: Res<AppTypeRegistry>,
 
+    binding_tracker: Res<HtmlBindingValueTracker>,
     queries: HtmlSourceQueries,
 ) {
     let type_registry = type_registry.read();
@@ -158,12 +307,13 @@ fn update_html_ui(
         true
     });
     let resolved = state.ui_lang.resolved().map(|lang| lang.to_string());
-    let mut lang_dirty = false;
+    let mut locale_dirty = false;
+    let mut value_dirty = false;
     let vars_hash = vars_fingerprint(&template_inputs.lang_vars);
 
     if state.lang_state.last_resolved != resolved {
         state.lang_state.last_resolved = resolved;
-        lang_dirty = true;
+        locale_dirty = true;
     }
 
     if state.lang_state.last_language_path.as_deref() != Some(config.language_path.as_str()) {
@@ -171,18 +321,18 @@ fn update_html_ui(
             .lang_state
             .last_language_path
             .replace(config.language_path.clone());
-        lang_dirty = true;
+        locale_dirty = true;
     }
 
     if state.lang_state.last_vars_fingerprint != Some(vars_hash) {
         state.lang_state.last_vars_fingerprint = Some(vars_hash);
-        lang_dirty = true;
+        value_dirty = true;
     }
 
     let shared_hash = shared_values_fingerprint(&template_inputs.shared_values);
     if state.lang_state.last_shared_fingerprint != Some(shared_hash) {
         state.lang_state.last_shared_fingerprint = Some(shared_hash);
-        lang_dirty = true;
+        value_dirty = true;
     }
 
     // Entities that need reparse (new HtmlSource, pending retry, or changed HtmlAsset).
@@ -208,8 +358,21 @@ fn update_html_ui(
     dirty_entities.sort();
     dirty_entities.dedup();
 
-    if lang_dirty {
+    if locale_dirty {
         dirty_entities.extend(queries.all.iter().map(|(e, _)| e));
+        dirty_entities.sort();
+        dirty_entities.dedup();
+    }
+
+    if value_dirty {
+        dirty_entities.extend(queries.all.iter().filter_map(|(entity, source)| {
+            source_requires_value_reparse(
+                source,
+                &state.binding_profiles,
+                &binding_tracker.changed_roots,
+            )
+            .then_some(entity)
+        }));
         dirty_entities.sort();
         dirty_entities.dedup();
     }
@@ -242,11 +405,12 @@ fn update_html_ui(
         let source_path = html.get_source_path();
         let raw_content = html_asset.html.clone();
         #[cfg(feature = "extended-framework")]
-        let framework_compiled = compile_framework_template_with_router(
+        let framework_compiled = compile_framework_template_with_router_cached(
             &raw_content,
             &source_path,
             &framework_config,
             framework_inputs.router.as_deref(),
+            &mut framework_inputs.cache,
         );
         #[cfg(feature = "extended-framework")]
         let content = framework_compiled.html.clone();
@@ -268,6 +432,10 @@ fn update_html_ui(
             &config.language_path,
             &template_inputs.lang_vars,
         );
+        let binding_analysis =
+            analyze_template_bindings_cached(&localized, &mut state.binding_analysis_cache);
+        let raw_text_bindings = binding_analysis.text_bindings;
+        let binding_profile = binding_analysis.profile;
         #[cfg(feature = "extended-framework")]
         let component_local_type_names = {
             let mut names = component_local_type_names(&source_path, &framework_config);
@@ -406,6 +574,7 @@ fn update_html_ui(
             &label_map,
             &ui_key,
             &parse_source,
+            &raw_text_bindings,
             &type_registry,
             "0",
         ) {
@@ -413,6 +582,10 @@ fn update_html_ui(
                 .structure_map
                 .html_map
                 .insert(ui_key.clone(), vec![body_widget]);
+            state
+                .binding_profiles
+                .by_key
+                .insert(ui_key.clone(), binding_profile);
             #[cfg(feature = "extended-framework")]
             {
                 let active = state.structure_map.active.get_or_insert_with(Vec::new);
@@ -468,6 +641,7 @@ fn parse_html_node(
     label_map: &HashMap<String, String>,
     key: &String,
     html: &HtmlSource,
+    raw_text_bindings: &HashMap<String, HtmlTextBinding>,
     type_registry: &TypeRegistry,
     path: &str,
 ) -> Option<HtmlWidgetNode> {
@@ -484,6 +658,7 @@ fn parse_html_node(
         style: attributes.get("style").map(HtmlStyle::from_str),
         validation: parse_validation_attributes(&attributes),
         inner_content: parse_inner_content(node),
+        text_binding: raw_text_bindings.get(path).cloned(),
     };
 
     let states = HtmlStates {
@@ -510,6 +685,7 @@ fn parse_html_node(
                         label_map,
                         key,
                         html,
+                        raw_text_bindings,
                         type_registry,
                         child_path.as_str(),
                     )
@@ -618,6 +794,7 @@ fn parse_html_node(
                     label_map,
                     key,
                     html,
+                    raw_text_bindings,
                     type_registry,
                     child_path.as_str(),
                 ) {
@@ -646,6 +823,7 @@ fn parse_html_node(
                     label_map,
                     key,
                     html,
+                    raw_text_bindings,
                     type_registry,
                     child_path.as_str(),
                 ) {
@@ -690,6 +868,7 @@ fn parse_html_node(
                     label_map,
                     key,
                     html,
+                    raw_text_bindings,
                     type_registry,
                     child_path.as_str(),
                 ) {
@@ -744,6 +923,7 @@ fn parse_html_node(
                     label_map,
                     key,
                     html,
+                    raw_text_bindings,
                     type_registry,
                     child_path.as_str(),
                 ) {
@@ -776,6 +956,7 @@ fn parse_html_node(
                     label_map,
                     key,
                     html,
+                    raw_text_bindings,
                     type_registry,
                     child_path.as_str(),
                 ) {
@@ -808,6 +989,7 @@ fn parse_html_node(
                     label_map,
                     key,
                     html,
+                    raw_text_bindings,
                     type_registry,
                     child_path.as_str(),
                 ) {
@@ -866,6 +1048,7 @@ fn parse_html_node(
                     label_map,
                     key,
                     html,
+                    raw_text_bindings,
                     type_registry,
                     child_path.as_str(),
                 ) {
@@ -915,6 +1098,7 @@ fn parse_html_node(
                     style: attrs.get("style").map(HtmlStyle::from_str),
                     validation: parse_validation_attributes(&attrs),
                     inner_content: parse_inner_content(&radio_node),
+                    text_binding: None,
                 };
 
                 let child_states = HtmlStates {
@@ -3816,6 +4000,131 @@ pub fn extract_inner_bindings(content: &str) -> Vec<String> {
     }
 
     out
+}
+
+fn collect_text_bindings_by_path(body_node: &NodeRef) -> HashMap<String, HtmlTextBinding> {
+    let mut out = HashMap::new();
+    collect_text_bindings_by_path_inner(body_node, "0", &mut out);
+    out
+}
+
+fn analyze_template_bindings_cached(
+    template: &str,
+    cache: &mut HtmlTemplateBindingAnalysisCache,
+) -> HtmlTemplateBindingAnalysis {
+    let key = template_hash(template);
+    if let Some(cached) = cache.by_template_hash.get(&key) {
+        return cached.clone();
+    }
+
+    let document = kuchiki::parse_html().one(template.to_string());
+    let text_bindings = select_primary_body_node(&document)
+        .as_ref()
+        .map(collect_text_bindings_by_path)
+        .unwrap_or_default();
+    let profile = build_template_binding_profile(template, &text_bindings);
+    let analysis = HtmlTemplateBindingAnalysis {
+        text_bindings,
+        profile,
+    };
+
+    cache.by_template_hash.insert(key, analysis.clone());
+    analysis
+}
+
+fn template_hash(template: &str) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    template.hash(&mut hasher);
+    hasher.finish()
+}
+
+fn collect_text_bindings_by_path_inner(
+    node: &NodeRef,
+    path: &str,
+    out: &mut HashMap<String, HtmlTextBinding>,
+) {
+    if let Some(element) = node.as_element() {
+        let tag = element.name.local.to_string();
+        if is_patchable_text_tag(&tag) {
+            let template = node.text_contents();
+            let bindings = extract_inner_bindings(&template);
+            if !bindings.is_empty() {
+                out.insert(path.to_string(), HtmlTextBinding { template, bindings });
+            }
+        }
+    }
+
+    for (index, child) in node.children().enumerate() {
+        let child_path = format!("{path}.{index}");
+        collect_text_bindings_by_path_inner(&child, child_path.as_str(), out);
+    }
+}
+
+fn is_patchable_text_tag(tag: &str) -> bool {
+    matches!(
+        tag,
+        "p" | "button" | "h1" | "h2" | "h3" | "h4" | "h5" | "h6"
+    )
+}
+
+fn build_template_binding_profile(
+    localized_template: &str,
+    text_bindings: &HashMap<String, HtmlTextBinding>,
+) -> HtmlTemplateBindingProfile {
+    let mut profile = HtmlTemplateBindingProfile::default();
+    let mut patchable_bindings = HashSet::new();
+
+    for binding in text_bindings.values() {
+        for inner in &binding.bindings {
+            patchable_bindings.insert(inner.clone());
+            profile.text_roots.insert(binding_root(inner));
+        }
+    }
+
+    for binding in extract_inner_bindings(localized_template) {
+        if !patchable_bindings.contains(&binding) {
+            profile.unpatchable_roots.insert(binding_root(&binding));
+        }
+    }
+    profile.force_reparse_on_value_change =
+        localized_template.contains("@if") || localized_template.contains("@for");
+    profile
+}
+
+fn source_requires_value_reparse(
+    source: &HtmlSource,
+    profiles: &HtmlTemplateBindingProfiles,
+    changed_roots: &HashSet<String>,
+) -> bool {
+    if changed_roots.is_empty() {
+        return false;
+    }
+
+    if source.source_id.is_empty() {
+        return true;
+    }
+
+    profiles
+        .by_key
+        .get(&source.source_id)
+        .is_none_or(|profile| profile.requires_reparse(changed_roots))
+}
+
+fn binding_root(binding: &str) -> String {
+    let trimmed = binding
+        .trim()
+        .trim_start_matches("{{")
+        .trim_end_matches("}}")
+        .trim();
+    let mut root = String::new();
+    for ch in trimmed.chars() {
+        if ch == '_' || ch.is_ascii_alphanumeric() {
+            root.push(ch);
+            continue;
+        }
+        break;
+    }
+    root
 }
 
 /// Converts an HTML option's `value` string into a [`WidgetValue`] using the
