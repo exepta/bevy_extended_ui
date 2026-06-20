@@ -10,7 +10,8 @@ use std::collections::{HashMap, HashSet};
 
 #[cfg(feature = "extended-framework")]
 use crate::component::{
-    load_component_definitions, load_component_template_html, validate_component_assets,
+    ComponentDefinition, load_component_definitions, load_component_template_html,
+    validate_component_assets,
 };
 use crate::lang::UiSharedValues;
 #[cfg(feature = "extended-framework")]
@@ -56,6 +57,16 @@ pub struct FrameworkCompileResult {
     pub component_controllers: Vec<String>,
 }
 
+#[cfg(feature = "extended-framework")]
+#[derive(Resource, Default)]
+pub struct FrameworkCompileCache {
+    config_key: Option<String>,
+    definitions_loaded: bool,
+    definitions: Vec<ComponentDefinition>,
+    component_templates: HashMap<String, String>,
+    component_regexes: HashMap<String, (Regex, Regex)>,
+}
+
 /// Plugin for initializing resources used by the extended framework.
 #[cfg(feature = "extended-framework")]
 pub struct ExtendedFrameworkPlugin;
@@ -66,6 +77,7 @@ impl Plugin for ExtendedFrameworkPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ExtendedFrameworkConfiguration>();
         app.init_resource::<UiBindingStore>();
+        app.init_resource::<FrameworkCompileCache>();
         app.add_systems(Startup, register_beu_stores);
     }
 }
@@ -726,16 +738,38 @@ pub fn compile_framework_template_with_router(
     config: &ExtendedFrameworkConfiguration,
     router: Option<&Router>,
 ) -> FrameworkCompileResult {
+    let mut cache = FrameworkCompileCache::default();
+    compile_framework_template_with_router_cached(
+        template_html,
+        source_path,
+        config,
+        router,
+        &mut cache,
+    )
+}
+
+/// Compiles an HTML template with a reusable component metadata/template cache.
+#[cfg(feature = "extended-framework")]
+pub fn compile_framework_template_with_router_cached(
+    template_html: &str,
+    source_path: &str,
+    config: &ExtendedFrameworkConfiguration,
+    router: Option<&Router>,
+    cache: &mut FrameworkCompileCache,
+) -> FrameworkCompileResult {
     let source = normalize_source_path(source_path);
     let mut html = template_html.to_string();
     let mut component_controllers = Vec::new();
     if source == normalize_source_path(&config.index_html_file) {
         let route_components = router.map(registered_route_components).unwrap_or_default();
-        component_controllers =
-            compile_index_template(&mut html, config, router, route_components.as_slice())
-                .unwrap_or_else(|err| {
-                    panic!("extended-framework compile failed for index.html: {err}")
-                });
+        component_controllers = compile_index_template(
+            &mut html,
+            config,
+            router,
+            route_components.as_slice(),
+            cache,
+        )
+        .unwrap_or_else(|err| panic!("extended-framework compile failed for index.html: {err}"));
     }
 
     FrameworkCompileResult {
@@ -816,9 +850,10 @@ fn compile_index_template(
     config: &ExtendedFrameworkConfiguration,
     router: Option<&Router>,
     route_components: &[String],
+    cache: &mut FrameworkCompileCache,
 ) -> Result<Vec<String>, String> {
-    let defs = load_component_definitions(config)?;
-    validate_component_assets(&defs, config)?;
+    refresh_framework_compile_cache(cache, config)?;
+    let defs = cache.definitions.clone();
     let has_router_outlet = has_router_outlet(index_html)?;
 
     if let Some(router) = router {
@@ -836,18 +871,8 @@ fn compile_index_template(
         let mut replaced = false;
 
         for def in &defs {
-            let component_html = load_component_template_html(def, config)?;
-            let tag_name = regex::escape(&def.template_name);
-
-            let full_tag_re = Regex::new(&format!(
-                r"(?is)<\s*{tag}\b[^>]*>.*?</\s*{tag}\s*>",
-                tag = tag_name
-            ))
-            .map_err(|err| format!("invalid regex for tag `{}`: {err}", def.template_name))?;
-            let self_closing_re =
-                Regex::new(&format!(r"(?is)<\s*{tag}\b[^>]*/\s*>", tag = tag_name)).map_err(
-                    |err| format!("invalid regex for tag `{}`: {err}", def.template_name),
-                )?;
+            let component_html = cached_component_template(cache, def, config)?;
+            let (full_tag_re, self_closing_re) = cached_component_regexes(cache, def)?;
 
             if full_tag_re.is_match(index_html) || self_closing_re.is_match(index_html) {
                 *index_html = full_tag_re
@@ -879,6 +904,96 @@ fn compile_index_template(
 
     inject_component_styles(index_html, used_style_hrefs);
     Ok(used_component_controllers.into_iter().collect())
+}
+
+#[cfg(feature = "extended-framework")]
+fn refresh_framework_compile_cache(
+    cache: &mut FrameworkCompileCache,
+    config: &ExtendedFrameworkConfiguration,
+) -> Result<(), String> {
+    let key = framework_config_key(config);
+    if cache.config_key.as_deref() != Some(key.as_str()) {
+        cache.config_key = Some(key);
+        cache.definitions_loaded = false;
+        cache.definitions.clear();
+        cache.component_templates.clear();
+        cache.component_regexes.clear();
+    }
+
+    if !cache.definitions_loaded {
+        let defs = load_component_definitions(config)?;
+        validate_component_assets(&defs, config)?;
+        cache.definitions = defs;
+        cache.definitions_loaded = true;
+    }
+
+    Ok(())
+}
+
+#[cfg(feature = "extended-framework")]
+fn framework_config_key(config: &ExtendedFrameworkConfiguration) -> String {
+    format!(
+        "{}\n{}\n{}\n{}",
+        config.assets_component_root,
+        config.rust_component_root,
+        config.asset_root_fs_path,
+        config.index_html_file
+    )
+}
+
+#[cfg(feature = "extended-framework")]
+fn component_cache_key(definition: &ComponentDefinition) -> String {
+    format!("{}/{}", definition.source_dir_rel, definition.template_file)
+}
+
+#[cfg(feature = "extended-framework")]
+fn cached_component_template(
+    cache: &mut FrameworkCompileCache,
+    definition: &ComponentDefinition,
+    config: &ExtendedFrameworkConfiguration,
+) -> Result<String, String> {
+    let key = component_cache_key(definition);
+    if let Some(template) = cache.component_templates.get(&key) {
+        return Ok(template.clone());
+    }
+
+    let template = load_component_template_html(definition, config)?;
+    cache.component_templates.insert(key, template.clone());
+    Ok(template)
+}
+
+#[cfg(feature = "extended-framework")]
+fn cached_component_regexes(
+    cache: &mut FrameworkCompileCache,
+    definition: &ComponentDefinition,
+) -> Result<(Regex, Regex), String> {
+    if let Some(regexes) = cache.component_regexes.get(&definition.template_name) {
+        return Ok(regexes.clone());
+    }
+
+    let tag_name = regex::escape(&definition.template_name);
+    let full_tag_re = Regex::new(&format!(
+        r"(?is)<\s*{tag}\b[^>]*>.*?</\s*{tag}\s*>",
+        tag = tag_name
+    ))
+    .map_err(|err| {
+        format!(
+            "invalid regex for tag `{}`: {err}",
+            definition.template_name
+        )
+    })?;
+    let self_closing_re = Regex::new(&format!(r"(?is)<\s*{tag}\b[^>]*/\s*>", tag = tag_name))
+        .map_err(|err| {
+            format!(
+                "invalid regex for tag `{}`: {err}",
+                definition.template_name
+            )
+        })?;
+    let regexes = (full_tag_re, self_closing_re);
+    cache
+        .component_regexes
+        .insert(definition.template_name.clone(), regexes.clone());
+    Ok(regexes)
 }
 
 /// Handles `registered_route_components` in the extended UI workflow.

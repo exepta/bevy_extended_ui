@@ -5,10 +5,9 @@ use crate::services::image_service::get_or_load_image;
 use crate::services::state_service::update_widget_states;
 use crate::styles::components::UiStyle;
 use crate::styles::{
-    AnimationDirection, AnimationKeyframe, AnimationSpec, BackdropFilter, BackgroundAttachment,
-    BackgroundPosition, BackgroundPositionValue, BackgroundSize, BackgroundSizeValue, CalcContext,
-    CalcExpr, CursorStyle, FontWeight, GradientStopPosition, LinearGradient, Radius, Style,
-    TextTransform, TransformStyle, TransitionProperty, TransitionSpec,
+    BackdropFilter, BackgroundAttachment, BackgroundPosition, BackgroundPositionValue,
+    BackgroundSize, BackgroundSizeValue, CalcContext, CalcExpr, FontWeight, GradientStopPosition,
+    LinearGradient, Style, TextTransform,
 };
 use crate::widgets::UIWidgetState;
 use std::collections::{HashMap, HashSet};
@@ -18,7 +17,6 @@ use bevy::asset::{load_internal_asset, uuid_handle};
 use bevy::color::Srgba;
 use bevy::core_pipeline::{Core2d, upscaling::upscaling};
 use bevy::image::{ImageSampler, TRANSPARENT_IMAGE_HANDLE};
-use bevy::math::Rot2;
 use bevy::prelude::*;
 use bevy::reflect::TypePath;
 use bevy::render::RenderApp;
@@ -36,16 +34,29 @@ use bevy::render::renderer::{RenderContext, ViewQuery};
 use bevy::render::texture::GpuImage;
 use bevy::render::view::{ExtractedView, RetainedViewEntity, ViewTarget};
 use bevy::shader::{Shader, ShaderRef};
-use bevy::text::{FontSize, FontSource, LineHeight};
+use bevy::text::{FontSource, LineHeight};
 use bevy::ui::{
-    ComputedNode, ComputedUiRenderTargetInfo, UiGlobalTransform, UiSystems, UiTransform, Val2,
+    ComputedNode, ComputedUiRenderTargetInfo, UiGlobalTransform, UiSystems, UiTransform,
 };
 use bevy::ui_render::{DrawUiMaterial, TransparentUi, UiCameraView, render_pass::ui_pass};
-use bevy::window::{
-    CursorIcon, CustomCursor, CustomCursorImage, PrimaryWindow, SystemCursorIcon, WindowResized,
-};
+use bevy::window::{PrimaryWindow, WindowResized};
 use once_cell::sync::Lazy;
 use std::sync::RwLock;
+
+mod cursor;
+mod motion;
+mod runtime_flags;
+mod transform_cache;
+
+use self::cursor::{CssCursorState, update_css_cursor_icons};
+pub use self::motion::{
+    StyleAnimation, StyleTransition, update_style_animations, update_style_transitions,
+};
+use self::motion::{
+    apply_transform_style_if_blocked, resolve_transform_transition, update_style_animation_state,
+};
+use self::runtime_flags::{StyleRuntimeFlags, style_uses_calc, sync_style_runtime_flags};
+pub use self::transform_cache::{LastUiTransform, sync_last_ui_transform};
 
 const BACKDROP_BLUR_SHADER_HANDLE: Handle<Shader> =
     uuid_handle!("9d04a8bb-b6cf-4758-bca8-30706480973f");
@@ -140,39 +151,6 @@ impl Plugin for StyleService {
     }
 }
 
-/// Component storing an active style transition.
-#[derive(Component, Debug, Clone)]
-pub struct StyleTransition {
-    pub from: Style,
-    pub to: Style,
-    pub start_time: f32,
-    pub spec: TransitionSpec,
-    pub from_transform: Option<UiTransform>,
-    pub to_transform: Option<UiTransform>,
-    pub current_style: Option<Style>,
-}
-
-/// Component caching the last computed UI transform.
-#[derive(Component, Debug, Clone, Copy)]
-pub struct LastUiTransform(pub UiTransform);
-
-/// Component storing an active style animation.
-#[derive(Component, Debug, Clone)]
-pub struct StyleAnimation {
-    pub base: Style,
-    pub keyframes: Vec<AnimationKeyframe>,
-    pub spec: AnimationSpec,
-    pub start_time: f32,
-    pub current_style: Option<Style>,
-}
-
-/// Resource tracking the currently applied CSS cursor state.
-#[derive(Resource, Default)]
-struct CssCursorState {
-    active: bool,
-    previous: Option<CursorIcon>,
-}
-
 /// Marker to force a style application pass when a UI node was just created.
 #[derive(Component)]
 pub struct StyleRefreshOnNodeAdded;
@@ -252,88 +230,6 @@ type UiStyleComponents<'w, 's> = (
     Option<Mut<'w, Outline>>,
 );
 
-/// Updates the OS cursor icon based on hovered widget styles.
-fn update_css_cursor_icons(
-    mut commands: Commands,
-    mut cursor_state: ResMut<CssCursorState>,
-    mut window_q: Query<(Entity, Option<&mut CursorIcon>), With<PrimaryWindow>>,
-    hovered_q: Query<(&UiStyle, &UIWidgetState)>,
-    asset_server: Res<AssetServer>,
-    mut image_cache: ResMut<ImageCache>,
-    mut images: ResMut<Assets<Image>>,
-) {
-    let Ok((window_entity, mut cursor_opt)) = window_q.single_mut() else {
-        return;
-    };
-
-    let mut desired_cursor: Option<(CursorStyle, i32)> = None;
-    let mut best_z = i32::MIN;
-
-    for (ui_style, state) in hovered_q.iter() {
-        if !state.hovered {
-            continue;
-        }
-
-        let Some(active) = ui_style.active_style.as_ref() else {
-            continue;
-        };
-
-        let Some(cursor) = active.cursor.clone() else {
-            continue;
-        };
-
-        let z = active.z_index.unwrap_or(0);
-        if desired_cursor.is_none() || z > best_z {
-            desired_cursor = Some((cursor, z));
-            best_z = z;
-        }
-    }
-
-    if let Some((cursor_style, _)) = desired_cursor {
-        let new_icon = match cursor_style {
-            CursorStyle::System(system_icon) => CursorIcon::from(system_icon),
-            CursorStyle::Custom(path) => {
-                let handle =
-                    get_or_load_image(path.as_str(), &mut image_cache, &mut images, &asset_server);
-                if images.get(handle.id()).is_none() {
-                    return;
-                }
-                CursorIcon::Custom(CustomCursor::Image(CustomCursorImage {
-                    handle,
-                    hotspot: (0, 0),
-                    ..default()
-                }))
-            }
-        };
-        if !cursor_state.active {
-            cursor_state.previous = cursor_opt.as_deref().cloned();
-            cursor_state.active = true;
-        }
-
-        if let Some(cursor) = cursor_opt.as_deref_mut() {
-            if *cursor != new_icon {
-                *cursor = new_icon;
-            }
-        } else {
-            commands.entity(window_entity).insert(new_icon);
-        }
-    } else if cursor_state.active {
-        cursor_state.active = false;
-        let restore_icon = cursor_state
-            .previous
-            .take()
-            .unwrap_or_else(|| CursorIcon::from(SystemCursorIcon::Default));
-
-        if let Some(cursor) = cursor_opt.as_deref_mut() {
-            if *cursor != restore_icon {
-                *cursor = restore_icon;
-            }
-        } else {
-            commands.entity(window_entity).insert(restore_icon);
-        }
-    }
-}
-
 /// Handles `mark_new_nodes_for_style_refresh` in the extended UI workflow.
 #[cfg(not(all(feature = "wasm-default", target_arch = "wasm32")))]
 fn mark_new_nodes_for_style_refresh(
@@ -351,8 +247,8 @@ pub fn update_widget_styles_system(
     mut query: Query<
         (
             Entity,
-            Option<&UIWidgetState>,
-            Option<&HtmlStyle>,
+            Option<Ref<UIWidgetState>>,
+            Option<Ref<HtmlStyle>>,
             Option<&StyleRefreshOnNodeAdded>,
             &mut UiStyle,
         ),
@@ -373,7 +269,22 @@ pub fn update_widget_styles_system(
 ) {
     for (entity, state_opt, html_style_opt, refresh_on_node_added, mut ui_style) in query.iter_mut()
     {
-        let state = state_opt.cloned().unwrap_or_default();
+        let state_changed = state_opt.as_ref().is_some_and(|state| state.is_changed());
+        let html_style_changed = html_style_opt
+            .as_ref()
+            .is_some_and(|html_style| html_style.is_changed());
+        let ui_style_changed = ui_style.is_changed();
+        if state_changed
+            && !html_style_changed
+            && !ui_style_changed
+            && refresh_on_node_added.is_none()
+            && ui_style.active_style.is_some()
+            && !ui_style_has_stateful_selectors(&ui_style)
+        {
+            continue;
+        }
+
+        let state = state_opt.as_deref().cloned().unwrap_or_default();
         let node_added = refresh_on_node_added.is_some();
 
         let mut base_styles: Vec<(&String, u32, usize)> = vec![];
@@ -428,6 +339,7 @@ pub fn update_widget_styles_system(
         if has_changed {
             ui_style.active_style = Some(final_style.clone());
         }
+        sync_style_runtime_flags(&mut commands, entity, &final_style);
 
         if style_requests_outline(&final_style) {
             let mut has_outline_component = false;
@@ -531,180 +443,45 @@ pub fn update_widget_styles_system(
     }
 }
 
-/// Advances and applies style transitions based on time.
-pub fn update_style_transitions(
-    mut commands: Commands,
-    time: Res<Time>,
-    mut transitions: Query<(Entity, &mut StyleTransition)>,
-    mut style_query: Query<UiStyleComponents>,
-    asset_server: Res<AssetServer>,
-    mut image_cache: ResMut<ImageCache>,
-    mut images: ResMut<Assets<Image>>,
-) {
-    let now = time.elapsed_secs();
+fn ui_style_has_stateful_selectors(ui_style: &UiStyle) -> bool {
+    ui_style.styles.iter().any(|(key, style_pair)| {
+        let selector = if style_pair.selector.is_empty() {
+            key.as_str()
+        } else {
+            style_pair.selector.as_str()
+        };
 
-    for (entity, mut transition) in transitions.iter_mut() {
-        let elapsed = now - transition.start_time - transition.spec.delay;
-        let duration = transition.spec.duration.max(0.001);
-        let t = (elapsed / duration).clamp(0.0, 1.0);
-        let eased = transition.spec.timing.apply(t);
-        let blended = blend_style(&transition.from, &transition.to, eased, &transition.spec);
-        transition.current_style = Some(blended.clone());
-
-        if let Ok(mut components) = style_query.get_mut(entity) {
-            apply_style_components(
-                &blended,
-                &mut components,
-                &asset_server,
-                &mut image_cache,
-                &mut images,
-            );
-
-            if transition_allows_transform(&transition.spec) {
-                if let (Some(from), Some(to)) = (transition.from_transform, transition.to_transform)
-                {
-                    if let Some(transform) = components.10.as_mut() {
-                        **transform = blend_ui_transform(from, to, eased);
-                    }
-                }
-            }
-
-            if elapsed >= duration {
-                apply_style_components(
-                    &transition.to,
-                    &mut components,
-                    &asset_server,
-                    &mut image_cache,
-                    &mut images,
-                );
-
-                if transition_allows_transform(&transition.spec) {
-                    if let Some(target) = transition.to_transform {
-                        if let Some(transform) = components.10.as_mut() {
-                            **transform = target;
-                        }
-                    }
-                }
-
-                commands.entity(entity).remove::<StyleTransition>();
-            }
-        }
-    }
-}
-
-/// Advances and applies style animations based on time.
-pub fn update_style_animations(
-    mut commands: Commands,
-    time: Res<Time>,
-    mut animations: Query<(Entity, &mut StyleAnimation)>,
-    mut style_query: Query<UiStyleComponents>,
-    ui_style_query: Query<&UiStyle>,
-    asset_server: Res<AssetServer>,
-    mut image_cache: ResMut<ImageCache>,
-    mut images: ResMut<Assets<Image>>,
-) {
-    let now = time.elapsed_secs();
-
-    for (entity, mut animation) in animations.iter_mut() {
-        let desired_style = ui_style_query
-            .get(entity)
-            .ok()
-            .and_then(|ui| ui.active_style.as_ref());
-
-        let desired_animation_name = desired_style
-            .and_then(|s| s.animation.as_ref())
-            .map(|a| a.name.as_str());
-
-        if desired_animation_name != Some(animation.spec.name.as_str()) {
-            if let (Some(style), Ok(mut components)) = (desired_style, style_query.get_mut(entity))
-            {
-                apply_style_components(
-                    style,
-                    &mut components,
-                    &asset_server,
-                    &mut image_cache,
-                    &mut images,
-                );
-            }
-            commands.entity(entity).remove::<StyleAnimation>();
-            continue;
-        }
-
-        let duration = animation.spec.duration.max(0.001);
-        let elapsed = now - animation.start_time - animation.spec.delay;
-
-        if elapsed < 0.0 {
-            continue;
-        }
-
-        if let Some(iterations) = animation.spec.iterations {
-            if iterations <= 0.0 {
-                if let Ok(mut components) = style_query.get_mut(entity) {
-                    apply_style_components(
-                        &animation.base,
-                        &mut components,
-                        &asset_server,
-                        &mut image_cache,
-                        &mut images,
-                    );
-                }
-                commands.entity(entity).remove::<StyleAnimation>();
-                continue;
-            }
-
-            let total = duration * iterations;
-            if elapsed >= total {
-                let final_cycle = (iterations - 1.0).max(0.0).floor() as u32;
-                let progress = animation_progress(&animation.spec, final_cycle, 1.0);
-                if let Ok(mut components) = style_query.get_mut(entity) {
-                    let blended = sample_animation_style(&animation.keyframes, progress);
-                    apply_style_components(
-                        &blended,
-                        &mut components,
-                        &asset_server,
-                        &mut image_cache,
-                        &mut images,
-                    );
-                }
-                commands.entity(entity).remove::<StyleAnimation>();
-                continue;
-            }
-        }
-
-        let cycles = (elapsed / duration).floor().max(0.0) as u32;
-        let cycle_progress = (elapsed / duration).fract();
-        let progress = animation_progress(&animation.spec, cycles, cycle_progress);
-
-        if let Ok(mut components) = style_query.get_mut(entity) {
-            let blended = sample_animation_style(&animation.keyframes, progress);
-            animation.current_style = Some(blended.clone());
-            apply_style_components(
-                &blended,
-                &mut components,
-                &asset_server,
-                &mut image_cache,
-                &mut images,
-            );
-        }
-    }
+        let metadata = selector_metadata(selector);
+        !metadata.skip && metadata.has_pseudo
+    })
 }
 
 /// Applies deferred CSS `calc(...)` values to Bevy UI nodes after styles were resolved.
 pub fn apply_calc_styles_system(
-    mut query: Query<(
-        Entity,
-        &UiStyle,
-        Option<&StyleTransition>,
-        Option<&StyleAnimation>,
-        Option<&ChildOf>,
-        Option<&mut Node>,
-    )>,
+    mut query: Query<
+        (
+            Entity,
+            &UiStyle,
+            Option<&StyleRuntimeFlags>,
+            Option<&StyleTransition>,
+            Option<&StyleAnimation>,
+            Option<&ChildOf>,
+            Option<&mut Node>,
+        ),
+        Or<(
+            With<StyleRuntimeFlags>,
+            Changed<UiStyle>,
+            With<StyleTransition>,
+            With<StyleAnimation>,
+        )>,
+    >,
     computed_query: Query<&ComputedNode>,
     window_q: Query<&Window, With<PrimaryWindow>>,
 ) {
     let viewport = resolve_layout_viewport(&window_q).unwrap_or_default();
 
-    for (_entity, ui_style, transition_opt, animation_opt, parent_opt, node_opt) in query.iter_mut()
+    for (_entity, ui_style, flags_opt, transition_opt, animation_opt, parent_opt, node_opt) in
+        query.iter_mut()
     {
         let Some(mut node) = node_opt else {
             continue;
@@ -720,6 +497,11 @@ pub fn apply_calc_styles_system(
             };
             active
         };
+
+        let needs_calc = flags_opt.is_some_and(|flags| flags.uses_calc) || style_uses_calc(style);
+        if !needs_calc {
+            continue;
+        }
 
         let (content_w, content_h, box_w, box_h) = if let Some(parent) = parent_opt {
             if let Ok(parent_node) = computed_query.get(parent.parent()) {
@@ -897,16 +679,27 @@ fn clear_image_node_texture(img_node: &mut ImageNode) {
 /// Handles `apply_background_gradients_system` in the extended UI workflow.
 fn apply_background_gradients_system(
     mut commands: Commands,
-    mut query: Query<(
-        Entity,
-        &UiStyle,
-        Option<&StyleTransition>,
-        Option<&StyleAnimation>,
-        &ComputedNode,
-        Option<&mut ImageNode>,
-        Option<&BackgroundGradientApplied>,
-        Option<&BackgroundImageApplied>,
-    )>,
+    mut query: Query<
+        (
+            Entity,
+            &UiStyle,
+            Option<&StyleRuntimeFlags>,
+            Option<&StyleTransition>,
+            Option<&StyleAnimation>,
+            &ComputedNode,
+            Option<&mut ImageNode>,
+            Option<&BackgroundGradientApplied>,
+            Option<&BackgroundImageApplied>,
+        ),
+        Or<(
+            With<StyleRuntimeFlags>,
+            Changed<UiStyle>,
+            With<StyleTransition>,
+            With<StyleAnimation>,
+            With<BackgroundGradientApplied>,
+            With<BackgroundImageApplied>,
+        )>,
+    >,
     mut resize_events: MessageReader<WindowResized>,
     mut image_cache: ResMut<ImageCache>,
     mut images: ResMut<Assets<Image>>,
@@ -916,6 +709,7 @@ fn apply_background_gradients_system(
     for (
         entity,
         ui_style,
+        flags_opt,
         transition_opt,
         animation_opt,
         computed,
@@ -960,6 +754,13 @@ fn apply_background_gradients_system(
             }
             continue;
         };
+        if flags_opt.is_some_and(|flags| !flags.uses_background_gradient)
+            && gradient_applied.is_none()
+            && transition_opt.is_none()
+            && animation_opt.is_none()
+        {
+            continue;
+        }
         let Some(gradient) = background.gradient.as_ref() else {
             if gradient_applied.is_some() {
                 if background.image.is_none() {
@@ -1018,18 +819,29 @@ fn apply_background_gradients_system(
 /// Handles `apply_background_images_system` in the extended UI workflow.
 fn apply_background_images_system(
     mut commands: Commands,
-    mut query: Query<(
-        Entity,
-        &UiStyle,
-        Option<&StyleTransition>,
-        Option<&StyleAnimation>,
-        &ComputedNode,
-        &ComputedUiRenderTargetInfo,
-        Option<&UiGlobalTransform>,
-        Option<&mut ImageNode>,
-        Option<&BackgroundImageApplied>,
-        Option<&BackgroundGradientApplied>,
-    )>,
+    mut query: Query<
+        (
+            Entity,
+            &UiStyle,
+            Option<&StyleRuntimeFlags>,
+            Option<&StyleTransition>,
+            Option<&StyleAnimation>,
+            &ComputedNode,
+            &ComputedUiRenderTargetInfo,
+            Option<&UiGlobalTransform>,
+            Option<&mut ImageNode>,
+            Option<&BackgroundImageApplied>,
+            Option<&BackgroundGradientApplied>,
+        ),
+        Or<(
+            With<StyleRuntimeFlags>,
+            Changed<UiStyle>,
+            With<StyleTransition>,
+            With<StyleAnimation>,
+            With<BackgroundGradientApplied>,
+            With<BackgroundImageApplied>,
+        )>,
+    >,
     mut resize_events: MessageReader<WindowResized>,
     asset_server: Res<AssetServer>,
     mut image_cache: ResMut<ImageCache>,
@@ -1040,6 +852,7 @@ fn apply_background_images_system(
     for (
         entity,
         ui_style,
+        flags_opt,
         transition_opt,
         animation_opt,
         computed,
@@ -1082,6 +895,13 @@ fn apply_background_images_system(
             }
             continue;
         };
+        if flags_opt.is_some_and(|flags| !flags.uses_background_image)
+            && image_applied.is_none()
+            && transition_opt.is_none()
+            && animation_opt.is_none()
+        {
+            continue;
+        }
         if background.gradient.is_some() {
             if image_applied.is_some() {
                 commands.entity(entity).remove::<BackgroundImageApplied>();
@@ -1220,14 +1040,24 @@ fn resolved_active_style<'a>(
 fn sync_backdrop_blur_materials_system(
     mut commands: Commands,
     window_q: Query<&Window, With<PrimaryWindow>>,
-    query: Query<(
-        Entity,
-        &UiStyle,
-        Option<&StyleTransition>,
-        Option<&StyleAnimation>,
-        Option<&ImageNode>,
-        Option<&MaterialNode<BackdropBlurMaterial>>,
-    )>,
+    query: Query<
+        (
+            Entity,
+            &UiStyle,
+            Option<&StyleRuntimeFlags>,
+            Option<&StyleTransition>,
+            Option<&StyleAnimation>,
+            Option<&ImageNode>,
+            Option<&MaterialNode<BackdropBlurMaterial>>,
+        ),
+        Or<(
+            With<StyleRuntimeFlags>,
+            Changed<UiStyle>,
+            With<StyleTransition>,
+            With<StyleAnimation>,
+            With<MaterialNode<BackdropBlurMaterial>>,
+        )>,
+    >,
     capture_state: Res<BackdropCaptureState>,
     mut materials: ResMut<Assets<BackdropBlurMaterial>>,
 ) {
@@ -1236,9 +1066,24 @@ fn sync_backdrop_blur_materials_system(
         .map(|w| w.physical_size().as_vec2())
         .unwrap_or(Vec2::ONE)
         .max(Vec2::ONE);
-    for (entity, ui_style, transition_opt, animation_opt, image_node_opt, material_node_opt) in
-        query.iter()
+    for (
+        entity,
+        ui_style,
+        flags_opt,
+        transition_opt,
+        animation_opt,
+        image_node_opt,
+        material_node_opt,
+    ) in query.iter()
     {
+        if flags_opt.is_some_and(|flags| !flags.uses_backdrop_filter)
+            && material_node_opt.is_none()
+            && transition_opt.is_none()
+            && animation_opt.is_none()
+        {
+            continue;
+        }
+
         let Some(style) = resolved_active_style(ui_style, transition_opt, animation_opt) else {
             if material_node_opt.is_some() {
                 commands
@@ -1349,21 +1194,44 @@ fn sync_backdrop_blur_materials_system(
 /// Handles `ensure_backdrop_capture_texture_system` in the extended UI workflow.
 fn ensure_backdrop_capture_texture_system(
     window_q: Query<&Window, With<PrimaryWindow>>,
-    blur_query: Query<(&UiStyle, Option<&StyleTransition>, Option<&StyleAnimation>)>,
+    blur_query: Query<
+        (
+            &UiStyle,
+            Option<&StyleRuntimeFlags>,
+            Option<&StyleTransition>,
+            Option<&StyleAnimation>,
+            Option<&MaterialNode<BackdropBlurMaterial>>,
+        ),
+        Or<(
+            With<StyleRuntimeFlags>,
+            Changed<UiStyle>,
+            With<StyleTransition>,
+            With<StyleAnimation>,
+            With<MaterialNode<BackdropBlurMaterial>>,
+        )>,
+    >,
     configuration: Res<ExtendedUiConfiguration>,
     mut capture_state: ResMut<BackdropCaptureState>,
     mut images: ResMut<Assets<Image>>,
 ) {
-    let has_backdrop_blur = blur_query
-        .iter()
-        .any(|(ui_style, transition_opt, animation_opt)| {
+    let has_backdrop_blur = blur_query.iter().any(
+        |(ui_style, flags_opt, transition_opt, animation_opt, material_node_opt)| {
+            if flags_opt.is_some_and(|flags| !flags.uses_backdrop_filter)
+                && material_node_opt.is_none()
+                && transition_opt.is_none()
+                && animation_opt.is_none()
+            {
+                return false;
+            }
+
             resolved_active_style(ui_style, transition_opt, animation_opt).is_some_and(|style| {
                 matches!(
                     style.backdrop_filter.as_ref(),
                     Some(BackdropFilter::Blur(radius)) if *radius > 0.0
                 )
             })
-        });
+        },
+    );
 
     if !has_backdrop_blur {
         capture_state.screen_texture = None;
@@ -1605,24 +1473,6 @@ fn merge_style_candidates(
             } else {
                 final_style.merge(&pair.normal);
             }
-        }
-    }
-}
-
-/// Handles `apply_transform_style_if_blocked` in the extended UI workflow.
-fn apply_transform_style_if_blocked(
-    qs: &mut ParamSet<(Query<UiStyleComponents>,)>,
-    entity: Entity,
-    style: &Style,
-    spec: &TransitionSpec,
-) {
-    if transition_allows_transform(spec) {
-        return;
-    }
-
-    if let Ok(mut components) = qs.p0().get_mut(entity) {
-        if let Some(transform) = components.10.as_mut() {
-            apply_transform_style(style, transform);
         }
     }
 }
@@ -2051,25 +1901,16 @@ fn lerp_srgba(a: Srgba, b: Srgba, t: f32) -> Srgba {
     }
 }
 
+/// Linearly interpolates between two floats.
+fn lerp(from: f32, to: f32, t: f32) -> f32 {
+    from + (to - from) * t
+}
+
 /// Handles `apply_calc_length` in the extended UI workflow.
 fn apply_calc_length(expr: Option<&CalcExpr>, ctx: CalcContext, target: &mut Val) {
     if let Some(expr) = expr {
         if let Some(px) = expr.eval_length(ctx) {
             *target = Val::Px(px);
-        }
-    }
-}
-
-/// Updates the cached UI transform after styles are applied.
-pub fn sync_last_ui_transform(
-    mut commands: Commands,
-    mut query: Query<(Entity, &UiTransform, Option<&mut LastUiTransform>)>,
-) {
-    for (entity, transform, last_opt) in query.iter_mut() {
-        if let Some(mut last) = last_opt {
-            last.0 = *transform;
-        } else {
-            commands.entity(entity).insert(LastUiTransform(*transform));
         }
     }
 }
@@ -2227,50 +2068,6 @@ fn apply_transform_style(style: &Style, transform: &mut UiTransform) {
 }
 
 /// Builds a `UiTransform` from the style's transform fields.
-fn ui_transform_from_style(style: &Style) -> UiTransform {
-    let mut transform = UiTransform::default();
-    apply_transform_style(style, &mut transform);
-    transform
-}
-
-/// Blends two styles based on a transition specification.
-fn blend_style(from: &Style, to: &Style, t: f32, spec: &TransitionSpec) -> Style {
-    let mut blended = to.clone();
-
-    if transition_allows_color(spec) {
-        blended.color = blend_color(from.color, to.color, t);
-        blended.border_color = blend_color(from.border_color, to.border_color, t);
-        blended.outline_color = blend_color(from.outline_color, to.outline_color, t);
-    }
-
-    if transition_allows_background(spec) {
-        blended.background = blend_background(from.background.clone(), to.background.clone(), t);
-    }
-
-    blended
-}
-
-/// Blends two styles for animation interpolation.
-fn blend_animation_style(from: &Style, to: &Style, t: f32) -> Style {
-    let mut blended = to.clone();
-    blended.color = blend_color(from.color, to.color, t);
-    blended.border_color = blend_color(from.border_color, to.border_color, t);
-    blended.outline_color = blend_color(from.outline_color, to.outline_color, t);
-    blended.background = blend_background(from.background.clone(), to.background.clone(), t);
-    blended.transform = blend_transform_style(&from.transform, &to.transform, t);
-    blended.width = blend_val_opt(from.width.clone(), to.width.clone(), t);
-    blended.height = blend_val_opt(from.height.clone(), to.height.clone(), t);
-    blended.min_width = blend_val_opt(from.min_width.clone(), to.min_width.clone(), t);
-    blended.max_width = blend_val_opt(from.max_width.clone(), to.max_width.clone(), t);
-    blended.min_height = blend_val_opt(from.min_height.clone(), to.min_height.clone(), t);
-    blended.max_height = blend_val_opt(from.max_height.clone(), to.max_height.clone(), t);
-    blended.padding = blend_ui_rect_opt(&from.padding, &to.padding, t);
-    blended.margin = blend_ui_rect_opt(&from.margin, &to.margin, t);
-    blended.font_size = blend_font_size_opt(&from.font_size, &to.font_size, t);
-    blended.border_radius = blend_radius_opt(&from.border_radius, &to.border_radius, t);
-    blended
-}
-
 /// Handles `style_requests_outline` in the extended UI workflow.
 fn style_requests_outline(style: &Style) -> bool {
     style.outline_width.is_some() || style.outline_offset.is_some() || style.outline_color.is_some()
@@ -2285,350 +2082,6 @@ fn build_outline_from_style(style: &Style) -> Outline {
         offset: style.outline_offset.unwrap_or(default_outline.offset),
         color: style.outline_color.unwrap_or(default_outline.color),
     }
-}
-
-/// Resolves transform blending with optional cached transforms.
-fn resolve_transform_transition(
-    spec: &TransitionSpec,
-    from: &Style,
-    to: &Style,
-) -> (Option<UiTransform>, Option<UiTransform>) {
-    if !transition_allows_transform(spec) {
-        return (None, None);
-    }
-
-    let from_transform = ui_transform_from_style(from);
-    let to_transform = ui_transform_from_style(to);
-    (Some(from_transform), Some(to_transform))
-}
-
-/// Returns true if the transition includes color changes.
-fn transition_allows_color(spec: &TransitionSpec) -> bool {
-    spec.properties.iter().any(|prop| {
-        matches!(prop, TransitionProperty::All) || matches!(prop, TransitionProperty::Color)
-    })
-}
-
-/// Returns true if the transition includes background changes.
-fn transition_allows_background(spec: &TransitionSpec) -> bool {
-    spec.properties.iter().any(|prop| {
-        matches!(prop, TransitionProperty::All) || matches!(prop, TransitionProperty::Background)
-    })
-}
-
-/// Returns true if the transition includes transform changes.
-fn transition_allows_transform(spec: &TransitionSpec) -> bool {
-    spec.properties.iter().any(|prop| {
-        matches!(
-            prop,
-            TransitionProperty::All | TransitionProperty::Transform
-        )
-    })
-}
-
-/// Linearly interpolates between two UI transforms.
-fn blend_ui_transform(from: UiTransform, to: UiTransform, t: f32) -> UiTransform {
-    UiTransform {
-        translation: blend_val2(from.translation, to.translation, t),
-        scale: from.scale.lerp(to.scale, t),
-        rotation: blend_rot2(from.rotation, to.rotation, t),
-    }
-}
-
-/// Blends transform style fields based on a factor.
-fn blend_transform_style(from: &TransformStyle, to: &TransformStyle, t: f32) -> TransformStyle {
-    TransformStyle {
-        translation: blend_val2_opt(from.translation, to.translation, t),
-        translation_x: blend_val_opt(from.translation_x, to.translation_x, t),
-        translation_y: blend_val_opt(from.translation_y, to.translation_y, t),
-        scale: blend_vec2_opt(from.scale, to.scale, t),
-        scale_x: blend_f32_opt(from.scale_x, to.scale_x, t),
-        scale_y: blend_f32_opt(from.scale_y, to.scale_y, t),
-        rotation: blend_f32_opt(from.rotation, to.rotation, t),
-    }
-}
-
-/// Blends two `Val2` values.
-fn blend_val2(from: Val2, to: Val2, t: f32) -> Val2 {
-    Val2::new(blend_val(from.x, to.x, t), blend_val(from.y, to.y, t))
-}
-
-/// Blends optional `Val2` values when both are set.
-fn blend_val2_opt(from: Option<Val2>, to: Option<Val2>, t: f32) -> Option<Val2> {
-    match (from, to) {
-        (Some(a), Some(b)) => Some(blend_val2(a, b, t)),
-        (None, Some(b)) => Some(b),
-        (Some(a), None) => Some(a),
-        _ => None,
-    }
-}
-
-/// Blends two `Val` values.
-fn blend_val(from: Val, to: Val, t: f32) -> Val {
-    match (from, to) {
-        (Val::Px(a), Val::Px(b)) => Val::Px(lerp(a, b, t)),
-        (Val::Percent(a), Val::Percent(b)) => Val::Percent(lerp(a, b, t)),
-        _ => to,
-    }
-}
-
-/// Blends optional `Val` values when both are set.
-fn blend_val_opt(from: Option<Val>, to: Option<Val>, t: f32) -> Option<Val> {
-    match (from, to) {
-        (Some(a), Some(b)) => Some(blend_val(a, b, t)),
-        (None, Some(b)) => Some(b),
-        (Some(a), None) => Some(a),
-        _ => None,
-    }
-}
-
-/// Blends two `UiRect` values.
-fn blend_ui_rect(from: &UiRect, to: &UiRect, t: f32) -> UiRect {
-    UiRect {
-        left: blend_val(from.left.clone(), to.left.clone(), t),
-        right: blend_val(from.right.clone(), to.right.clone(), t),
-        top: blend_val(from.top.clone(), to.top.clone(), t),
-        bottom: blend_val(from.bottom.clone(), to.bottom.clone(), t),
-    }
-}
-
-/// Blends optional `UiRect` values when both are set.
-fn blend_ui_rect_opt(from: &Option<UiRect>, to: &Option<UiRect>, t: f32) -> Option<UiRect> {
-    match (from, to) {
-        (Some(a), Some(b)) => Some(blend_ui_rect(a, b, t)),
-        (None, Some(b)) => Some(b.clone()),
-        (Some(a), None) => Some(a.clone()),
-        _ => None,
-    }
-}
-
-/// Blends two border radius values.
-fn blend_radius(from: &Radius, to: &Radius, t: f32) -> Radius {
-    Radius {
-        top_left: blend_val(from.top_left.clone(), to.top_left.clone(), t),
-        top_right: blend_val(from.top_right.clone(), to.top_right.clone(), t),
-        bottom_left: blend_val(from.bottom_left.clone(), to.bottom_left.clone(), t),
-        bottom_right: blend_val(from.bottom_right.clone(), to.bottom_right.clone(), t),
-    }
-}
-
-/// Blends optional radius values when both are set.
-fn blend_radius_opt(from: &Option<Radius>, to: &Option<Radius>, t: f32) -> Option<Radius> {
-    match (from, to) {
-        (Some(a), Some(b)) => Some(blend_radius(a, b, t)),
-        (None, Some(b)) => Some(b.clone()),
-        (Some(a), None) => Some(a.clone()),
-        _ => None,
-    }
-}
-
-/// Blends two font size values.
-fn blend_font_size(from: FontSize, to: FontSize, t: f32) -> FontSize {
-    match (from, to) {
-        (FontSize::Px(a), FontSize::Px(b)) => FontSize::Px(lerp(a, b, t)),
-        (FontSize::Rem(a), FontSize::Rem(b)) => FontSize::Rem(lerp(a, b, t)),
-        (FontSize::Vw(a), FontSize::Vw(b)) => FontSize::Vw(lerp(a, b, t)),
-        (FontSize::Vh(a), FontSize::Vh(b)) => FontSize::Vh(lerp(a, b, t)),
-        (FontSize::VMin(a), FontSize::VMin(b)) => FontSize::VMin(lerp(a, b, t)),
-        (FontSize::VMax(a), FontSize::VMax(b)) => FontSize::VMax(lerp(a, b, t)),
-        _ => to,
-    }
-}
-
-/// Blends optional font sizes when both are set.
-fn blend_font_size_opt(from: &Option<FontSize>, to: &Option<FontSize>, t: f32) -> Option<FontSize> {
-    match (from, to) {
-        (Some(a), Some(b)) => Some(blend_font_size(*a, *b, t)),
-        (None, Some(b)) => Some(*b),
-        (Some(a), None) => Some(*a),
-        _ => None,
-    }
-}
-
-/// Blends two rotations.
-fn blend_rot2(from: Rot2, to: Rot2, t: f32) -> Rot2 {
-    let from_angle = from.as_radians();
-    let to_angle = to.as_radians();
-    Rot2::radians(lerp(from_angle, to_angle, t))
-}
-
-/// Blends optional vectors when both are set.
-fn blend_vec2_opt(from: Option<Vec2>, to: Option<Vec2>, t: f32) -> Option<Vec2> {
-    match (from, to) {
-        (Some(a), Some(b)) => Some(a.lerp(b, t)),
-        (None, Some(b)) => Some(b),
-        (Some(a), None) => Some(a),
-        _ => None,
-    }
-}
-
-/// Blends optional floats when both are set.
-fn blend_f32_opt(from: Option<f32>, to: Option<f32>, t: f32) -> Option<f32> {
-    match (from, to) {
-        (Some(a), Some(b)) => Some(lerp(a, b, t)),
-        (None, Some(b)) => Some(b),
-        (Some(a), None) => Some(a),
-        _ => None,
-    }
-}
-
-/// Blends optional colors when both are set.
-fn blend_color(from: Option<Color>, to: Option<Color>, t: f32) -> Option<Color> {
-    match (from, to) {
-        (Some(a), Some(b)) => {
-            let a = a.to_srgba();
-            let b = b.to_srgba();
-            Some(Color::Srgba(Srgba {
-                red: lerp(a.red, b.red, t),
-                green: lerp(a.green, b.green, t),
-                blue: lerp(a.blue, b.blue, t),
-                alpha: lerp(a.alpha, b.alpha, t),
-            }))
-        }
-        (Some(value), None) => Some(value),
-        (None, Some(value)) => Some(value),
-        _ => None,
-    }
-}
-
-/// Blends background colors and images.
-fn blend_background(
-    from: Option<crate::styles::Background>,
-    to: Option<crate::styles::Background>,
-    t: f32,
-) -> Option<crate::styles::Background> {
-    match (from, to) {
-        (Some(a), Some(b)) => Some(crate::styles::Background {
-            color: blend_color(Some(a.color), Some(b.color), t).unwrap_or(a.color),
-            image: if t >= 1.0 { b.image } else { a.image },
-            gradient: if t >= 1.0 { b.gradient } else { a.gradient },
-        }),
-        (Some(value), None) => Some(value),
-        (None, Some(value)) => Some(value),
-        _ => None,
-    }
-}
-
-/// Computes the current animation style state and applies it.
-fn update_style_animation_state(
-    commands: &mut Commands,
-    entity: Entity,
-    final_style: &Style,
-    keyframes: &HashMap<String, Vec<AnimationKeyframe>>,
-    now: f32,
-    animation_query: &mut Query<Option<&mut StyleAnimation>>,
-) {
-    let mut animation = animation_query.get_mut(entity).ok().flatten();
-
-    let Some(spec) = final_style.animation.clone() else {
-        if animation.is_some() {
-            commands.entity(entity).remove::<StyleAnimation>();
-        }
-        return;
-    };
-
-    if spec.name.is_empty() {
-        if animation.is_some() {
-            commands.entity(entity).remove::<StyleAnimation>();
-        }
-        return;
-    }
-
-    let Some(frames) = keyframes.get(&spec.name) else {
-        if animation.is_some() {
-            commands.entity(entity).remove::<StyleAnimation>();
-        }
-        return;
-    };
-
-    if frames.is_empty() {
-        if animation.is_some() {
-            commands.entity(entity).remove::<StyleAnimation>();
-        }
-        return;
-    }
-
-    let mut computed = Vec::with_capacity(frames.len());
-    for frame in frames {
-        let mut style = final_style.clone();
-        style.merge(&frame.style);
-        computed.push(AnimationKeyframe {
-            progress: frame.progress,
-            style,
-        });
-    }
-
-    let new_animation = StyleAnimation {
-        base: final_style.clone(),
-        keyframes: computed,
-        spec,
-        start_time: now,
-        current_style: None,
-    };
-
-    if let Some(existing) = animation.as_mut() {
-        if existing.spec != new_animation.spec {
-            **existing = new_animation;
-        } else if existing.base != new_animation.base
-            || existing.keyframes != new_animation.keyframes
-        {
-            existing.base = new_animation.base;
-            existing.keyframes = new_animation.keyframes;
-        }
-    } else {
-        commands.entity(entity).insert(new_animation);
-    }
-}
-
-/// Computes eased animation progress based on spec and cycle.
-fn animation_progress(spec: &AnimationSpec, cycle_index: u32, cycle_progress: f32) -> f32 {
-    let mut progress = cycle_progress.clamp(0.0, 1.0);
-    let is_odd = cycle_index % 2 == 1;
-    match spec.direction {
-        AnimationDirection::Normal => {}
-        AnimationDirection::Reverse => progress = 1.0 - progress,
-        AnimationDirection::Alternate => {
-            if is_odd {
-                progress = 1.0 - progress;
-            }
-        }
-        AnimationDirection::AlternateReverse => {
-            if !is_odd {
-                progress = 1.0 - progress;
-            }
-        }
-    }
-    spec.timing.apply(progress)
-}
-
-/// Samples a style from keyframes at the given progress.
-fn sample_animation_style(keyframes: &[AnimationKeyframe], progress: f32) -> Style {
-    if keyframes.is_empty() {
-        return Style::default();
-    }
-
-    let mut prev = &keyframes[0];
-    if progress <= prev.progress {
-        return prev.style.clone();
-    }
-
-    for next in keyframes.iter().skip(1) {
-        if progress <= next.progress {
-            if (next.progress - prev.progress).abs() < f32::EPSILON {
-                return next.style.clone();
-            }
-            let local_t = (progress - prev.progress) / (next.progress - prev.progress);
-            return blend_animation_style(&prev.style, &next.style, local_t);
-        }
-        prev = next;
-    }
-
-    prev.style.clone()
-}
-
-/// Linearly interpolates between two floats.
-fn lerp(from: f32, to: f32, t: f32) -> f32 {
-    from + (to - from) * t
 }
 
 /// Handles `selector_metadata` in the extended UI workflow.

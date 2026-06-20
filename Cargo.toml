@@ -52,9 +52,9 @@ version = "0.1.0"
 #               Dependencies               #
 ############################################
 
-# Bevy 0.18.0 main library
+# Bevy 0.19.0 main library
 [dependencies.bevy]
-version = "0.19.0-rc.2"
+version = "0.19.0"
 default-features = false
 features = [
     "bevy_asset",
@@ -95,7 +95,7 @@ version = "1.0.0-alpha.71"
 version = "1.21.4"
 
 [dependencies.regex]
-version = "1.12.3"
+version = "1.12.4"
 
 [dependencies.base64]
 version = "0.22.1"
