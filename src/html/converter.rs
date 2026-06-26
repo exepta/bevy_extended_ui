@@ -1751,8 +1751,168 @@ fn parse_html_node(
             ))
         }
 
+        "td" | "th" => {
+            let mut children = Vec::new();
+            for (index, child) in node.children().enumerate() {
+                let child_path = format!("{path}.{index}");
+                if let Some(parsed) = parse_html_node(
+                    &child,
+                    css_sources,
+                    label_map,
+                    key,
+                    html,
+                    raw_text_bindings,
+                    type_registry,
+                    child_path.as_str(),
+                ) {
+                    children.push(parsed);
+                }
+            }
+
+            // row/col default to 0 here; the enclosing `"table"` arm re-stamps the
+            // real grid coordinates. A bare cell outside a table is a valid 0,0 item.
+            Some(HtmlWidgetNode::TableCell(
+                TableCell {
+                    header: tag == "th",
+                    ..default()
+                },
+                meta,
+                states,
+                children,
+                functions,
+                widget.clone(),
+                node_id.clone(),
+            ))
+        }
+
+        "table" => {
+            let mut cells = Vec::new();
+            let mut columns = 0usize;
+            let mut row_idx = 0usize;
+
+            // The `kuchiki` HTML5 parser injects an implicit `<tbody>` (and honors
+            // any authored `<thead>`/`<tbody>`/`<tfoot>`) between `<table>` and its
+            // `<tr>` rows. Flatten those section wrappers so `<tr>` is found whether
+            // it sits directly under `<table>` or one level down inside a section,
+            // carrying the origin section so each cell can be tagged with it.
+            let rows = node.children().flat_map(|child| {
+                let section = child.as_element().and_then(|el| match &*el.name.local {
+                    "thead" => Some(TableSection::Head),
+                    "tbody" => Some(TableSection::Body),
+                    "tfoot" => Some(TableSection::Foot),
+                    _ => None,
+                });
+                match section {
+                    Some(section) => child.children().map(|tr| (section, tr)).collect::<Vec<_>>(),
+                    None => vec![(TableSection::Body, child)],
+                }
+            });
+
+            for (section, tr) in rows {
+                let Some(tr_el) = tr.as_element() else {
+                    continue;
+                };
+                if !tr_el.name.local.eq("tr") {
+                    continue;
+                }
+
+                let mut col_idx = 0usize;
+                for (index, cell) in tr.children().enumerate() {
+                    let Some(cell_el) = cell.as_element() else {
+                        continue;
+                    };
+                    let cell_name = cell_el.name.local.to_string();
+                    if cell_name != "td" && cell_name != "th" {
+                        continue;
+                    }
+
+                    let child_path = format!("{path}.{row_idx}.{index}");
+                    let Some(mut parsed) = parse_html_node(
+                        &cell,
+                        css_sources,
+                        label_map,
+                        key,
+                        html,
+                        raw_text_bindings,
+                        type_registry,
+                        child_path.as_str(),
+                    ) else {
+                        continue;
+                    };
+
+                    // Re-stamp the grid coordinates and origin section only the
+                    // table can know, and expose the section to CSS as a class.
+                    if let HtmlWidgetNode::TableCell(c, cell_meta, ..) = &mut parsed {
+                        c.row = row_idx;
+                        c.col = col_idx;
+                        c.section = section;
+                        let classes = cell_meta.class.get_or_insert_with(Vec::new);
+                        let section_class = section.css_class().to_string();
+                        if !classes.contains(&section_class) {
+                            classes.push(section_class);
+                        }
+                    }
+
+                    cells.push(parsed);
+                    col_idx += 1;
+                }
+
+                columns = columns.max(col_idx);
+                row_idx += 1;
+            }
+
+            Some(HtmlWidgetNode::Table(
+                Table {
+                    columns,
+                    ..default()
+                },
+                meta,
+                states,
+                cells,
+                functions,
+                widget.clone(),
+                node_id.clone(),
+            ))
+        }
+
         _ => None,
     }
+}
+
+/// Parses a standalone HTML fragment into its top-level [`HtmlWidgetNode`]s.
+///
+/// Wraps the fragment in a document, then runs [`parse_html_node`] on each direct
+/// child element of the resulting `<body>` with an empty CSS/label/binding context
+/// and a fresh [`TypeRegistry`]. Intended for parsing isolated snippets (e.g. a
+/// `<table>` subtree) without the full asset/runtime pipeline.
+pub fn parse_html_fragment(html: &str) -> Vec<HtmlWidgetNode> {
+    let document = kuchiki::parse_html().one(html);
+    let css_sources: Vec<Handle<CssAsset>> = Vec::new();
+    let label_map: HashMap<String, String> = HashMap::new();
+    let key = String::from("fragment");
+    let html_source = HtmlSource::from_handle(Handle::default());
+    let raw_text_bindings: HashMap<String, HtmlTextBinding> = HashMap::new();
+    let type_registry = TypeRegistry::default();
+
+    let Some(body) = select_primary_body_node(&document) else {
+        return Vec::new();
+    };
+
+    body.children()
+        .enumerate()
+        .filter_map(|(index, child)| {
+            parse_html_node(
+                &child,
+                &css_sources,
+                &label_map,
+                &key,
+                &html_source,
+                &raw_text_bindings,
+                &type_registry,
+                index.to_string().as_str(),
+            )
+        })
+        .collect()
 }
 
 /// Extracts HTML event bindings from element attributes.

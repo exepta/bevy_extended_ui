@@ -29,7 +29,8 @@ use crate::styles::parser::apply_property_to_style;
 use crate::widgets::{
     Badge, Body, Button, CheckBox, ChoiceBox, ColorPicker, DatePicker, Div, Divider, FieldSet,
     Form, Headline, HyperLink, Img, InputField, ListBox, Paragraph, ProgressBar, RadioButton,
-    Scrollbar, Slider, SwitchButton, ToggleButton, ToolTip, ValidationRules, Widget,
+    Scrollbar, Slider, SwitchButton, Table, TableCell, ToggleButton, ToolTip, ValidationRules,
+    Widget,
 };
 
 pub static HTML_ID_COUNTER: AtomicUsize = AtomicUsize::new(1);
@@ -277,6 +278,38 @@ pub enum HtmlWidgetNode {
     Form(
         /// Variant `Form`.
         Form,
+        /// Variant `HtmlMeta`.
+        HtmlMeta,
+        /// Variant `HtmlStates`.
+        HtmlStates,
+        Vec<HtmlWidgetNode>,
+        /// Variant `HtmlEventBindings`.
+        HtmlEventBindings,
+        /// Variant `Widget`.
+        Widget,
+        /// Variant `HtmlID`.
+        HtmlID,
+    ),
+    /// A `<table>` grid container with cell child nodes.
+    Table(
+        /// Variant `Table`.
+        Table,
+        /// Variant `HtmlMeta`.
+        HtmlMeta,
+        /// Variant `HtmlStates`.
+        HtmlStates,
+        Vec<HtmlWidgetNode>,
+        /// Variant `HtmlEventBindings`.
+        HtmlEventBindings,
+        /// Variant `Widget`.
+        Widget,
+        /// Variant `HtmlID`.
+        HtmlID,
+    ),
+    /// A `<th>`/`<td>` table cell with nested child nodes.
+    TableCell(
+        /// Variant `TableCell`.
+        TableCell,
         /// Variant `HtmlMeta`.
         HtmlMeta,
         /// Variant `HtmlStates`.
