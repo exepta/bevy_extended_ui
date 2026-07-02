@@ -4,6 +4,7 @@ pub mod controls;
 pub(crate) mod default_style;
 pub mod div;
 mod form;
+pub mod table;
 pub mod validation;
 pub mod widget_util;
 
@@ -12,6 +13,7 @@ use crate::styles::IconPlace;
 use crate::widgets::body::BodyWidget;
 use crate::widgets::div::DivWidget;
 use crate::widgets::form::FormWidget;
+use crate::widgets::table::TableWidget;
 use bevy::prelude::*;
 use std::any::Any;
 use std::fmt;
@@ -19,6 +21,7 @@ use std::sync::Arc;
 
 pub use content::ExtendedContentWidgets;
 pub use controls::ExtendedControlWidgets;
+pub use table::{Table, TableCell, TableSection};
 pub use validation::evaluate_validation_state;
 
 /// Marker component for UI elements that should ignore the parent widget state.
@@ -213,6 +216,10 @@ pub enum WidgetKind {
     Divider,
     /// Variant `Form`.
     Form,
+    /// Variant `Table`.
+    Table,
+    /// Variant `TableCell`.
+    TableCell,
     /// Variant `FieldSet`.
     FieldSet,
     /// Variant `Headline`.
@@ -258,12 +265,16 @@ impl Plugin for ExtendedWidgetPlugin {
         app.register_type::<ValidationRules>();
         app.register_type::<Body>();
         app.register_type::<Form>();
+        app.register_type::<Table>();
+        app.register_type::<TableCell>();
+        app.register_type::<TableSection>();
         app.add_plugins((
             ExtendedControlWidgets,
             ExtendedContentWidgets,
             BodyWidget,
             DivWidget,
             FormWidget,
+            TableWidget,
         ));
         app.add_systems(Update, validation::update_validation_states);
     }

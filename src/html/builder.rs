@@ -27,6 +27,8 @@ enum HtmlNodeKindDiscriminant {
     Body,
     Div,
     Form,
+    Table,
+    TableCell,
     Dialog,
     Divider,
     Button,
@@ -501,6 +503,8 @@ macro_rules! preserve_entry {
 preserve_entry!(
     Body,
     crate::widgets::Form,
+    crate::widgets::Table,
+    crate::widgets::TableCell,
     crate::widgets::Button,
     crate::widgets::CheckBox,
     crate::widgets::ChoiceBox,
@@ -549,6 +553,12 @@ fn get_node_children(node: &HtmlWidgetNode) -> Option<&Vec<HtmlWidgetNode>> {
         return Some(children);
     }
     if let HtmlWidgetNode::FieldSet(_, _, _, children, _, _, _) = node {
+        return Some(children);
+    }
+    if let HtmlWidgetNode::Table(_, _, _, children, _, _, _) = node {
+        return Some(children);
+    }
+    if let HtmlWidgetNode::TableCell(_, _, _, children, _, _, _) = node {
         return Some(children);
     }
     #[cfg(feature = "extended-dialog")]
@@ -663,6 +673,32 @@ fn update_existing_widget_node(
                 commands,
                 entity,
                 form.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+                start_hidden,
+            );
+        }
+        HtmlWidgetNode::Table(table, meta, states, _, functions, widget, id) => {
+            update_with_meta(
+                commands,
+                entity,
+                table.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+                start_hidden,
+            );
+        }
+        HtmlWidgetNode::TableCell(cell, meta, states, _, functions, widget, id) => {
+            update_with_meta(
+                commands,
+                entity,
+                cell.clone(),
                 meta,
                 states,
                 functions,
@@ -1198,6 +1234,8 @@ fn get_node_id(node: &HtmlWidgetNode) -> &HtmlID {
         | HtmlWidgetNode::ListBox(_, _, _, _, _, id)
         | HtmlWidgetNode::Div(_, _, _, _, _, _, id)
         | HtmlWidgetNode::Form(_, _, _, _, _, _, id)
+        | HtmlWidgetNode::Table(_, _, _, _, _, _, id)
+        | HtmlWidgetNode::TableCell(_, _, _, _, _, _, id)
         | HtmlWidgetNode::FieldSet(_, _, _, _, _, _, id) => id,
         #[cfg(feature = "extended-dialog")]
         HtmlWidgetNode::Dialog(_, _, _, _, _, _, id) => id,
@@ -1209,6 +1247,8 @@ fn get_node_kind(node: &HtmlWidgetNode) -> HtmlNodeKind {
         HtmlWidgetNode::Body(..) => HtmlNodeKindDiscriminant::Body,
         HtmlWidgetNode::Div(..) => HtmlNodeKindDiscriminant::Div,
         HtmlWidgetNode::Form(..) => HtmlNodeKindDiscriminant::Form,
+        HtmlWidgetNode::Table(..) => HtmlNodeKindDiscriminant::Table,
+        HtmlWidgetNode::TableCell(..) => HtmlNodeKindDiscriminant::TableCell,
         #[cfg(feature = "extended-dialog")]
         HtmlWidgetNode::Dialog(..) => HtmlNodeKindDiscriminant::Dialog,
         HtmlWidgetNode::Divider(..) => HtmlNodeKindDiscriminant::Divider,
@@ -1389,6 +1429,14 @@ fn collect_html_ids(nodes: &Vec<HtmlWidgetNode>, ids: &mut Vec<HtmlID>) {
                 ids.push(id.clone());
                 collect_html_ids(children, ids);
             }
+            HtmlWidgetNode::Table(_, _, _, children, _, _, id) => {
+                ids.push(id.clone());
+                collect_html_ids(children, ids);
+            }
+            HtmlWidgetNode::TableCell(_, _, _, children, _, _, id) => {
+                ids.push(id.clone());
+                collect_html_ids(children, ids);
+            }
             HtmlWidgetNode::FieldSet(_, _, _, children, _, _, id) => {
                 ids.push(id.clone());
                 collect_html_ids(children, ids);
@@ -1512,6 +1560,52 @@ fn spawn_widget_node(
             let entity = spawn_with_meta(
                 commands,
                 form.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+                start_hidden,
+            );
+            for child in children {
+                let child_start_hidden = start_hidden;
+                spawn_widget_node(
+                    commands,
+                    child,
+                    asset_server,
+                    Some(entity),
+                    child_start_hidden,
+                );
+            }
+            entity
+        }
+        HtmlWidgetNode::Table(table, meta, states, children, functions, widget, id) => {
+            let entity = spawn_with_meta(
+                commands,
+                table.clone(),
+                meta,
+                states,
+                functions,
+                widget,
+                id,
+                start_hidden,
+            );
+            for child in children {
+                let child_start_hidden = start_hidden;
+                spawn_widget_node(
+                    commands,
+                    child,
+                    asset_server,
+                    Some(entity),
+                    child_start_hidden,
+                );
+            }
+            entity
+        }
+        HtmlWidgetNode::TableCell(cell, meta, states, children, functions, widget, id) => {
+            let entity = spawn_with_meta(
+                commands,
+                cell.clone(),
                 meta,
                 states,
                 functions,

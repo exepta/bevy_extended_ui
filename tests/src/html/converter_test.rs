@@ -1,12 +1,240 @@
 #[cfg(test)]
 mod tests {
+    use super::super::HtmlWidgetNode;
     use super::super::converter::{
-        extract_inner_bindings, parse_inner_content, preprocess_template_directives,
-        preprocess_template_directives_with_shared,
+        extract_inner_bindings, parse_html_fragment, parse_inner_content,
+        preprocess_template_directives, preprocess_template_directives_with_shared,
         preprocess_template_directives_with_shared_and_local_types,
     };
     use crate::lang::{UiLangVariables, UiSharedValues};
     use kuchiki::traits::TendrilSink;
+
+    /// Returns the cells of the first parsed `Table` node, asserting the fragment
+    /// produced exactly one table and no stray top-level `<tr>` nodes.
+    fn table_cells(html: &str) -> (usize, Vec<(bool, usize, usize, String)>) {
+        let nodes = parse_html_fragment(html);
+        let tables: Vec<&HtmlWidgetNode> = nodes
+            .iter()
+            .filter(|n| matches!(n, HtmlWidgetNode::Table(..)))
+            .collect();
+        assert_eq!(tables.len(), 1, "expected exactly one Table node");
+
+        let HtmlWidgetNode::Table(table, _, _, cells, _, _, _) = tables[0] else {
+            unreachable!()
+        };
+
+        // <tr> is flattened: every direct table child must be a TableCell, never a
+        // row node. `parse_html_node` returns `None` for `<tr>`, so a row node could
+        // not appear here — this assertion locks that contract.
+        let parsed = cells
+            .iter()
+            .map(|cell| {
+                let HtmlWidgetNode::TableCell(c, meta, _, _, _, _, _) = cell else {
+                    panic!("table child was not a TableCell: {cell:?}");
+                };
+                (
+                    c.header,
+                    c.row,
+                    c.col,
+                    meta.inner_content.inner_text().trim().to_string(),
+                )
+            })
+            .collect();
+
+        (table.columns, parsed)
+    }
+
+    /// Returns the raw `TableCell` nodes of the single table in `html` (cells kept
+    /// as `HtmlWidgetNode` so callers can inspect their children).
+    fn first_table_cells(html: &str) -> Vec<HtmlWidgetNode> {
+        let nodes = parse_html_fragment(html);
+        let table = nodes
+            .into_iter()
+            .find(|n| matches!(n, HtmlWidgetNode::Table(..)))
+            .expect("expected a Table node");
+        let HtmlWidgetNode::Table(_, _, _, cells, _, _, _) = table else {
+            unreachable!()
+        };
+        cells
+    }
+
+    #[test]
+    fn parse_cell_marks_header_flag() {
+        // A bare `<td>`/`<th>` is foster-parented away by the HTML5 parser, so the
+        // `td|th` arm is reached only inside a table — exercise it there.
+        let cells = first_table_cells("<table><tr><td>Hi</td><th>Yo</th></tr></table>");
+        assert_eq!(cells.len(), 2);
+        match (&cells[0], &cells[1]) {
+            (
+                HtmlWidgetNode::TableCell(data, _, _, _, _, _, _),
+                HtmlWidgetNode::TableCell(header, _, _, _, _, _, _),
+            ) => {
+                assert!(!data.header);
+                assert_eq!((data.row, data.col), (0, 0));
+                assert!(header.header);
+                assert_eq!((header.row, header.col), (0, 1));
+            }
+            other => panic!("expected two TableCells, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_cell_with_nested_button_keeps_child_node() {
+        let cells = first_table_cells(
+            r#"<table><tr><td><button onclick="go">X</button></td></tr></table>"#,
+        );
+        match &cells[0] {
+            HtmlWidgetNode::TableCell(_, _, _, children, _, _, _) => {
+                assert_eq!(children.len(), 1);
+                assert!(matches!(children[0], HtmlWidgetNode::Button(..)));
+            }
+            other => panic!("expected TableCell, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_table_2x3_yields_six_cells_and_three_columns() {
+        let html = r#"
+            <table>
+                <tr><th>A</th><th>B</th><th>C</th></tr>
+                <tr><td>1</td><td>2</td><td>3</td></tr>
+            </table>
+        "#;
+        let (columns, cells) = table_cells(html);
+        assert_eq!(columns, 3, "column count is the widest row");
+        assert_eq!(cells.len(), 6);
+
+        // Row 0 is the header row, row 1 data; indices stamped per cell.
+        assert_eq!(
+            cells,
+            vec![
+                (true, 0, 0, "A".to_string()),
+                (true, 0, 1, "B".to_string()),
+                (true, 0, 2, "C".to_string()),
+                (false, 1, 0, "1".to_string()),
+                (false, 1, 1, "2".to_string()),
+                (false, 1, 2, "3".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn parse_table_text_only_cell_exposes_inner_content() {
+        let (_, cells) = table_cells("<table><tr><td>Hello</td></tr></table>");
+        assert_eq!(cells.len(), 1);
+        assert_eq!(cells[0].3, "Hello");
+    }
+
+    #[test]
+    fn parse_table_skips_whitespace_between_rows_and_cells() {
+        // Newlines/spaces between <tr> and between <td> must not create cells.
+        let html = "<table>\n  <tr>\n    <td>1</td>\n    <td>2</td>\n  </tr>\n</table>";
+        let (columns, cells) = table_cells(html);
+        assert_eq!(columns, 2);
+        assert_eq!(cells.len(), 2, "whitespace must not become cells");
+    }
+
+    #[test]
+    fn parse_table_ignores_stray_non_structural_tags() {
+        // A stray non-<tr> child of <table>, and a stray non-cell child of <tr>.
+        let html = r#"
+            <table>
+                <div>ignored</div>
+                <tr><td>1</td><span>nope</span><td>2</td></tr>
+            </table>
+        "#;
+        let (columns, cells) = table_cells(html);
+        assert_eq!(columns, 2, "stray tags do not count as cells");
+        assert_eq!(cells.len(), 2);
+        assert_eq!(cells[0].3, "1");
+        assert_eq!(cells[1].3, "2");
+        assert_eq!(cells[1].2, 1, "second cell keeps col index 1");
+    }
+
+    #[test]
+    fn parse_table_ragged_rows_keep_max_columns_and_own_indices() {
+        let html = r#"
+            <table>
+                <tr><td>a</td><td>b</td><td>c</td></tr>
+                <tr><td>d</td><td>e</td></tr>
+            </table>
+        "#;
+        let (columns, cells) = table_cells(html);
+        assert_eq!(columns, 3, "widest row sets the column count");
+        assert_eq!(cells.len(), 5);
+        // Row 1's two cells sit at col 0 and 1; col 2 is simply unoccupied.
+        assert_eq!(cells[3], (false, 1, 0, "d".to_string()));
+        assert_eq!(cells[4], (false, 1, 1, "e".to_string()));
+    }
+
+    #[test]
+    fn parse_table_stamps_section_and_class_from_wrappers() {
+        use crate::widgets::TableSection;
+
+        let html = r#"
+            <table>
+                <thead><tr><th>H</th></tr></thead>
+                <tbody><tr><td>B</td></tr></tbody>
+                <tfoot><tr><td>F</td></tr></tfoot>
+            </table>
+        "#;
+        let cells = first_table_cells(html);
+        assert_eq!(cells.len(), 3);
+
+        let section_and_class: Vec<(TableSection, Vec<String>)> = cells
+            .iter()
+            .map(|cell| {
+                let HtmlWidgetNode::TableCell(c, meta, _, _, _, _, _) = cell else {
+                    panic!("expected TableCell, got {cell:?}");
+                };
+                (c.section, meta.class.clone().unwrap_or_default())
+            })
+            .collect();
+
+        assert_eq!(section_and_class[0].0, TableSection::Head);
+        assert!(section_and_class[0].1.contains(&"thead".to_string()));
+        assert_eq!(section_and_class[1].0, TableSection::Body);
+        assert!(section_and_class[1].1.contains(&"tbody".to_string()));
+        assert_eq!(section_and_class[2].0, TableSection::Foot);
+        assert!(section_and_class[2].1.contains(&"tfoot".to_string()));
+    }
+
+    #[test]
+    fn parse_table_bare_rows_default_to_body_section() {
+        use crate::widgets::TableSection;
+
+        // A `<tr>` directly under `<table>` (implicit tbody) is the Body section,
+        // and its class carries `tbody`.
+        let cells = first_table_cells("<table><tr><td>x</td></tr></table>");
+        let HtmlWidgetNode::TableCell(c, meta, _, _, _, _, _) = &cells[0] else {
+            panic!("expected TableCell");
+        };
+        assert_eq!(c.section, TableSection::Body);
+        assert!(
+            meta.class
+                .clone()
+                .unwrap_or_default()
+                .contains(&"tbody".to_string())
+        );
+    }
+
+    #[test]
+    fn parse_table_section_class_preserves_author_classes() {
+        use crate::widgets::TableSection;
+
+        let cells =
+            first_table_cells(r#"<table><thead><tr><th class="hd">H</th></tr></thead></table>"#);
+        let HtmlWidgetNode::TableCell(c, meta, _, _, _, _, _) = &cells[0] else {
+            panic!("expected TableCell");
+        };
+        assert_eq!(c.section, TableSection::Head);
+        let classes = meta.class.clone().unwrap_or_default();
+        assert!(classes.contains(&"hd".to_string()), "author class kept");
+        assert!(
+            classes.contains(&"thead".to_string()),
+            "section class added"
+        );
+    }
 
     #[test]
     fn extract_inner_bindings_returns_unique_placeholders() {

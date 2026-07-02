@@ -18,8 +18,8 @@ mod tests {
     use crate::widgets::{
         BadgeAnchor, Body, Button, ButtonType, DateFormat, FieldMode, FormValidationMode,
         HyperLinkBrowsers, InputCap, InputField, InputType, Paragraph, RadioButton, Scrollbar,
-        Slider, SliderDotAnchor, SliderType, SwitchButton, ToggleButton, ToolTipAlignment,
-        ToolTipPriority, ToolTipTrigger, ToolTipVariant, UIWidgetState, Widget,
+        Slider, SliderDotAnchor, SliderType, SwitchButton, Table, TableCell, ToggleButton,
+        ToolTipAlignment, ToolTipPriority, ToolTipTrigger, ToolTipVariant, UIWidgetState, Widget,
     };
     use bevy::asset::{AssetEvent, AssetPlugin};
     use bevy::ecs::message::Messages;
@@ -1265,6 +1265,214 @@ mod tests {
         assert!(entity_ref.contains::<UIWidgetState>());
 
         assert!(!app.world().entities().contains(old_body));
+    }
+
+    fn table_fixture() -> &'static str {
+        r##"
+        <html>
+          <head>
+            <meta name="table-key" />
+          </head>
+          <body>
+            <table>
+              <tr><th>Name</th><th>Action</th></tr>
+              <tr>
+                <td>Alice</td>
+                <td><button onclick="row_click">Go</button></td>
+              </tr>
+            </table>
+          </body>
+        </html>
+        "##
+    }
+
+    /// Drives the converter + builder over a real table fixture and asserts the
+    /// spawned entity tree: one `Table`, its cells are direct `TableCell` children
+    /// (so `<tr>` produced no row entity — it was flattened), a text-only cell keeps
+    /// its `HtmlInnerContent`, and an in-cell `<button onclick>` keeps its
+    /// `Button` + `HtmlEventBindings`.
+    #[test]
+    fn builder_spawns_table_tree_with_cells_and_nested_widget() {
+        let mut app = setup_converter_app();
+        app.add_message::<HtmlAllWidgetsSpawned>();
+        app.add_systems(Update, builder::build_html_source);
+        app.init_resource::<HtmlPendingReveal>();
+
+        add_html_source(
+            &mut app,
+            "examples/table_fixture.html",
+            table_fixture(),
+            "table-key",
+            None,
+        );
+
+        app.update();
+        {
+            let mut map = app.world_mut().resource_mut::<HtmlStructureMap>();
+            map.active = Some(vec!["table-key".to_string()]);
+        }
+        app.world_mut().resource_mut::<HtmlDirty>().0 = true;
+        app.update();
+
+        let world = app.world_mut();
+
+        // Exactly one Table entity.
+        let mut table_q = world.query::<(Entity, &Table)>();
+        let tables: Vec<Entity> = table_q.iter(world).map(|(e, _)| e).collect();
+        assert_eq!(tables.len(), 1, "exactly one Table entity");
+        let table_entity = tables[0];
+
+        // Its direct children are all TableCell — `<tr>` is flattened, so no row
+        // entity sits between the table and its cells.
+        let children: Vec<Entity> = world
+            .get::<Children>(table_entity)
+            .map(|c| c.iter().collect())
+            .unwrap_or_default();
+        assert_eq!(
+            children.len(),
+            4,
+            "2 header + 2 data cells are direct children"
+        );
+        for child in &children {
+            assert!(
+                world.get::<TableCell>(*child).is_some(),
+                "every direct table child is a TableCell, never a row node"
+            );
+        }
+
+        // No entity in the whole world is a row: there is no Tr component/variant,
+        // and the only TableCell parents are the table — assert cell count is 4.
+        let mut cell_q = world.query::<&TableCell>();
+        assert_eq!(cell_q.iter(world).count(), 4);
+
+        // The text-only data cell ("Alice") exposes its text via HtmlInnerContent.
+        let mut text_cell_q = world.query::<(&TableCell, &HtmlInnerContent)>();
+        let has_alice = text_cell_q
+            .iter(world)
+            .any(|(_, inner)| inner.inner_text().trim() == "Alice");
+        assert!(has_alice, "text cell keeps its inner content");
+
+        // The in-cell <button onclick> kept its Button + HtmlEventBindings.
+        let mut button_q = world.query::<(&Button, &HtmlEventBindings)>();
+        let buttons: Vec<String> = button_q
+            .iter(world)
+            .filter_map(|(_, bind)| bind.onclick.clone())
+            .collect();
+        assert!(
+            buttons.iter().any(|name| name == "row_click"),
+            "nested button preserved its onclick binding inside the cell"
+        );
+    }
+
+    /// A table-free asset spawns no table entities and still builds.
+    #[test]
+    fn builder_leaves_table_free_asset_without_table_entities() {
+        let mut app = setup_converter_app();
+        app.add_message::<HtmlAllWidgetsSpawned>();
+        app.add_systems(Update, builder::build_html_source);
+        app.init_resource::<HtmlPendingReveal>();
+
+        add_html_source(
+            &mut app,
+            "examples/no_table.html",
+            html_fixture(),
+            "meta-key",
+            None,
+        );
+
+        app.update();
+        {
+            let mut map = app.world_mut().resource_mut::<HtmlStructureMap>();
+            map.active = Some(vec!["meta-key".to_string()]);
+        }
+        app.world_mut().resource_mut::<HtmlDirty>().0 = true;
+        app.update();
+
+        let world = app.world_mut();
+        let mut table_q = world.query::<&Table>();
+        assert_eq!(table_q.iter(world).count(), 0, "no Table entities");
+        let mut cell_q = world.query::<&TableCell>();
+        assert_eq!(cell_q.iter(world).count(), 0, "no TableCell entities");
+        // The unrelated widgets still built (sanity that the build ran at all).
+        let mut body_q = world.query::<&Body>();
+        assert_eq!(body_q.iter(world).count(), 1);
+    }
+
+    /// Rebuilding the active UI with a structurally larger table diffs the
+    /// tree in place through the reconcile path: the converter re-parses the modified
+    /// asset into the SAME key, the builder reconciles the existing Body tree (reusing
+    /// matching cells, spawning the added row's cells), and no stale cells remain.
+    #[test]
+    fn rebuild_reconciles_table_when_a_row_is_added() {
+        let mut app = setup_converter_app();
+        app.add_message::<HtmlAllWidgetsSpawned>();
+        app.add_systems(Update, builder::build_html_source);
+        app.init_resource::<HtmlPendingReveal>();
+
+        let two_row = r##"
+        <html><head><meta name="rk" /></head>
+          <body><table>
+            <tr><td>a</td><td>b</td></tr>
+            <tr><td>c</td><td>d</td></tr>
+          </table></body>
+        </html>"##;
+        let handle = add_html_source(&mut app, "examples/recon.html", two_row, "rk", None);
+
+        app.update();
+        {
+            let mut map = app.world_mut().resource_mut::<HtmlStructureMap>();
+            map.active = Some(vec!["rk".to_string()]);
+        }
+        app.world_mut().resource_mut::<HtmlDirty>().0 = true;
+        app.update();
+
+        let world = app.world_mut();
+        let mut cell_q = world.query::<&TableCell>();
+        assert_eq!(cell_q.iter(world).count(), 4, "2x2 table → 4 cells");
+
+        // Modify the asset to a 3-row table and notify the converter; it re-parses
+        // the same "rk" key into a fresh Body tree, then the builder reconciles.
+        let three_row = r##"
+        <html><head><meta name="rk" /></head>
+          <body><table>
+            <tr><td>a</td><td>b</td></tr>
+            <tr><td>c</td><td>d</td></tr>
+            <tr><td>e</td><td>f</td></tr>
+          </table></body>
+        </html>"##;
+        app.world_mut()
+            .resource_mut::<Assets<HtmlAsset>>()
+            .insert(
+                handle.id(),
+                HtmlAsset {
+                    html: three_row.to_string(),
+                    stylesheets: Vec::new(),
+                },
+            )
+            .expect("replace HtmlAsset");
+        app.world_mut()
+            .resource_mut::<Messages<AssetEvent<HtmlAsset>>>()
+            .write(AssetEvent::Modified { id: handle.id() });
+
+        // One update re-parses (converter) + sets the active key dirty; a second
+        // update lets the builder reconcile the now-dirty active tree.
+        app.update();
+        {
+            let mut map = app.world_mut().resource_mut::<HtmlStructureMap>();
+            map.active = Some(vec!["rk".to_string()]);
+        }
+        app.world_mut().resource_mut::<HtmlDirty>().0 = true;
+        app.update();
+
+        let world = app.world_mut();
+        let mut cell_q2 = world.query::<&TableCell>();
+        assert_eq!(
+            cell_q2.iter(world).count(),
+            6,
+            "after reconcile the added row's 2 cells exist (6 total), none stale"
+        );
+        let mut table_q = world.query::<&Table>();
+        assert_eq!(table_q.iter(world).count(), 1, "still exactly one table");
     }
 
     #[test]
