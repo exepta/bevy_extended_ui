@@ -46,6 +46,10 @@ use crate::styles::parser::convert_to_color;
 use crate::widgets::Button;
 use crate::widgets::*;
 
+#[cfg(test)]
+#[path = "converter_tests.rs"]
+mod tests;
+
 /// Legacy identifier for the built-in embedded default stylesheet.
 pub const DEFAULT_UI_CSS: &str = "embedded/default_style";
 
@@ -162,6 +166,15 @@ fn track_html_binding_value_changes(
     vars: Res<UiLangVariables>,
     shared_values: Res<UiSharedValues>,
 ) {
+    // Clear the previous frame's notification even when the inputs are unchanged.
+    // Cloning shared JSON every frame makes idle UI cost scale with application data.
+    if !vars.is_changed() && !shared_values.is_changed() {
+        if tracker.values_changed {
+            tracker.values_changed = false;
+            tracker.changed_roots.clear();
+        }
+        return;
+    }
     let mut changed_roots = HashSet::new();
 
     for (key, value) in &vars.vars {
@@ -309,7 +322,6 @@ fn update_html_ui(
     let resolved = state.ui_lang.resolved().map(|lang| lang.to_string());
     let mut locale_dirty = false;
     let mut value_dirty = false;
-    let vars_hash = vars_fingerprint(&template_inputs.lang_vars);
 
     if state.lang_state.last_resolved != resolved {
         state.lang_state.last_resolved = resolved;
@@ -324,15 +336,24 @@ fn update_html_ui(
         locale_dirty = true;
     }
 
-    if state.lang_state.last_vars_fingerprint != Some(vars_hash) {
-        state.lang_state.last_vars_fingerprint = Some(vars_hash);
-        value_dirty = true;
+    // Fingerprints include sorting and JSON serialization. Recompute only after
+    // Bevy reports a resource change, while still initializing a fresh cache.
+    if template_inputs.lang_vars.is_changed() || state.lang_state.last_vars_fingerprint.is_none() {
+        let vars_hash = vars_fingerprint(&template_inputs.lang_vars);
+        if state.lang_state.last_vars_fingerprint != Some(vars_hash) {
+            state.lang_state.last_vars_fingerprint = Some(vars_hash);
+            value_dirty = true;
+        }
     }
 
-    let shared_hash = shared_values_fingerprint(&template_inputs.shared_values);
-    if state.lang_state.last_shared_fingerprint != Some(shared_hash) {
-        state.lang_state.last_shared_fingerprint = Some(shared_hash);
-        value_dirty = true;
+    if template_inputs.shared_values.is_changed()
+        || state.lang_state.last_shared_fingerprint.is_none()
+    {
+        let shared_hash = shared_values_fingerprint(&template_inputs.shared_values);
+        if state.lang_state.last_shared_fingerprint != Some(shared_hash) {
+            state.lang_state.last_shared_fingerprint = Some(shared_hash);
+            value_dirty = true;
+        }
     }
 
     // Entities that need reparse (new HtmlSource, pending retry, or changed HtmlAsset).

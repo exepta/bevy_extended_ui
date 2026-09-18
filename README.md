@@ -69,8 +69,8 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-bevy_extended_ui = "1.5.0"
-bevy_extended_ui_macros = "1.5.0"
+bevy_extended_ui = "1.7.0"
+bevy_extended_ui_macros = "1.7.0"
 ```
 
 #### Features

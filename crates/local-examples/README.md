@@ -3,6 +3,11 @@
 This crate contains local demo apps for `bevy_extended_ui`.
 It is intentionally **not** part of the root workspace.
 
+For performance measurements, run with `--release`. The headless HTML/CSS
+benchmark runs from the repository root with
+`cargo bench --bench html_css --features extended-framework`.
+See the [performance guide](../../docs/How-to%20Guides/en_US/05_Performance.md).
+
 ## What is in this crate?
 
 You can run these examples:

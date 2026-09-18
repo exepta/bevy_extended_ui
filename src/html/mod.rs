@@ -10,8 +10,6 @@ pub use inline_functions::{
 };
 pub use inventory;
 
-#[cfg(feature = "extended-framework")]
-use crate::framework::sync_ui_binding_store_values;
 use crate::html::builder::HtmlBuilderSystem;
 use crate::html::converter::HtmlConverterSystem;
 use crate::html::reload::HtmlReloadPlugin;
@@ -1106,8 +1104,6 @@ impl Plugin for ExtendedUiHtmlPlugin {
 
 fn sync_shared_values_system(world: &mut World) {
     refresh_shared_values(world);
-    #[cfg(feature = "extended-framework")]
-    sync_ui_binding_store_values(world);
 }
 
 /// Registers all HTML event handlers collected via `inventory`.

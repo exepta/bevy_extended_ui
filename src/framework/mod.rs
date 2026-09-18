@@ -680,7 +680,10 @@ pub fn sync_ui_binding_store_values(world: &mut World) {
     let mut changed = false;
 
     for known in known_types {
-        changed |= shared.known_types.insert(known);
+        if !shared.known_types.contains(&known) {
+            shared.known_types.insert(known);
+            changed = true;
+        }
     }
 
     for (key, value) in values {

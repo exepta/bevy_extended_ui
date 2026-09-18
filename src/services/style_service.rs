@@ -545,33 +545,59 @@ pub fn apply_calc_styles_system(
             viewport,
         };
 
-        apply_calc_length(style.width_calc.as_ref(), ctx_content_w, &mut node.width);
+        // Mutable field access alone marks Node changed in Bevy. Map the fields
+        // without changing their ticks, then notify layout only for new values.
+        apply_calc_length(
+            style.width_calc.as_ref(),
+            ctx_content_w,
+            node.reborrow().map_unchanged(|n| &mut n.width),
+        );
         apply_calc_length(
             style.min_width_calc.as_ref(),
             ctx_content_w,
-            &mut node.min_width,
+            node.reborrow().map_unchanged(|n| &mut n.min_width),
         );
         apply_calc_length(
             style.max_width_calc.as_ref(),
             ctx_content_w,
-            &mut node.max_width,
+            node.reborrow().map_unchanged(|n| &mut n.max_width),
         );
-        apply_calc_length(style.height_calc.as_ref(), ctx_content_h, &mut node.height);
+        apply_calc_length(
+            style.height_calc.as_ref(),
+            ctx_content_h,
+            node.reborrow().map_unchanged(|n| &mut n.height),
+        );
         apply_calc_length(
             style.min_height_calc.as_ref(),
             ctx_content_h,
-            &mut node.min_height,
+            node.reborrow().map_unchanged(|n| &mut n.min_height),
         );
         apply_calc_length(
             style.max_height_calc.as_ref(),
             ctx_content_h,
-            &mut node.max_height,
+            node.reborrow().map_unchanged(|n| &mut n.max_height),
         );
 
-        apply_calc_length(style.left_calc.as_ref(), ctx_box_w, &mut node.left);
-        apply_calc_length(style.right_calc.as_ref(), ctx_box_w, &mut node.right);
-        apply_calc_length(style.top_calc.as_ref(), ctx_box_h, &mut node.top);
-        apply_calc_length(style.bottom_calc.as_ref(), ctx_box_h, &mut node.bottom);
+        apply_calc_length(
+            style.left_calc.as_ref(),
+            ctx_box_w,
+            node.reborrow().map_unchanged(|n| &mut n.left),
+        );
+        apply_calc_length(
+            style.right_calc.as_ref(),
+            ctx_box_w,
+            node.reborrow().map_unchanged(|n| &mut n.right),
+        );
+        apply_calc_length(
+            style.top_calc.as_ref(),
+            ctx_box_h,
+            node.reborrow().map_unchanged(|n| &mut n.top),
+        );
+        apply_calc_length(
+            style.bottom_calc.as_ref(),
+            ctx_box_h,
+            node.reborrow().map_unchanged(|n| &mut n.bottom),
+        );
 
         if let Some(expr) = style.flex_basis_calc.as_ref() {
             let base_main = match node.flex_direction {
@@ -583,7 +609,9 @@ pub fn apply_calc_styles_system(
                 viewport,
             };
             if let Some(px) = expr.eval_length(ctx_main) {
-                node.flex_basis = Val::Px(px);
+                node.reborrow()
+                    .map_unchanged(|n| &mut n.flex_basis)
+                    .set_if_neq(Val::Px(px));
             }
         }
 
@@ -620,10 +648,14 @@ pub fn apply_calc_styles_system(
         }
 
         if let Some(val) = row_gap_val {
-            node.row_gap = val;
+            node.reborrow()
+                .map_unchanged(|n| &mut n.row_gap)
+                .set_if_neq(val);
         }
         if let Some(val) = column_gap_val {
-            node.column_gap = val;
+            node.reborrow()
+                .map_unchanged(|n| &mut n.column_gap)
+                .set_if_neq(val);
         }
     }
 }
@@ -1907,10 +1939,10 @@ fn lerp(from: f32, to: f32, t: f32) -> f32 {
 }
 
 /// Handles `apply_calc_length` in the extended UI workflow.
-fn apply_calc_length(expr: Option<&CalcExpr>, ctx: CalcContext, target: &mut Val) {
+fn apply_calc_length(expr: Option<&CalcExpr>, ctx: CalcContext, mut target: Mut<Val>) {
     if let Some(expr) = expr {
         if let Some(px) = expr.eval_length(ctx) {
-            *target = Val::Px(px);
+            target.set_if_neq(Val::Px(px));
         }
     }
 }
