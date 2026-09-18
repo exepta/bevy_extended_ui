@@ -2135,19 +2135,11 @@ fn compute_selector_metadata(selector: &str) -> SelectorMetadata {
         let segments: Vec<&str> = part.split(':').collect();
         let base = segments[0];
 
-        specificity += if base.starts_with('#') {
-            100
-        } else if base.starts_with('.') {
-            10
-        } else if base == "*" || base.is_empty() {
-            0
-        } else {
-            1
-        };
+        specificity += crate::services::css_service::simple_selector_specificity(base);
 
         if segments.len() > 1 {
             has_pseudo = true;
-            specificity += segments.len().saturating_sub(1) as u32;
+            specificity += segments.len().saturating_sub(1) as u32 * 10;
         }
 
         for pseudo in &segments[1..] {

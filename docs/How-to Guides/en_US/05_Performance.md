@@ -87,6 +87,10 @@ frames. Their structure-maintenance pass only changes layout fields when values
 actually differ. Inherited font families ending in `.ttf` or `.otf` load that file
 directly, including quoted paths; folder families still resolve weighted files.
 Non-text nodes do not request font assets during inheritance.
+Focus changes only dirty widgets whose focus actually changes, and bound child
+states skip identical updates. Scrollbars inherit their window's visibility.
+Compound selector priority counts every class and ID, keeping targeted container
+overrides stronger than general hidden-state rules.
 Grid track parsing also accepts normalized unitless zero, preserving definitions
 such as `repeat(6, minmax(0px, 1fr))` after CSS serialization.
 

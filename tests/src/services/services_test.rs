@@ -514,6 +514,34 @@ mod tests {
     }
 
     #[test]
+    fn compound_selector_priority_keeps_scroll_content_visible() {
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, AssetPlugin::default(), CssService))
+            .init_asset::<CssAsset>()
+            .init_asset::<Image>()
+            .init_resource::<ImageCache>()
+            .add_systems(Update, update_widget_styles_system);
+        let sheet = app.world_mut().resource_mut::<Assets<CssAsset>>().add(CssAsset {
+            text: ".hidden { display: none; width: 10px; } div.hidden.content { display: flex; width: 20px; }".into(),
+        });
+        let entity = app
+            .world_mut()
+            .spawn((
+                Node::default(),
+                TagName("div".into()),
+                CssClass(vec!["hidden".into(), "content".into()]),
+                CssSource(vec![sheet]),
+            ))
+            .id();
+        for _ in 0..5 {
+            app.update();
+        }
+        let node = app.world().get::<Node>(entity).unwrap();
+        assert_eq!(node.display, Display::Flex);
+        assert_eq!(node.width, Val::Px(20.));
+    }
+
+    #[test]
     fn css_service_rejects_selectors_with_missing_parts() {
         let id = CssID("main-card".to_string());
         let classes = CssClass(vec!["card".to_string()]);

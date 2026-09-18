@@ -757,7 +757,18 @@ pub fn matches_css_selector_token(
 struct SimpleSelectorRequirements<'a> {
     tag: Option<&'a str>,
     id: Option<&'a str>,
+    id_count: u32,
     classes: Vec<&'a str>,
+}
+
+/// Uses the same token grammar for matching and cascade priority. A compound
+/// selector must count every class/ID, not just its first character.
+pub(crate) fn simple_selector_specificity(selector: &str) -> u32 {
+    parse_simple_selector(selector).map_or(0, |requirements| {
+        requirements.id_count * 100
+            + requirements.classes.len() as u32 * 10
+            + u32::from(requirements.tag.is_some_and(|tag| tag != "*"))
+    })
 }
 
 /// Strips pseudo and attribute suffixes from one selector token.
@@ -812,6 +823,9 @@ fn parse_simple_selector(selector: &str) -> Option<SimpleSelectorRequirements<'_
         }
 
         let token = &base[start..i];
+        if prefix == b'#' {
+            requirements.id_count += 1;
+        }
         if prefix == b'.' {
             requirements.classes.push(token);
         } else if let Some(existing) = requirements.id {
