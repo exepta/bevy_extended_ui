@@ -82,6 +82,28 @@ results describe the updated implementation only.
 
 ## Application Measurements
 
+Scroll containers now retain their transforms and inherited visibility between
+frames. Their structure-maintenance pass only changes layout fields when values
+actually differ. Inherited font families ending in `.ttf` or `.otf` load that file
+directly, including quoted paths; folder families still resolve weighted files.
+Non-text nodes do not request font assets during inheritance.
+
+### Mounting Game Screens
+
+`html::builder::mount_html_fragment` mounts parsed widget nodes under an optional
+ECS parent and returns the root entities. Its visitor receives each entity and
+`HtmlWidgetNode`, whose `meta()` exposes CSS IDs and classes for controller binding.
+Attach your stylesheet using `CssSource` in the visitor. Parse each instance
+separately so generated widget IDs remain unique. Fragments are caller-owned:
+despawn their roots to remove them; they do not participate in `HtmlSource` diffing.
+Construct screens once, then update text/state instead of reparsing every frame.
+
+Widget initialization runs after spawning and creates presentation components.
+Attach native render targets or other presentation overrides after initialization
+(when `TagName` is present). Gameplay markers and observers can be attached in the
+visitor immediately. This keeps the normal HTML widgets, CSS cascade and scrolling
+while allowing game controllers to retain their existing ECS ownership.
+
 Run the local widget example with optimizations enabled:
 
 ```bash

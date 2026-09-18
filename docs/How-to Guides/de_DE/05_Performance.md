@@ -6,6 +6,25 @@ title: HTML- und CSS-Performance
 
 Die Optimierungen sind automatisch aktiv und brauchen kein neues Feature-Flag.
 
+Scroll-Container schreiben Layout, Transformation und geerbte Sichtbarkeit nicht
+mehr in jedem unveraenderten Frame neu. Vererbte `.ttf`- und `.otf`-Pfade werden
+als Font-Dateien geladen, nicht als Verzeichnisse; Nicht-Text-Nodes laden keine Fonts.
+
+## HTML-Fragmente im Spiel
+
+`html::builder::mount_html_fragment` bindet geparste Widget-Nodes an einen optionalen
+ECS-Parent und liefert die Root-Entities. Im Visitor stehen Entity und
+`HtmlWidgetNode::meta()` fuer CSS-IDs, Klassen und Controller-Marker bereit.
+Das Stylesheet wird per `CssSource` angebunden. Jede Instanz separat parsen, damit
+die Widget-IDs eindeutig bleiben. Fragmente werden vom Aufrufer verwaltet und
+nicht vom `HtmlSource`-Diff erfasst; zum Entfernen die Root-Entities despawnen.
+Screens nur beim Erzeugen parsen, danach Text und Zustand gezielt aktualisieren.
+
+Native Render-Targets und andere Darstellungskomponenten erst nach der
+Widget-Initialisierung setzen (`TagName` ist dann vorhanden). Gameplay-Marker
+und Observer koennen bereits im Visitor angebunden werden. Ein Beispiel sind
+die HTML/CSS-Spieloberflaechen mit bestehenden ECS-Controllern und 3D-Vorschauen.
+
 ## Aenderungen
 
 - Binding-Snapshots und Fingerprints werden nur bei geaenderten Eingaberessourcen

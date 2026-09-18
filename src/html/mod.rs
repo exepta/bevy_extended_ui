@@ -664,6 +664,42 @@ impl Default for HtmlStructureMap {
 #[derive(Clone, Debug, PartialEq, Eq, Component)]
 pub struct HtmlID(pub usize);
 
+impl HtmlWidgetNode {
+    /// Returns the HTML attributes independently of the concrete widget kind.
+    pub fn meta(&self) -> &HtmlMeta {
+        match self {
+            Self::Body(_, meta, ..)
+            | Self::Button(_, meta, ..)
+            | Self::CheckBox(_, meta, ..)
+            | Self::ColorPicker(_, meta, ..)
+            | Self::ChoiceBox(_, meta, ..)
+            | Self::DatePicker(_, meta, ..)
+            | Self::Divider(_, meta, ..)
+            | Self::Headline(_, meta, ..)
+            | Self::HyperLink(_, meta, ..)
+            | Self::Img(_, meta, ..)
+            | Self::Input(_, meta, ..)
+            | Self::Paragraph(_, meta, ..)
+            | Self::ToolTip(_, meta, ..)
+            | Self::Badge(_, meta, ..)
+            | Self::ProgressBar(_, meta, ..)
+            | Self::RadioButton(_, meta, ..)
+            | Self::Scrollbar(_, meta, ..)
+            | Self::Slider(_, meta, ..)
+            | Self::SwitchButton(_, meta, ..)
+            | Self::ToggleButton(_, meta, ..)
+            | Self::ListBox(_, meta, ..)
+            | Self::Div(_, meta, ..)
+            | Self::Form(_, meta, ..)
+            | Self::Table(_, meta, ..)
+            | Self::TableCell(_, meta, ..)
+            | Self::FieldSet(_, meta, ..) => meta,
+            #[cfg(feature = "extended-dialog")]
+            Self::Dialog(_, meta, ..) => meta,
+        }
+    }
+}
+
 impl Default for HtmlID {
     /// Allocates a new HTML ID from the global counter.
     fn default() -> Self {

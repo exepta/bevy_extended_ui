@@ -1993,26 +1993,7 @@ fn apply_style_components(
         }
 
         if let Some(font_family) = style.font_family.as_ref() {
-            let font_path_str = font_family.0.to_string();
-
-            if font_path_str.eq_ignore_ascii_case("default") {
-                tf.font = Default::default();
-            } else if font_path_str.ends_with(".ttf") {
-                tf.font = FontSource::Handle(asset_server.load(font_path_str));
-            } else {
-                let folder = font_path_str.trim().trim_matches('"').trim_matches('\'');
-
-                if folder.is_empty() {
-                    tf.font = Default::default();
-                } else {
-                    let weight_opt = style.font_weight.clone();
-                    tf.font = FontSource::Handle(load_weighted_font_from_folder(
-                        asset_server,
-                        folder,
-                        weight_opt,
-                    ));
-                }
-            }
+            tf.font = resolve_font_source(asset_server, &font_family.0, style.font_weight);
         }
     }
 
@@ -2269,6 +2250,23 @@ fn apply_style_to_node(style: &Style, node: Option<&mut Node>) {
         node.grid_template_columns = style.grid_template_columns.clone().unwrap_or_default();
         node.grid_auto_columns = style.grid_auto_columns.clone().unwrap_or_default();
         node.grid_auto_rows = style.grid_auto_rows.clone().unwrap_or_default();
+    }
+}
+
+/// Resolves local and inherited families identically. A file is not a family
+/// directory: appending a weight filename to it causes repeated failed loads.
+fn resolve_font_source(
+    asset_server: &AssetServer,
+    family: &str,
+    weight: Option<FontWeight>,
+) -> FontSource {
+    let family = family.trim().trim_matches('"').trim_matches('\'');
+    if family.is_empty() || family.eq_ignore_ascii_case("default") {
+        FontSource::default()
+    } else if family.ends_with(".ttf") || family.ends_with(".otf") {
+        FontSource::Handle(asset_server.load(family.to_owned()))
+    } else {
+        FontSource::Handle(load_weighted_font_from_folder(asset_server, family, weight))
     }
 }
 
@@ -2555,23 +2553,14 @@ fn propagate_recursive(
         // (CSS semantics); the local weight then picks the weighted file from
         // the inherited family folder.
         if !has_local_family {
-            if let Some(inherited) = inherited_style {
-                if let Some(family) = &inherited.font_family {
-                    let weight = style_to_propagate
-                        .font_weight
-                        .unwrap_or(FontWeight::Normal);
-                    let folder = &family.0;
-                    let weight_str = weight_token_exact(weight);
-                    let filename = format!("{}-{}.ttf", folder_basename(folder), weight_str);
-                    let full_path = format!("{}/{}", folder, filename);
-
-                    let handle = asset_server.load(full_path);
-                    if let Some(text_font) = text_font_opt.as_mut() {
-                        let font = FontSource::Handle(handle);
-                        if text_font.font != font {
-                            text_font.font = font;
-                        }
-                    }
+            if let (Some(family), Some(text_font)) = (
+                inherited_style.and_then(|style| style.font_family.as_ref()),
+                text_font_opt.as_mut(),
+            ) {
+                let font =
+                    resolve_font_source(asset_server, &family.0, style_to_propagate.font_weight);
+                if text_font.font != font {
+                    text_font.font = font;
                 }
             }
         }
