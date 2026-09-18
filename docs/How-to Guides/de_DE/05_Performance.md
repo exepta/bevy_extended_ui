@@ -9,6 +9,8 @@ Die Optimierungen sind automatisch aktiv und brauchen kein neues Feature-Flag.
 Scroll-Container schreiben Layout, Transformation und geerbte Sichtbarkeit nicht
 mehr in jedem unveraenderten Frame neu. Vererbte `.ttf`- und `.otf`-Pfade werden
 als Font-Dateien geladen, nicht als Verzeichnisse; Nicht-Text-Nodes laden keine Fonts.
+Grid-Tracks akzeptieren auch normalisierte Nullwerte ohne Einheit, damit
+`repeat(6, minmax(0px, 1fr))` bei der CSS-Verarbeitung erhalten bleibt.
 
 ## HTML-Fragmente im Spiel
 
