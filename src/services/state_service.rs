@@ -121,7 +121,17 @@ pub fn update_widget_states(
     }
 }
 
-fn copy_widget_state(target: &mut UIWidgetState, source: &UIWidgetState) {
+fn copy_widget_state(target: &mut Mut<'_, UIWidgetState>, source: &UIWidgetState) {
+    // Parent-only changes (for example `open`) must not dirty bound text and
+    // trigger another CSS/layout pass when none of its inherited flags changed.
+    if target.hovered == source.hovered
+        && target.focused == source.focused
+        && target.readonly == source.readonly
+        && target.disabled == source.disabled
+        && target.checked == source.checked
+    {
+        return;
+    }
     target.hovered = source.hovered;
     target.focused = source.focused;
     target.readonly = source.readonly;
@@ -149,7 +159,9 @@ fn internal_state_check(
         if gen_id.get() == current_state_element.widget_id {
             continue;
         }
-        state.focused = false;
+        if state.focused {
+            state.focused = false;
+        }
     }
 }
 
@@ -229,5 +241,93 @@ fn unfocus_disabled(mut state_query: Query<&mut UIWidgetState, Changed<UIWidgetS
         if widget_state.disabled && widget_state.focused {
             widget_state.focused = false;
         }
+    }
+}
+
+#[cfg(test)]
+mod performance_tests {
+    use super::*;
+
+    #[test]
+    fn focus_changes_do_not_invalidate_unfocused_widgets() {
+        let mut app = App::new();
+        app.init_resource::<CurrentWidgetState>()
+            .add_systems(Update, internal_state_check);
+        let idle: Vec<_> = (0..1000)
+            .map(|_| {
+                app.world_mut()
+                    .spawn((UIWidgetState::default(), UIGenID::default()))
+                    .id()
+            })
+            .collect();
+        let previous = app
+            .world_mut()
+            .spawn((
+                UIWidgetState {
+                    focused: true,
+                    ..default()
+                },
+                UIGenID::default(),
+            ))
+            .id();
+        let current = app
+            .world_mut()
+            .spawn((
+                UIWidgetState {
+                    focused: true,
+                    ..default()
+                },
+                UIGenID::default(),
+            ))
+            .id();
+        app.world_mut()
+            .resource_mut::<CurrentWidgetState>()
+            .widget_id = app.world().get::<UIGenID>(current).unwrap().get();
+        app.world_mut().clear_trackers();
+        app.update();
+        for entity in idle {
+            assert!(
+                !app.world()
+                    .entity(entity)
+                    .get_ref::<UIWidgetState>()
+                    .unwrap()
+                    .is_changed()
+            );
+        }
+        assert!(!app.world().get::<UIWidgetState>(previous).unwrap().focused);
+        assert!(app.world().get::<UIWidgetState>(current).unwrap().focused);
+    }
+
+    #[test]
+    fn bound_state_ignores_parent_only_changes_and_retains_local_flags() {
+        let mut world = World::new();
+        let entity = world
+            .spawn(UIWidgetState {
+                open: true,
+                invalid: true,
+                ..default()
+            })
+            .id();
+        world.clear_trackers();
+        copy_widget_state(
+            &mut world.get_mut::<UIWidgetState>(entity).unwrap(),
+            &UIWidgetState::default(),
+        );
+        assert!(
+            !world
+                .entity(entity)
+                .get_ref::<UIWidgetState>()
+                .unwrap()
+                .is_changed()
+        );
+        copy_widget_state(
+            &mut world.get_mut::<UIWidgetState>(entity).unwrap(),
+            &UIWidgetState {
+                hovered: true,
+                ..default()
+            },
+        );
+        let state = world.get::<UIWidgetState>(entity).unwrap();
+        assert!(state.hovered && state.open && state.invalid);
     }
 }

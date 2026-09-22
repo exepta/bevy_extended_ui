@@ -23,6 +23,10 @@ exclude = [
 name = "bevy_extended_ui"
 path = "src/lib.rs"
 
+[[bench]]
+name = "html_css"
+harness = false
+
 [features]
 default = ["css-breakpoints", "fluent", "providers", "svg", "extended-dialog"]
 css-breakpoints = []

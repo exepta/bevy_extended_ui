@@ -545,33 +545,59 @@ pub fn apply_calc_styles_system(
             viewport,
         };
 
-        apply_calc_length(style.width_calc.as_ref(), ctx_content_w, &mut node.width);
+        // Mutable field access alone marks Node changed in Bevy. Map the fields
+        // without changing their ticks, then notify layout only for new values.
+        apply_calc_length(
+            style.width_calc.as_ref(),
+            ctx_content_w,
+            node.reborrow().map_unchanged(|n| &mut n.width),
+        );
         apply_calc_length(
             style.min_width_calc.as_ref(),
             ctx_content_w,
-            &mut node.min_width,
+            node.reborrow().map_unchanged(|n| &mut n.min_width),
         );
         apply_calc_length(
             style.max_width_calc.as_ref(),
             ctx_content_w,
-            &mut node.max_width,
+            node.reborrow().map_unchanged(|n| &mut n.max_width),
         );
-        apply_calc_length(style.height_calc.as_ref(), ctx_content_h, &mut node.height);
+        apply_calc_length(
+            style.height_calc.as_ref(),
+            ctx_content_h,
+            node.reborrow().map_unchanged(|n| &mut n.height),
+        );
         apply_calc_length(
             style.min_height_calc.as_ref(),
             ctx_content_h,
-            &mut node.min_height,
+            node.reborrow().map_unchanged(|n| &mut n.min_height),
         );
         apply_calc_length(
             style.max_height_calc.as_ref(),
             ctx_content_h,
-            &mut node.max_height,
+            node.reborrow().map_unchanged(|n| &mut n.max_height),
         );
 
-        apply_calc_length(style.left_calc.as_ref(), ctx_box_w, &mut node.left);
-        apply_calc_length(style.right_calc.as_ref(), ctx_box_w, &mut node.right);
-        apply_calc_length(style.top_calc.as_ref(), ctx_box_h, &mut node.top);
-        apply_calc_length(style.bottom_calc.as_ref(), ctx_box_h, &mut node.bottom);
+        apply_calc_length(
+            style.left_calc.as_ref(),
+            ctx_box_w,
+            node.reborrow().map_unchanged(|n| &mut n.left),
+        );
+        apply_calc_length(
+            style.right_calc.as_ref(),
+            ctx_box_w,
+            node.reborrow().map_unchanged(|n| &mut n.right),
+        );
+        apply_calc_length(
+            style.top_calc.as_ref(),
+            ctx_box_h,
+            node.reborrow().map_unchanged(|n| &mut n.top),
+        );
+        apply_calc_length(
+            style.bottom_calc.as_ref(),
+            ctx_box_h,
+            node.reborrow().map_unchanged(|n| &mut n.bottom),
+        );
 
         if let Some(expr) = style.flex_basis_calc.as_ref() {
             let base_main = match node.flex_direction {
@@ -583,7 +609,9 @@ pub fn apply_calc_styles_system(
                 viewport,
             };
             if let Some(px) = expr.eval_length(ctx_main) {
-                node.flex_basis = Val::Px(px);
+                node.reborrow()
+                    .map_unchanged(|n| &mut n.flex_basis)
+                    .set_if_neq(Val::Px(px));
             }
         }
 
@@ -620,10 +648,14 @@ pub fn apply_calc_styles_system(
         }
 
         if let Some(val) = row_gap_val {
-            node.row_gap = val;
+            node.reborrow()
+                .map_unchanged(|n| &mut n.row_gap)
+                .set_if_neq(val);
         }
         if let Some(val) = column_gap_val {
-            node.column_gap = val;
+            node.reborrow()
+                .map_unchanged(|n| &mut n.column_gap)
+                .set_if_neq(val);
         }
     }
 }
@@ -1907,10 +1939,10 @@ fn lerp(from: f32, to: f32, t: f32) -> f32 {
 }
 
 /// Handles `apply_calc_length` in the extended UI workflow.
-fn apply_calc_length(expr: Option<&CalcExpr>, ctx: CalcContext, target: &mut Val) {
+fn apply_calc_length(expr: Option<&CalcExpr>, ctx: CalcContext, mut target: Mut<Val>) {
     if let Some(expr) = expr {
         if let Some(px) = expr.eval_length(ctx) {
-            *target = Val::Px(px);
+            target.set_if_neq(Val::Px(px));
         }
     }
 }
@@ -1961,26 +1993,7 @@ fn apply_style_components(
         }
 
         if let Some(font_family) = style.font_family.as_ref() {
-            let font_path_str = font_family.0.to_string();
-
-            if font_path_str.eq_ignore_ascii_case("default") {
-                tf.font = Default::default();
-            } else if font_path_str.ends_with(".ttf") {
-                tf.font = FontSource::Handle(asset_server.load(font_path_str));
-            } else {
-                let folder = font_path_str.trim().trim_matches('"').trim_matches('\'');
-
-                if folder.is_empty() {
-                    tf.font = Default::default();
-                } else {
-                    let weight_opt = style.font_weight.clone();
-                    tf.font = FontSource::Handle(load_weighted_font_from_folder(
-                        asset_server,
-                        folder,
-                        weight_opt,
-                    ));
-                }
-            }
+            tf.font = resolve_font_source(asset_server, &font_family.0, style.font_weight);
         }
     }
 
@@ -2122,19 +2135,11 @@ fn compute_selector_metadata(selector: &str) -> SelectorMetadata {
         let segments: Vec<&str> = part.split(':').collect();
         let base = segments[0];
 
-        specificity += if base.starts_with('#') {
-            100
-        } else if base.starts_with('.') {
-            10
-        } else if base == "*" || base.is_empty() {
-            0
-        } else {
-            1
-        };
+        specificity += crate::services::css_service::simple_selector_specificity(base);
 
         if segments.len() > 1 {
             has_pseudo = true;
-            specificity += segments.len().saturating_sub(1) as u32;
+            specificity += segments.len().saturating_sub(1) as u32 * 10;
         }
 
         for pseudo in &segments[1..] {
@@ -2237,6 +2242,23 @@ fn apply_style_to_node(style: &Style, node: Option<&mut Node>) {
         node.grid_template_columns = style.grid_template_columns.clone().unwrap_or_default();
         node.grid_auto_columns = style.grid_auto_columns.clone().unwrap_or_default();
         node.grid_auto_rows = style.grid_auto_rows.clone().unwrap_or_default();
+    }
+}
+
+/// Resolves local and inherited families identically. A file is not a family
+/// directory: appending a weight filename to it causes repeated failed loads.
+fn resolve_font_source(
+    asset_server: &AssetServer,
+    family: &str,
+    weight: Option<FontWeight>,
+) -> FontSource {
+    let family = family.trim().trim_matches('"').trim_matches('\'');
+    if family.is_empty() || family.eq_ignore_ascii_case("default") {
+        FontSource::default()
+    } else if family.ends_with(".ttf") || family.ends_with(".otf") {
+        FontSource::Handle(asset_server.load(family.to_owned()))
+    } else {
+        FontSource::Handle(load_weighted_font_from_folder(asset_server, family, weight))
     }
 }
 
@@ -2523,23 +2545,14 @@ fn propagate_recursive(
         // (CSS semantics); the local weight then picks the weighted file from
         // the inherited family folder.
         if !has_local_family {
-            if let Some(inherited) = inherited_style {
-                if let Some(family) = &inherited.font_family {
-                    let weight = style_to_propagate
-                        .font_weight
-                        .unwrap_or(FontWeight::Normal);
-                    let folder = &family.0;
-                    let weight_str = weight_token_exact(weight);
-                    let filename = format!("{}-{}.ttf", folder_basename(folder), weight_str);
-                    let full_path = format!("{}/{}", folder, filename);
-
-                    let handle = asset_server.load(full_path);
-                    if let Some(text_font) = text_font_opt.as_mut() {
-                        let font = FontSource::Handle(handle);
-                        if text_font.font != font {
-                            text_font.font = font;
-                        }
-                    }
+            if let (Some(family), Some(text_font)) = (
+                inherited_style.and_then(|style| style.font_family.as_ref()),
+                text_font_opt.as_mut(),
+            ) {
+                let font =
+                    resolve_font_source(asset_server, &family.0, style_to_propagate.font_weight);
+                if text_font.font != font {
+                    text_font.font = font;
                 }
             }
         }

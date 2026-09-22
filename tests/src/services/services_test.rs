@@ -514,6 +514,34 @@ mod tests {
     }
 
     #[test]
+    fn compound_selector_priority_keeps_scroll_content_visible() {
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, AssetPlugin::default(), CssService))
+            .init_asset::<CssAsset>()
+            .init_asset::<Image>()
+            .init_resource::<ImageCache>()
+            .add_systems(Update, update_widget_styles_system);
+        let sheet = app.world_mut().resource_mut::<Assets<CssAsset>>().add(CssAsset {
+            text: ".hidden { display: none; width: 10px; } div.hidden.content { display: flex; width: 20px; }".into(),
+        });
+        let entity = app
+            .world_mut()
+            .spawn((
+                Node::default(),
+                TagName("div".into()),
+                CssClass(vec!["hidden".into(), "content".into()]),
+                CssSource(vec![sheet]),
+            ))
+            .id();
+        for _ in 0..5 {
+            app.update();
+        }
+        let node = app.world().get::<Node>(entity).unwrap();
+        assert_eq!(node.display, Display::Flex);
+        assert_eq!(node.width, Val::Px(20.));
+    }
+
+    #[test]
     fn css_service_rejects_selectors_with_missing_parts() {
         let id = CssID("main-card".to_string());
         let classes = CssClass(vec!["card".to_string()]);
@@ -757,6 +785,7 @@ mod tests {
     /// whose current style carries a weight), runs propagation, and returns
     /// the asset path of the font resolved onto the child's `TextFont`.
     fn resolved_child_font_path(
+        family: &str,
         parent_weight: Option<FontWeight>,
         child_style: Style,
         child_transition_weight: Option<FontWeight>,
@@ -770,7 +799,7 @@ mod tests {
         app.add_systems(Update, propagate_style_inheritance);
 
         let mut parent_style = Style::default();
-        parent_style.font_family = Some(FontFamily("fonts/Roboto".to_string()));
+        parent_style.font_family = Some(FontFamily(family.to_string()));
         parent_style.font_weight = parent_weight;
         let mut parent_ui = empty_ui_style();
         parent_ui.active_style = Some(parent_style);
@@ -780,10 +809,7 @@ mod tests {
         let mut child_ui = empty_ui_style();
         child_ui.active_style = Some(child_style);
 
-        let child = app
-            .world_mut()
-            .spawn((child_ui, TextFont::default()))
-            .id();
+        let child = app.world_mut().spawn((child_ui, TextFont::default())).id();
 
         if let Some(weight) = child_transition_weight {
             let mut current_style = Style::default();
@@ -824,7 +850,7 @@ mod tests {
         child_style.font_weight = Some(FontWeight::Bold);
 
         assert_eq!(
-            resolved_child_font_path(Some(FontWeight::Normal), child_style, None),
+            resolved_child_font_path("fonts/Roboto", Some(FontWeight::Normal), child_style, None),
             "fonts/Roboto/Roboto-Bold.ttf",
             "inherited family must resolve with the LOCAL font-weight (Bold), not the parent's (Normal)"
         );
@@ -833,7 +859,12 @@ mod tests {
     #[test]
     fn propagate_style_inheritance_inherits_font_family_and_parent_weight_without_local_weight() {
         assert_eq!(
-            resolved_child_font_path(Some(FontWeight::Bold), Style::default(), None),
+            resolved_child_font_path(
+                "fonts/Roboto",
+                Some(FontWeight::Bold),
+                Style::default(),
+                None
+            ),
             "fonts/Roboto/Roboto-Bold.ttf",
             "child without a local font-weight must inherit the parent's weight (Bold), not fall back to Normal"
         );
@@ -842,10 +873,29 @@ mod tests {
     #[test]
     fn propagate_style_inheritance_resolves_inherited_family_with_transition_weight() {
         assert_eq!(
-            resolved_child_font_path(Some(FontWeight::Normal), Style::default(), Some(FontWeight::Bold)),
+            resolved_child_font_path(
+                "fonts/Roboto",
+                Some(FontWeight::Normal),
+                Style::default(),
+                Some(FontWeight::Bold)
+            ),
             "fonts/Roboto/Roboto-Bold.ttf",
             "a font-weight from the child's transition current style must win over the inherited weight"
         );
+    }
+
+    #[test]
+    fn inherited_font_files_are_not_treated_as_family_directories() {
+        for path in ["ui/NotoSans-Regular.ttf", "ui/Display.otf"] {
+            assert_eq!(
+                resolved_child_font_path(path, Some(FontWeight::Bold), Style::default(), None),
+                path
+            );
+            assert_eq!(
+                resolved_child_font_path(&format!("\"{path}\""), None, Style::default(), None),
+                path
+            );
+        }
     }
 
     #[test]

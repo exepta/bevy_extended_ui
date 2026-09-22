@@ -1,10 +1,6 @@
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
-use once_cell::sync::Lazy;
-use std::collections::hash_map::DefaultHasher;
 use std::collections::{HashMap, HashSet};
-use std::hash::{Hash, Hasher};
-use std::sync::RwLock;
 
 use crate::io::CssAsset;
 use crate::styles::components::UiStyle;
@@ -16,19 +12,8 @@ use crate::styles::{
 // Marks entities as needing CSS re-apply on hot reload
 use crate::html::reload::CssDirty;
 
-static PARSED_CSS_CACHE: Lazy<RwLock<HashMap<AssetId<CssAsset>, ParsedCss>>> =
-    Lazy::new(|| RwLock::new(HashMap::new()));
-static ROOT_CSS_VARS_CACHE: Lazy<RwLock<HashMap<AssetId<CssAsset>, HashMap<String, String>>>> =
-    Lazy::new(|| RwLock::new(HashMap::new()));
-static PARSED_CSS_WITH_VARS_CACHE: Lazy<RwLock<HashMap<ParsedCssWithVarsKey, ParsedCss>>> =
-    Lazy::new(|| RwLock::new(HashMap::new()));
-
-/// Represents the `ParsedCssWithVarsKey` data structure used by the extended UI system.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
-struct ParsedCssWithVarsKey {
-    asset_id: AssetId<CssAsset>,
-    vars_hash: u64,
-}
+mod cache;
+use cache::CssCache;
 
 /// Tracks which entities reference which CSS assets.
 #[derive(Resource, Default)]
@@ -89,6 +74,7 @@ impl Plugin for CssService {
     fn build(&self, app: &mut App) {
         app.init_resource::<ExistingCssIDs>();
         app.init_resource::<CssUsers>();
+        app.init_resource::<CssCache>();
         #[cfg(not(all(feature = "wasm-default", target_arch = "wasm32")))]
         app.init_resource::<CssViewportTracker>();
         #[cfg(all(feature = "wasm-default", target_arch = "wasm32"))]
@@ -113,15 +99,6 @@ impl Plugin for CssService {
                 .chain(),
         );
     }
-}
-
-/// Reads a clone from an RwLock-backed cache.
-fn read_cached<K, V>(cache: &RwLock<HashMap<K, V>>, key: &K) -> Option<V>
-where
-    K: Eq + Hash,
-    V: Clone,
-{
-    cache.read().ok().and_then(|map| map.get(key).cloned())
 }
 
 /// Extracts the CSS asset id when the asset event affects content.
@@ -200,127 +177,15 @@ fn apply_entity_style_state(
 }
 
 /// Invalidates cached parsed CSS when assets change.
-fn invalidate_css_cache_on_asset_change(mut ev: MessageReader<AssetEvent<CssAsset>>) {
+fn invalidate_css_cache_on_asset_change(
+    mut ev: MessageReader<AssetEvent<CssAsset>>,
+    mut cache: ResMut<CssCache>,
+) {
     for event in ev.read() {
-        let Some(asset_id) = css_asset_id_from_event(event) else {
-            continue;
-        };
-
-        if let Ok(mut cache) = PARSED_CSS_CACHE.write() {
-            cache.remove(&asset_id);
-        }
-        if let Ok(mut cache) = ROOT_CSS_VARS_CACHE.write() {
-            cache.remove(&asset_id);
-        }
-        if let Ok(mut cache) = PARSED_CSS_WITH_VARS_CACHE.write() {
-            cache.retain(|key, _| key.asset_id != asset_id);
+        if let Some(asset_id) = css_asset_id_from_event(event) {
+            cache.invalidate(asset_id);
         }
     }
-}
-
-/// Handles `get_or_parse_css_by_id` in the extended UI workflow.
-fn get_or_parse_css_by_id(
-    asset_id: AssetId<CssAsset>,
-    css_assets: &Assets<CssAsset>,
-) -> Option<ParsedCss> {
-    if let Some(cached) = read_cached(&PARSED_CSS_CACHE, &asset_id) {
-        return Some(cached);
-    }
-
-    let css_asset = css_assets.get(asset_id)?;
-    let parsed = load_css(&css_asset.text);
-    if let Ok(mut cache) = PARSED_CSS_CACHE.write() {
-        cache.insert(asset_id, parsed.clone());
-    }
-    Some(parsed)
-}
-
-/// Handles `get_or_parse_css` in the extended UI workflow.
-fn get_or_parse_css(handle: &Handle<CssAsset>, css_assets: &Assets<CssAsset>) -> Option<ParsedCss> {
-    get_or_parse_css_by_id(handle.id(), css_assets)
-}
-
-/// Handles `hash_root_vars` in the extended UI workflow.
-fn hash_root_vars(root_vars: &HashMap<String, String>) -> u64 {
-    let mut entries: Vec<(&String, &String)> = root_vars.iter().collect();
-    entries.sort_unstable_by(|(left_key, _), (right_key, _)| left_key.cmp(right_key));
-
-    let mut hasher = DefaultHasher::new();
-    for (key, value) in entries {
-        key.hash(&mut hasher);
-        value.hash(&mut hasher);
-    }
-    hasher.finish()
-}
-
-/// Handles `get_or_collect_root_vars` in the extended UI workflow.
-fn get_or_collect_root_vars(
-    handle: &Handle<CssAsset>,
-    css_assets: &Assets<CssAsset>,
-) -> Option<HashMap<String, String>> {
-    let asset_id = handle.id();
-
-    if let Some(cached) = read_cached(&ROOT_CSS_VARS_CACHE, &asset_id) {
-        return Some(cached);
-    }
-
-    let css_asset = css_assets.get(handle)?;
-    let vars = collect_root_css_vars(&css_asset.text);
-
-    if let Ok(mut cache) = ROOT_CSS_VARS_CACHE.write() {
-        cache.insert(asset_id, vars.clone());
-    }
-
-    Some(vars)
-}
-
-/// Handles `get_or_parse_css_with_root_vars` in the extended UI workflow.
-fn get_or_parse_css_with_root_vars(
-    handle: &Handle<CssAsset>,
-    css_assets: &Assets<CssAsset>,
-    root_vars: &HashMap<String, String>,
-) -> Option<ParsedCss> {
-    if root_vars.is_empty() {
-        return get_or_parse_css(handle, css_assets);
-    }
-
-    let vars_hash = hash_root_vars(root_vars);
-    let cache_key = ParsedCssWithVarsKey {
-        asset_id: handle.id(),
-        vars_hash,
-    };
-
-    if let Some(cached) = read_cached(&PARSED_CSS_WITH_VARS_CACHE, &cache_key) {
-        return Some(cached);
-    }
-
-    let css_asset = css_assets.get(handle)?;
-    let parsed = load_css_with_root_vars(&css_asset.text, root_vars);
-
-    if let Ok(mut cache) = PARSED_CSS_WITH_VARS_CACHE.write() {
-        cache.insert(cache_key, parsed.clone());
-    }
-
-    Some(parsed)
-}
-
-/// Handles `collect_global_root_vars_for_sources` in the extended UI workflow.
-fn collect_global_root_vars_for_sources(
-    sources: &[Handle<CssAsset>],
-    css_assets: &Assets<CssAsset>,
-) -> HashMap<String, String> {
-    let mut vars = HashMap::new();
-
-    for handle in sources {
-        let Some(extracted) = get_or_collect_root_vars(handle, css_assets) else {
-            continue;
-        };
-        for (name, value) in extracted {
-            vars.insert(name, value);
-        }
-    }
-
-    vars
 }
 
 /// Handles `remove_entity_from_css_users` in the extended UI workflow.
@@ -376,6 +241,7 @@ fn update_css_users_index(
 fn mark_css_users_dirty_on_viewport_change(
     mut commands: Commands,
     mut viewport_tracker: ResMut<CssViewportTracker>,
+    mut cache: ResMut<CssCache>,
     window_query: Query<&Window, With<PrimaryWindow>>,
     css_assets: Res<Assets<CssAsset>>,
     css_users: Res<CssUsers>,
@@ -397,7 +263,8 @@ fn mark_css_users_dirty_on_viewport_change(
         // Initial resize tracking warm-up: startup CssSource insertion already triggers CSS apply.
         HashSet::new()
     } else {
-        collect_assets_with_changed_media_matches(
+        collect_assets_with_changed_media_matches_cached(
+            &mut cache,
             &css_users,
             &css_assets,
             prev_viewport,
@@ -477,14 +344,27 @@ pub fn collect_assets_with_changed_media_matches(
     prev_viewport: Vec2,
     next_viewport: Vec2,
 ) -> HashSet<AssetId<CssAsset>> {
+    collect_assets_with_changed_media_matches_cached(
+        &mut CssCache::default(),
+        css_users,
+        css_assets,
+        prev_viewport,
+        next_viewport,
+    )
+}
+
+fn collect_assets_with_changed_media_matches_cached(
+    cache: &mut CssCache,
+    css_users: &CssUsers,
+    css_assets: &Assets<CssAsset>,
+    prev_viewport: Vec2,
+    next_viewport: Vec2,
+) -> HashSet<AssetId<CssAsset>> {
     let mut affected_assets = HashSet::new();
 
     for asset_id in css_users.users.keys().copied() {
-        let Some(parsed) = get_or_parse_css_by_id(asset_id, css_assets) else {
-            continue;
-        };
-
-        let media_changed = parsed.styles.values().any(|style| {
+        let prepared = cache.prepare_ids(vec![asset_id], css_assets);
+        let media_changed = prepared[0].parsed.styles.values().any(|style| {
             let Some(media) = style.media.as_ref() else {
                 return false;
             };
@@ -506,6 +386,7 @@ fn apply_css_to_entities(
 
     css_assets: Res<Assets<CssAsset>>,
     mut css_events: MessageReader<AssetEvent<CssAsset>>,
+    mut cache: ResMut<CssCache>,
     css_users: Res<CssUsers>,
 
     // CHANGED: include entities that got CssDirty added
@@ -533,6 +414,7 @@ fn apply_css_to_entities(
         };
 
         let merged_css = load_and_merge_styles_from_assets(
+            &mut cache,
             &css_source.0,
             &css_assets,
             id,
@@ -570,6 +452,7 @@ fn apply_css_to_entities_legacy(
     mut commands: Commands,
     css_assets: Res<Assets<CssAsset>>,
     mut css_events: MessageReader<AssetEvent<CssAsset>>,
+    mut cache: ResMut<CssCache>,
     css_users: Res<CssUsers>,
     query_changed_source: Query<(Entity, Option<&CssDirty>), CssApplyTrigger>,
     query_all_source: Query<CssSourceEntry<'_>, With<CssSource>>,
@@ -590,6 +473,7 @@ fn apply_css_to_entities_legacy(
         };
 
         let merged_css = load_and_merge_styles_from_assets_legacy(
+            &mut cache,
             &css_source.0,
             &css_assets,
             id,
@@ -640,6 +524,7 @@ fn merge_style_for_selector(
 
 /// Handles `load_and_merge_styles_from_assets_common` in the extended UI workflow.
 fn load_and_merge_styles_from_assets_common(
+    cache: &mut CssCache,
     sources: &[Handle<CssAsset>],
     css_assets: &Assets<CssAsset>,
     id: Option<&CssID>,
@@ -656,16 +541,10 @@ fn load_and_merge_styles_from_assets_common(
 ) -> ParsedCss {
     let mut merged_styles: HashMap<String, StylePair> = HashMap::new();
     let mut merged_keyframes: HashMap<String, Vec<AnimationKeyframe>> = HashMap::new();
-    let global_root_vars = collect_global_root_vars_for_sources(sources, css_assets);
+    let prepared = cache.prepare(sources, css_assets);
 
-    for (index, handle) in sources.iter().enumerate() {
-        let Some(parsed_map) =
-            get_or_parse_css_with_root_vars(handle, css_assets, &global_root_vars)
-        else {
-            continue;
-        };
-
-        for (selector_key, new_style) in parsed_map.styles.iter() {
+    for (index, sheet) in prepared.iter().enumerate() {
+        for (selector_key, new_style, selector_parts) in sheet.candidates(id, class, tag) {
             if let Some(viewport) = viewport {
                 if let Some(media) = &new_style.media {
                     if !media.matches_viewport(viewport) {
@@ -674,19 +553,12 @@ fn load_and_merge_styles_from_assets_common(
                 }
             }
 
-            let selector = if new_style.selector.is_empty() {
-                selector_key.as_str()
-            } else {
-                new_style.selector.as_str()
-            };
-            let selector_parts = parse_selector_steps(selector);
-
-            if matches_selector_chain(&selector_parts, id, class, tag, parent, parent_query) {
+            if matches_selector_chain(selector_parts, id, class, tag, parent, parent_query) {
                 merge_style_for_selector(&mut merged_styles, selector_key, new_style, index);
             }
         }
 
-        for (name, keyframes) in parsed_map.keyframes.iter() {
+        for (name, keyframes) in sheet.parsed.keyframes.iter() {
             merged_keyframes.insert(name.clone(), keyframes.clone());
         }
     }
@@ -699,6 +571,7 @@ fn load_and_merge_styles_from_assets_common(
 
 /// Loads and merges CSS styles from multiple sources with selector matching.
 fn load_and_merge_styles_from_assets(
+    cache: &mut CssCache,
     sources: &[Handle<CssAsset>],
     css_assets: &Assets<CssAsset>,
     id: Option<&CssID>,
@@ -709,6 +582,7 @@ fn load_and_merge_styles_from_assets(
     viewport: Vec2,
 ) -> ParsedCss {
     load_and_merge_styles_from_assets_common(
+        cache,
         sources,
         css_assets,
         id,
@@ -723,6 +597,7 @@ fn load_and_merge_styles_from_assets(
 /// Handles `load_and_merge_styles_from_assets_legacy` in the extended UI workflow.
 #[cfg(all(feature = "wasm-default", target_arch = "wasm32"))]
 fn load_and_merge_styles_from_assets_legacy(
+    cache: &mut CssCache,
     sources: &[Handle<CssAsset>],
     css_assets: &Assets<CssAsset>,
     id: Option<&CssID>,
@@ -732,6 +607,7 @@ fn load_and_merge_styles_from_assets_legacy(
     parent_query: &Query<CssParentSelectorEntry<'_>>,
 ) -> ParsedCss {
     load_and_merge_styles_from_assets_common(
+        cache,
         sources,
         css_assets,
         id,
@@ -881,7 +757,18 @@ pub fn matches_css_selector_token(
 struct SimpleSelectorRequirements<'a> {
     tag: Option<&'a str>,
     id: Option<&'a str>,
+    id_count: u32,
     classes: Vec<&'a str>,
+}
+
+/// Uses the same token grammar for matching and cascade priority. A compound
+/// selector must count every class/ID, not just its first character.
+pub(crate) fn simple_selector_specificity(selector: &str) -> u32 {
+    parse_simple_selector(selector).map_or(0, |requirements| {
+        requirements.id_count * 100
+            + requirements.classes.len() as u32 * 10
+            + u32::from(requirements.tag.is_some_and(|tag| tag != "*"))
+    })
 }
 
 /// Strips pseudo and attribute suffixes from one selector token.
@@ -936,6 +823,9 @@ fn parse_simple_selector(selector: &str) -> Option<SimpleSelectorRequirements<'_
         }
 
         let token = &base[start..i];
+        if prefix == b'#' {
+            requirements.id_count += 1;
+        }
         if prefix == b'.' {
             requirements.classes.push(token);
         } else if let Some(existing) = requirements.id {

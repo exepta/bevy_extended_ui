@@ -1449,9 +1449,52 @@ fn collect_html_ids(nodes: &Vec<HtmlWidgetNode>, ids: &mut Vec<HtmlID>) {
 fn spawn_widget_node(
     commands: &mut Commands,
     node: &HtmlWidgetNode,
-    asset_server: &AssetServer,
+    _asset_server: &AssetServer,
     parent: Option<Entity>,
     start_hidden: bool,
+) -> Entity {
+    spawn_widget_node_with_visitor(commands, node, parent, start_hidden, &mut |_, _, _| {})
+}
+
+/// Mounts a parsed fragment using the normal widget builder. The visitor runs
+/// once per node (children first), allowing hosts to attach game-specific ECS
+/// components without recreating HTML parsing or widget construction.
+///
+/// Parse each instance separately with [`super::converter::parse_html_fragment`]
+/// so widget IDs remain unique. Widget initialization and CSS application still
+/// run in their normal schedules; do not replace their layout components here.
+/// Mounted fragments are owned by the caller, not the active-document diff.
+/// Their document-local `HtmlID`s are therefore removed to avoid collisions
+/// between independently parsed fragments.
+pub fn mount_html_fragment(
+    commands: &mut Commands,
+    nodes: &[HtmlWidgetNode],
+    parent: Option<Entity>,
+    visitor: &mut impl FnMut(&mut Commands, Entity, &HtmlWidgetNode),
+) -> Vec<Entity> {
+    nodes
+        .iter()
+        .map(|node| {
+            spawn_widget_node_with_visitor(
+                commands,
+                node,
+                parent,
+                false,
+                &mut |commands, entity, node| {
+                    commands.entity(entity).remove::<HtmlID>();
+                    visitor(commands, entity, node);
+                },
+            )
+        })
+        .collect()
+}
+
+fn spawn_widget_node_with_visitor(
+    commands: &mut Commands,
+    node: &HtmlWidgetNode,
+    parent: Option<Entity>,
+    start_hidden: bool,
+    visitor: &mut impl FnMut(&mut Commands, Entity, &HtmlWidgetNode),
 ) -> Entity {
     let entity = match node {
         HtmlWidgetNode::Body(body, meta, states, children, functions, widget, id) => {
@@ -1467,12 +1510,12 @@ fn spawn_widget_node(
             );
             for child in children {
                 let child_start_hidden = start_hidden;
-                spawn_widget_node(
+                spawn_widget_node_with_visitor(
                     commands,
                     child,
-                    asset_server,
                     Some(entity),
                     child_start_hidden,
+                    visitor,
                 );
             }
             entity
@@ -1546,12 +1589,12 @@ fn spawn_widget_node(
             );
             for child in children {
                 let child_start_hidden = start_hidden;
-                spawn_widget_node(
+                spawn_widget_node_with_visitor(
                     commands,
                     child,
-                    asset_server,
                     Some(entity),
                     child_start_hidden,
+                    visitor,
                 );
             }
             entity
@@ -1569,12 +1612,12 @@ fn spawn_widget_node(
             );
             for child in children {
                 let child_start_hidden = start_hidden;
-                spawn_widget_node(
+                spawn_widget_node_with_visitor(
                     commands,
                     child,
-                    asset_server,
                     Some(entity),
                     child_start_hidden,
+                    visitor,
                 );
             }
             entity
@@ -1592,12 +1635,12 @@ fn spawn_widget_node(
             );
             for child in children {
                 let child_start_hidden = start_hidden;
-                spawn_widget_node(
+                spawn_widget_node_with_visitor(
                     commands,
                     child,
-                    asset_server,
                     Some(entity),
                     child_start_hidden,
+                    visitor,
                 );
             }
             entity
@@ -1615,12 +1658,12 @@ fn spawn_widget_node(
             );
             for child in children {
                 let child_start_hidden = start_hidden;
-                spawn_widget_node(
+                spawn_widget_node_with_visitor(
                     commands,
                     child,
-                    asset_server,
                     Some(entity),
                     child_start_hidden,
+                    visitor,
                 );
             }
             entity
@@ -1640,12 +1683,12 @@ fn spawn_widget_node(
             commands.entity(entity).insert(NeedHidden);
             for child in children {
                 let child_start_hidden = start_hidden;
-                spawn_widget_node(
+                spawn_widget_node_with_visitor(
                     commands,
                     child,
-                    asset_server,
                     Some(entity),
                     child_start_hidden,
+                    visitor,
                 );
             }
             entity
@@ -1673,12 +1716,12 @@ fn spawn_widget_node(
             );
             for child in children {
                 let child_start_hidden = start_hidden;
-                spawn_widget_node(
+                spawn_widget_node_with_visitor(
                     commands,
                     child,
-                    asset_server,
                     Some(entity),
                     child_start_hidden,
+                    visitor,
                 );
             }
             entity
@@ -1844,6 +1887,8 @@ fn spawn_widget_node(
     }
 
     commands.entity(entity).insert(get_node_kind(node));
+
+    visitor(commands, entity, node);
 
     entity
 }

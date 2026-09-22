@@ -68,3 +68,6 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: HTML and CSS benchmark smoke test
+        run: cargo bench --bench html_css --profile dev --features extended-framework -- --smoke
