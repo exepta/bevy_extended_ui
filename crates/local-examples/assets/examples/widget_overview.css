@@ -89,6 +89,39 @@ body {
     gap: 10px;
 }
 
+.demo-table {
+    width: 100%;
+    gap: 4px;
+}
+
+.demo-table > th,
+.demo-table > td {
+    height: 34px;
+    border-radius: 6px;
+    background: #2a3247;
+    text-wrap: nowrap;
+}
+
+.demo-table > th {
+    background: #343d57;
+}
+
+.demo-table > .thead {
+    background: #3d4766;
+    color: #cdd6f4;
+}
+
+.demo-table > .tfoot {
+    background: #232a3d;
+    color: #8b93a7;
+}
+
+.demo-table > td > button {
+    width: 100%;
+    min-width: 0;
+    height: 28px;
+}
+
 .widget-card > form > input,
 .widget-card > form > button {
     width: 100%;

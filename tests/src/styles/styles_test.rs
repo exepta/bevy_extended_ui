@@ -54,6 +54,24 @@ mod tests {
     }
 
     #[test]
+    fn css_metadata_equality_helpers_work() {
+        assert_eq!(
+            CssClass(vec!["button".to_string(), "primary".to_string()]),
+            CssClass(vec!["button".to_string(), "primary".to_string()])
+        );
+        assert_ne!(
+            CssClass(vec!["button".to_string()]),
+            CssClass(vec!["card".to_string()])
+        );
+
+        assert_eq!(CssID("submit".to_string()), CssID("submit".to_string()));
+        assert_ne!(CssID("submit".to_string()), CssID("cancel".to_string()));
+
+        assert_eq!(CssSource::default(), CssSource::default());
+        assert_ne!(IconPlace::Left, IconPlace::Right);
+    }
+
+    #[test]
     fn radius_all_sets_all_corners() {
         let radius = Radius::all(Val::Px(8.0));
         assert_eq!(radius.top_left, Val::Px(8.0));

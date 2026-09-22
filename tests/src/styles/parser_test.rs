@@ -8,6 +8,38 @@ mod tests {
     use std::collections::HashMap;
 
     #[test]
+    fn grid_repeat_tracks_survive_css_normalization() {
+        let fractional = load_css(".grid { grid-template-columns: repeat(6, 1fr); }");
+        assert!(
+            fractional
+                .styles
+                .values()
+                .next()
+                .unwrap()
+                .normal
+                .grid_template_columns
+                .is_some()
+        );
+        let parsed = load_css(
+            ".grid { display: grid; grid-template-columns: repeat(6, minmax(0px, 1fr)); grid-template-rows: repeat(8, 68px); }",
+        );
+        let style = &parsed
+            .styles
+            .values()
+            .find(|pair| pair.selector == ".grid")
+            .unwrap()
+            .normal;
+        assert_eq!(
+            style.grid_template_columns,
+            Some(RepeatedGridTrack::flex::<Vec<_>>(6, 1.))
+        );
+        assert_eq!(
+            style.grid_template_rows,
+            Some(RepeatedGridTrack::px::<Vec<_>>(8, 68.))
+        );
+    }
+
+    #[test]
     fn keeps_base_and_media_variants_for_same_selector() {
         let parsed = load_css(
             r#"

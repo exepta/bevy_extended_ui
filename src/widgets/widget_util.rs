@@ -266,13 +266,48 @@ pub(crate) fn set_scrollbar_display_and_visibility<T>(
     if let Ok(mut visibility) = scrollbar_visibility_query.get_mut(**scrollbar_owner) {
         let want_visible = max_scroll > 0.5;
         let next_visibility = if want_visible {
-            Visibility::Visible
+            // A scroll range does not override a hidden owning window or tab.
+            Visibility::Inherited
         } else {
             Visibility::Hidden
         };
         if *visibility != next_visibility {
             *visibility = next_visibility;
         }
+    }
+}
+
+#[cfg(test)]
+mod visibility_tests {
+    use super::*;
+
+    #[derive(Deref)]
+    struct Owner(Entity);
+
+    #[test]
+    fn overflowing_scrollbar_inherits_the_owning_windows_visibility() {
+        let mut app = App::new();
+        let bar = app
+            .world_mut()
+            .spawn((Node::default(), Scrollbar::default(), Visibility::Hidden))
+            .id();
+        app.add_systems(
+            Update,
+            move |mut nodes: Query<&mut Node, With<Scrollbar>>,
+                  mut visibility: Query<&mut Visibility, With<Scrollbar>>| {
+                set_scrollbar_display_and_visibility(
+                    &mut nodes,
+                    &mut visibility,
+                    &Owner(bar),
+                    100.,
+                );
+            },
+        );
+        app.update();
+        assert_eq!(
+            *app.world().get::<Visibility>(bar).unwrap(),
+            Visibility::Inherited
+        );
     }
 }
 

@@ -29,6 +29,7 @@ ignore:
   # Services: heavy runtime styling pipeline remains excluded until dedicated tests exist.
   - "src/services/mod.rs"
   - "src/services/style_service.rs"
+  - "src/services/style_service/**"
   - "src/services/css_service.rs"
   # Large CSS parser pipeline still needs dedicated high-volume fixture tests.
   - "src/styles/parser.rs"

@@ -72,6 +72,47 @@ When a child `<button type="submit">` is clicked, the form:
 
 ---
 
+## Table (`Table` / `TableCell`)
+
+**Struct purpose:** HTML-formatted table laid out as a CSS Grid. `Table` is the grid
+container and stores the auto-derived `columns` count (the widest row). Each `<th>`/`<td>`
+becomes a `TableCell` grid item carrying its zero-based `row`/`col`, a `header` flag, and
+its origin `section` (`Head`/`Body`/`Foot`).
+
+`<tr>` is **flattened**: it produces no entity. Instead, each cell is stamped with its
+row index and placed directly in the table grid via `grid_row`/`grid_column`. Cells are
+full containers — they may hold any nested widgets (text, button, img, div, …).
+
+The default column template is `repeat(N, 1fr)` (N = `columns`), applied after the style
+pass only when the author left `grid-template-columns` unset, so author CSS always wins.
+Section wrappers (`<thead>`/`<tbody>`/`<tfoot>`, plus the `<tbody>` the `kuchiki` HTML5
+parser implicitly wraps around bare `<tr>` rows) produce no entity, but each cell records which
+section it came from: its `TableCell.section` is set, and a matching CSS class
+(`thead`/`tbody`/`tfoot`) is stamped on the cell so author rules can target header,
+body, or footer rows (e.g. `.thead { font-weight: 700; }`, `td.tfoot { ... }`). Cells
+render in source order — sections are not reordered, and `colspan`/`rowspan` are not
+supported.
+
+**HTML tag:**
+```html
+<table>
+  <thead>
+    <tr><th>Name</th><th>Action</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Alice</td>
+      <td><button onclick="edit_row">Edit</button></td>
+    </tr>
+  </tbody>
+  <tfoot>
+    <tr><td>Total: 1</td><td></td></tr>
+  </tfoot>
+</table>
+```
+
+---
+
 ## Button (`Button`)
 
 **Struct purpose:** Clickable button with text plus an optional icon and its placement. Supports `type="button|submit|reset"` (`Auto` when omitted).

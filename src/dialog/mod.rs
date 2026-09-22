@@ -1987,6 +1987,7 @@ mod tests {
                 },
                 Press {
                     button: PointerButton::Primary,
+                    count: 1,
                     hit: HitData {
                         camera: Entity::PLACEHOLDER,
                         depth: 0.0,
@@ -2073,6 +2074,7 @@ mod tests {
                 },
                 Press {
                     button: PointerButton::Primary,
+                    count: 1,
                     hit: HitData {
                         camera: Entity::PLACEHOLDER,
                         depth: 0.0,

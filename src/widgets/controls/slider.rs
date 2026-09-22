@@ -3,6 +3,7 @@ use bevy::ecs::query::QueryFilter;
 use bevy::prelude::*;
 use bevy::ui::RelativeCursorPosition;
 use bevy::window::PrimaryWindow;
+use std::collections::HashMap;
 
 use crate::styles::components::UiStyle;
 use crate::styles::paint::Colored;
@@ -99,6 +100,14 @@ struct SliderNeedInit;
 #[derive(Component)]
 pub struct SliderUserChanged;
 
+/// Marker inserted for high-frequency slider drag updates.
+#[derive(Component)]
+pub(crate) struct SliderLiveChanged;
+
+/// Marker inserted when a slider drag has committed its final value.
+#[derive(Component)]
+pub(crate) struct SliderChangeCommitted;
+
 /// Plugin that registers slider widget behavior.
 pub struct SliderWidget;
 
@@ -191,6 +200,7 @@ fn internal_node_creation_system(
                     .insert(ImageNode::default())
                     .observe(on_track_click)
                     .observe(on_track_drag)
+                    .observe(on_track_drag_end)
                     .with_children(|builder| {
                         if let Some(requested_segments) = slider.dots.filter(|v| *v > 0) {
                             let segments = effective_dot_segments(slider, requested_segments);
@@ -373,6 +383,7 @@ fn spawn_thumb(
             ),
         ))
         .observe(on_thumb_drag)
+        .observe(on_thumb_drag_end)
         .observe(on_thumb_click)
         .observe(on_thumb_over)
         .observe(on_thumb_out)
@@ -512,6 +523,8 @@ fn on_track_click(
         &thumb_size_q,
         &mut fill_q,
         &mut thumb_q,
+        true,
+        false,
     );
 
     trigger.propagate(false);
@@ -557,7 +570,23 @@ fn on_track_drag(
         &thumb_size_q,
         &mut fill_q,
         &mut thumb_q,
+        true,
+        true,
     );
+
+    trigger.propagate(false);
+}
+
+/// Emits a committed change after track dragging ends.
+fn on_track_drag_end(
+    mut trigger: On<Pointer<DragEnd>>,
+    mut commands: Commands,
+    track_q: Query<&BindToID, With<SliderTrackContainer>>,
+    slider_q: Query<(Entity, &UIGenID), With<Slider>>,
+) {
+    if let Ok(bind) = track_q.get(trigger.entity) {
+        mark_slider_user_changed(bind.0, &mut commands, &slider_q);
+    }
 
     trigger.propagate(false);
 }
@@ -588,6 +617,8 @@ fn apply_from_track_pointer(
         ),
         (With<SliderThumb>, Without<SliderTrackFill>),
     >,
+    emit_change: bool,
+    live_change: bool,
 ) {
     let Ok((track_node, bind, rel)) = track_q.get(track_entity) else {
         return;
@@ -623,6 +654,8 @@ fn apply_from_track_pointer(
         slider_query,
         fill_q,
         thumb_q,
+        emit_change,
+        live_change,
     );
 }
 
@@ -700,9 +733,29 @@ fn on_thumb_drag(
         &mut slider_q,
         &mut fill_q,
         &mut thumb_q,
+        true,
+        true,
     );
 
     // Prevent thumb drags from bubbling to the track drag observer.
+    event.propagate(false);
+}
+
+/// Emits a committed change after thumb dragging ends.
+fn on_thumb_drag_end(
+    mut event: On<Pointer<DragEnd>>,
+    parent_q: Query<&ChildOf>,
+    track_q: Query<&BindToID, With<SliderTrackContainer>>,
+    mut commands: Commands,
+    slider_q: Query<(Entity, &UIGenID), With<Slider>>,
+) {
+    let Ok(parent) = parent_q.get(event.entity) else {
+        return;
+    };
+    if let Ok(bind) = track_q.get(parent.parent()) {
+        mark_slider_user_changed(bind.0, &mut commands, &slider_q);
+    }
+
     event.propagate(false);
 }
 
@@ -750,6 +803,8 @@ fn apply_from_track_left_x(
         ),
         (With<SliderThumb>, Without<SliderTrackFill>),
     >,
+    emit_change: bool,
+    live_change: bool,
 ) {
     for (entity, mut slider, ui_id) in slider_q.iter_mut() {
         if ui_id.0 != target_ui_id {
@@ -819,10 +874,29 @@ fn apply_from_track_left_x(
             thumb_q,
         );
 
-        if PreviousSliderState::from_slider(&slider) != before {
-            commands.entity(entity).insert(SliderUserChanged);
+        if emit_change && PreviousSliderState::from_slider(&slider) != before {
+            if live_change {
+                commands
+                    .entity(entity)
+                    .insert((SliderUserChanged, SliderLiveChanged));
+            } else {
+                commands.entity(entity).insert(SliderUserChanged);
+            }
         }
         break;
+    }
+}
+
+fn mark_slider_user_changed(
+    target_ui_id: usize,
+    commands: &mut Commands,
+    slider_q: &Query<(Entity, &UIGenID), With<Slider>>,
+) {
+    if let Some((entity, _)) = slider_q.iter().find(|(_, ui_id)| ui_id.0 == target_ui_id) {
+        commands
+            .entity(entity)
+            .insert((SliderUserChanged, SliderChangeCommitted))
+            .remove::<SliderLiveChanged>();
     }
 }
 
@@ -1005,6 +1079,8 @@ fn detect_change_slider_values(
         return;
     };
     let sf = window.scale_factor() * ui_scale.0;
+    let track_widths = collect_bound_widths(&track_q, sf);
+    let thumb_widths = collect_bound_widths(&thumb_size_q, sf);
 
     let shift = keyboard.pressed(KeyCode::ShiftLeft) || keyboard.pressed(KeyCode::ShiftRight);
 
@@ -1053,8 +1129,8 @@ fn detect_change_slider_values(
         }
         *prev = next_state;
 
-        let track_width = find_bound_width(ui_id.0, &track_q, sf).unwrap_or(0.0);
-        let Some(thumb_width) = find_bound_width(ui_id.0, &thumb_size_q, sf) else {
+        let track_width = track_widths.get(&ui_id.0).copied().unwrap_or(0.0);
+        let Some(thumb_width) = thumb_widths.get(&ui_id.0).copied() else {
             continue;
         };
         if track_width <= 1.0 || thumb_width <= 1.0 {
@@ -1110,6 +1186,8 @@ fn initialize_slider_visual_state(
         return;
     };
     let sf = window.scale_factor() * ui_scale.0;
+    let track_widths = collect_bound_widths(&track_q, sf);
+    let thumb_widths = collect_bound_widths(&thumb_size_q, sf);
 
     for (entity, mut slider, ui_id, needs, mut layout_cache) in slider_q.iter_mut() {
         if needs.is_none() {
@@ -1118,8 +1196,8 @@ fn initialize_slider_visual_state(
 
         sanitize_slider(&mut slider);
 
-        let track_width = find_bound_width(ui_id.0, &track_q, sf).unwrap_or(0.0);
-        let Some(thumb_width) = find_bound_width(ui_id.0, &thumb_size_q, sf) else {
+        let track_width = track_widths.get(&ui_id.0).copied().unwrap_or(0.0);
+        let Some(thumb_width) = thumb_widths.get(&ui_id.0).copied() else {
             continue;
         };
         if track_width <= 1.0 || thumb_width <= 1.0 {
@@ -1167,10 +1245,12 @@ fn sync_slider_layout_changes(
         return;
     };
     let sf = window.scale_factor() * ui_scale.0;
+    let track_widths = collect_bound_widths(&track_q, sf);
+    let thumb_widths = collect_bound_widths(&thumb_size_q, sf);
 
     for (mut slider, ui_id, mut layout_cache) in slider_q.iter_mut() {
-        let track_width = find_bound_width(ui_id.0, &track_q, sf).unwrap_or(0.0);
-        let Some(thumb_width) = find_bound_width(ui_id.0, &thumb_size_q, sf) else {
+        let track_width = track_widths.get(&ui_id.0).copied().unwrap_or(0.0);
+        let Some(thumb_width) = thumb_widths.get(&ui_id.0).copied() else {
             continue;
         };
         if track_width <= 1.0 || thumb_width <= 1.0 {
@@ -1353,6 +1433,19 @@ where
         .iter()
         .find(|(_, bind)| bind.0 == ui_id)
         .map(|(computed, _)| computed.size().x / scale_factor)
+}
+
+fn collect_bound_widths<Q>(
+    query: &Query<(&ComputedNode, &BindToID), Q>,
+    scale_factor: f32,
+) -> HashMap<usize, f32>
+where
+    Q: QueryFilter,
+{
+    query
+        .iter()
+        .map(|(computed, bind)| (bind.0, computed.size().x / scale_factor))
+        .collect()
 }
 
 /// Returns true if the slider is disabled.

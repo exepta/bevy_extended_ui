@@ -220,10 +220,6 @@ fn ensure_div_scroll_structure(
 
             content_entity
         };
-        commands
-            .entity(content_entity)
-            .insert(BindToID(ui_id.get()));
-
         let mut sb_y_entity = sb_y_opt.map(|s| **s);
         let mut sb_x_entity = sb_x_opt.map(|s| **s);
 
@@ -333,8 +329,7 @@ fn ensure_div_scroll_structure(
             let sb_y = sb_y_opt.map(|s| **s);
             let sb_x = sb_x_opt.map(|s| **s);
 
-            let list: Vec<Entity> = children.iter().clone().collect();
-            for child in list {
+            for child in children.iter() {
                 if child == content_entity {
                     continue;
                 }
@@ -354,7 +349,11 @@ fn ensure_div_scroll_structure(
 
         // 3b) Ensure the div's direct children order keeps scroll content first
         // This mirrors the manual reordering workaround observed in the inspector.
-        if let Some(children) = children_opt {
+        if let Some(children) = children_opt.filter(|children| {
+            !children.iter().eq(std::iter::once(content_entity)
+                .chain(sb_y_entity)
+                .chain(sb_x_entity))
+        }) {
             let mut rest: Vec<Entity> = children
                 .iter()
                 .clone()
@@ -381,23 +380,34 @@ fn ensure_div_scroll_structure(
         }
 
         // Wrapper clips but does not scroll
-        div_node.overflow.y = OverflowAxis::Clip;
-        div_node.overflow.x = OverflowAxis::Clip;
+        div_node
+            .reborrow()
+            .map_unchanged(|node| &mut node.overflow)
+            .set_if_neq(Overflow::clip());
 
         // Ensure content scroll flags stay aligned
         if let Ok(mut node) = content_node_q.get_mut(content_entity) {
-            node.overflow.y = if wants_scroll_y {
+            let y = if wants_scroll_y {
                 OverflowAxis::Scroll
             } else {
                 OverflowAxis::Hidden
             };
-            node.overflow.x = if wants_scroll_x {
+            let x = if wants_scroll_x {
                 OverflowAxis::Scroll
             } else {
                 OverflowAxis::Hidden
             };
-            node.width = Val::Percent(100.0);
-            node.height = Val::Percent(100.0);
+            // Touch only fields that actually changed. Otherwise Bevy rebuilds
+            // layout for every scroll view even when the interface is idle.
+            node.reborrow()
+                .map_unchanged(|node| &mut node.overflow)
+                .set_if_neq(Overflow { x, y });
+            node.reborrow()
+                .map_unchanged(|node| &mut node.width)
+                .set_if_neq(Val::Percent(100.0));
+            node.reborrow()
+                .map_unchanged(|node| &mut node.height)
+                .set_if_neq(Val::Percent(100.0));
         }
 
         if has_scroll_pos_q.get(content_entity).is_err() {
@@ -406,12 +416,64 @@ fn ensure_div_scroll_structure(
                 .insert(ScrollPosition::default());
         }
 
-        commands.entity(content_entity).insert((
-            Transform::default(),
-            GlobalTransform::default(),
-            Visibility::Inherited,
-            InheritedVisibility::default(),
-        ));
+        // Required transforms and visibility are installed at creation. Resetting
+        // them here would invalidate propagation and overwrite computed visibility.
+    }
+}
+
+#[cfg(test)]
+mod performance_tests {
+    use super::*;
+
+    #[test]
+    fn idle_scroll_structure_does_not_invalidate_layout_or_visibility() {
+        let mut app = App::new();
+        app.add_systems(Update, ensure_div_scroll_structure);
+        let root = app
+            .world_mut()
+            .spawn((
+                Div::default(),
+                DivBase,
+                UIGenID::default(),
+                Node {
+                    overflow: Overflow::scroll_y(),
+                    ..default()
+                },
+            ))
+            .id();
+        app.update();
+        app.update();
+        let content = app.world().get::<DivContentRoot>(root).unwrap().0;
+        app.world_mut().clear_trackers();
+        app.update();
+        assert!(
+            !app.world()
+                .entity(root)
+                .get_ref::<Node>()
+                .unwrap()
+                .is_changed()
+        );
+        assert!(
+            !app.world()
+                .entity(content)
+                .get_ref::<Node>()
+                .unwrap()
+                .is_changed()
+        );
+        assert!(
+            !app.world()
+                .entity(content)
+                .get_ref::<InheritedVisibility>()
+                .unwrap()
+                .is_changed()
+        );
+        assert!(
+            !app.world()
+                .entity(content)
+                .get_ref::<Transform>()
+                .unwrap()
+                .is_changed()
+        );
     }
 }
 

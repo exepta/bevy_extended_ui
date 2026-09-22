@@ -24,17 +24,17 @@ pub struct ExistingCssIDs(pub HashSet<String>);
 pub struct TagName(pub String);
 
 /// Component representing one or more CSS classes applied to an element.
-#[derive(Component, Reflect, Debug, Clone)]
+#[derive(Component, Reflect, Debug, Clone, PartialEq, Eq)]
 #[reflect(Component)]
 pub struct CssClass(pub Vec<String>);
 
 /// Component representing the CSS ID of an element.
-#[derive(Component, Reflect, Debug, Clone)]
+#[derive(Component, Reflect, Debug, Clone, PartialEq, Eq)]
 #[reflect(Component)]
 pub struct CssID(pub String);
 
 /// Component that stores one or more CSS asset handles for an entity.
-#[derive(Component, Reflect, Debug, Clone, Default)]
+#[derive(Component, Reflect, Debug, Clone, Default, PartialEq)]
 #[reflect(Component)]
 pub struct CssSource(pub Vec<Handle<CssAsset>>);
 
@@ -283,7 +283,7 @@ impl FontWeight {
 }
 
 /// Placement of an icon relative to text.
-#[derive(Reflect, Debug, Clone, Copy, PartialEq)]
+#[derive(Reflect, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IconPlace {
     /// Variant `Left`.
     Left,

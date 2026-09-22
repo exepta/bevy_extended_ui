@@ -13,6 +13,8 @@ pub static UI_ID_GENERATE: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool:
 pub static BODY_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
 pub static DIV_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
 pub static FORM_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
+pub static TABLE_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
+pub static TABLE_CELL_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
 pub static BUTTON_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
 pub static CHECK_BOX_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
 pub static CHOICE_BOX_ID_POOL: Lazy<Mutex<IdPool>> = Lazy::new(|| Mutex::new(IdPool::new()));
@@ -576,6 +578,8 @@ fn despawn_widget_ids(
                 WidgetKind::Body => BODY_ID_POOL.lock().unwrap().release(widget_id.id),
                 WidgetKind::Div => DIV_ID_POOL.lock().unwrap().release(widget_id.id),
                 WidgetKind::Form => FORM_ID_POOL.lock().unwrap().release(widget_id.id),
+                WidgetKind::Table => TABLE_ID_POOL.lock().unwrap().release(widget_id.id),
+                WidgetKind::TableCell => TABLE_CELL_ID_POOL.lock().unwrap().release(widget_id.id),
                 WidgetKind::Headline => HEADLINE_ID_POOL.lock().unwrap().release(widget_id.id),
                 WidgetKind::HyperLink => HYPER_LINK_ID_POOL.lock().unwrap().release(widget_id.id),
                 WidgetKind::Paragraph => PARAGRAPH_ID_POOL.lock().unwrap().release(widget_id.id),

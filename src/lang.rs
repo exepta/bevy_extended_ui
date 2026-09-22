@@ -561,7 +561,7 @@ pub fn shared_values_fingerprint(shared: &UiSharedValues) -> u64 {
     hasher.finish()
 }
 
-/// Refreshes all shared typed values from macro-generated registrations.
+/// Refreshes shared values from registrations and framework stores atomically.
 pub fn refresh_shared_values(world: &mut World) {
     let mut values: HashMap<String, JsonValue> = HashMap::new();
     let mut aliases: HashMap<String, String> = HashMap::new();
@@ -595,6 +595,14 @@ pub fn refresh_shared_values(world: &mut World) {
             values.insert((*path).to_string(), value.clone());
             values.insert((*name).to_string(), value);
         }
+    }
+
+    // Compare the complete snapshot once. Clearing store values here and adding
+    // them again afterward would mark unchanged templates dirty every frame.
+    #[cfg(feature = "extended-framework")]
+    if let Some(store) = world.get_resource::<crate::framework::UiBindingStore>() {
+        known_types.extend(store.known_types().map(str::to_owned));
+        values.extend(store.template_values());
     }
 
     let mut shared = world.resource_mut::<UiSharedValues>();

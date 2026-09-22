@@ -3585,6 +3585,8 @@ pub fn convert_to_bevy_grid_template(value: String) -> Option<Vec<RepeatedGridTr
 fn parse_single_grid_track(input: &str) -> Option<GridTrack> {
     let input = input.trim();
     match input {
+        // CSS serializers remove length units from zero, including inside minmax.
+        "0" => Some(GridTrack::px(0.0)),
         "auto" => Some(GridTrack::auto()),
         "min-content" => Some(GridTrack::min_content()),
         "max-content" => Some(GridTrack::max_content()),
@@ -3626,6 +3628,7 @@ fn parse_single_grid_track(input: &str) -> Option<GridTrack> {
 /// Parses a minimum track sizing function.
 fn parse_min_sizing(input: &str) -> Option<MinTrackSizingFunction> {
     match input {
+        "0" => Some(MinTrackSizingFunction::Px(0.0)),
         "auto" => Some(MinTrackSizingFunction::Auto),
         "min-content" => Some(MinTrackSizingFunction::MinContent),
         "max-content" => Some(MinTrackSizingFunction::MaxContent),
@@ -3660,6 +3663,7 @@ fn parse_min_sizing(input: &str) -> Option<MinTrackSizingFunction> {
 /// Parses a maximum track sizing function.
 fn parse_max_sizing(input: &str) -> Option<MaxTrackSizingFunction> {
     match input {
+        "0" => Some(MaxTrackSizingFunction::Px(0.0)),
         "auto" => Some(MaxTrackSizingFunction::Auto),
         "min-content" => Some(MaxTrackSizingFunction::MinContent),
         "max-content" => Some(MaxTrackSizingFunction::MaxContent),

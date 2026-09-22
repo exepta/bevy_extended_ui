@@ -148,6 +148,29 @@ fieldset {
     gap: 5px;
 }
 
+/* Table */
+
+table {
+    display: grid;
+    gap: 1px;
+    min-width: 200px;
+}
+
+th {
+    display: flex;
+    align-items: center;
+    padding: 6px 10px;
+    font-weight: 700;
+    color: var(--headline);
+}
+
+td {
+    display: flex;
+    align-items: center;
+    padding: 6px 10px;
+    color: var(--text-color);
+}
+
 /* Image */
 img {
     width: 100%;

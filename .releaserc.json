@@ -9,7 +9,7 @@
     ],
     "plugins": [
         [
-            "@semantic-release/commit-analyzer",
+            "./scripts/semantic-release-branch-analyzer.cjs",
             {
                 "preset": "conventionalcommits",
                 "parserOpts": {

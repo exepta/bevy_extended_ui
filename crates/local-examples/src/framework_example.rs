@@ -1,8 +1,10 @@
 #[cfg(feature = "extended-framework")]
 use bevy::asset::{AssetMetaCheck, AssetPlugin};
+#[cfg(feature = "extended-framework")]
 use bevy::prelude::*;
 #[cfg(feature = "extended-framework")]
 use bevy_extended_ui::framework::ExtendedFrameworkConfiguration;
+#[cfg(feature = "extended-framework")]
 use bevy_extended_ui::{ExtendedCam, ExtendedUiConfiguration, ExtendedUiPlugin};
 
 #[cfg(feature = "extended-framework")]

@@ -353,6 +353,16 @@ Tracks support:
 
 `grid-auto-rows` / `grid-auto-columns` accept a list of tracks (space-separated).
 
+### Tables
+
+`<table>` is a CSS Grid (`display: grid`), so it needs **no new properties** — the grid
+properties above already style it. The default column template is `repeat(N, 1fr)` where
+`N` is the widest row's cell count; set `grid-template-columns` on a `table` selector to
+override it. Style cells with `th`/`td` (or class/id) selectors. `<tr>` is flattened to a
+row index and has no entity, so it cannot be targeted by CSS. Cells inside `<thead>` /
+`<tbody>` / `<tfoot>` also get a matching `thead` / `tbody` / `tfoot` **class**, so target
+header/body/footer rows with `.thead`, `.tbody`, `.tfoot` (e.g. `.thead { font-weight: 700; }`).
+
 ## Media Queries (Breakpoints)
 
 `@media` rules are supported and are re-evaluated automatically when the configured viewport changes.

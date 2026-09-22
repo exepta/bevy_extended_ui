@@ -10,8 +10,6 @@ pub use inline_functions::{
 };
 pub use inventory;
 
-#[cfg(feature = "extended-framework")]
-use crate::framework::sync_ui_binding_store_values;
 use crate::html::builder::HtmlBuilderSystem;
 use crate::html::converter::HtmlConverterSystem;
 use crate::html::reload::HtmlReloadPlugin;
@@ -29,7 +27,8 @@ use crate::styles::parser::apply_property_to_style;
 use crate::widgets::{
     Badge, Body, Button, CheckBox, ChoiceBox, ColorPicker, DatePicker, Div, Divider, FieldSet,
     Form, Headline, HyperLink, Img, InputField, ListBox, Paragraph, ProgressBar, RadioButton,
-    Scrollbar, Slider, SwitchButton, ToggleButton, ToolTip, ValidationRules, Widget,
+    Scrollbar, Slider, SwitchButton, Table, TableCell, ToggleButton, ToolTip, ValidationRules,
+    Widget,
 };
 
 pub static HTML_ID_COUNTER: AtomicUsize = AtomicUsize::new(1);
@@ -120,7 +119,7 @@ pub struct HtmlPendingReveal(pub HashSet<String>);
 
 /// Component storing parsed inline CSS (`style="..."`) as your custom Style struct.
 /// Component storing parsed inline CSS (`style="..."`) as a `Style`.
-#[derive(Component, Reflect, Debug, Clone)]
+#[derive(Component, Reflect, Debug, Clone, PartialEq)]
 #[reflect(Component)]
 pub struct HtmlStyle(pub Style);
 
@@ -150,8 +149,16 @@ impl HtmlStyle {
     }
 }
 
+/// Runtime metadata for simple text bindings that can be patched without rebuilding the template.
+#[derive(Component, Reflect, Debug, Clone, Default, PartialEq)]
+#[reflect(Component)]
+pub struct HtmlTextBinding {
+    pub template: String,
+    pub bindings: Vec<String>,
+}
+
 /// Metadata collected from HTML attributes.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct HtmlMeta {
     /// All referenced CSS assets for this node.
     pub css: Vec<Handle<CssAsset>>,
@@ -160,6 +167,7 @@ pub struct HtmlMeta {
     pub style: Option<HtmlStyle>,
     pub validation: Option<ValidationRules>,
     pub inner_content: HtmlInnerContent,
+    pub text_binding: Option<HtmlTextBinding>,
 }
 
 /// Captures textual and reactive inner content for an HTML element.
@@ -168,7 +176,7 @@ pub struct HtmlMeta {
 /// - `inner_text`: plain text inside the element
 /// - `inner_html`: serialized child HTML
 /// - `inner_bindings`: placeholders such as `{{user.name}}`
-#[derive(Component, Reflect, Debug, Clone, Default)]
+#[derive(Component, Reflect, Debug, Clone, Default, PartialEq)]
 #[reflect(Component)]
 pub struct HtmlInnerContent {
     inner_text: String,
@@ -222,7 +230,7 @@ impl HtmlInnerContent {
 }
 
 /// Common HTML state flags for nodes.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct HtmlStates {
     pub hidden: bool,
     pub disabled: bool,
@@ -268,6 +276,38 @@ pub enum HtmlWidgetNode {
     Form(
         /// Variant `Form`.
         Form,
+        /// Variant `HtmlMeta`.
+        HtmlMeta,
+        /// Variant `HtmlStates`.
+        HtmlStates,
+        Vec<HtmlWidgetNode>,
+        /// Variant `HtmlEventBindings`.
+        HtmlEventBindings,
+        /// Variant `Widget`.
+        Widget,
+        /// Variant `HtmlID`.
+        HtmlID,
+    ),
+    /// A `<table>` grid container with cell child nodes.
+    Table(
+        /// Variant `Table`.
+        Table,
+        /// Variant `HtmlMeta`.
+        HtmlMeta,
+        /// Variant `HtmlStates`.
+        HtmlStates,
+        Vec<HtmlWidgetNode>,
+        /// Variant `HtmlEventBindings`.
+        HtmlEventBindings,
+        /// Variant `Widget`.
+        Widget,
+        /// Variant `HtmlID`.
+        HtmlID,
+    ),
+    /// A `<th>`/`<td>` table cell with nested child nodes.
+    TableCell(
+        /// Variant `TableCell`.
+        TableCell,
         /// Variant `HtmlMeta`.
         HtmlMeta,
         /// Variant `HtmlStates`.
@@ -621,8 +661,44 @@ impl Default for HtmlStructureMap {
 }
 
 /// Unique identifier for HTML nodes.
-#[derive(Clone, Debug, PartialEq, Component)]
+#[derive(Clone, Debug, PartialEq, Eq, Component)]
 pub struct HtmlID(pub usize);
+
+impl HtmlWidgetNode {
+    /// Returns the HTML attributes independently of the concrete widget kind.
+    pub fn meta(&self) -> &HtmlMeta {
+        match self {
+            Self::Body(_, meta, ..)
+            | Self::Button(_, meta, ..)
+            | Self::CheckBox(_, meta, ..)
+            | Self::ColorPicker(_, meta, ..)
+            | Self::ChoiceBox(_, meta, ..)
+            | Self::DatePicker(_, meta, ..)
+            | Self::Divider(_, meta, ..)
+            | Self::Headline(_, meta, ..)
+            | Self::HyperLink(_, meta, ..)
+            | Self::Img(_, meta, ..)
+            | Self::Input(_, meta, ..)
+            | Self::Paragraph(_, meta, ..)
+            | Self::ToolTip(_, meta, ..)
+            | Self::Badge(_, meta, ..)
+            | Self::ProgressBar(_, meta, ..)
+            | Self::RadioButton(_, meta, ..)
+            | Self::Scrollbar(_, meta, ..)
+            | Self::Slider(_, meta, ..)
+            | Self::SwitchButton(_, meta, ..)
+            | Self::ToggleButton(_, meta, ..)
+            | Self::ListBox(_, meta, ..)
+            | Self::Div(_, meta, ..)
+            | Self::Form(_, meta, ..)
+            | Self::Table(_, meta, ..)
+            | Self::TableCell(_, meta, ..)
+            | Self::FieldSet(_, meta, ..) => meta,
+            #[cfg(feature = "extended-dialog")]
+            Self::Dialog(_, meta, ..) => meta,
+        }
+    }
+}
 
 impl Default for HtmlID {
     /// Allocates a new HTML ID from the global counter.
@@ -802,7 +878,7 @@ pub struct HtmlFunctionRegistry {
 }
 
 /// Component storing event handler names attached in HTML.
-#[derive(Component, Reflect, Default, Clone, Debug)]
+#[derive(Component, Reflect, Default, Clone, Debug, PartialEq)]
 #[reflect(Component)]
 pub struct HtmlEventBindings {
     pub onclick: Option<String>,
@@ -1037,6 +1113,7 @@ impl Plugin for ExtendedUiHtmlPlugin {
         app.register_type::<HtmlSource>();
         app.register_type::<HtmlStyle>();
         app.register_type::<HtmlInnerContent>();
+        app.register_type::<HtmlTextBinding>();
 
         app.configure_sets(
             Update,
@@ -1063,8 +1140,6 @@ impl Plugin for ExtendedUiHtmlPlugin {
 
 fn sync_shared_values_system(world: &mut World) {
     refresh_shared_values(world);
-    #[cfg(feature = "extended-framework")]
-    sync_ui_binding_store_values(world);
 }
 
 /// Registers all HTML event handlers collected via `inventory`.
