@@ -17,6 +17,65 @@ const PATCH_BRANCH_RE = /^(?:fix|hotfix|bugfix|perf|refactor|build)\//;
 const NO_RELEASE_BRANCH_RE = /^(?:docs|style|chore|test|ci)\//;
 const MINOR_BRANCH_RE = /^feat\//;
 
+function parseVersion(version) {
+  const match = String(version || "").match(/^(\d+)\.(\d+)\.(\d+)(-.+)?$/);
+
+  if (!match) {
+    return null;
+  }
+
+  return {
+    major: Number(match[1]),
+    minor: Number(match[2]),
+    patch: Number(match[3]),
+    prerelease: Boolean(match[4]),
+  };
+}
+
+function compareVersions(left, right) {
+  for (const part of ["major", "minor", "patch"]) {
+    if (left[part] !== right[part]) {
+      return left[part] - right[part];
+    }
+  }
+
+  return 0;
+}
+
+function latestStableRelease(branches) {
+  return (branches || [])
+    .flatMap((branch) => branch.tags || [])
+    .map((tag) => ({ tag, parsed: parseVersion(tag.version) }))
+    .filter(({ parsed }) => parsed && !parsed.prerelease)
+    .sort((left, right) => compareVersions(right.parsed, left.parsed))[0];
+}
+
+function startPatchBetaAfterStableRelease(context) {
+  const lastBetaRelease = parseVersion(context.lastRelease && context.lastRelease.version);
+  const stableRelease = latestStableRelease(context.branches);
+
+  if (
+    !lastBetaRelease ||
+    !lastBetaRelease.prerelease ||
+    !stableRelease ||
+    compareVersions(stableRelease.parsed, lastBetaRelease) < 0
+  ) {
+    return false;
+  }
+
+  if (!context.branch.tags.some((tag) => tag.version === stableRelease.tag.version)) {
+    context.branch.tags.push(stableRelease.tag);
+  }
+
+  context.logger.log(
+    "Stable release %s supersedes beta baseline %s; starting a patch beta cycle",
+    stableRelease.tag.version,
+    context.lastRelease.version,
+  );
+
+  return true;
+}
+
 function parseMergeSourceBranch(message) {
   const firstLine = String(message || "").split(/\r?\n/, 1)[0];
   const match = firstLine.match(/^Merge pull request #\d+ from [^/]+\/(.+)$/);
@@ -80,6 +139,10 @@ module.exports = {
     const branchName = context.branch && context.branch.name;
     const commits = context.commits || [];
     const rules = pluginConfig.releaseRules || [];
+
+    if (branchName === "beta" && startPatchBetaAfterStableRelease(context)) {
+      return "patch";
+    }
 
     const releaseType =
       branchName === "beta"
