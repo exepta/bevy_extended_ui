@@ -1,4 +1,4 @@
-> **Important Note:** *Bevy Extended UI is now discontinued. The new and better project tilt-ui is now slowly replacing it! Please note that the new project no longer supports legacy UIRegistry! The new project now only uses the Angular inspired system!*
+> **Important Note:** *Bevy Extended UI is now discontinued. The new and better project [_tilt-ui_](https://github.com/exepta/tilt-ui) is now slowly replacing it! Please note that the new project no longer supports legacy UIRegistry! The new project now only uses the Angular inspired system!*
 
 <div style="text-align: center;">
 <img src="./doc/bevy_extended_ui.svg" alt="Logo" width="128" height="128">
